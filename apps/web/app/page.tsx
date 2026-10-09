@@ -1,5 +1,6 @@
 import { CopySnippet } from "@/components/copy-snippet";
 import { HeroDemo } from "@/components/hero-demo";
+import { MegaMenu } from "@/components/mega-menu";
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
 
 const steps = [
@@ -27,6 +28,7 @@ export default function Home() {
         <a href="/" className="logo" aria-label="Apex Bot ana sayfa">
           <span className="logo__mark" aria-hidden="true" />
         </a>
+        <MegaMenu />
         <nav className="bar__nav" aria-label="Ana menü">
           <a href="/giris" className="bar__link">
             Giriş yap
