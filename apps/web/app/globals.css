@@ -29,8 +29,8 @@
   --text-h2: clamp(1.75rem, 2.6vw + 0.8rem, 2.5rem);
   --text-h1: clamp(2.75rem, 7vw + 0.5rem, 5.5rem);
 
-  --content: 1080px;
-  --gutter: clamp(20px, 5vw, 48px);
+  --content: 100%;
+  --gutter: clamp(20px, 4vw, 80px);
 
   color-scheme: light;
 }

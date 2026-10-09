@@ -1,5 +1,5 @@
 {
-  "name": "@jj/web",
+  "name": "@apex/web",
   "private": true,
   "scripts": {
     "dev": "next dev",

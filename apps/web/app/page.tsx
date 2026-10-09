@@ -3,7 +3,7 @@ import { HeroDemo } from "@/components/hero-demo";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 const steps = [
-  { title: "Sitenizi ekleyin", text: "Adresinizi girin, JJ sayfalarınızı okusun. PDF ve SSS de ekleyebilirsiniz." },
+  { title: "Sitenizi ekleyin", text: "Adresinizi girin, Apex Bot sayfalarınızı okusun. PDF ve SSS de ekleyebilirsiniz." },
   { title: "Asistanı ayarlayın", text: "Adını, tonunu ve renklerini seçin; konuşmaması gereken konuları belirleyin." },
   { title: "Kodu yapıştırın", text: "Tek satırı sitenize ekleyin. Asistan yalnızca izin verdiğiniz alan adlarında çalışır." },
 ];
@@ -14,7 +14,7 @@ const principles = [
   { title: "Türkçe ve İngilizce", text: "Ziyaretçi hangi dilde yazarsa o dilde yanıt verir." },
 ];
 
-const snippet = `<script src="https://cdn.jj.bot/widget.js" data-site-key="jj_pk_…" async></script>`;
+const snippet = `<script src="https://cdn.apex.bot/widget.js" data-site-key="apex_pk_…" async></script>`;
 
 export default function Home() {
   return (
@@ -24,8 +24,8 @@ export default function Home() {
       </a>
 
       <header className="bar">
-        <a href="/" className="logo" aria-label="JJ ana sayfa">
-          JJ
+        <a href="/" className="logo" aria-label="Apex Bot ana sayfa">
+          Apex Bot
         </a>
         <nav className="bar__nav" aria-label="Ana menü">
           <a href="#nasil" className="bar__link">
@@ -42,7 +42,7 @@ export default function Home() {
         <section className="hero">
           <h1>Sitenizi bilen asistan.</h1>
           <p className="lede">
-            JJ, ziyaretçilerinizin sorularını yalnızca sitenizdeki bilgilerle yanıtlar. Bilmediğinde uydurmaz.
+            Apex Bot, ziyaretçilerinizin sorularını yalnızca sitenizdeki bilgilerle yanıtlar. Bilmediğinde uydurmaz.
           </p>
           <div className="actions">
             <a className="btn btn--primary" href="/kayit">
@@ -92,10 +92,10 @@ export default function Home() {
       </main>
 
       <footer className="foot">
-        <span>© {new Date().getFullYear()} JJ</span>
+        <span>© {new Date().getFullYear()} Apex Bot</span>
         <nav aria-label="Alt menü">
           <a href="/gizlilik">Gizlilik ve KVKK</a>
-          <a href="mailto:merhaba@jj.bot">merhaba@jj.bot</a>
+          <a href="mailto:merhaba@apex.bot">merhaba@apex.bot</a>
         </nav>
       </footer>
     </>

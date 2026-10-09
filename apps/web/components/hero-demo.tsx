@@ -4,7 +4,7 @@ export function HeroDemo() {
     <figure className="demo">
       <div className="demo__head">
         <span className="demo__dot" aria-hidden="true" />
-        <span>JJ · kahvedukkani.com</span>
+        <span>Apex Bot · kahvedukkani.com</span>
       </div>
 
       <div className="demo__body">
@@ -19,7 +19,7 @@ export function HeroDemo() {
       </div>
 
       <figcaption className="sr-only">
-        Örnek konuşma: JJ, ziyaretçinin iade sorusunu sitedeki iade sayfasına dayanarak yanıtlıyor ve kaynağı
+        Örnek konuşma: Apex Bot, ziyaretçinin iade sorusunu sitedeki iade sayfasına dayanarak yanıtlıyor ve kaynağı
         gösteriyor.
       </figcaption>
     </figure>

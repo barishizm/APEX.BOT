@@ -1,8 +1,8 @@
-# JJ.bot
+# Apex Bot
 
-JJ, web sitelerine eklenen bir AI asistanıdır. Ziyaretçilerin sorularını site içeriğine dayanarak yanıtlayan, tek bir `<script>` satırıyla kurulabilen bir sohbet widget'ı ve bunu besleyen bir backend'den oluşur.
+Apex Bot, web sitelerine eklenen bir AI asistanıdır. Ziyaretçilerin sorularını site içeriğine dayanarak yanıtlayan, tek bir `<script>` satırıyla kurulabilen bir sohbet widget'ı ve bunu besleyen bir backend'den oluşur.
 
-JJ.bot **kapalı kaynaklı, ticari bir SaaS** ürünüdür: birçok müşteri sitesine abonelikle sunulur, tamamı bizim tarafımızda barındırılır. Yapay zekâ modelleri kendi altyapımızda değil, **bulut API'leri üzerinden** çalışır.
+Apex Bot **kapalı kaynaklı, ticari bir SaaS** ürünüdür: birçok müşteri sitesine abonelikle sunulur, tamamı bizim tarafımızda barındırılır. Yapay zekâ modelleri kendi altyapımızda değil, **bulut API'leri üzerinden** çalışır.
 
 > **Durum:** Planlama aşaması. Bu doküman hedefleri, mimariyi ve yol haritasını tanımlar; teknoloji seçimleri başlangıç önerileridir ve kesinleşmemiştir.
 
@@ -95,9 +95,9 @@ JJ.bot **kapalı kaynaklı, ticari bir SaaS** ürünüdür: birçok müşteri si
 
 ```
 ┌──────────────────────┐        ┌───────────────────────────────────────┐
-│  Müşterinin sitesi   │        │              JJ Backend               │
+│  Müşterinin sitesi   │        │             Apex Backend              │
 │                      │        │                                       │
-│  <script jj.js>      │ HTTPS  │  API Gateway  ──►  Chat Orkestratörü  │
+│  <script apex.js>    │ HTTPS  │  API Gateway  ──►  Chat Orkestratörü  │
 │  Sohbet widget'ı  ───┼───────►│  (auth, rate       │                  │
 │  (Shadow DOM)        │  SSE   │   limit, CORS)     ├─► Retriever ──► Vektör DB
 └──────────────────────┘        │                    ├─► LLM (Claude)   │
@@ -160,8 +160,8 @@ Hedef kullanım:
 
 ```html
 <script
-  src="https://cdn.jj.bot/widget.js"
-  data-site-key="jj_pk_xxxxxxxx"
+  src="https://cdn.apex.bot/widget.js"
+  data-site-key="apex_pk_xxxxxxxx"
   async
 ></script>
 ```
@@ -170,7 +170,7 @@ Hedef kullanım:
 
 ```html
 <script>
-  window.JJ = {
+  window.Apex = {
     theme: { primary: "#4f46e5", position: "bottom-right" },
     greeting: "Merhaba! Size nasıl yardımcı olabilirim?",
     lang: "auto",
@@ -179,7 +179,7 @@ Hedef kullanım:
 </script>
 ```
 
-JavaScript API (taslak): `JJ.open()`, `JJ.close()`, `JJ.send(text)`, `JJ.identify({ name, email })`, `JJ.on("message", fn)`.
+JavaScript API (taslak): `Apex.open()`, `Apex.close()`, `Apex.send(text)`, `Apex.identify({ name, email })`, `Apex.on("message", fn)`.
 
 Teknik kararlar: Shadow DOM ile stil izolasyonu, `site_key` herkese açık (yalnızca domain izin listesiyle kullanılabilir), gizli anahtarlar asla istemciye gitmez.
 
@@ -230,7 +230,7 @@ Halka açık bir chatbot saldırı yüzeyidir; bunlar baştan tasarıma dahildir
 Önerilen monorepo düzeni:
 
 ```
-JJ.bot/
+apex-bot/
 ├── apps/
 │   ├── api/            # Backend: gateway + chat orkestratörü
 │   ├── worker/         # Ingestion işleri (tarama, parçalama, embedding)
@@ -249,7 +249,7 @@ JJ.bot/
 > Kod henüz yazılmadı; aşağıdaki adımlar hedeflenen geliştirici deneyimidir.
 
 ```bash
-git clone <repo-url> JJ.bot && cd JJ.bot
+git clone <repo-url> apex-bot && cd apex-bot
 cp .env.example .env        # anahtarları doldur
 docker compose up -d        # Postgres (pgvector) + Redis
 pnpm install
@@ -304,7 +304,7 @@ Ortam değişkenleri (taslak):
 2. **Ödeme sağlayıcısı:** Türkiye'deki müşteriler için iyzico/PayTR, yurt dışı için Stripe gibi bir ayrım gerekir mi?
 3. **Veri bölgesi:** Müşteriler verinin Türkiye/AB içinde kalmasını isteyecek mi? Mesajlar üçüncü taraf model API'sine gittiği için gizlilik sözleşmesinde ve aydınlatma metninde belirtilmeli.
 4. **Müşteri başlangıcı (onboarding):** Self-servis kayıt mı, yoksa ilk müşterilerde kurulumu biz mi yapacağız?
-5. **İsim ve marka:** "JJ" kısaltması neyi temsil ediyor, asistanın bir kişiliği/karakteri olacak mı?
+5. **İsim ve marka:** Ürün adı "Apex Bot" olarak belirlendi. Asistanın bir kişiliği/karakteri olacak mı, widget içinde bu isimle mi anılacak?
 
 ---
 
