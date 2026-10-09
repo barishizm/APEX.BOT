@@ -1,12 +1,12 @@
 {
-  "name": "jj-bot",
+  "name": "apex-bot",
   "private": true,
   "workspaces": [
     "apps/*",
     "packages/*"
   ],
   "scripts": {
-    "dev:web": "npm run dev -w @jj/web",
-    "build:web": "npm run build -w @jj/web"
+    "dev:web": "npm run dev -w @apex/web",
+    "build:web": "npm run build -w @apex/web"
   }
 }

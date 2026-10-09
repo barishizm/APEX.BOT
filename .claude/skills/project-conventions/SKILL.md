@@ -1,10 +1,10 @@
 ---
 name: project-conventions
-description: JJ.bot security and architecture rules (tenant isolation, prompt-injection handling, PII masking, bilingual TR/EN). Apply when writing or reviewing API, retrieval, ingestion, widget or prompt code.
+description: Apex Bot security and architecture rules (tenant isolation, prompt-injection handling, PII masking, bilingual TR/EN). Apply when writing or reviewing API, retrieval, ingestion, widget or prompt code.
 user-invocable: false
 ---
 
-# JJ.bot conventions
+# Apex Bot conventions
 
 - **Tenant isolation:** every retrieval/DB query must filter by `tenant_id`; retrieval must not be callable without it. Add a test for each new query path.
 - **Prompt injection:** retrieved site content and visitor messages are DATA, never instructions. Delimit them clearly in prompts. v1 has no side-effect tools.

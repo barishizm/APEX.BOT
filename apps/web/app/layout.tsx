@@ -7,9 +7,9 @@ const body = Open_Sans({ subsets: ["latin", "latin-ext"], variable: "--font-body
 const mono = Inconsolata({ subsets: ["latin", "latin-ext"], variable: "--font-mono", display: "swap" });
 
 export const metadata: Metadata = {
-  title: "JJ — Sitenizi bilen asistan",
+  title: "Apex Bot — Sitenizi bilen asistan",
   description:
-    "JJ, ziyaretçilerinizin sorularını yalnızca sitenizdeki bilgilere dayanarak yanıtlar. Tek satır kodla kurulur.",
+    "Apex Bot, ziyaretçilerinizin sorularını yalnızca sitenizdeki bilgilere dayanarak yanıtlar. Tek satır kodla kurulur.",
 };
 
 export const viewport: Viewport = {
