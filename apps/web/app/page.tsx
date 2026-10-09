@@ -1,6 +1,6 @@
 import { CopySnippet } from "@/components/copy-snippet";
 import { HeroDemo } from "@/components/hero-demo";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
 
 const steps = [
   { title: "Sitenizi ekleyin", text: "Adresinizi girin, Apex Bot sayfalarınızı okusun. PDF ve SSS de ekleyebilirsiniz." },
@@ -34,7 +34,7 @@ export default function Home() {
           <a href="/giris" className="bar__link">
             Giriş yap
           </a>
-          <ThemeToggle />
+          <AnimatedThemeToggler />
         </nav>
       </header>
 
