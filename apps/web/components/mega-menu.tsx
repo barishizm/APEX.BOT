@@ -4,18 +4,36 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   Building2,
+  Code,
   CircleUser,
   Globe,
   GraduationCap,
   Heart,
+  LayoutTemplate,
+  LifeBuoy,
   Megaphone,
   HandCoins,
   ShoppingBag,
   ShoppingCart,
+  SquareTerminal,
 } from "lucide-react";
 
-type PanelItem = { title: string; href: string; text?: string; icon?: LucideIcon };
-type Panel = { cols: { heading: string; items: PanelItem[] }[]; cta: { label: string; href: string } };
+type IconType = LucideIcon | ((props: { size?: number }) => React.JSX.Element);
+type PanelItem = { title: string; href: string; text?: string; icon?: IconType };
+type Panel = { cols: { heading?: string; items: PanelItem[] }[]; cta: { label: string; href: string } };
+
+// Placeholder brand marks (colored tile + initial); swap for official logos when available.
+const brand = (bg: string, letter: string) =>
+  function BrandIcon({ size = 22 }: { size?: number }) {
+    return (
+      <svg className="mega__icon" width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+        <rect width="24" height="24" rx="6" fill={bg} />
+        <text x="12" y="17" textAnchor="middle" fontSize="14" fontWeight="700" fill="#fff" fontFamily="system-ui, sans-serif">
+          {letter}
+        </text>
+      </svg>
+    );
+  };
 
 const productPanel: Panel = {
   cols: [
@@ -65,11 +83,59 @@ const solutionsPanel: Panel = {
   cta: { label: "All solutions", href: "/solutions" },
 };
 
+const resourcesPanel: Panel = {
+  cols: [
+    {
+      heading: "Get started",
+      items: [
+        { title: "Help Center", href: "/resources/help", icon: LifeBuoy },
+        { title: "Setup Guide", href: "/resources/setup", icon: LifeBuoy },
+        { title: "Templates", href: "/resources/templates", icon: LayoutTemplate },
+        { title: "API & Developers", href: "/resources/api", icon: SquareTerminal },
+        { title: "MCP", href: "/resources/mcp", icon: Code },
+      ],
+    },
+    {
+      heading: "Learn",
+      items: [
+        { title: "Case Studies", text: "See how customers use Apex Bot", href: "/resources/case-studies" },
+        { title: "Apex Academy", text: "Learn to build your chatbot", href: "/resources/academy" },
+        { title: "Chatbot Best Practices", text: "Plan, build, and improve", href: "/resources/best-practices" },
+        { title: "Blog", text: "Guides to AI and customer service", href: "/resources/blog" },
+      ],
+    },
+  ],
+  cta: { label: "System Status", href: "/status" },
+};
+
+const integrationsPanel: Panel = {
+  cols: [
+    {
+      heading: "Top integrations",
+      items: [
+        { title: "Facebook Messenger", href: "/integrations/messenger", icon: brand("#0084ff", "M") },
+        { title: "Twilio SMS", href: "/integrations/twilio", icon: brand("#e0404f", "T") },
+        { title: "Klaviyo", href: "/integrations/klaviyo", icon: brand("#1c1c21", "K") },
+        { title: "WhatsApp", href: "/integrations/whatsapp", icon: brand("#25d366", "W") },
+      ],
+    },
+    {
+      items: [
+        { title: "WordPress", href: "/integrations/wordpress", icon: brand("#3858e9", "W") },
+        { title: "Shopify", href: "/integrations/shopify", icon: brand("#95bf47", "S") },
+        { title: "WooCommerce", href: "/integrations/woocommerce", icon: brand("#7f54b3", "W") },
+        { title: "Slack", href: "/integrations/slack", icon: brand("#611f69", "S") },
+      ],
+    },
+  ],
+  cta: { label: "All integrations", href: "/integrations" },
+};
+
 const menu: { label: string; href: string; panel?: Panel }[] = [
   { label: "Product", href: "/product", panel: productPanel },
   { label: "Solutions", href: "/solutions", panel: solutionsPanel },
-  { label: "Integrations", href: "/integrations" },
-  { label: "Resources", href: "/resources" },
+  { label: "Integrations", href: "/integrations", panel: integrationsPanel },
+  { label: "Resources", href: "/resources", panel: resourcesPanel },
   { label: "Pricing", href: "/pricing" },
 ];
 
@@ -171,9 +237,9 @@ export function MegaMenu() {
                 data-active={idx === i ? "" : undefined}
               >
                 <div className="mega__cols">
-                  {m.panel.cols.map((col) => (
-                    <div key={col.heading} className="mega__col">
-                      <p className="mega__heading">{col.heading}</p>
+                  {m.panel.cols.map((col, ci) => (
+                    <div key={ci} className="mega__col">
+                      {col.heading && <p className="mega__heading">{col.heading}</p>}
                       {col.items.map((it) => (
                         <a key={it.title} href={it.href} className={it.icon ? "mega__item mega__item--icon" : "mega__item"}>
                           {it.icon && <it.icon className="mega__icon" size={22} strokeWidth={1.75} aria-hidden="true" />}
