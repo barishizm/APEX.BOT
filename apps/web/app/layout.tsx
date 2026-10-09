@@ -7,6 +7,7 @@ const body = Open_Sans({ subsets: ["latin", "latin-ext"], variable: "--font-body
 const mono = Inconsolata({ subsets: ["latin", "latin-ext"], variable: "--font-mono", display: "swap" });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
   title: "Apex Bot — Sitenizi bilen asistan",
   description:
     "Apex Bot, ziyaretçilerinizin sorularını yalnızca sitenizdeki bilgilere dayanarak yanıtlar. Tek satır kodla kurulur.",
