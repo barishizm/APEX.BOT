@@ -28,9 +28,6 @@ export default function Home() {
           <span className="logo__mark" aria-hidden="true" />
         </a>
         <nav className="bar__nav" aria-label="Ana menü">
-          <a href="#nasil" className="bar__link">
-            Nasıl çalışır
-          </a>
           <a href="/giris" className="bar__link">
             Giriş yap
           </a>
@@ -47,9 +44,6 @@ export default function Home() {
           <div className="actions">
             <a className="btn btn--primary" href="/kayit">
               Ücretsiz başla
-            </a>
-            <a className="btn btn--ghost" href="#nasil">
-              Nasıl çalışır
             </a>
           </div>
           <HeroDemo />
