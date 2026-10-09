@@ -150,11 +150,18 @@ ul {
 }
 
 .logo {
-  font-family: var(--font-display), system-ui, sans-serif;
-  font-weight: 800;
-  font-size: var(--text-lg);
-  letter-spacing: -0.04em;
+  display: inline-flex;
   text-decoration: none;
+}
+
+/* The wordmark is an alpha mask, so it takes the current text color in both themes. */
+.logo__mark {
+  display: block;
+  height: 16px;
+  aspect-ratio: 7.7 / 1;
+  background: var(--color-text);
+  -webkit-mask: url("/brand/apex-wordmark.png") center / contain no-repeat;
+  mask: url("/brand/apex-wordmark.png") center / contain no-repeat;
 }
 
 .bar__nav {

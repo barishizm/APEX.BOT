@@ -25,7 +25,7 @@ export default function Home() {
 
       <header className="bar">
         <a href="/" className="logo" aria-label="Apex Bot ana sayfa">
-          Apex Bot
+          <span className="logo__mark" aria-hidden="true" />
         </a>
         <nav className="bar__nav" aria-label="Ana menü">
           <a href="#nasil" className="bar__link">
