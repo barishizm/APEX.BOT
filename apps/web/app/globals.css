@@ -1,3 +1,7 @@
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* ---------- Tokens (Minimal design system) ---------- */
 
 :root {
@@ -493,4 +497,18 @@ ul {
   .bar__nav {
     gap: var(--space-4);
   }
+}
+
+/* ---------- Theme toggle view transition ---------- */
+/* Disable the default cross-fade so only the circular clip-path reveal runs. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+::view-transition-old(root) {
+  z-index: 1;
+}
+::view-transition-new(root) {
+  z-index: 2;
 }

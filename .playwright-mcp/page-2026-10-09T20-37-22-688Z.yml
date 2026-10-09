@@ -1,0 +1,69 @@
+- generic [active] [ref=e1]:
+  - link "İçeriğe geç" [ref=e2] [cursor=pointer]:
+    - /url: "#main"
+  - banner [ref=e3]:
+    - link "Apex Bot ana sayfa" [ref=e4] [cursor=pointer]:
+      - /url: /
+    - navigation "Ana menü" [ref=e6]:
+      - link "Nasıl çalışır" [ref=e7] [cursor=pointer]:
+        - /url: "#nasil"
+      - link "Giriş yap" [ref=e8] [cursor=pointer]:
+        - /url: /giris
+      - button "Switch theme" [ref=e9] [cursor=pointer]
+  - main [ref=e13]:
+    - generic [ref=e14]:
+      - heading "Sitenizi bilen asistan." [level=1] [ref=e15]
+      - paragraph [ref=e16]: Apex Bot, ziyaretçilerinizin sorularını yalnızca sitenizdeki bilgilerle yanıtlar. Bilmediğinde uydurmaz.
+      - generic [ref=e17]:
+        - link "Ücretsiz başla" [ref=e18] [cursor=pointer]:
+          - /url: /kayit
+        - link "Nasıl çalışır" [ref=e19] [cursor=pointer]:
+          - /url: "#nasil"
+      - 'figure "Örnek konuşma: Apex Bot, ziyaretçinin iade sorusunu sitedeki iade sayfasına dayanarak yanıtlıyor ve kaynağı gösteriyor." [ref=e20]':
+        - generic [ref=e21]: Apex Bot · kahvedukkani.com
+        - generic [ref=e24]:
+          - paragraph [ref=e25]: Kahveyi beğenmezsem iade edebilir miyim?
+          - generic [ref=e26]:
+            - paragraph [ref=e27]: Evet. Paket açılmamışsa teslimattan sonraki 14 gün içinde ücretsiz iade edebilirsiniz. Öğütülmüş kahvelerde iade yapılmıyor.
+            - generic [ref=e28]: kahvedukkani.com/iade
+    - region [ref=e30]:
+      - heading "Beş dakikada kurulur." [level=2] [ref=e31]
+      - list [ref=e32]:
+        - listitem [ref=e33]:
+          - generic [aria-hidden] [ref=e34]: "01"
+          - heading "Sitenizi ekleyin" [level=3] [ref=e35]
+          - paragraph [ref=e36]: Adresinizi girin, Apex Bot sayfalarınızı okusun. PDF ve SSS de ekleyebilirsiniz.
+        - listitem [ref=e37]:
+          - generic [aria-hidden] [ref=e38]: "02"
+          - heading "Asistanı ayarlayın" [level=3] [ref=e39]
+          - paragraph [ref=e40]: Adını, tonunu ve renklerini seçin; konuşmaması gereken konuları belirleyin.
+        - listitem [ref=e41]:
+          - generic [aria-hidden] [ref=e42]: "03"
+          - heading "Kodu yapıştırın" [level=3] [ref=e43]
+          - paragraph [ref=e44]: Tek satırı sitenize ekleyin. Asistan yalnızca izin verdiğiniz alan adlarında çalışır.
+      - generic [ref=e45]:
+        - code [ref=e46]: <script src="https://cdn.apex.bot/widget.js" data-site-key="apex_pk_…" async></script>
+        - button "Kopyala" [ref=e47] [cursor=pointer]
+    - region [ref=e48]:
+      - heading "Ziyaretçiniz yanıta güvenebilir." [level=2] [ref=e49]
+      - list [ref=e50]:
+        - listitem [ref=e51]:
+          - heading "Uydurmaz" [level=3] [ref=e52]
+          - paragraph [ref=e53]: Sitenizde yanıt yoksa bunu söyler ve soruyu e-postayla size iletir.
+        - listitem [ref=e54]:
+          - heading "Kaynağını gösterir" [level=3] [ref=e55]
+          - paragraph [ref=e56]: Her yanıtın altında bilginin geldiği sayfa yer alır.
+        - listitem [ref=e57]:
+          - heading "Türkçe ve İngilizce" [level=3] [ref=e58]
+          - paragraph [ref=e59]: Ziyaretçi hangi dilde yazarsa o dilde yanıt verir.
+    - generic [ref=e60]:
+      - heading "İlk asistanınızı bugün kurun." [level=2] [ref=e61]
+      - link "Ücretsiz başla" [ref=e62] [cursor=pointer]:
+        - /url: /kayit
+  - contentinfo [ref=e63]:
+    - generic [ref=e64]: © 2026 Apex Bot
+    - navigation "Alt menü" [ref=e65]:
+      - link "Gizlilik ve KVKK" [ref=e66] [cursor=pointer]:
+        - /url: /gizlilik
+      - link "merhaba@apex.bot" [ref=e67] [cursor=pointer]:
+        - /url: mailto:merhaba@apex.bot
