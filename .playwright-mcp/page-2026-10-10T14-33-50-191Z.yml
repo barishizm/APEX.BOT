@@ -1,0 +1,61 @@
+- generic [active] [ref=e1]:
+  - link "Skip to content" [ref=e2] [cursor=pointer]:
+    - /url: "#main"
+  - banner [ref=e3]:
+    - link "Apex Bot home" [ref=e4] [cursor=pointer]:
+      - /url: /
+    - navigation "Site menu" [ref=e6]:
+      - link "Product" [ref=e7] [cursor=pointer]:
+        - /url: /product
+      - link "Solutions" [ref=e10] [cursor=pointer]:
+        - /url: /solutions
+      - link "Integrations" [ref=e13] [cursor=pointer]:
+        - /url: /integrations
+      - link "Resources" [ref=e16] [cursor=pointer]:
+        - /url: /resources
+      - link "Pricing" [ref=e19] [cursor=pointer]:
+        - /url: /pricing
+      - generic [ref=e20]:
+        - generic [ref=e21]:
+          - generic [ref=e22]:
+            - paragraph [ref=e23]: Build your Apex
+            - link "AI Customer Service Agent Answer questions and help customers buy" [ref=e24] [cursor=pointer]:
+              - /url: /product/agent
+              - generic [ref=e25]: AI Customer Service Agent
+              - generic [ref=e26]: Answer questions and help customers buy
+            - link "AI Chatbot Builder Build your chatbot without coding" [ref=e27] [cursor=pointer]:
+              - /url: /product/builder
+              - generic [ref=e28]: AI Chatbot Builder
+              - generic [ref=e29]: Build your chatbot without coding
+            - link "Chat Widget Add your chatbot to your website" [ref=e30] [cursor=pointer]:
+              - /url: /product/widget
+              - generic [ref=e31]: Chat Widget
+              - generic [ref=e32]: Add your chatbot to your website
+          - generic [ref=e33]:
+            - paragraph [ref=e34]: Explore the product
+            - link "All Features Explore what your chatbot can do" [ref=e35] [cursor=pointer]:
+              - /url: /product/features
+              - generic [ref=e36]: All Features
+              - generic [ref=e37]: Explore what your chatbot can do
+            - link "Analytics Measure resolutions and sales" [ref=e38] [cursor=pointer]:
+              - /url: /product/analytics
+              - generic [ref=e39]: Analytics
+              - generic [ref=e40]: Measure resolutions and sales
+            - link "Product Demo Watch the five-minute walkthrough" [ref=e41] [cursor=pointer]:
+              - /url: /product/demo
+              - generic [ref=e42]: Product Demo
+              - generic [ref=e43]: Watch the five-minute walkthrough
+        - link "Start a free 14-day trial" [ref=e44] [cursor=pointer]:
+          - /url: /kayit
+          - text: Start a free 14-day trial →
+    - navigation "Main menu" [ref=e45]:
+      - link "Log in" [ref=e46] [cursor=pointer]:
+        - /url: /giris
+      - button "Switch theme" [ref=e47] [cursor=pointer]
+  - main [ref=e51]:
+    - generic [ref=e53]:
+      - generic [ref=e54]: "New: We are Close Beta!"
+      - heading "Support that never sleeps." [level=1] [ref=e56]
+      - paragraph [ref=e57]: Give every visitor instant answers without hiring more staff. Set up in minutes, customize to your brand, and start supporting customers today.
+      - button "Start building now" [ref=e60] [cursor=pointer]
+  - button "Open Next.js Dev Tools" [ref=e68] [cursor=pointer]

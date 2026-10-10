@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { X, Check, ArrowRight, BarChart3, Globe2 } from "lucide-react"
+import { X, Check, ArrowRight, Clock, Languages, BarChart3 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { GodRays, MeshGradient } from "@paper-design/shaders-react"
 
@@ -9,6 +9,8 @@ export default function Hero() {
   const [isExpanded, setIsExpanded] = useState(false)
   const [meshReady, setMeshReady] = useState(false)
   const [formStep, setFormStep] = useState<"idle" | "submitting" | "success">("idle")
+  const [accountType, setAccountType] = useState<"business" | "personal">("business")
+  const isBusiness = accountType === "business"
 
   const handleExpand = () => setIsExpanded(true)
 
@@ -204,53 +206,64 @@ export default function Hero() {
                 className="relative z-10 flex flex-col lg:flex-row h-full w-full max-w-7xl mx-auto overflow-y-auto lg:overflow-hidden"
               >
                 {/* Left Side: Testimonials & Info */}
-                <div className="flex-1 flex flex-col justify-center p-8 sm:p-12 lg:p-16 gap-8 text-zinc-900 dark:text-white">
+                <div className="flex-1 flex flex-col justify-center p-8 sm:p-12 lg:py-16 lg:pl-16 lg:pr-6 gap-8 text-zinc-900 dark:text-white">
                   <div className="space-y-4">
                     <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold leading-tight tracking-tight">
-                      Ready to scale?
+                      Ready to build?
                     </h2>
                     <p className="text-zinc-600 dark:text-zinc-200 text-lg max-w-md">
-                      Join 4,000+ forward-thinking companies building the future with Nexus.
+                      Join today and start supporting your customers with Apex
                     </p>
                   </div>
 
                   <div className="space-y-6">
                     <div className="flex gap-4 items-start">
                       <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-black/5 dark:bg-white/10 backdrop-blur-sm flex items-center justify-center border border-black/10 dark:border-white/10">
-                        <BarChart3 className="w-6 h-6 text-zinc-600 dark:text-zinc-300" />
+                        <Clock className="w-6 h-6 text-zinc-600 dark:text-zinc-300" />
                       </div>
                       <div>
-                        <h3 className="font-semibold text-lg">Analytics First</h3>
+                        <h3 className="font-semibold text-lg">Always On, 24/7</h3>
                         <p className="text-zinc-600 dark:text-zinc-200/80 text-sm leading-relaxed mt-1">
-                          Real-time insights embedded directly into your deployment workflow.
+                          Answer customer questions instantly, any time of day, without growing your team.
                         </p>
                       </div>
                     </div>
                     <div className="flex gap-4 items-start">
                       <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-black/5 dark:bg-white/10 backdrop-blur-sm flex items-center justify-center border border-black/10 dark:border-white/10">
-                        <Globe2 className="w-6 h-6 text-zinc-600 dark:text-zinc-300" />
+                        <Languages className="w-6 h-6 text-zinc-600 dark:text-zinc-300" />
                       </div>
                       <div>
-                        <h3 className="font-semibold text-lg">Global Edge</h3>
+                        <h3 className="font-semibold text-lg">Speaks Your Customers' Language</h3>
                         <p className="text-zinc-600 dark:text-zinc-200/80 text-sm leading-relaxed mt-1">
-                          Deploy to 35+ regions instantly with our automated edge network.
+                          Reply in English, German and more, grounded in your own docs and knowledge base.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex gap-4 items-start">
+                      <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-black/5 dark:bg-white/10 backdrop-blur-sm flex items-center justify-center border border-black/10 dark:border-white/10">
+                        <BarChart3 className="w-6 h-6 text-zinc-600 dark:text-zinc-300" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-lg">Insights That Improve Support</h3>
+                        <p className="text-zinc-600 dark:text-zinc-200/80 text-sm leading-relaxed mt-1">
+                          Track resolution rates, top questions and knowledge gaps to keep getting better.
                         </p>
                       </div>
                     </div>
                   </div>
 
                   <div className="mt-auto pt-8 border-t border-black/10 dark:border-white/20">
-                    <figure>
-                      <blockquote className="text-xl font-medium leading-relaxed mb-6">
-                        "Nexus transformed how we ship software. We went from weekly releases to daily deployments with zero downtime."
+                    <figure className="m-0">
+                      <blockquote className="mx-0 mt-0 max-w-md text-base font-medium leading-relaxed mb-6">
+                        "We built Apex so every customer gets an instant, accurate answer at any hour, and support teams can finally focus on the hard cases."
                       </blockquote>
                       <figcaption className="flex items-center gap-4">
                         <div className="h-12 w-12 rounded-full bg-gradient-to-tr from-orange-400 to-pink-500 flex items-center justify-center text-lg font-bold text-white">
-                          ER
+                          MA
                         </div>
                         <div>
-                          <div className="font-semibold">Elena Rodriguez</div>
-                          <div className="text-sm text-zinc-600 dark:text-zinc-300">VP of Engineering, Chrono</div>
+                          <div className="font-semibold">M. Barış Akıntı</div>
+                          <div className="text-sm text-zinc-600 dark:text-zinc-300">CEO of APEX BOT</div>
                         </div>
                       </figcaption>
                     </figure>
@@ -271,21 +284,53 @@ export default function Hero() {
                           <Check className="w-10 h-10 text-white" />
                         </div>
                         <div>
-                          <h3 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">Request Received!</h3>
-                          <p className="text-zinc-600 dark:text-zinc-200">Our team will be in touch shortly to schedule your personalized demo.</p>
+                          <h3 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">Account created!</h3>
+                          <p className="text-zinc-600 dark:text-zinc-200">Welcome to Apex. Your account is ready, so you can start building your support bot.</p>
                         </div>
                         <button
                           onClick={handleClose}
                           className="px-6 py-2 bg-black/10 hover:bg-black/15 text-zinc-900 dark:bg-white/20 dark:hover:bg-white/30 dark:text-white rounded-lg transition-colors text-sm font-medium"
                         >
-                          Return to Homepage
+                          Continue
                         </button>
                       </motion.div>
                     ) : (
                       <form onSubmit={handleSubmit} className="space-y-5">
                         <div className="space-y-1">
-                          <h3 className="text-xl font-semibold text-zinc-900 dark:text-white">Get a Demo</h3>
-                          <p className="text-sm text-zinc-600 dark:text-zinc-300">Fill out the form below and we'll contact you.</p>
+                          <h3 className="text-xl font-semibold text-zinc-900 dark:text-white">Create your account</h3>
+                          <p className="text-sm text-zinc-600 dark:text-zinc-300">
+                            {isBusiness
+                              ? "Set up Apex for your team and start supporting customers."
+                              : "Set up Apex for your own site in minutes."}
+                          </p>
+                        </div>
+
+                        <div
+                          role="tablist"
+                          aria-label="Account type"
+                          className="relative grid grid-cols-2 rounded-lg bg-black/5 dark:bg-white/10 p-1"
+                        >
+                          {(["personal", "business"] as const).map((type) => (
+                            <button
+                              key={type}
+                              type="button"
+                              role="tab"
+                              aria-selected={accountType === type}
+                              onClick={() => setAccountType(type)}
+                              className="relative z-10 cursor-pointer rounded-md border-0 bg-transparent py-2 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
+                            >
+                              {accountType === type && (
+                                <motion.span
+                                  layoutId="account-type-pill"
+                                  transition={{ type: "spring", bounce: 0.15, duration: 0.35 }}
+                                  className="absolute inset-0 -z-10 rounded-md bg-white dark:bg-zinc-900 shadow-sm"
+                                />
+                              )}
+                              <span className={accountType === type ? "text-zinc-900 dark:text-white" : "text-zinc-500 dark:text-zinc-400"}>
+                                {type === "business" ? "Business" : "Personal"}
+                              </span>
+                            </button>
+                          ))}
                         </div>
 
                         <div className="space-y-4">
@@ -304,17 +349,35 @@ export default function Hero() {
 
                           <div>
                             <label htmlFor="email" className="block text-xs font-medium text-zinc-600 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">
-                              Work Email
+                              {isBusiness ? "Work Email" : "Personal Email"}
                             </label>
                             <input
                               required
                               type="email"
                               id="email"
-                              placeholder="jane@company.com"
+                              name="email"
+                              autoComplete="email"
+                              placeholder={isBusiness ? "jane@company.com" : "jane@example.com"}
                               className="w-full px-4 py-3 rounded-lg bg-white dark:bg-zinc-950/40 border border-zinc-300 dark:border-zinc-400/20 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:border-transparent transition-all text-sm"
                             />
                           </div>
 
+                          {!isBusiness && (
+                            <div>
+                              <label htmlFor="website" className="block text-xs font-medium text-zinc-600 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">
+                                Website <span className="normal-case tracking-normal text-zinc-400">(optional)</span>
+                              </label>
+                              <input
+                                type="url"
+                                id="website"
+                                name="website"
+                                placeholder="https://yoursite.com"
+                                className="w-full px-4 py-3 rounded-lg bg-white dark:bg-zinc-950/40 border border-zinc-300 dark:border-zinc-400/20 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:border-transparent transition-all text-sm"
+                              />
+                            </div>
+                          )}
+
+                          {isBusiness && (
                           <div className="grid grid-cols-2 gap-4">
                             <div>
                               <label htmlFor="company" className="block text-xs font-medium text-zinc-600 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">
@@ -342,16 +405,21 @@ export default function Hero() {
                               </select>
                             </div>
                           </div>
+                          )}
 
                           <div>
-                            <label htmlFor="message" className="block text-xs font-medium text-zinc-600 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">
-                              Needs
+                            <label htmlFor="password" className="block text-xs font-medium text-zinc-600 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">
+                              Password
                             </label>
-                            <textarea
-                              id="message"
-                              rows={3}
-                              placeholder="Tell us about your project..."
-                              className="w-full px-4 py-3 rounded-lg bg-white dark:bg-zinc-950/40 border border-zinc-300 dark:border-zinc-400/20 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:border-transparent transition-all resize-none text-sm"
+                            <input
+                              required
+                              type="password"
+                              id="password"
+                              name="password"
+                              minLength={8}
+                              autoComplete="new-password"
+                              placeholder="At least 8 characters"
+                              className="w-full px-4 py-3 rounded-lg bg-white dark:bg-zinc-950/40 border border-zinc-300 dark:border-zinc-400/20 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:border-transparent transition-all text-sm"
                             />
                           </div>
                         </div>
@@ -364,13 +432,13 @@ export default function Hero() {
                           {formStep === "submitting" ? (
                              <span className="flex items-center gap-2">
                                <span className="h-4 w-4 border-2 border-white/70 dark:border-zinc-600 border-t-transparent rounded-full animate-spin"></span>
-                               Sending...
+                               Creating account...
                              </span>
-                          ) : "Submit Request"}
+                          ) : "Create account"}
                         </button>
 
                         <p className="text-xs text-center text-zinc-500 dark:text-zinc-300/60 mt-4">
-                          By submitting, you agree to our Terms of Service and Privacy Policy.
+                          By creating an account, you agree to our Terms of Service and Privacy Policy.
                         </p>
                       </form>
                     )}
