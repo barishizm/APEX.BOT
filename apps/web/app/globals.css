@@ -121,6 +121,14 @@ ul {
   border-radius: var(--radius-sm);
 }
 
+/* The global :focus-visible rule is unlayered, so it beats Tailwind's focus:outline-none
+   and rounded-* utilities. Fields in the auth modal opt out of both. */
+.auth-modal input:not([type="checkbox"]):focus-visible,
+.auth-modal select:focus-visible {
+  outline: none;
+  border-radius: revert-layer;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
