@@ -7,12 +7,14 @@ import { GodRays, MeshGradient } from "@paper-design/shaders-react"
 
 export default function Hero() {
   const [isExpanded, setIsExpanded] = useState(false)
+  const [meshReady, setMeshReady] = useState(false)
   const [formStep, setFormStep] = useState<"idle" | "submitting" | "success">("idle")
 
   const handleExpand = () => setIsExpanded(true)
 
   const handleClose = () => {
     setIsExpanded(false)
+    setMeshReady(false)
     // Reset form after a brief delay so the user doesn't see it reset while closing
     setTimeout(() => setFormStep("idle"), 500)
   }
@@ -108,7 +110,6 @@ export default function Hero() {
                 {/* The expanding background element */}
                 <motion.div
                   style={{ borderRadius: "100px" }}
-                  layout
                   layoutId="cta-card"
                   className="absolute inset-0 bg-zinc-900 dark:bg-zinc-100"
                 />
@@ -139,18 +140,18 @@ export default function Hero() {
             <motion.div
               layoutId="cta-card"
               transition={{ type: "spring", bounce: 0, duration: 0.4 }}
-              style={{ borderRadius: "24px" }}
-              layout
+              style={{ borderRadius: "24px", willChange: "transform" }}
+              onLayoutAnimationComplete={() => setMeshReady(true)}
               className="relative flex h-full w-full overflow-hidden bg-zinc-100 dark:bg-zinc-800 sm:rounded-[24px] shadow-2xl"
             >
               {/* Mesh Gradient Background inside Modal */}
               <motion.div
                 initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.3 }}
+                animate={{ opacity: meshReady ? 1 : 0 }}
+                transition={{ duration: 0.4 }}
                 className="absolute inset-0 pointer-events-none"
               >
+                {meshReady && (<>
                 <MeshGradient
                   speed={0.6}
                   colors={["#f4f4f5", "#e4e4e7", "#fafafa", "#d4d4d8"]}
@@ -169,6 +170,7 @@ export default function Hero() {
                   grainOverlay={0}
                   className="hidden dark:block" style={{ height: "100%", width: "100%" }}
                 />
+                </>)}
               </motion.div>
 
               {/* Close Button */}
@@ -185,7 +187,7 @@ export default function Hero() {
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ delay: 0.2, duration: 0.4 }}
+                transition={{ delay: 0.25, duration: 0.3 }}
                 className="relative z-10 flex flex-col lg:flex-row h-full w-full max-w-7xl mx-auto overflow-y-auto lg:overflow-hidden"
               >
                 {/* Left Side: Testimonials & Info */}
