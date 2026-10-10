@@ -93,6 +93,18 @@ export default function Hero() {
   const [meshReady, setMeshReady] = useState(false)
   const [formStep, setFormStep] = useState<"idle" | "submitting" | "success">("idle")
   const [accountType, setAccountType] = useState<"business" | "personal">("business")
+  // Card height follows its content, animated, so switching forms grows/shrinks smoothly
+  const [contentEl, setContentEl] = useState<HTMLDivElement | null>(null)
+  const [cardHeight, setCardHeight] = useState<number | "auto">("auto")
+  useEffect(() => {
+    if (!contentEl) return
+    const ro = new ResizeObserver(() => setCardHeight(contentEl.offsetHeight))
+    ro.observe(contentEl)
+    return () => ro.disconnect()
+  }, [contentEl])
+  useEffect(() => {
+    if (!isExpanded) setCardHeight("auto")
+  }, [isExpanded])
   const [authMode, setAuthMode] = useState<"register" | "login">("register")
   const isBusiness = accountType === "business"
 
@@ -323,11 +335,21 @@ export default function Hero() {
                 className="auth-modal relative z-10 flex flex-col lg:flex-row h-full w-full max-w-7xl mx-auto overflow-y-auto lg:overflow-hidden"
               >
                 {/* Left Side: Testimonials & Info */}
-                <AnimatePresence initial={false} mode="popLayout">
-                {authMode === "register" && (
-                <motion.div key="left" initial={{ opacity: 0, x: -24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} transition={{ duration: 0.3 }} className={`flex flex-1 flex-col justify-center p-8 sm:p-12 lg:py-16 lg:pl-16 lg:pr-6 gap-8 text-zinc-900 dark:text-white`}>
+                {/* Collapses via flex-grow (CSS-driven) so the form column glides to center instead of jumping */}
+                <motion.div
+                  initial={false}
+                  animate={{ flexGrow: authMode === "register" ? 1 : 0, opacity: authMode === "register" ? 1 : 0 }}
+                  transition={{ type: "spring", bounce: 0, duration: 0.5 }}
+                  aria-hidden={authMode !== "register"}
+                  className={`flex min-w-0 flex-col overflow-hidden max-lg:!grow-0 lg:basis-0 ${authMode === "login" ? "max-lg:hidden pointer-events-none" : ""}`}
+                >
+                <div className={`flex flex-1 shrink-0 flex-col justify-center p-8 pb-0 sm:p-12 sm:pb-0 lg:pb-16 lg:w-[40rem] lg:py-16 lg:pl-16 lg:pr-6 gap-8 text-zinc-900 dark:text-white`}>
+                  {authMode === "register" && (
+                    <span className="logo__mark block max-lg:mx-auto max-lg:[@media(max-height:700px)]:hidden" style={{ height: 28, width: 216 }} aria-label="Apex Bot" role="img" />
+                  )}
+                  <div className="flex flex-1 flex-col justify-center gap-8 max-lg:hidden">
                   <div className="space-y-4">
-                    <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold leading-tight tracking-tight">
+                    <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold leading-tight tracking-tight">
                       Ready to build?
                     </h2>
                     <p className="text-zinc-600 dark:text-zinc-200 text-lg max-w-md">
@@ -370,8 +392,9 @@ export default function Hero() {
                       </div>
                     </div>
                   </div>
+                  </div>
 
-                  <div className="mt-auto pt-8 border-t border-black/10 dark:border-white/20">
+                  <div className="pt-8 border-t border-black/10 dark:border-white/20 max-lg:hidden">
                     <figure className="m-0">
                       <blockquote className="mx-0 mt-0 max-w-md text-base font-medium leading-relaxed mb-6">
                         "We built Apex so every customer gets an instant, accurate answer at any hour, and support teams can finally focus on the hard cases."
@@ -387,41 +410,31 @@ export default function Hero() {
                       </figcaption>
                     </figure>
                   </div>
+                </div>
                 </motion.div>
-                )}
-                </AnimatePresence>
 
                 {/* Right Side: Form */}
-                <motion.div layout={meshReady} transition={{ type: "spring", bounce: 0, duration: 0.5 }} className="relative isolate flex-1 flex flex-col gap-8 items-center overflow-y-auto p-4 sm:p-12 lg:py-10 lg:px-16">
-                  {/* Dimming layer: fades in/out behind the form instead of sliding with the column */}
-                  <motion.div
-                    aria-hidden="true"
-                    initial={false}
-                    animate={{ opacity: authMode === "register" ? 1 : 0 }}
-                    transition={{ duration: 0.4 }}
-                    className="pointer-events-none absolute inset-0 -z-10 bg-black/5 dark:bg-black/10 backdrop-blur-sm"
-                  />
-                  <AnimatePresence initial={false} mode="popLayout">
+                <div className="relative isolate flex-1 flex flex-col gap-8 items-center justify-center p-4 sm:p-12 lg:p-16">
                     {authMode === "login" && formStep !== "success" && (
-                      <motion.span
+                      <span
                         key="logo"
-                        layout={meshReady}
-                        initial={{ opacity: 0, y: -8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -8 }}
-                        transition={{ duration: 0.3 }}
-                        className="logo__mark mb-2 mt-auto shrink-0"
+                        className="logo__mark mb-2"
                         style={{ height: 28 }}
                         aria-label="Apex Bot"
                         role="img"
                       />
                     )}
-                  </AnimatePresence>
-                  <motion.div layout={meshReady} transition={{ type: "spring", bounce: 0, duration: 0.5 }} style={{ borderRadius: 16 }} className={`w-full max-w-sm shrink-0 overflow-hidden rounded-2xl border border-black/10 dark:border-white/15 bg-white dark:bg-black p-5 sm:p-6 shadow-[0_1px_0_rgba(255,255,255,0.9)_inset,0_2px_4px_rgba(0,0,0,0.06),0_12px_24px_rgba(0,0,0,0.1),0_32px_64px_-12px_rgba(0,0,0,0.25)] dark:shadow-[0_1px_0_rgba(255,255,255,0.14)_inset,0_0_0_1px_rgba(255,255,255,0.04),0_2px_4px_rgba(0,0,0,0.5),0_16px_32px_rgba(0,0,0,0.55),0_40px_80px_-12px_rgba(0,0,0,0.9)] ${authMode === "login" ? "mb-auto" : "my-auto"}`}>
+                  <motion.div layout={meshReady ? "position" : false} transition={{ type: "spring", bounce: 0, duration: 0.5 }} className={`w-full max-w-sm rounded-2xl border border-black/10 dark:border-white/15 bg-white dark:bg-black p-5 sm:p-6 shadow-[0_1px_0_rgba(255,255,255,0.9)_inset,0_2px_4px_rgba(0,0,0,0.06),0_12px_24px_rgba(0,0,0,0.1),0_32px_64px_-12px_rgba(0,0,0,0.25)] dark:shadow-[0_1px_0_rgba(255,255,255,0.14)_inset,0_0_0_1px_rgba(255,255,255,0.04),0_2px_4px_rgba(0,0,0,0.5),0_16px_32px_rgba(0,0,0,0.55),0_40px_80px_-12px_rgba(0,0,0,0.9)]`}>
 
                     <motion.div
+                      initial={false}
+                      animate={{ height: cardHeight }}
+                      transition={{ type: "spring", bounce: 0, duration: 0.5 }}
+                      style={{ overflow: "hidden" }}
+                    >
+                    <div ref={setContentEl}>
+                    <motion.div
                       key={authMode}
-                      layout={meshReady ? "position" : false}
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       transition={{ duration: 0.3 }}
@@ -516,9 +529,9 @@ export default function Hero() {
                       </form>
                     ) : (
                       <form onSubmit={handleSubmit} className="space-y-4">
-                        <div className="space-y-1">
-                          <h3 className="text-xl font-semibold text-zinc-900 dark:text-white">Create your account</h3>
-                          <p className="text-sm text-zinc-600 dark:text-zinc-300">
+                        <div className="space-y-1 pb-1 text-center text-zinc-900 dark:text-white">
+                          <h2 className="text-4xl font-normal tracking-tight" style={{ fontFamily: "var(--font-serif), Georgia, serif" }}>Create your account</h2>
+                          <p className="text-lg italic text-zinc-600 dark:text-zinc-300" style={{ fontFamily: "var(--font-serif), Georgia, serif" }}>
                             Set up Apex for your own site in minutes.
                           </p>
                         </div>
@@ -685,8 +698,10 @@ export default function Hero() {
                       </form>
                     )}
                     </motion.div>
+                    </div>
+                    </motion.div>
                   </motion.div>
-                </motion.div>
+                </div>
               </motion.div>
             </motion.div>
           </div>
