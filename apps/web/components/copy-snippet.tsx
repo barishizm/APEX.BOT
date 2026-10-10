@@ -17,7 +17,7 @@ export function CopySnippet({ code }: { code: string }) {
     <div className="snippet">
       <code>{code}</code>
       <button type="button" onClick={copy} aria-live="polite">
-        {copied ? "Kopyalandı" : "Kopyala"}
+        {copied ? "Copied" : "Copy"}
       </button>
     </div>
   );

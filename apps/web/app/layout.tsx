@@ -8,9 +8,9 @@ const mono = Inconsolata({ subsets: ["latin", "latin-ext"], variable: "--font-mo
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
-  title: "Apex Bot — Sitenizi bilen asistan",
+  title: "Apex Bot — The assistant that knows your site",
   description:
-    "Apex Bot, ziyaretçilerinizin sorularını yalnızca sitenizdeki bilgilere dayanarak yanıtlar. Tek satır kodla kurulur.",
+    "Apex Bot answers your visitors' questions using only the information on your site. Installs with a single line of code.",
 };
 
 export const viewport: Viewport = {
@@ -25,7 +25,7 @@ const themeScript = `(function(){try{var t=localStorage.getItem("theme");if(t===
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="tr" className={`${display.variable} ${body.variable} ${mono.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`${display.variable} ${body.variable} ${mono.variable}`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
