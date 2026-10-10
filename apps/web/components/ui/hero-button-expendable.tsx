@@ -38,6 +38,16 @@ export default function Hero() {
     return () => { document.body.style.overflow = "unset" }
   }, [isExpanded])
 
+  // Close on Escape
+  useEffect(() => {
+    if (!isExpanded) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") handleClose()
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [isExpanded])
+
   return (
     <>
       <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-white dark:bg-zinc-950 px-4 sm:px-6 py-12 sm:py-20 transition-colors duration-300">
@@ -175,12 +185,15 @@ export default function Hero() {
 
               {/* Close Button */}
               <motion.button
+                type="button"
+                aria-label="Close"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
+                transition={{ delay: 0.2, duration: 0.25 }}
                 onClick={handleClose}
-                className="absolute right-4 top-4 sm:right-8 sm:top-8 z-50 flex h-10 w-10 items-center justify-center rounded-full bg-black/5 text-zinc-900 hover:bg-black/10 dark:bg-white/10 dark:text-white dark:hover:bg-white/20 backdrop-blur-md transition-colors"
+                className="absolute right-4 top-4 sm:right-8 sm:top-8 z-50 flex h-11 w-11 items-center justify-center rounded-full border border-white/40 bg-white/30 text-zinc-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.6),0_4px_16px_rgba(0,0,0,0.08)] backdrop-blur-xl backdrop-saturate-150 transition-colors duration-200 hover:bg-white/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 dark:border-white/15 dark:bg-white/10 dark:text-white dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_4px_16px_rgba(0,0,0,0.35)] dark:hover:bg-white/20"
               >
-                <X className="h-5 w-5" />
+                <X className="h-[18px] w-[18px]" strokeWidth={2.25} />
               </motion.button>
 
               {/* Modal Content */}
