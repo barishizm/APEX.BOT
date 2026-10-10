@@ -187,7 +187,7 @@ export function MegaMenu() {
     <nav
       ref={navRef}
       className="bar__menu"
-      aria-label="Site menüsü"
+      aria-label="Site menu"
       onMouseLeave={scheduleClose}
       onBlur={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget)) setOpen(false);

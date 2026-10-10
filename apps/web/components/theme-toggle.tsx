@@ -24,7 +24,7 @@ export function ThemeToggle() {
     setTheme(next);
   }
 
-  const label = theme === "dark" ? "Açık temaya geç" : "Koyu temaya geç";
+  const label = theme === "dark" ? "Switch to light theme" : "Switch to dark theme";
 
   return (
     <button type="button" className="theme-toggle" onClick={toggle} aria-label={label} title={label}>

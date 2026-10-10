@@ -151,6 +151,23 @@ ul {
   max-width: var(--content);
   margin-inline: auto;
   padding: calc(var(--space-5) + 4px) var(--gutter);
+  /* Floats over the hero so its background runs underneath. */
+  position: fixed;
+  inset-inline: 0;
+  top: 0;
+  z-index: 40;
+}
+
+/* Full-width translucent backdrop behind the centered bar. */
+.bar::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline: calc(50% - 50vw);
+  z-index: -1;
+  background: color-mix(in srgb, var(--color-surface) 30%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
 }
 
 /* Logo left, menu centered on the page, actions right. */

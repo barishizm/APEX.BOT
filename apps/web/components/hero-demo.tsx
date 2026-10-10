@@ -4,23 +4,22 @@ export function HeroDemo() {
     <figure className="demo">
       <div className="demo__head">
         <span className="demo__dot" aria-hidden="true" />
-        <span>Apex Bot · kahvedukkani.com</span>
+        <span>Apex Bot · coffeeroasters.com</span>
       </div>
 
       <div className="demo__body">
-        <p className="msg msg--visitor">Kahveyi beğenmezsem iade edebilir miyim?</p>
+        <p className="msg msg--visitor">Can I return the coffee if I don't like it?</p>
         <div className="msg msg--bot">
           <p>
-            Evet. Paket açılmamışsa teslimattan sonraki 14 gün içinde ücretsiz iade edebilirsiniz. Öğütülmüş kahvelerde
-            iade yapılmıyor.
+            Yes. If the bag is unopened, you can return it free of charge within 14 days of delivery. Ground coffee
+            can't be returned.
           </p>
-          <span className="msg__source">kahvedukkani.com/iade</span>
+          <span className="msg__source">coffeeroasters.com/returns</span>
         </div>
       </div>
 
       <figcaption className="sr-only">
-        Örnek konuşma: Apex Bot, ziyaretçinin iade sorusunu sitedeki iade sayfasına dayanarak yanıtlıyor ve kaynağı
-        gösteriyor.
+        Example conversation: Apex Bot answers the visitor's return question based on the site's returns page and shows the source.
       </figcaption>
     </figure>
   );
