@@ -528,13 +528,13 @@ ul {
 
 /* ---------- Content blocks ---------- */
 
-.block {
+.section-block {
   max-width: var(--content);
   margin-inline: auto;
   padding: var(--space-section) var(--gutter) 0;
 }
 
-.block h2,
+.section-block h2,
 .closing h2 {
   font-size: var(--text-h2);
   font-weight: 700;
