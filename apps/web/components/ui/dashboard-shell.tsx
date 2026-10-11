@@ -61,8 +61,10 @@ function RailButton({
 export function DashboardShell({ children }: { children?: ReactNode }) {
   return (
     <div className="flex h-screen flex-col bg-[var(--color-surface)] text-[var(--color-text)]">
-      <header className="flex h-14 shrink-0 items-center gap-3 px-3">
-        <img src="/brand/mini-ico.png" alt="Apex Bot" className="mx-1 h-8 w-8 rounded-lg" />
+      <header className="flex h-14 shrink-0 items-center gap-3 pr-3">
+        <div className="-mr-3 flex h-14 w-16 shrink-0 items-center justify-center">
+          <img src="/brand/mini-logo.png" alt="Apex Bot" className="block h-11 w-11 rounded-xl" />
+        </div>
 
         <div className={`${pill} max-md:hidden`}>
           <CircleDollarSign className="h-4 w-4 text-[var(--color-muted)]" aria-hidden />
