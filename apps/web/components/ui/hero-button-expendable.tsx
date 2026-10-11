@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { X, Check, ArrowRight, Clock, Languages, BarChart3, Eye, EyeOff } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { GodRays, MeshGradient } from "@paper-design/shaders-react"
@@ -88,11 +89,13 @@ function PasswordInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
   )
 }
 
-export default function Hero() {
+export default function Hero({ modalOnly = false }: { modalOnly?: boolean }) {
+  const router = useRouter()
   const [isExpanded, setIsExpanded] = useState(false)
   const [meshReady, setMeshReady] = useState(false)
-  const [formStep, setFormStep] = useState<"idle" | "submitting" | "success">("idle")
   const [accountType, setAccountType] = useState<"business" | "personal">("business")
+  const isBusiness = accountType === "business"
+  const [formStep, setFormStep] = useState<"idle" | "submitting" | "success">("idle")
   // Card height follows its content, animated, so switching forms grows/shrinks smoothly
   const [contentEl, setContentEl] = useState<HTMLDivElement | null>(null)
   const [cardHeight, setCardHeight] = useState<number | "auto">("auto")
@@ -106,7 +109,6 @@ export default function Hero() {
     if (!isExpanded) setCardHeight("auto")
   }, [isExpanded])
   const [authMode, setAuthMode] = useState<"register" | "login">("register")
-  const isBusiness = accountType === "business"
 
   // When opened from the header "Log in" link, the modal grows out of that point
   const [origin, setOrigin] = useState<{ x: number; y: number } | null>(null)
@@ -121,17 +123,32 @@ export default function Hero() {
     setIsExpanded(true)
   }
 
-  // Header "Log in" link dispatches this event to open the modal in login mode
+  // Header "Log in" link and pricing CTAs dispatch these events to open the modal
   useEffect(() => {
-    const onOpenLogin = (e: Event) => {
+    const opener = (mode: "login" | "register") => (e: Event) => {
       const { x, y } = (e as CustomEvent<{ x: number; y: number }>).detail
       setOrigin({ x, y })
       setFormStep("idle")
-      setAuthMode("login")
+      setAuthMode(mode)
       setIsExpanded(true)
     }
-    window.addEventListener("apex:open-login", onOpenLogin)
-    return () => window.removeEventListener("apex:open-login", onOpenLogin)
+    const onLogin = opener("login")
+    const onRegister = opener("register")
+    window.addEventListener("apex:open-login", onLogin)
+    window.addEventListener("apex:open-register", onRegister)
+    return () => {
+      window.removeEventListener("apex:open-login", onLogin)
+      window.removeEventListener("apex:open-register", onRegister)
+    }
+  }, [])
+
+  // The dashboard guard redirects here with ?login=1
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("login") !== "1") return
+    window.history.replaceState(null, "", window.location.pathname)
+    setFormStep("idle")
+    setAuthMode("login")
+    setIsExpanded(true)
   }, [])
 
   const switchMode = (mode: "register" | "login") => {
@@ -148,9 +165,17 @@ export default function Hero() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    const email = new FormData(e.currentTarget as HTMLFormElement).get("email")
+    if (typeof email === "string") {
+      try {
+        sessionStorage.setItem("apex:verify:email", email)
+      } catch {}
+    }
     setFormStep("submitting")
     // Simulate API call
     setTimeout(() => {
+      // Placeholder session until real auth exists; proxy.ts checks for it
+      document.cookie = "apex_session=1; path=/; max-age=2592000; samesite=lax"
       setFormStep("success")
     }, 1500)
   }
@@ -177,6 +202,7 @@ export default function Hero() {
 
   return (
     <>
+      {!modalOnly && (
       <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-white dark:bg-zinc-950 px-4 sm:px-6 py-12 sm:py-20 transition-colors duration-300">
 
         {/* GodRays Background - Adjusted to be subtle in both modes */}
@@ -267,6 +293,7 @@ export default function Hero() {
           </AnimatePresence>
         </div>
       </div>
+      )}
 
       {/*
         Expanded Modal Overlay
@@ -445,15 +472,15 @@ export default function Hero() {
                         animate={{ opacity: 1, scale: 1 }}
                         className="flex flex-col items-center justify-center text-center h-[400px] space-y-6"
                       >
-                        <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center shadow-lg shadow-green-500/30">
-                          <Check className="w-10 h-10 text-white" />
+                        <div className={`w-20 h-20 rounded-full flex items-center justify-center shadow-lg ${authMode === "register" ? "bg-indigo-600 shadow-indigo-600/30" : "bg-green-500 shadow-green-500/30"}`}>
+                          {authMode === "register" ? <ArrowRight className="w-10 h-10 text-white" /> : <Check className="w-10 h-10 text-white" />}
                         </div>
                         <div>
-                          <h3 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">{authMode === "login" ? "Welcome back!" : "Account created!"}</h3>
-                          <p className="text-zinc-600 dark:text-zinc-200">{authMode === "login" ? "You're logged in to Apex." : "Welcome to Apex. Your account is ready, so you can start building your support bot."}</p>
+                          <h3 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">{authMode === "login" ? "Welcome back!" : "Verify your email"}</h3>
+                          <p className="text-zinc-600 dark:text-zinc-200">{authMode === "login" ? "You're logged in to Apex." : "You'll be redirected to the next step to verify your email."}</p>
                         </div>
                         <button
-                          onClick={handleClose}
+                          onClick={() => router.push(authMode === "register" ? "/verify-email" : "/dashboard")}
                           className="cursor-pointer px-6 py-2 bg-black/10 hover:bg-black/15 text-zinc-900 dark:bg-white/20 dark:hover:bg-white/30 dark:text-white rounded-lg transition-colors text-sm font-medium"
                         >
                           Continue
@@ -504,7 +531,7 @@ export default function Hero() {
                         <button
                           disabled={formStep === "submitting"}
                           type="submit"
-                          className="w-full cursor-pointer flex items-center justify-center px-8 py-3 rounded-lg bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-800 dark:hover:bg-zinc-100 font-semibold focus:ring-4 focus:ring-zinc-500/30 transition-all disabled:opacity-70 disabled:cursor-not-allowed"
+                          className="w-full cursor-pointer flex items-center justify-center px-8 py-3 rounded-lg bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-800 dark:hover:bg-zinc-100 font-semibold transition-all disabled:opacity-70 disabled:cursor-not-allowed"
                         >
                           {formStep === "submitting" ? (
                             <span className="flex items-center gap-2">
@@ -566,14 +593,17 @@ export default function Hero() {
 
                         <div className="space-y-4">
                           <div>
-                            <label htmlFor="name" className="block text-xs font-medium text-zinc-600 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">
-                              Full Name
+                            <label htmlFor="username" className="block text-xs font-medium text-zinc-600 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">
+                              Username
                             </label>
                             <input
                               required
                               type="text"
-                              id="name"
-                              placeholder="Jane Doe"
+                              id="username"
+                              name="username"
+                              autoComplete="username"
+                              minLength={3}
+                              placeholder="janedoe"
                               className="w-full px-4 py-2.5 rounded-lg bg-white dark:bg-zinc-950/40 border border-zinc-300 dark:border-zinc-400/20 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-white/30 focus:outline-none focus:border-zinc-500 dark:focus:border-white/40 transition-all text-sm"
                             />
                           </div>
@@ -592,21 +622,6 @@ export default function Hero() {
                               className="w-full px-4 py-2.5 rounded-lg bg-white dark:bg-zinc-950/40 border border-zinc-300 dark:border-zinc-400/20 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-white/30 focus:outline-none focus:border-zinc-500 dark:focus:border-white/40 transition-all text-sm"
                             />
                           </div>
-
-                          {!isBusiness && (
-                            <div>
-                              <label htmlFor="website" className="block text-xs font-medium text-zinc-600 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">
-                                Website <span className="normal-case tracking-normal text-zinc-400">(optional)</span>
-                              </label>
-                              <input
-                                type="url"
-                                id="website"
-                                name="website"
-                                placeholder="https://yoursite.com"
-                                className="w-full px-4 py-2.5 rounded-lg bg-white dark:bg-zinc-950/40 border border-zinc-300 dark:border-zinc-400/20 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-white/30 focus:outline-none focus:border-zinc-500 dark:focus:border-white/40 transition-all text-sm"
-                              />
-                            </div>
-                          )}
 
                           {isBusiness && (
                           <div className="grid grid-cols-2 gap-4">
@@ -627,7 +642,7 @@ export default function Hero() {
                               </label>
                               <select
                                 id="size"
-                                className="w-full px-4 py-2.5 rounded-lg bg-white dark:bg-zinc-950/40 border border-zinc-300 dark:border-zinc-400/20 text-zinc-900 dark:text-white focus:outline-none focus:border-zinc-500 dark:focus:border-white/40 transition-all text-sm appearance-none cursor-pointer"
+                                className="w-full px-4 py-2.5 rounded-lg bg-white dark:bg-zinc-950/40 border border-zinc-300 dark:border-zinc-400/20 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-white/30 focus:outline-none focus:border-zinc-500 dark:focus:border-white/40 transition-all text-sm appearance-none cursor-pointer"
                               >
                                 <option className="bg-zinc-900">1-50</option>
                                 <option className="bg-zinc-900">51-200</option>
@@ -672,7 +687,7 @@ export default function Hero() {
                         <button
                           disabled={formStep === "submitting"}
                           type="submit"
-                          className="w-full cursor-pointer flex items-center justify-center px-8 py-3 rounded-lg bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-800 dark:hover:bg-zinc-100 font-semibold focus:ring-4 focus:ring-zinc-500/30 transition-all disabled:opacity-70 disabled:cursor-not-allowed mt-2"
+                          className="w-full cursor-pointer flex items-center justify-center px-8 py-3 rounded-lg bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-800 dark:hover:bg-zinc-100 font-semibold transition-all disabled:opacity-70 disabled:cursor-not-allowed mt-2"
                         >
                           {formStep === "submitting" ? (
                              <span className="flex items-center gap-2">

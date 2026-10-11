@@ -115,18 +115,26 @@ ul {
   padding: 0;
 }
 
-:focus-visible {
-  outline: 2px solid var(--color-secondary);
-  outline-offset: 3px;
-  border-radius: var(--radius-sm);
+* {
+  -webkit-tap-highlight-color: transparent;
 }
 
-/* The global :focus-visible rule is unlayered, so it beats Tailwind's focus:outline-none
-   and rounded-* utilities. Fields in the auth modal opt out of both. */
-.auth-modal input:not([type="checkbox"]):focus-visible,
-.auth-modal select:focus-visible {
+/* No outline after a mouse/touch click. Only links and buttons reached with the
+   keyboard (Tab) keep a visible ring. */
+:focus,
+:focus-visible {
   outline: none;
-  border-radius: revert-layer;
+}
+a:focus-visible,
+button:focus-visible,
+[role="button"]:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--color-secondary);
+  outline-offset: 3px;
+}
+a:not(:focus-visible),
+button:not(:focus-visible) {
+  outline: none;
 }
 
 .sr-only {
