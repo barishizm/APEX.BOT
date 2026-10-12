@@ -174,14 +174,26 @@ export function ProfileMenu({
                 </div>
               </div>
 
-              <div className={`${group} px-4 py-3`}>
-                <p className="flex items-center gap-2 text-[0.95rem] font-medium">
+              {/* not `group`: its overflow-hidden would clip the tooltip */}
+              <div className="rounded-xl bg-[var(--color-bubble)] px-4 py-3">
+                <div className="flex items-center gap-2 text-[0.95rem] font-medium">
                   AI resolutions
-                  <Info
-                    className="h-4 w-4 text-[var(--color-muted)]"
-                    aria-label="Conversations the AI resolved without a human"
-                  />
-                </p>
+                  <span
+                    tabIndex={0}
+                    aria-describedby="ai-resolutions-tip"
+                    className="group/info relative flex rounded-full text-[var(--color-muted)] outline-none transition-colors hover:text-[var(--color-text)] focus-visible:text-[var(--color-text)]"
+                  >
+                    <Info className="h-4 w-4" aria-label="About AI resolutions" />
+                    <span
+                      id="ai-resolutions-tip"
+                      role="tooltip"
+                      className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 w-56 -translate-x-1/2 translate-y-1 rounded-lg bg-[var(--color-primary)] px-3 py-2 text-center text-xs font-normal leading-snug text-[var(--color-on-primary)] opacity-0 shadow-lg transition-[opacity,translate] duration-150 group-hover/info:translate-y-0 group-hover/info:opacity-100 group-focus-visible/info:translate-y-0 group-focus-visible/info:opacity-100"
+                    >
+                      {resolutionsLimit} included in your trial. Need more?{" "}
+                      <span className="font-semibold">Start a paid plan</span>
+                    </span>
+                  </span>
+                </div>
                 <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[var(--color-line)]">
                   <motion.div
                     className="h-full rounded-full bg-green-500"
