@@ -13,6 +13,7 @@ import {
   UserPlus,
 } from "lucide-react"
 import type { ReactNode } from "react"
+import { ProfileMenu } from "./profile-menu"
 
 const NAV = [
   { label: "Inbox", icon: Inbox, active: true },
@@ -119,9 +120,7 @@ export function DashboardShell({ children }: { children?: ReactNode }) {
             <RailButton label="Help">
               <CircleHelp className="h-5 w-5" />
             </RailButton>
-            <span className="mb-1 flex h-8 w-8 items-center justify-center rounded-full bg-[var(--color-secondary)] text-sm font-semibold text-[var(--color-surface)]">
-              B
-            </span>
+            <ProfileMenu />
           </div>
         </nav>
 
