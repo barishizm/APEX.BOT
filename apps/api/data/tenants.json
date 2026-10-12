@@ -1,0 +1,28 @@
+[
+  {
+    "id": "tn_demo",
+    "siteKey": "apex_pk_demo",
+    "name": "Coffee Roasters",
+    "allowedOrigins": ["http://localhost:8787", "http://127.0.0.1:8787", "http://localhost:3000"],
+    "handoffEmail": "support@coffeeroasters.example",
+    "dailyTokenBudget": 2000000,
+    "retentionDays": 30,
+    "settings": {
+      "botName": "Apex",
+      "tone": "friendly",
+      "defaultLang": "tr",
+      "primaryColor": "#0c0c09",
+      "position": "bottom-right",
+      "greeting": {
+        "tr": "Merhaba! Ben Coffee Roasters'ın yapay zekâ asistanıyım. Sipariş, kargo, iade veya kahvelerimiz hakkında sorabilirsiniz.",
+        "en": "Hi! I'm Coffee Roasters' AI assistant. Ask me about orders, shipping, returns or our coffees."
+      },
+      "suggestions": {
+        "tr": ["Kargo ne kadar sürer?", "İade politikası", "Abonelik nasıl çalışır?"],
+        "en": ["How long is shipping?", "Return policy", "How do subscriptions work?"]
+      },
+      "privacyUrl": "https://coffeeroasters.example/gizlilik",
+      "blockedTopics": ["competitors' products and prices", "politics"]
+    }
+  }
+]

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { ArrowUp, CircleAlert, CircleCheck, LoaderCircle, Plus, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { KNOWLEDGE_KEY } from "./onboarding-list"
 
 const BENEFITS = [
   "Create AI Agent",
@@ -46,7 +47,7 @@ export default function Onboarding() {
     setTouched(true)
     if (!normalized) return
     try {
-      sessionStorage.setItem("apex:onboarding:url", normalized)
+      localStorage.setItem(KNOWLEDGE_KEY, normalized)
     } catch {}
     setRunning(true)
   }
@@ -146,7 +147,13 @@ export default function Onboarding() {
               </button>
               <button
                 type="button"
-                onClick={() => router.push("/")}
+                onClick={() => {
+                  // Skipped the website step, so the agent still needs training
+                  try {
+                    localStorage.removeItem(KNOWLEDGE_KEY)
+                  } catch {}
+                  router.push("/")
+                }}
                 disabled={running}
                 className="h-12 cursor-pointer rounded-lg border-0 bg-transparent px-5 text-[0.9375rem] font-semibold text-[var(--color-text)] transition-opacity hover:opacity-70"
               >

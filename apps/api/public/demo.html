@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Coffee Roasters · Apex Bot demo</title>
+    <style>
+      /* Deliberately loud host styles: the widget must not inherit any of them. */
+      * { font-family: Georgia, serif; }
+      button { background: hotpink !important; border: 3px dashed red; }
+      p { color: #7a3e12; letter-spacing: 0.05em; }
+      body { margin: 0; background: #faf6f0; color: #2b1a0e; }
+      main { max-width: 720px; margin: 0 auto; padding: 64px 24px; line-height: 1.7; }
+      h1 { font-size: 44px; margin: 0 0 12px; }
+      code { background: #efe6da; padding: 2px 6px; border-radius: 4px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Coffee Roasters</h1>
+      <p>Apex Bot demo sayfası. Sağ alttaki balondan iade, kargo, abonelik veya kahveler hakkında sorun.</p>
+      <p>Bu sayfanın CSS'i bilerek bozuk (pembe butonlar, serif yazı); widget Shadow DOM içinde olduğu için etkilenmemeli.</p>
+      <p>Konsoldan deneyin: <code>Apex.send("Kargo ücreti ne kadar?")</code></p>
+    </main>
+    <script>
+      window.Apex = { lang: "auto" };
+    </script>
+    <script src="/widget.js" data-site-key="apex_pk_demo" async></script>
+  </body>
+</html>
