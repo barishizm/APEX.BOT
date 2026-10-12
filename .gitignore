@@ -8,3 +8,28 @@ dist/
 .DS_Store
 *.tsbuildinfo
 next-env.d.ts
+
+# Secrets & credentials
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+credentials*.json
+service-account*.json
+.mcp.json
+
+# Logs
+*.log
+npm-debug.log*
+
+# Agent skills & local AI tooling (not for GitHub)
+.agents/
+.codex/
+.claude/skills/
+.claude/settings.local.json
+skills-lock.json
+
+# Editor / local
+.vscode/settings.json
+.idea/
