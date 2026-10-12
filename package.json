@@ -7,6 +7,11 @@
   ],
   "scripts": {
     "dev:web": "npm run dev -w @apex/web",
-    "build:web": "npm run build -w @apex/web"
+    "build:web": "npm run build -w @apex/web",
+    "dev:api": "npm run dev -w @apex/api",
+    "dev:widget": "npm run dev -w @apex/widget",
+    "build:widget": "npm run build -w @apex/widget",
+    "test": "npm test -w @apex/api && npm test -w @apex/widget",
+    "typecheck": "npm run typecheck -w @apex/api && npm run typecheck -w @apex/widget"
   }
 }

@@ -12,8 +12,10 @@ import {
   Settings,
   UserPlus,
 } from "lucide-react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useEffect, useState, type ReactNode } from "react"
+import { useSetupProgress } from "./onboarding-list"
 import { PrismFluxLoader } from "./prism-flux-loader"
 import { ProfileMenu } from "./profile-menu"
 
@@ -64,6 +66,7 @@ function RailButton({
 export function DashboardShell({ children, intro }: { children?: ReactNode; intro?: boolean }) {
   const router = useRouter()
   const [loading, setLoading] = useState(intro)
+  const setup = useSetupProgress()
 
   // Fresh login/register: keep the loader up for 3s while the page settles,
   // then drop ?welcome so a refresh doesn't replay it
@@ -93,14 +96,16 @@ export function DashboardShell({ children, intro }: { children?: ReactNode; intr
           <span className="font-semibold">$0.00</span>
           <span className="text-[var(--color-muted)]">Sales closed</span>
         </div>
-        <button type="button" className={`${pill} cursor-pointer max-sm:hidden`}>
+        <Link href="/dashboard/onboarding/list" className={`${pill} text-[var(--color-text)] no-underline max-sm:hidden`}>
           <span
             aria-hidden
             className="h-4 w-4 rounded-full border-2 border-[var(--color-line)] border-t-green-500"
           />
           <span>Complete setup</span>
-          <span className="text-[var(--color-muted)]">(1/5)</span>
-        </button>
+          <span className="text-[var(--color-muted)]">
+            ({setup.done}/{setup.total})
+          </span>
+        </Link>
 
         <div className="mx-auto flex h-9 w-full max-w-[28rem] items-center gap-2 rounded-full border border-[var(--color-line)] bg-[var(--color-raised)] px-4 text-sm text-[var(--color-muted)]">
           <Search className="h-4 w-4" aria-hidden />

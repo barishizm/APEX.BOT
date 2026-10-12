@@ -1,0 +1,57 @@
+[
+  {
+    "url": "https://coffeeroasters.example/iade",
+    "title": "İade ve değişim",
+    "text": "Açılmamış kahve paketlerini teslimattan itibaren 14 gün içinde ücretsiz iade edebilirsiniz. Öğütülmüş kahve ve açılmış paketler hijyen nedeniyle iade alınmaz. İade başlatmak için Hesabım > Siparişlerim sayfasından 'İade talebi' oluşturun; size anlaşmalı kargo kodu gönderilir. Ücret iadesi, ürün depomuza ulaştıktan sonra 3 iş günü içinde ödeme yaptığınız karta yapılır. Hasarlı veya yanlış ürün geldiyse fotoğrafıyla birlikte destek@coffeeroasters.example adresine yazın, yenisini ücretsiz gönderiyoruz."
+  },
+  {
+    "url": "https://coffeeroasters.example/kargo",
+    "title": "Kargo ve teslimat",
+    "text": "Siparişler hafta içi saat 14:00'e kadar verilirse aynı gün kavrulur ve kargoya verilir. Türkiye içi teslimat genellikle 1-3 iş günü sürer. 750 TL ve üzeri siparişlerde kargo ücretsizdir; altındaki siparişlerde kargo ücreti 69 TL'dir. Kargo takip numarası, paket kargoya verildiğinde e-posta ve SMS ile gönderilir. Şu an yurt dışına gönderim yapmıyoruz."
+  },
+  {
+    "url": "https://coffeeroasters.example/abonelik",
+    "title": "Kahve aboneliği",
+    "text": "Abonelikte seçtiğiniz kahve her 2 veya 4 haftada bir taze kavrulmuş olarak gönderilir. Abonelerimize her siparişte %15 indirim ve ücretsiz kargo uygulanır. Aboneliğinizi Hesabım > Abonelik sayfasından istediğiniz zaman duraklatabilir, kahvenizi değiştirebilir veya iptal edebilirsiniz; taahhüt yoktur. Bir sonraki gönderimden en az 2 gün önce yapılan değişiklikler o gönderime yansır."
+  },
+  {
+    "url": "https://coffeeroasters.example/kahveler",
+    "title": "Kahvelerimiz ve öğütme seçenekleri",
+    "text": "Tek kökenli kahvelerimiz Etiyopya Yirgacheffe, Kolombiya Huila ve Brezilya Cerrado'dur; ayrıca espresso için Ev Harmanı'mız vardır. Her kahve 250 g ve 1 kg paketlerde satılır. Çekirdek olarak ya da demleme yönteminize göre öğütülmüş (espresso, moka pot, filtre, French press, Türk kahvesi) sipariş edebilirsiniz. Kahveler siparişten sonra kavrulur; kavrum tarihi paketin üzerinde yazar. En iyi lezzet için kavrumdan sonraki 4-6 hafta içinde tüketmenizi öneririz."
+  },
+  {
+    "url": "https://coffeeroasters.example/odeme",
+    "title": "Ödeme seçenekleri",
+    "text": "Kredi kartı, banka kartı ve havale/EFT ile ödeme alıyoruz. Kredi kartına 3 aya kadar taksit seçeneği vardır. Kapıda ödeme seçeneğimiz bulunmuyor. Kurumsal siparişlerde fatura bilgilerinizi ödeme adımında girebilirsiniz."
+  },
+  {
+    "url": "https://coffeeroasters.example/iletisim",
+    "title": "İletişim ve çalışma saatleri",
+    "text": "Müşteri hizmetlerimiz hafta içi 09:00-18:00 arasında hizmet verir. Bize destek@coffeeroasters.example adresinden veya 0212 555 01 23 numaralı telefondan ulaşabilirsiniz. Kadıköy'deki dükkânımız her gün 08:00-20:00 arası açıktır. Toptan ve kafe siparişleri için toptan@coffeeroasters.example adresine yazın."
+  },
+  {
+    "url": "https://coffeeroasters.example/en/returns",
+    "title": "Returns and exchanges",
+    "text": "You can return unopened bags of coffee free of charge within 14 days of delivery. Ground coffee and opened bags can't be returned for hygiene reasons. To start a return, open My Account > Orders and create a return request; we'll send you a prepaid shipping code. Refunds go back to the card you paid with within 3 business days after the parcel reaches our warehouse. If an item arrived damaged or wrong, email support@coffeeroasters.example with a photo and we'll send a replacement for free."
+  },
+  {
+    "url": "https://coffeeroasters.example/en/shipping",
+    "title": "Shipping and delivery",
+    "text": "Orders placed on weekdays before 2 pm are roasted and shipped the same day. Delivery within Turkey usually takes 1-3 business days. Shipping is free on orders of 750 TL or more; below that, shipping costs 69 TL. You get a tracking number by email and SMS once the parcel ships. We don't ship internationally at the moment."
+  },
+  {
+    "url": "https://coffeeroasters.example/en/subscription",
+    "title": "Coffee subscription",
+    "text": "With a subscription, your chosen coffee is roasted fresh and shipped every 2 or 4 weeks. Subscribers get 15% off every order and free shipping. You can pause, switch coffees or cancel any time from My Account > Subscription; there is no commitment. Changes made at least 2 days before the next shipment apply to that shipment."
+  },
+  {
+    "url": "https://coffeeroasters.example/en/coffees",
+    "title": "Our coffees and grind options",
+    "text": "Our single origins are Ethiopia Yirgacheffe, Colombia Huila and Brazil Cerrado, plus our House Blend for espresso. Every coffee comes in 250 g and 1 kg bags. Order whole bean or ground for your brew method (espresso, moka pot, filter, French press, Turkish coffee). Coffee is roasted after you order and the roast date is printed on the bag. For the best flavour, drink it within 4-6 weeks of roasting."
+  },
+  {
+    "url": "https://coffeeroasters.example/en/contact",
+    "title": "Contact and opening hours",
+    "text": "Customer service is available on weekdays from 9 am to 6 pm. Reach us at support@coffeeroasters.example or by phone on 0212 555 01 23. Our shop in Kadıköy is open every day from 8 am to 8 pm. For wholesale and café orders, email wholesale@coffeeroasters.example."
+  }
+]
