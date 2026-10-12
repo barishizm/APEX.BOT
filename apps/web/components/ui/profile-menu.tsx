@@ -115,6 +115,12 @@ export function ProfileMenu({
     setTheme(next)
   }
 
+  function logOut() {
+    document.cookie = "apex_session=; path=/; max-age=0; samesite=lax"
+    // replace, so Back doesn't return to the dashboard
+    window.location.replace("/")
+  }
+
   const initial = name.charAt(0).toUpperCase()
   const pct = resolutionsLimit ? Math.round((resolutionsUsed / resolutionsLimit) * 100) : 0
 
@@ -256,7 +262,7 @@ export function ProfileMenu({
                 </button>
               </div>
 
-              <button type="button" className={`${rowButton} rounded-xl`}>
+              <button type="button" onClick={logOut} className={`${rowButton} rounded-xl`}>
                 Log out
                 <Power className="h-4 w-4 text-[var(--color-muted)]" aria-hidden />
               </button>
