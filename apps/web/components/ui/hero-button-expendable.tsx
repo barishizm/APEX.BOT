@@ -480,7 +480,7 @@ export default function Hero({ modalOnly = false }: { modalOnly?: boolean }) {
                           <p className="text-zinc-600 dark:text-zinc-200">{authMode === "login" ? "You're logged in to Apex." : "You'll be redirected to the next step to verify your email."}</p>
                         </div>
                         <button
-                          onClick={() => router.push(authMode === "register" ? "/verify-email" : "/dashboard")}
+                          onClick={() => router.push(authMode === "register" ? "/verify-email" : "/dashboard?welcome=1")}
                           className="cursor-pointer px-6 py-2 bg-black/10 hover:bg-black/15 text-zinc-900 dark:bg-white/20 dark:hover:bg-white/30 dark:text-white rounded-lg transition-colors text-sm font-medium"
                         >
                           Continue
