@@ -7,6 +7,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "@apex/db": "*",
     "@paper-design/shaders-react": "^0.0.81",
     "clsx": "^2.1.1",
     "framer-motion": "^14.1.0",

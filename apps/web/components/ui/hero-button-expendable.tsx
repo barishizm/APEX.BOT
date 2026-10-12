@@ -25,7 +25,7 @@ function GitHubLogo() {
   )
 }
 
-function SocialButtons({ verb }: { verb: string }) {
+function SocialButtons({ verb, accountType }: { verb: string; accountType?: "business" | "personal" }) {
   return (
     <>
       <div className="flex items-center gap-3 text-xs uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
@@ -36,19 +36,26 @@ function SocialButtons({ verb }: { verb: string }) {
 
       <div className="space-y-2">
         {[
-          { name: "Google", logo: <GoogleLogo /> },
-          { name: "GitHub", logo: <GitHubLogo /> },
-        ].map(({ name, logo }) => (
-          <button
+          { name: "Google", slug: "google", logo: <GoogleLogo /> },
+          { name: "GitHub", slug: "github", logo: <GitHubLogo /> },
+        ].map(({ name, slug, logo }) => (
+          <a
             key={name}
-            type="button"
+            href={`/api/auth/oauth/${slug}${accountType ? `?type=${accountType}` : ""}`}
             className="w-full flex items-center justify-center gap-3 px-8 py-2.5 rounded-lg border border-zinc-300 dark:border-white/20 bg-white dark:bg-zinc-950 text-sm font-medium text-zinc-900 dark:text-white hover:bg-zinc-50 dark:hover:bg-zinc-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 transition-colors cursor-pointer"
           >
             {logo}
             {verb} with {name}
-          </button>
+          </a>
         ))}
       </div>
+      {accountType && (
+        <p className="text-center text-xs text-zinc-500 dark:text-zinc-400">
+          By continuing with Google or GitHub you agree to the{" "}
+          <a href="/terms" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">Terms of Service</a> and{" "}
+          <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">Privacy Policy</a>.
+        </p>
+      )}
     </>
   )
 }
@@ -96,6 +103,9 @@ export default function Hero({ modalOnly = false }: { modalOnly?: boolean }) {
   const [accountType, setAccountType] = useState<"business" | "personal">("business")
   const isBusiness = accountType === "business"
   const [formStep, setFormStep] = useState<"idle" | "submitting" | "success">("idle")
+  const [authError, setAuthError] = useState<string | null>(null)
+  const [nextPath, setNextPath] = useState("/verify-email")
+  const needsVerify = nextPath === "/verify-email"
   // Card height follows its content, animated, so switching forms grows/shrinks smoothly
   const [contentEl, setContentEl] = useState<HTMLDivElement | null>(null)
   const [cardHeight, setCardHeight] = useState<number | "auto">("auto")
@@ -144,7 +154,16 @@ export default function Hero({ modalOnly = false }: { modalOnly?: boolean }) {
 
   // The dashboard guard redirects here with ?login=1
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("login") !== "1") return
+    const params = new URLSearchParams(window.location.search)
+    if (params.get("login") !== "1") return
+    const oauthErrors: Record<string, string> = {
+      oauth_not_configured: "Google/GitHub sign-in isn't set up yet. Use your email instead",
+      oauth_denied: "Sign-in was cancelled. Try again or use your email",
+      oauth_email_unverified: "Your provider has no verified email for this account. Verify it there and try again",
+      oauth_failed: "Couldn't sign you in with that provider. Try again or use your email",
+    }
+    const error = params.get("error")
+    setAuthError(error ? (oauthErrors[error] ?? null) : null)
     window.history.replaceState(null, "", window.location.pathname)
     setFormStep("idle")
     setAuthMode("login")
@@ -153,6 +172,7 @@ export default function Hero({ modalOnly = false }: { modalOnly?: boolean }) {
 
   const switchMode = (mode: "register" | "login") => {
     setFormStep("idle")
+    setAuthError(null)
     setAuthMode(mode)
   }
 
@@ -163,21 +183,46 @@ export default function Hero({ modalOnly = false }: { modalOnly?: boolean }) {
     setTimeout(() => setFormStep("idle"), 500)
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    const email = new FormData(e.currentTarget as HTMLFormElement).get("email")
-    if (typeof email === "string") {
-      try {
-        sessionStorage.setItem("apex:verify:email", email)
-      } catch {}
-    }
+    const form = new FormData(e.currentTarget)
+    const field = (name: string) => form.get(name) ?? undefined
+    const body =
+      authMode === "login"
+        ? { email: field("email"), password: field("password"), remember: form.has("rememberMe") }
+        : {
+            accountType,
+            username: field("username"),
+            email: field("email"),
+            company: field("company"),
+            companySize: field("companySize"),
+            password: field("password"),
+            acceptTerms: form.has("acceptTerms"),
+            allowTraining: form.has("allowTraining"),
+          }
+    setAuthError(null)
     setFormStep("submitting")
-    // Simulate API call
-    setTimeout(() => {
-      // Placeholder session until real auth exists; proxy.ts checks for it
-      document.cookie = "apex_session=1; path=/; max-age=2592000; samesite=lax"
+    try {
+      const res = await fetch(`/api/auth/${authMode}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setAuthError(data.message ?? "Something went wrong. Try again")
+        setFormStep("idle")
+        return
+      }
+      try {
+        sessionStorage.setItem("apex:verify:email", data.user.email)
+      } catch {}
+      setNextPath(data.user.emailVerified ? "/dashboard?welcome=1" : "/verify-email")
       setFormStep("success")
-    }, 1500)
+    } catch {
+      setAuthError("Couldn't reach the server. Check your connection and try again")
+      setFormStep("idle")
+    }
   }
 
   // Lock body scroll when modal is open
@@ -472,15 +517,15 @@ export default function Hero({ modalOnly = false }: { modalOnly?: boolean }) {
                         animate={{ opacity: 1, scale: 1 }}
                         className="flex flex-col items-center justify-center text-center h-[400px] space-y-6"
                       >
-                        <div className={`w-20 h-20 rounded-full flex items-center justify-center shadow-lg ${authMode === "register" ? "bg-indigo-600 shadow-indigo-600/30" : "bg-green-500 shadow-green-500/30"}`}>
-                          {authMode === "register" ? <ArrowRight className="w-10 h-10 text-white" /> : <Check className="w-10 h-10 text-white" />}
+                        <div className={`w-20 h-20 rounded-full flex items-center justify-center shadow-lg ${needsVerify ? "bg-indigo-600 shadow-indigo-600/30" : "bg-green-500 shadow-green-500/30"}`}>
+                          {needsVerify ? <ArrowRight className="w-10 h-10 text-white" /> : <Check className="w-10 h-10 text-white" />}
                         </div>
                         <div>
-                          <h3 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">{authMode === "login" ? "Welcome back!" : "Verify your email"}</h3>
-                          <p className="text-zinc-600 dark:text-zinc-200">{authMode === "login" ? "You're logged in to Apex." : "You'll be redirected to the next step to verify your email."}</p>
+                          <h3 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">{!needsVerify ? "Welcome back!" : "Verify your email"}</h3>
+                          <p className="text-zinc-600 dark:text-zinc-200">{!needsVerify ? "You're logged in to Apex." : "You'll be redirected to the next step to verify your email."}</p>
                         </div>
                         <button
-                          onClick={() => router.push(authMode === "register" ? "/verify-email" : "/dashboard?welcome=1")}
+                          onClick={() => router.push(nextPath)}
                           className="cursor-pointer px-6 py-2 bg-black/10 hover:bg-black/15 text-zinc-900 dark:bg-white/20 dark:hover:bg-white/30 dark:text-white rounded-lg transition-colors text-sm font-medium"
                         >
                           Continue
@@ -527,6 +572,10 @@ export default function Hero({ modalOnly = false }: { modalOnly?: boolean }) {
                           <a href="/forgot-password" className="text-xs text-zinc-600 dark:text-zinc-300 underline underline-offset-2 hover:text-zinc-900 dark:hover:text-white">Forgot password?</a>
                           </div>
                         </div>
+
+                        {authError && (
+                          <p role="alert" className="text-sm text-red-600 dark:text-red-400">{authError}</p>
+                        )}
 
                         <button
                           disabled={formStep === "submitting"}
@@ -632,6 +681,7 @@ export default function Hero({ modalOnly = false }: { modalOnly?: boolean }) {
                               <input
                                 type="text"
                                 id="company"
+                                name="company"
                                 placeholder="Acme Inc"
                                 className="w-full px-4 py-2.5 rounded-lg bg-white dark:bg-zinc-950/40 border border-zinc-300 dark:border-zinc-400/20 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-white/30 focus:outline-none focus:border-zinc-500 dark:focus:border-white/40 transition-all text-sm"
                               />
@@ -642,6 +692,7 @@ export default function Hero({ modalOnly = false }: { modalOnly?: boolean }) {
                               </label>
                               <select
                                 id="size"
+                                name="companySize"
                                 className="w-full px-4 py-2.5 rounded-lg bg-white dark:bg-zinc-950/40 border border-zinc-300 dark:border-zinc-400/20 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-white/30 focus:outline-none focus:border-zinc-500 dark:focus:border-white/40 transition-all text-sm appearance-none cursor-pointer"
                               >
                                 <option className="bg-zinc-900">1-50</option>
@@ -684,6 +735,10 @@ export default function Hero({ modalOnly = false }: { modalOnly?: boolean }) {
                           </div>
                         </div>
 
+                        {authError && (
+                          <p role="alert" className="text-sm text-red-600 dark:text-red-400">{authError}</p>
+                        )}
+
                         <button
                           disabled={formStep === "submitting"}
                           type="submit"
@@ -697,7 +752,7 @@ export default function Hero({ modalOnly = false }: { modalOnly?: boolean }) {
                           ) : "Create account"}
                         </button>
 
-                        <SocialButtons verb="Sign up" />
+                        <SocialButtons verb="Sign up" accountType={accountType} />
 
                         <p className="text-center text-sm text-zinc-600 dark:text-zinc-300">
                           Already have an account?{" "}

@@ -9,8 +9,19 @@ import { cn } from "@/lib/utils"
 
 const CODE_LENGTH = 6
 const RESEND_SECONDS = 30
-// Temporary valid code until the verification backend exists
-const VALID_CODE = "123123"
+
+async function postJson(path: string, body: object): Promise<{ ok: boolean; status: number; data: any }> {
+  try {
+    const res = await fetch(path, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    })
+    return { ok: res.ok, status: res.status, data: await res.json().catch(() => ({})) }
+  } catch {
+    return { ok: false, status: 0, data: { message: "Couldn't reach the server. Check your connection and try again" } }
+  }
+}
 
 export default function VerifyEmail() {
   const router = useRouter()
@@ -30,7 +41,15 @@ export default function VerifyEmail() {
     try {
       setEmail(sessionStorage.getItem("apex:verify:email") ?? "")
     } catch {}
-  }, [])
+    // The account is the source of truth (e.g. after logging in on another tab)
+    fetch("/api/auth/me")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.user?.emailVerified) router.replace("/dashboard")
+        else if (data?.user?.email) setEmail(data.user.email)
+      })
+      .catch(() => {})
+  }, [router])
 
   useEffect(() => {
     if (cooldown <= 0) return
@@ -67,24 +86,23 @@ export default function VerifyEmail() {
     inputs.current[Math.min(pasted.length, CODE_LENGTH - 1)]?.focus()
   }
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (code.length < CODE_LENGTH) {
       setError("Enter the 6-digit code we sent you")
       return
     }
     setVerifying(true)
-    // TODO: POST the code to the verification endpoint. There is no backend yet, so VALID_CODE is the only valid one.
-    setTimeout(() => {
-      setVerifying(false)
-      if (code !== VALID_CODE) {
-        setError("Incorrect code. Check your email and try again")
-        setShakeKey((k) => k + 1)
-        return
-      }
-      setVerified(true)
-      setTimeout(() => router.push("/onboarding"), 3000)
-    }, 700)
+    const { ok, status, data } = await postJson("/api/auth/verify-email", { code })
+    setVerifying(false)
+    if (status === 401) return router.replace("/?login=1")
+    if (!ok) {
+      setError(data.message ?? "Something went wrong. Try again")
+      setShakeKey((k) => k + 1)
+      return
+    }
+    setVerified(true)
+    setTimeout(() => router.push("/onboarding"), 3000)
   }
 
   const startEdit = () => {
@@ -93,27 +111,37 @@ export default function VerifyEmail() {
     setEditing(true)
   }
 
-  const saveEmail = () => {
+  const saveEmail = async () => {
     const next = draft.trim()
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(next)) {
       setEmailError("Enter a valid email address")
       return
     }
+    const { ok, status, data } = await postJson("/api/auth/resend-code", { email: next })
+    if (status === 401) return router.replace("/?login=1")
+    if (!ok) {
+      setEmailError(data.message ?? "Something went wrong. Try again")
+      return
+    }
     try {
-      sessionStorage.setItem("apex:verify:email", next)
+      sessionStorage.setItem("apex:verify:email", data.email)
     } catch {}
-    setEmail(next)
+    setEmail(data.email)
     setEditing(false)
-    // TODO: call the "send verification email" endpoint for the new address
     setDigits(Array(CODE_LENGTH).fill(""))
     setError(null)
     setCooldown(RESEND_SECONDS)
     inputs.current[0]?.focus()
   }
 
-  const resend = () => {
+  const resend = async () => {
     if (cooldown > 0) return
-    // TODO: call the "send verification email" endpoint
+    const { ok, status, data } = await postJson("/api/auth/resend-code", {})
+    if (status === 401) return router.replace("/?login=1")
+    if (!ok) {
+      setError(data.message ?? "Something went wrong. Try again")
+      return
+    }
     setDigits(Array(CODE_LENGTH).fill(""))
     setError(null)
     setCooldown(RESEND_SECONDS)
