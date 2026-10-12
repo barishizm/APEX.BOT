@@ -12,7 +12,9 @@ import {
   Settings,
   UserPlus,
 } from "lucide-react"
-import type { ReactNode } from "react"
+import { useRouter } from "next/navigation"
+import { useEffect, useState, type ReactNode } from "react"
+import { PrismFluxLoader } from "./prism-flux-loader"
 import { ProfileMenu } from "./profile-menu"
 
 const NAV = [
@@ -59,9 +61,28 @@ function RailButton({
   )
 }
 
-export function DashboardShell({ children }: { children?: ReactNode }) {
+export function DashboardShell({ children, intro }: { children?: ReactNode; intro?: boolean }) {
+  const router = useRouter()
+  const [loading, setLoading] = useState(intro)
+
+  // Fresh login/register: keep the loader up for 3s while the page settles,
+  // then drop ?welcome so a refresh doesn't replay it
+  useEffect(() => {
+    if (!intro) return
+    const t = setTimeout(() => {
+      setLoading(false)
+      router.replace("/dashboard")
+    }, 3000)
+    return () => clearTimeout(t)
+  }, [intro, router])
+
   return (
     <div className="flex h-screen flex-col bg-[var(--color-surface)] text-[var(--color-text)]">
+      {loading && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--color-surface)]">
+          <PrismFluxLoader />
+        </div>
+      )}
       <header className="flex h-14 shrink-0 items-center gap-3 pr-3">
         <div className="-mr-3 flex h-14 w-16 shrink-0 items-center justify-center">
           <img src="/brand/mini-logo.png" alt="Apex Bot" className="block h-11 w-11 rounded-xl" />
