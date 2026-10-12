@@ -55,7 +55,7 @@ export default function Onboarding() {
   useEffect(() => {
     if (!running) return
     const t = setTimeout(
-      () => (done < BENEFITS.length ? setDone(done + 1) : router.push("/dashboard")),
+      () => (done < BENEFITS.length ? setDone(done + 1) : router.push("/dashboard?welcome=1")),
       done < BENEFITS.length ? 800 : 600
     )
     return () => clearTimeout(t)
