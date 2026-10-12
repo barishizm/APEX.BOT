@@ -11,7 +11,8 @@
     "dev:api": "npm run dev -w @apex/api",
     "dev:widget": "npm run dev -w @apex/widget",
     "build:widget": "npm run build -w @apex/widget",
-    "test": "npm test -w @apex/api && npm test -w @apex/widget",
-    "typecheck": "npm run typecheck -w @apex/api && npm run typecheck -w @apex/widget"
+    "db:migrate": "npm run migrate -w @apex/db",
+    "test": "npm test -w @apex/db && npm test -w @apex/api && npm test -w @apex/widget",
+    "typecheck": "npm run typecheck -w @apex/db && npm run typecheck -w @apex/api && npm run typecheck -w @apex/widget"
   }
 }

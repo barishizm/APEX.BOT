@@ -72,13 +72,13 @@ function Switch({
 }
 
 export function ProfileMenu({
-  name = "Barishizm",
-  email = "jane.doe@example.com",
+  name,
+  email,
   resolutionsUsed = 0,
   resolutionsLimit = 100,
 }: {
-  name?: string
-  email?: string
+  name: string
+  email: string
   resolutionsUsed?: number
   resolutionsLimit?: number
 }) {
@@ -115,8 +115,9 @@ export function ProfileMenu({
     setTheme(next)
   }
 
-  function logOut() {
-    document.cookie = "apex_session=; path=/; max-age=0; samesite=lax"
+  async function logOut() {
+    // the session cookie is httpOnly, so only the server can clear it
+    await fetch("/api/auth/logout", { method: "POST" }).catch(() => {})
     // replace, so Back doesn't return to the dashboard
     window.location.replace("/")
   }

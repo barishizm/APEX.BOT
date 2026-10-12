@@ -63,7 +63,15 @@ function RailButton({
   )
 }
 
-export function DashboardShell({ children, intro }: { children?: ReactNode; intro?: boolean }) {
+export function DashboardShell({
+  children,
+  intro,
+  user,
+}: {
+  children?: ReactNode
+  intro?: boolean
+  user: { username: string; email: string }
+}) {
   const router = useRouter()
   const [loading, setLoading] = useState(intro)
   const setup = useSetupProgress()
@@ -146,7 +154,7 @@ export function DashboardShell({ children, intro }: { children?: ReactNode; intr
             <RailButton label="Help">
               <CircleHelp className="h-5 w-5" />
             </RailButton>
-            <ProfileMenu />
+            <ProfileMenu name={user.username} email={user.email} />
           </div>
         </nav>
 

@@ -257,6 +257,8 @@ pnpm db:migrate
 pnpm dev                    # api + worker + dashboard + widget
 ```
 
+Kayıt / giriş veritabanı (Supabase kurulumu ve kendi sunucuya geçiş dahil): [`packages/db/README.md`](packages/db/README.md).
+
 Ortam değişkenleri (taslak):
 
 | Değişken | Açıklama |
@@ -265,7 +267,7 @@ Ortam değişkenleri (taslak):
 | `DATABASE_URL` | PostgreSQL bağlantısı |
 | `REDIS_URL` | Kuyruk için Redis |
 | `EMBEDDING_API_KEY` | Embedding sağlayıcısı anahtarı |
-| `JWT_SECRET` | Yönetim paneli oturumları |
+| `DATABASE_SSL` | `require` / `verify` / `off`; ayrıntılar `packages/db/README.md` |
 | `PUBLIC_WIDGET_URL` | Widget'ın servis edildiği adres |
 
 ## Yol haritası
