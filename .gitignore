@@ -26,10 +26,9 @@ npm-debug.log*
 # Agent skills & local AI tooling (not for GitHub)
 .agents/
 .codex/
-.claude/skills/
-.claude/settings.local.json
+.claude/
 skills-lock.json
 
 # Editor / local
-.vscode/settings.json
+.vscode/
 .idea/
