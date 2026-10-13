@@ -42,6 +42,12 @@ if (!siteKey) {
       widget = new Widget(api, config, options, siteKey);
       widget.mount();
       for (const [method, args] of queue.splice(0)) (widget[method] as (...a: unknown[]) => unknown)(...args);
+      // The dashboard's "Start test chat" opens the site with #apex-test. The text is
+      // fixed so a crafted link can't put words in a visitor's mouth.
+      if (location.hash === "#apex-test") {
+        history.replaceState(history.state, "", location.pathname + location.search);
+        void widget.send("Hello");
+      }
     } catch (error) {
       console.warn("[Apex] Widget disabled:", error instanceof ApiError ? error.code : error);
     }

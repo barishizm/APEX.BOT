@@ -205,7 +205,7 @@ export function AppearanceSection({ s, set, lang, err }: SectionProps) {
             onChange={(launcherImage) => set("appearance", { launcherImage })}
             error={err("appearance.launcherImage")}
             background={a.primaryColor}
-            hint="Drop a PNG, JPEG, WebP or GIF here. It's resized to 128 px. A transparent logo or mascot on your brand color works best."
+            hint="Drop a PNG, JPEG, WebP or GIF here. You can crop, rotate and position it after uploading. A transparent logo or mascot on your brand color works best."
           />
         )}
         <div className={grid2}>
@@ -835,7 +835,9 @@ Apex.on("message", (m) => console.log(m.text))`
   return (
     <>
       <Group title="Install" description="Paste this before the closing </body> tag on every page where the chat should appear.">
-        <CodeBlock label="Embed code" code={snippet} />
+        <div data-tour="embed">
+          <CodeBlock label="Embed code" code={snippet} />
+        </div>
         {sec.allowedOrigins.length === 0 && (
           <p className="flex items-start gap-2 rounded-lg bg-amber-500/10 p-3 text-xs leading-relaxed text-amber-700 dark:text-amber-300">
             <TriangleAlert className="mt-px h-4 w-4 shrink-0" aria-hidden />
@@ -846,17 +848,19 @@ Apex.on("message", (m) => console.log(m.text))`
       </Group>
 
       <Group title="Allowed websites" description="The widget only answers on these sites, so a copied embed code is useless elsewhere.">
-        <ListEditor
-          label="Website addresses"
-          items={sec.allowedOrigins}
-          onChange={(allowedOrigins) => set("security", { allowedOrigins })}
-          max={LIMITS.origins}
-          maxLength={LIMITS.url}
-          placeholder="https://www.example.com"
-          hint="Include every variant visitors use: with and without www, and staging sites."
-          errors={listErr("security.allowedOrigins")}
-          mono
-        />
+        <div data-tour="origins">
+          <ListEditor
+            label="Website addresses"
+            items={sec.allowedOrigins}
+            onChange={(allowedOrigins) => set("security", { allowedOrigins })}
+            max={LIMITS.origins}
+            maxLength={LIMITS.url}
+            placeholder="https://www.example.com"
+            hint="Include every variant visitors use: with and without www, and staging sites."
+            errors={listErr("security.allowedOrigins")}
+            mono
+          />
+        </div>
       </Group>
 
       <Group title="Usage limits" description="Guards against abuse and runaway costs.">

@@ -18,6 +18,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { checkSettings, type BotSettings, type Lang, type SettingsIssue } from "@apex/db/bot-settings"
 import type { BotJson } from "@/lib/bot"
 import { cn } from "@/lib/utils"
+import { InstallGuide } from "./install-guide"
 import { WidgetPreview, type PreviewView } from "./preview"
 import {
   AppearanceSection,
@@ -49,10 +50,22 @@ type SaveState = { kind: "idle" } | { kind: "saving" } | { kind: "saved" } | { k
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
 
-export function WidgetStudio({ initial, widgetUrl }: { initial: BotJson; widgetUrl: string }) {
+export function WidgetStudio({
+  initial,
+  widgetUrl,
+  initialSection,
+  guide = false,
+}: {
+  initial: BotJson
+  widgetUrl: string
+  /** From ?section=, ignored unless it names a section. */
+  initialSection?: string
+  guide?: boolean
+}) {
   const [bot, setBot] = useState(initial)
   const [draft, setDraft] = useState<BotSettings>(initial.settings)
-  const [section, setSection] = useState<SectionId>("general")
+  const [section, setSection] = useState<SectionId>(() => SECTIONS.find((s) => s.id === initialSection)?.id ?? "general")
+  const [guiding, setGuiding] = useState(guide)
   const [lang, setLang] = useState<Lang>(initial.settings.general.defaultLang)
   const [save, setSave] = useState<SaveState>({ kind: "idle" })
   // issues from the server win until the next edit; local checks run on every change
@@ -247,6 +260,7 @@ export function WidgetStudio({ initial, widgetUrl }: { initial: BotJson; widgetU
             type="button"
             onClick={() => void doSave()}
             disabled={!dirty || save.kind === "saving" || !bot.canEdit}
+            data-tour="save"
             title="Save (⌘S)"
             className="h-9 cursor-pointer rounded-lg border-0 bg-[var(--color-primary)] px-4 text-sm font-semibold text-[var(--color-on-primary)] transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40"
           >
@@ -304,6 +318,15 @@ export function WidgetStudio({ initial, widgetUrl }: { initial: BotJson; widgetU
               <InstallSection {...props} siteKey={bot.siteKey} widgetUrl={widgetUrl} canEdit={bot.canEdit} dirty={dirty} onRotate={rotate} />
             )}
           </fieldset>
+          {guiding && section === "install" && (
+            <InstallGuide
+              onClose={() => {
+                setGuiding(false)
+                // so a reload doesn't start the walkthrough again
+                window.history.replaceState(null, "", window.location.pathname + "?section=install")
+              }}
+            />
+          )}
         </div>
 
         <aside aria-label="Live preview" className="flex flex-col gap-3 lg:col-start-2 2xl:col-start-auto 2xl:sticky 2xl:top-24 2xl:self-start">

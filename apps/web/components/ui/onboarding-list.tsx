@@ -4,12 +4,14 @@ import { Check, ChevronRight, Sparkles, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { useState, useSyncExternalStore } from "react";
 
+type StepId = "knowledge" | "widget" | "install" | "test";
+
 type Step = {
   title: string;
   description: string;
   cta: string;
   done?: boolean;
-  id?: "knowledge";
+  id?: StepId;
   href?: string;
 };
 
@@ -17,9 +19,19 @@ type Step = {
 // that crawl is the agent's first training, so the knowledge step counts as done
 export const KNOWLEDGE_KEY = "apex:onboarding:url";
 
-function readTrained() {
+const STEP_KEYS: Record<StepId, string> = {
+  knowledge: KNOWLEDGE_KEY,
+  widget: "apex:onboarding:widget",
+  install: "apex:onboarding:install",
+  test: "apex:onboarding:test",
+};
+
+// "storage" only fires in other tabs, so same-tab writes announce themselves
+const CHANGE_EVENT = "apex:onboarding";
+
+function readFlag(key: string) {
   try {
-    return !!localStorage.getItem(KNOWLEDGE_KEY);
+    return !!localStorage.getItem(key);
   } catch {
     return false;
   }
@@ -27,15 +39,36 @@ function readTrained() {
 
 function subscribe(onChange: () => void) {
   window.addEventListener("storage", onChange);
-  return () => window.removeEventListener("storage", onChange);
+  window.addEventListener(CHANGE_EVENT, onChange);
+  return () => {
+    window.removeEventListener("storage", onChange);
+    window.removeEventListener(CHANGE_EVENT, onChange);
+  };
 }
 
-function useKnowledgeTrained() {
-  return useSyncExternalStore(subscribe, readTrained, () => false);
+type Flags = Record<StepId, boolean>;
+
+function useFlags(): Flags {
+  const serverFalse = () => false;
+  return {
+    knowledge: useSyncExternalStore(subscribe, () => readFlag(STEP_KEYS.knowledge), serverFalse),
+    widget: useSyncExternalStore(subscribe, () => readFlag(STEP_KEYS.widget), serverFalse),
+    install: useSyncExternalStore(subscribe, () => readFlag(STEP_KEYS.install), serverFalse),
+    test: useSyncExternalStore(subscribe, () => readFlag(STEP_KEYS.test), serverFalse),
+  };
 }
 
-function isDone(step: Step, trained: boolean) {
-  return !!step.done || (step.id === "knowledge" && trained);
+function markDone(id: StepId) {
+  try {
+    localStorage.setItem(STEP_KEYS[id], "1");
+  } catch {
+    return;
+  }
+  window.dispatchEvent(new Event(CHANGE_EVENT));
+}
+
+function isDone(step: Step, flags: Flags) {
+  return !!step.done || (!!step.id && flags[step.id]);
 }
 
 const STAGES: { label: string; steps: Step[] }[] = [
@@ -56,18 +89,21 @@ const STAGES: { label: string; steps: Step[] }[] = [
         cta: "Add knowledge",
       },
       {
+        id: "widget",
         title: "Customize your widget",
         description: "Match colors, greeting and avatar to your brand.",
         cta: "Customize widget",
         href: "/dashboard/widget",
       },
       {
+        id: "install",
         title: "Place widget on your website",
         description: "Talk to visitors as they browse and guide them to buy.",
         cta: "Connect widget",
-        href: "/dashboard/widget",
+        href: "/dashboard/widget?section=install&guide=1",
       },
       {
+        id: "test",
         title: "Test a live conversation",
         description:
           "Open your site and chat with the agent before customers do.",
@@ -120,10 +156,10 @@ const STAGES: { label: string; steps: Step[] }[] = [
 ];
 
 export function useSetupProgress() {
-  const trained = useKnowledgeTrained();
+  const flags = useFlags();
   const goLive = STAGES[0].steps;
   return {
-    done: goLive.filter((s) => isDone(s, trained)).length,
+    done: goLive.filter((s) => isDone(s, flags)).length,
     total: goLive.length,
   };
 }
@@ -166,14 +202,22 @@ function ChatPreview() {
   );
 }
 
-export function OnboardingList() {
+/** Where a step's button goes; the test chat needs a site the widget is allowed on. */
+function target(step: Step, testSite: string | null) {
+  if (step.id !== "test") return step.href && { href: step.href, cta: step.cta, external: false };
+  // #apex-test makes the widget open and send "Hello" on arrival
+  if (testSite) return { href: `${testSite}/#apex-test`, cta: step.cta, external: true };
+  return { href: "/dashboard/widget?section=install&guide=1", cta: "Add your website first", external: false };
+}
+
+export function OnboardingList({ testSite }: { testSite: string | null }) {
   const [stage, setStage] = useState(0);
-  const trained = useKnowledgeTrained();
+  const flags = useFlags();
   const steps = STAGES[stage].steps;
   // null = follow progress and open the first unfinished step; storage is only
   // readable after hydration, so this can't be fixed at first render
   const [picked, setPicked] = useState<number | null>(null);
-  const open = picked ?? steps.findIndex((s) => !isDone(s, trained));
+  const open = picked ?? steps.findIndex((s) => !isDone(s, flags));
 
   function pickStage(i: number) {
     setStage(i);
@@ -220,8 +264,9 @@ export function OnboardingList() {
           >
             {steps.map((step, i) => {
               const expanded = open === i;
-              const done = isDone(step, trained);
+              const done = isDone(step, flags);
               const last = i === steps.length - 1;
+              const go = target(step, testSite);
               return (
                 <li key={step.title} className="relative flex gap-6">
                   {!last && (
@@ -274,12 +319,17 @@ export function OnboardingList() {
                         <p className="m-0 text-[var(--color-muted)]">
                           {step.description}
                         </p>
-                        {step.href ? (
+                        {go ? (
                           <Link
-                            href={step.href}
-                            className="mt-3 inline-flex h-9 cursor-pointer items-center rounded-lg border-0 bg-[var(--color-primary)] px-4 text-sm font-semibold text-[var(--color-on-primary)] no-underline"
+                            href={go.href}
+                            // the test-chat step only counts once a site was there to open
+                            onClick={() => step.id && (step.id !== "test" || go.external) && markDone(step.id)}
+                            {...(go.external && { target: "_blank", rel: "noopener noreferrer" })}
+                            className="mt-3 inline-flex h-9 cursor-pointer items-center rounded-lg border-0 bg-[var(--color-primary)] px-4 text-sm font-semibold no-underline"
+                            // unlayered `a { color: inherit }` in globals.css beats the utility
+                            style={{ color: "var(--color-on-primary)" }}
                           >
-                            {step.cta}
+                            {go.cta}
                           </Link>
                         ) : (
                           <button
