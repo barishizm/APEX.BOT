@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
+    "@apex/db": "*",
     "@types/jsdom": "^30.0.0",
     "esbuild": "^0.28.2",
     "jsdom": "^30.1.2",

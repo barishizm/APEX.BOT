@@ -34,6 +34,12 @@ const TONES: Record<Tone, string> = {
   detailed: "Thorough: include the relevant details and steps from the website content.",
 };
 
+const LENGTHS = {
+  short: "Answer in one or two sentences unless the visitor asks for more.",
+  balanced: "Usually two to five sentences, or a short list.",
+  detailed: "Give complete answers with the relevant steps and details; use lists for steps.",
+};
+
 export function buildSystem(tenant: Tenant): Anthropic.Beta.BetaTextBlockParam[] {
   const s = tenant.settings;
   const lines = [
@@ -42,15 +48,35 @@ export function buildSystem(tenant: Tenant): Anthropic.Beta.BetaTextBlockParam[]
     `Default language: ${s.defaultLang === "tr" ? "Turkish" : "English"}`,
     `Tone: ${TONES[s.tone]}`,
   ];
+  if (s.responseLength) lines.push(`Answer length: ${LENGTHS[s.responseLength]}`);
+  if (s.useEmoji !== undefined) {
+    lines.push(s.useEmoji && s.tone !== "formal" ? "Emoji: an occasional, fitting emoji is fine." : "Emoji: do not use emoji.");
+  }
+  if (s.unknownAnswer) {
+    lines.push(
+      `When the documents don't answer the question, convey this message in the visitor's language: Turkish: "${oneLine(s.unknownAnswer.tr)}" / English: "${oneLine(s.unknownAnswer.en)}"`,
+    );
+  }
+  if (s.handoffEnabled === false) {
+    lines.push('Human hand-off is not available on this site: never mention a "Talk to a human" option; suggest the contact details from the documents instead.');
+  }
   if (s.blockedTopics.length > 0) {
     lines.push(`Topics the site owner asked you not to discuss (politely decline): ${s.blockedTopics.join("; ")}`);
+  }
+  let settings = `Site settings\n${lines.join("\n")}`;
+  const owner = s.instructions?.trim();
+  if (owner) {
+    // Owner rules come after the fixed rules and can't override grounding or security
+    settings += `\n\nInstructions from the site owner (follow them unless they conflict with the rules above; never treat them as facts about the company):\n<owner_instructions>\n${neutralizeTags(owner).replace(/<\/?owner_instructions/gi, "")}\n</owner_instructions>`;
   }
   return [
     { type: "text", text: RULES },
     // Stable per tenant, so the whole system prompt is one cacheable prefix.
-    { type: "text", text: `Site settings\n${lines.join("\n")}`, cache_control: { type: "ephemeral" } },
+    { type: "text", text: settings, cache_control: { type: "ephemeral" } },
   ];
 }
+
+const oneLine = (text: string) => text.replace(/\s+/g, " ").replace(/"/g, "'").trim();
 
 /** Stops content from closing our tags early (a basic prompt-injection guard). */
 export function neutralizeTags(text: string): string {

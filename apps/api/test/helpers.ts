@@ -70,7 +70,7 @@ export function setup(overrides: Partial<Limits> = {}) {
     limits,
     clientIp: (c) => c.req.header("x-test-ip") ?? "1.1.1.1",
   });
-  return { app, store, model, mailer, knowledge };
+  return { app, store, model, mailer, knowledge, tenants };
 }
 
 export function headers(site: { key: string; origin: string }, extra: Record<string, string> = {}) {

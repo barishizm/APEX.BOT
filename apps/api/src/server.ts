@@ -11,7 +11,8 @@ import { createApp } from "./app.ts";
 import { loadConfig } from "./config.ts";
 import { log } from "./log.ts";
 import { OutboxMailer } from "./mailer.ts";
-import { ClaudeChatModel, EchoChatModel } from "./model.ts";
+import { startBotSync } from "./bot-sync.ts";
+import { ClaudeChatModel, EchoChatModel, GeminiChatModel, ModelRouter, OpenAIChatModel, type ChatModel } from "./model.ts";
 import { KnowledgeBase, type ChunkInput } from "./retrieval.ts";
 import { ConversationStore } from "./store.ts";
 import { TenantRegistry, type Tenant } from "./tenants.ts";
@@ -28,9 +29,23 @@ for (const tenant of tenants.all()) {
   log("info", "knowledge loaded", { tenant: tenant.id, chunks: chunks.length });
 }
 
+// Dashboard bots, when a database is configured (same DATABASE_URL as the web app)
+if (process.env.DATABASE_URL) {
+  const { createDbFromEnv } = await import("@apex/db");
+  startBotSync(createDbFromEnv(), tenants);
+  log("info", "syncing dashboard bots from the database");
+}
+
 const store = new ConversationStore();
-const retention = new Map(tenants.all().map((t) => [t.id, t.retentionDays]));
-setInterval(() => store.sweep((id) => retention.get(id) ?? 30), 3_600_000).unref();
+setInterval(() => store.sweep((id) => tenants.findById(id)?.retentionDays ?? 30), 3_600_000).unref();
+
+// APEX_MODEL=echo answers every tenant locally; otherwise each tenant's own model choice is
+// routed to its provider, and tenants without one use APEX_MODEL on Claude.
+function chatModel(): ChatModel {
+  if (config.model === "echo") return new EchoChatModel();
+  const claude = new ClaudeChatModel(config);
+  return new ModelRouter({ anthropic: claude, openai: new OpenAIChatModel(), google: new GeminiChatModel() }, claude);
+}
 
 function clientIp(c: Context): string {
   if (config.trustProxy) {
@@ -48,7 +63,7 @@ const app = createApp({
   tenants,
   knowledge,
   store,
-  model: config.model === "echo" ? new EchoChatModel() : new ClaudeChatModel(config),
+  model: chatModel(),
   mailer: new OutboxMailer(),
   limits: config.limits,
   clientIp,

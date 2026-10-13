@@ -42,7 +42,7 @@ let db: Db
 before(async () => {
   pg = new PGlite()
   db = pgliteDb(pg)
-  assert.deepEqual(await migrate(db), ["0001_auth.sql", "0002_function_search_path.sql"])
+  assert.deepEqual(await migrate(db), ["0001_auth.sql", "0002_function_search_path.sql", "0003_bots.sql"])
 })
 after(() => db.close())
 beforeEach(async () => {

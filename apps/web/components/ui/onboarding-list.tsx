@@ -1,6 +1,7 @@
 "use client";
 
 import { Check, ChevronRight, Sparkles, UserPlus } from "lucide-react";
+import Link from "next/link";
 import { useState, useSyncExternalStore } from "react";
 
 type Step = {
@@ -9,6 +10,7 @@ type Step = {
   cta: string;
   done?: boolean;
   id?: "knowledge";
+  href?: string;
 };
 
 // Set by the onboarding screen once the user's website URL passes validation;
@@ -57,11 +59,13 @@ const STAGES: { label: string; steps: Step[] }[] = [
         title: "Customize your widget",
         description: "Match colors, greeting and avatar to your brand.",
         cta: "Customize widget",
+        href: "/dashboard/widget",
       },
       {
         title: "Place widget on your website",
         description: "Talk to visitors as they browse and guide them to buy.",
         cta: "Connect widget",
+        href: "/dashboard/widget",
       },
       {
         title: "Test a live conversation",
@@ -270,12 +274,21 @@ export function OnboardingList() {
                         <p className="m-0 text-[var(--color-muted)]">
                           {step.description}
                         </p>
-                        <button
-                          type="button"
-                          className="mt-3 inline-flex h-9 cursor-pointer items-center rounded-lg border-0 bg-[var(--color-primary)] px-4 text-sm font-semibold text-[var(--color-on-primary)]"
-                        >
-                          {step.cta}
-                        </button>
+                        {step.href ? (
+                          <Link
+                            href={step.href}
+                            className="mt-3 inline-flex h-9 cursor-pointer items-center rounded-lg border-0 bg-[var(--color-primary)] px-4 text-sm font-semibold text-[var(--color-on-primary)] no-underline"
+                          >
+                            {step.cta}
+                          </Link>
+                        ) : (
+                          <button
+                            type="button"
+                            className="mt-3 inline-flex h-9 cursor-pointer items-center rounded-lg border-0 bg-[var(--color-primary)] px-4 text-sm font-semibold text-[var(--color-on-primary)]"
+                          >
+                            {step.cta}
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>

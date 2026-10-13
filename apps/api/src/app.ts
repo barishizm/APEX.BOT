@@ -41,6 +41,10 @@ type ErrorCode =
   | "refused";
 
 const EMAIL = /^[^\s@]{1,64}@[^\s@]+\.[^\s@]{2,}$/;
+const PHONE = /^\+?[\d\s().-]{7,40}$/;
+
+/** Retrieval floor multiplier per "answer confidence" setting. */
+const CONFIDENCE = { strict: 1.5, balanced: 1, lenient: 0.6 } as const;
 
 export function createApp(deps: AppDeps) {
   const { tenants, knowledge, store, model, mailer, limits } = deps;
@@ -100,10 +104,14 @@ export function createApp(deps: AppDeps) {
     const body = await readJson(c);
     const message = typeof body?.message === "string" ? body.message.trim() : "";
     if (!message) return fail(c, "bad_request", 400);
-    if (message.length > limits.maxMessageChars) return fail(c, "message_too_long", 413);
+    if (message.length > (tenant.limits?.maxMessageChars ?? limits.maxMessageChars)) return fail(c, "message_too_long", 413);
 
     const ip = deps.clientIp(c);
-    for (const check of [ipLimiter.hit(`ip:${ip}`), tenantLimiter.hit(`tenant:${tenant.id}`)]) {
+    // a tenant's own per-visitor limit is counted under its own key
+    const ipCheck = tenant.limits?.ipMessagesPerMinute
+      ? ipLimiter.hit(`ip:${tenant.id}:${ip}`, tenant.limits.ipMessagesPerMinute)
+      : ipLimiter.hit(`ip:${ip}`);
+    for (const check of [ipCheck, tenantLimiter.hit(`tenant:${tenant.id}`)]) {
       if (!check.ok) return fail(c, "rate_limited", 429, check.retryAfter);
     }
     if (budget.usedToday(tenant.id) >= tenant.dailyTokenBudget) {
@@ -116,16 +124,18 @@ export function createApp(deps: AppDeps) {
     conversation ??= store.create(tenant.id);
     if (conversation.messages.length >= limits.maxConversationMessages) return fail(c, "conversation_full", 409);
 
-    const history = conversation.messages.slice(-limits.historyMessages);
+    const historyCount = tenant.limits?.historyMessages ?? limits.historyMessages;
+    const history = historyCount > 0 ? conversation.messages.slice(-historyCount) : [];
     const previousQuestion = [...conversation.messages].reverse().find((m) => m.role === "user")?.content;
     const query = [{ text: message, weight: 1 }];
     if (previousQuestion) query.push({ text: previousQuestion, weight: 0.5 });
     const ranked = knowledge.search(tenant.id, query, limits.retrievalTopK);
     // Absolute floor for the "I don't know" path, plus a relative cut so weak extras don't show as sources.
-    const floor = Math.max(limits.minRetrievalScore, (ranked[0]?.score ?? 0) * 0.5);
+    const minScore = limits.minRetrievalScore * CONFIDENCE[tenant.settings.confidence ?? "balanced"];
+    const floor = Math.max(minScore, (ranked[0]?.score ?? 0) * 0.5);
     const hits = ranked.filter((h) => h.score >= floor);
 
-    const request = { system: buildSystem(tenant), messages: buildMessages(history, message, hits) };
+    const request = { system: buildSystem(tenant), messages: buildMessages(history, message, hits), model: tenant.settings.model };
     const userMessage = store.append(conversation, { role: "user", content: message });
     const conv = conversation;
 
@@ -161,9 +171,10 @@ export function createApp(deps: AppDeps) {
       const sources = uniqueSources(hits);
       const reply = store.append(conv, { role: "assistant", content: answer, sources, unanswered });
       if (unanswered) log("info", "unanswered question", { tenant: tenant.id, question: message });
+      const offerHandoff = unanswered && tenant.settings.handoffEnabled !== false && tenant.settings.offerHandoffWhenUnsure !== false;
       await stream.writeSSE({
         event: "done",
-        data: JSON.stringify({ messageId: reply.id, sources, handoff: unanswered }),
+        data: JSON.stringify({ messageId: reply.id, sources, handoff: offerHandoff }),
       });
     });
   });
@@ -180,6 +191,7 @@ export function createApp(deps: AppDeps) {
 
   app.post("/v1/handoff", async (c) => {
     const tenant = c.get("tenant");
+    if (tenant.settings.handoffEnabled === false || !tenant.handoffEmail) return fail(c, "not_found", 404);
     const body = await readJson(c);
     const email = typeof body?.email === "string" ? body.email.trim() : "";
     const name = typeof body?.name === "string" ? body.name.trim().slice(0, 100) : "";
@@ -195,10 +207,41 @@ export function createApp(deps: AppDeps) {
       to: tenant.handoffEmail,
       replyTo: email,
       subject: HANDOFF_SUBJECT[lang](tenant.name),
-      text: handoffBody(lang, { email, name, note, conversation }),
+      text: handoffBody(lang, { email, name, note, phone: conversation?.visitor?.phone ?? "", conversation }),
     });
     if (conversation) conversation.handoffSent = true;
     return c.json({ ok: true });
+  });
+
+  // Lead form shown before the chat. Attaches the contact to a (new) conversation and
+  // tells the team, so a visitor who leaves without asking anything is still a lead.
+  app.post("/v1/lead", async (c) => {
+    const tenant = c.get("tenant");
+    const body = await readJson(c);
+    const email = typeof body?.email === "string" ? body.email.trim() : "";
+    const name = typeof body?.name === "string" ? body.name.trim().slice(0, 100) : "";
+    const phone = typeof body?.phone === "string" ? body.phone.trim().slice(0, 40) : "";
+    if (email.length > 254 || !EMAIL.test(email)) return fail(c, "bad_request", 400);
+    if (phone && !PHONE.test(phone)) return fail(c, "bad_request", 400);
+
+    const limit = handoffLimiter.hit(`lead:${deps.clientIp(c)}`);
+    if (!limit.ok) return fail(c, "rate_limited", 429, limit.retryAfter);
+
+    let conversation: Conversation | undefined;
+    if (typeof body.conversationId === "string") conversation = store.get(tenant.id, body.conversationId);
+    conversation ??= store.create(tenant.id);
+    conversation.visitor = { email, ...(name ? { name } : {}), ...(phone ? { phone } : {}) };
+
+    if (tenant.handoffEmail) {
+      const lang = tenant.settings.defaultLang;
+      await mailer.send({
+        to: tenant.handoffEmail,
+        replyTo: email,
+        subject: LEAD_SUBJECT[lang](tenant.name),
+        text: leadBody(lang, { email, name, phone }),
+      });
+    }
+    return c.json({ conversationId: conversation.id });
   });
 
   app.get("/v1/conversations/:id", (c) => {
@@ -247,15 +290,30 @@ const HANDOFF_SUBJECT: Record<Lang, (site: string) => string> = {
   en: (site) => `[Apex Bot] ${site}: a visitor asked to talk to a human`,
 };
 
+const LEAD_SUBJECT: Record<Lang, (site: string) => string> = {
+  tr: (site) => `[Apex Bot] ${site}: yeni potansiyel müşteri`,
+  en: (site) => `[Apex Bot] ${site}: new lead from the chat`,
+};
+
+function leadBody(lang: Lang, { email, name, phone }: { email: string; name: string; phone: string }): string {
+  const t =
+    lang === "tr"
+      ? { intro: "Bir ziyaretçi sohbete başlamadan önce iletişim bilgilerini bıraktı.", name: "Ad", email: "E-posta", phone: "Telefon", reply: "Bu e-postayı yanıtladığınızda ziyaretçiye ulaşır." }
+      : { intro: "A visitor left their contact details before starting a chat.", name: "Name", email: "Email", phone: "Phone", reply: "Replying to this email reaches the visitor." };
+  return [t.intro, "", `${t.name}: ${name || "-"}`, `${t.email}: ${email}`, `${t.phone}: ${phone || "-"}`, "", t.reply].join("\n");
+}
+
 function handoffBody(
   lang: Lang,
-  { email, name, note, conversation }: { email: string; name: string; note: string; conversation?: Conversation },
+  { email, name, note, phone, conversation }: { email: string; name: string; note: string; phone: string; conversation?: Conversation },
 ): string {
   const t =
     lang === "tr"
-      ? { intro: "Sohbet widget'ından bir ziyaretçi iletişim talebi gönderdi.", name: "Ad", email: "E-posta", note: "Mesaj", transcript: "Konuşma", visitor: "Ziyaretçi", bot: "Asistan", none: "(Konuşma kaydı yok)", reply: "Bu e-postayı yanıtladığınızda ziyaretçiye ulaşır." }
-      : { intro: "A visitor sent a contact request from the chat widget.", name: "Name", email: "Email", note: "Message", transcript: "Conversation", visitor: "Visitor", bot: "Assistant", none: "(No conversation)", reply: "Replying to this email reaches the visitor." };
-  const lines = [t.intro, "", `${t.name}: ${name || "-"}`, `${t.email}: ${email}`, `${t.note}: ${note || "-"}`, "", `${t.transcript}:`];
+      ? { intro: "Sohbet widget'ından bir ziyaretçi iletişim talebi gönderdi.", name: "Ad", email: "E-posta", phone: "Telefon", note: "Mesaj", transcript: "Konuşma", visitor: "Ziyaretçi", bot: "Asistan", none: "(Konuşma kaydı yok)", reply: "Bu e-postayı yanıtladığınızda ziyaretçiye ulaşır." }
+      : { intro: "A visitor sent a contact request from the chat widget.", name: "Name", email: "Email", phone: "Phone", note: "Message", transcript: "Conversation", visitor: "Visitor", bot: "Assistant", none: "(No conversation)", reply: "Replying to this email reaches the visitor." };
+  const lines = [t.intro, "", `${t.name}: ${name || "-"}`, `${t.email}: ${email}`];
+  if (phone) lines.push(`${t.phone}: ${phone}`);
+  lines.push(`${t.note}: ${note || "-"}`, "", `${t.transcript}:`);
   const messages = conversation?.messages.slice(-30) ?? [];
   if (messages.length === 0) lines.push(t.none);
   for (const m of messages) lines.push(`${m.role === "user" ? t.visitor : t.bot}: ${m.content}`, "");

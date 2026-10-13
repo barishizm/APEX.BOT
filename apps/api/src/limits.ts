@@ -10,8 +10,8 @@ export class RateLimiter {
     private now: () => number = Date.now,
   ) {}
 
-  /** Counts one hit; returns the seconds to wait when the key is over its limit. */
-  hit(key: string): { ok: true } | { ok: false; retryAfter: number } {
+  /** Counts one hit; returns the seconds to wait when the key is over its limit (or `limit`, per call). */
+  hit(key: string, limit = this.limit): { ok: true } | { ok: false; retryAfter: number } {
     const at = this.now();
     let w = this.windows.get(key);
     if (!w || at - w.start >= this.windowMs) {
@@ -19,7 +19,7 @@ export class RateLimiter {
       this.windows.set(key, w);
       if (this.windows.size > 50_000) this.prune(at);
     }
-    if (w.count >= this.limit) return { ok: false, retryAfter: Math.ceil((w.start + this.windowMs - at) / 1000) };
+    if (w.count >= limit) return { ok: false, retryAfter: Math.ceil((w.start + this.windowMs - at) / 1000) };
     w.count++;
     return { ok: true };
   }

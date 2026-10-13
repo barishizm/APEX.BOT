@@ -1,5 +1,9 @@
+import type { PublicWidgetSettings } from "@apex/db/bot-settings";
 import { createSSEParser } from "./sse.ts";
 import type { Lang } from "./i18n.ts";
+
+/** Dashboard settings; absent for tenants configured in the API's JSON file. */
+export type WidgetUi = PublicWidgetSettings;
 
 export interface RemoteConfig {
   siteName: string;
@@ -10,6 +14,7 @@ export interface RemoteConfig {
   greeting: Record<Lang, string>;
   suggestions: Record<Lang, string[]>;
   privacyUrl?: string;
+  ui?: WidgetUi;
 }
 
 export interface Source {
@@ -100,5 +105,9 @@ export class ApiClient {
 
   async handoff(body: { conversationId: string | null; email: string; name: string; message: string }): Promise<void> {
     await this.request("/v1/handoff", { method: "POST", body: JSON.stringify(body) });
+  }
+
+  async lead(body: { conversationId: string | null; email: string; name: string; phone: string }): Promise<string> {
+    return (await (await this.request("/v1/lead", { method: "POST", body: JSON.stringify(body) })).json()).conversationId;
   }
 }

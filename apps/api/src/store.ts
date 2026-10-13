@@ -26,6 +26,8 @@ export interface Conversation {
   updatedAt: number;
   messages: StoredMessage[];
   handoffSent?: boolean;
+  /** Contact details from the widget's lead form. */
+  visitor?: { email: string; name?: string; phone?: string };
 }
 
 export class ConversationStore {
