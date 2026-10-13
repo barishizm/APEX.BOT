@@ -6,6 +6,7 @@ import {
   CircleHelp,
   Inbox,
   MessageSquareText,
+  Palette,
   PlayCircle,
   Plus,
   Search,
@@ -20,11 +21,12 @@ import { PrismFluxLoader } from "./prism-flux-loader"
 import { ProfileMenu } from "./profile-menu"
 
 const NAV = [
-  { label: "Inbox", icon: Inbox, active: true },
+  { label: "Inbox", icon: Inbox, href: "/dashboard" },
   { label: "Conversations", icon: MessageSquareText },
   { label: "Leads", icon: UserPlus },
   { label: "Playbooks", icon: PlayCircle },
   { label: "Analytics", icon: BarChart3 },
+  { label: "Widget", icon: Palette, href: "/dashboard/widget" },
 ]
 
 const pill =
@@ -34,23 +36,22 @@ function RailButton({
   label,
   active,
   badge,
+  href,
   children,
 }: {
   label: string
   active?: boolean
   badge?: boolean
+  href?: string
   children: ReactNode
 }) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      className={`group relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg border-0 transition-colors ${
-        active
-          ? "bg-[var(--color-bubble)] text-[var(--color-text)]"
-          : "bg-transparent text-[var(--color-muted)] hover:bg-[var(--color-bubble)] hover:text-[var(--color-text)]"
-      }`}
-    >
+  const className = `group relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg border-0 transition-colors ${
+    active
+      ? "bg-[var(--color-bubble)] text-[var(--color-text)]"
+      : "bg-transparent text-[var(--color-muted)] hover:bg-[var(--color-bubble)] hover:text-[var(--color-text)]"
+  }`
+  const inner = (
+    <>
       {children}
       {badge && <span className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full bg-red-500" />}
       <span
@@ -59,6 +60,15 @@ function RailButton({
       >
         {label}
       </span>
+    </>
+  )
+  return href ? (
+    <Link href={href} aria-label={label} aria-current={active ? "page" : undefined} className={className}>
+      {inner}
+    </Link>
+  ) : (
+    <button type="button" aria-label={label} className={className}>
+      {inner}
     </button>
   )
 }
@@ -67,10 +77,13 @@ export function DashboardShell({
   children,
   intro,
   user,
+  active = "Inbox",
 }: {
   children?: ReactNode
   intro?: boolean
   user: { username: string; email: string }
+  /** Label of the rail item to highlight. */
+  active?: string
 }) {
   const router = useRouter()
   const [loading, setLoading] = useState(intro)
@@ -137,8 +150,8 @@ export function DashboardShell({
 
       <div className="flex min-h-0 flex-1">
         <nav aria-label="Main" className="flex w-16 shrink-0 flex-col items-center gap-2 py-2">
-          {NAV.map(({ label, icon: Icon, active }) => (
-            <RailButton key={label} label={label} active={active}>
+          {NAV.map(({ label, icon: Icon, href }) => (
+            <RailButton key={label} label={label} href={href} active={label === active}>
               <Icon className="h-5 w-5" />
             </RailButton>
           ))}

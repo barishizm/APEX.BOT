@@ -3,7 +3,8 @@ import { build, context } from "esbuild";
 import { readFileSync } from "node:fs";
 import { gzipSync } from "node:zlib";
 
-const LIMIT = 30 * 1024;
+// Raised from 30 KB for the dashboard settings (themes, lead form, teaser, auto-open); ~12 KB gzipped
+const LIMIT = 36 * 1024;
 const options = {
   entryPoints: ["src/index.ts"],
   outfile: "dist/widget.js",

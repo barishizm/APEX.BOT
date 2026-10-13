@@ -1,6 +1,6 @@
 // Entry point loaded by <script src=".../widget.js" data-site-key="apex_pk_..." async>.
 import { ApiClient, ApiError } from "./api.ts";
-import { Widget, type UserOptions } from "./ui.ts";
+import { Widget, hiddenHere, type UserOptions } from "./ui.ts";
 
 type Method = "open" | "close" | "toggle" | "send" | "identify" | "on" | "off";
 const METHODS: Method[] = ["open", "close", "toggle", "send", "identify", "on", "off"];
@@ -36,7 +36,10 @@ if (!siteKey) {
 
   const start = async () => {
     try {
-      widget = new Widget(api, await api.config(), options, siteKey);
+      const config = await api.config();
+      // "Hide on these pages": calls queued for a hidden widget are dropped
+      if (hiddenHere(config.ui)) return;
+      widget = new Widget(api, config, options, siteKey);
       widget.mount();
       for (const [method, args] of queue.splice(0)) (widget[method] as (...a: unknown[]) => unknown)(...args);
     } catch (error) {

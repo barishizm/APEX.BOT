@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inconsolata, Instrument_Serif, Inter, Open_Sans } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 
 const display = Inter({ subsets: ["latin", "latin-ext"], variable: "--font-display", display: "swap" });
@@ -25,13 +26,20 @@ export const viewport: Viewport = {
 // Runs before first paint so the saved theme never flashes the wrong colors.
 const themeScript = `(function(){try{var t=localStorage.getItem("theme");if(t==="light"||t==="dark"){document.documentElement.dataset.theme=t;document.documentElement.classList.toggle("dark",t==="dark")}}catch(e){}})()`;
 
+// Our own Apex widget on the marketing site; unset NEXT_PUBLIC_APEX_WIDGET_SRC to hide it.
+const widgetSrc = process.env.NEXT_PUBLIC_APEX_WIDGET_SRC;
+const widgetSiteKey = process.env.NEXT_PUBLIC_APEX_SITE_KEY ?? "apex_pk_demo";
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${display.variable} ${body.variable} ${mono.variable} ${serif.variable}`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        {widgetSrc && <Script src={widgetSrc} data-site-key={widgetSiteKey} strategy="afterInteractive" />}
+      </body>
     </html>
   );
 }
