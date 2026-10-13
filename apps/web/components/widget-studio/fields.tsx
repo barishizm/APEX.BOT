@@ -1,8 +1,9 @@
 "use client"
 
-import { CircleAlert, Plus, X } from "lucide-react"
+import { CircleAlert, Crop, Plus, X } from "lucide-react"
 import { useId, useState, type ReactNode } from "react"
 import { cn } from "@/lib/utils"
+import { bake, ImageEditor, type Adjust } from "./image-editor"
 
 // Form building blocks for the widget studio. Global CSS zeroes margins on p/h/ul,
 // so spacing here comes from flex gaps, never margin utilities.
@@ -623,42 +624,19 @@ export function ColorField({
 }
 
 const IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"]
-const MAX_SIDE = 128
 const MAX_DATA_URL = 120_000
 
-/** Shrinks an uploaded image to at most 128 px and returns it as a data: URL. */
-async function toDataUrl(file: File): Promise<string> {
+async function readFile(file: File): Promise<string> {
   if (!IMAGE_TYPES.includes(file.type)) throw new Error("Use a PNG, JPEG, WebP or GIF image")
-  const original = await new Promise<string>((resolve, reject) => {
+  return new Promise<string>((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = () => resolve(String(reader.result))
     reader.onerror = () => reject(new Error("Couldn't read the file"))
     reader.readAsDataURL(file)
   })
-  // GIFs would lose their animation on a canvas, so they're kept as they are
-  if (file.type === "image/gif") {
-    if (original.length > MAX_DATA_URL) throw new Error("This GIF is too large. Keep it under 85 KB")
-    return original
-  }
-  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-    const el = new Image()
-    el.onload = () => resolve(el)
-    el.onerror = () => reject(new Error("Couldn't read the image"))
-    el.src = original
-  })
-  const scale = Math.min(1, MAX_SIDE / Math.max(img.naturalWidth, img.naturalHeight))
-  const canvas = document.createElement("canvas")
-  canvas.width = Math.max(1, Math.round(img.naturalWidth * scale))
-  canvas.height = Math.max(1, Math.round(img.naturalHeight * scale))
-  canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height)
-  let url = canvas.toDataURL("image/webp", 0.9)
-  // browsers without WebP encoding fall back to PNG
-  if (!url.startsWith("data:image/webp")) url = canvas.toDataURL("image/png")
-  if (url.length > MAX_DATA_URL) throw new Error("This image is too detailed. Try a simpler one")
-  return url
 }
 
-/** Upload (resized in the browser) or paste an https URL. */
+/** Upload (cropped and resized in the browser) or paste an https URL. */
 export function ImageField({
   label,
   value,
@@ -678,12 +656,32 @@ export function ImageField({
   const id = useId()
   const [problem, setProblem] = useState<string | null>(null)
   const [dragging, setDragging] = useState(false)
+  const [editing, setEditing] = useState<{ src: string; initial?: Adjust } | null>(null)
+  // the full-size original behind the current value, so re-adjusting doesn't lose quality
+  const [last, setLast] = useState<{ src: string; adjust: Adjust; out: string } | null>(null)
   const uploaded = value.startsWith("data:")
+  // GIFs would lose their animation on a canvas, and remote URLs can't be read back from one
+  const adjustable = uploaded && !value.startsWith("data:image/gif")
   const take = async (file?: File) => {
     if (!file) return
     try {
       setProblem(null)
-      onChange(await toDataUrl(file))
+      const original = await readFile(file)
+      if (file.type !== "image/gif") return setEditing({ src: original })
+      if (original.length > MAX_DATA_URL) throw new Error("This GIF is too large. Keep it under 85 KB")
+      onChange(original)
+    } catch (e) {
+      setProblem(e instanceof Error ? e.message : "Couldn't use this image")
+    }
+  }
+  const apply = (img: HTMLImageElement, adjust: Adjust) => {
+    const src = editing!.src
+    setEditing(null)
+    try {
+      const out = bake(img, adjust, MAX_DATA_URL)
+      setLast({ src, adjust, out })
+      setProblem(null)
+      onChange(out)
     } catch (e) {
       setProblem(e instanceof Error ? e.message : "Couldn't use this image")
     }
@@ -735,6 +733,16 @@ export function ImageField({
                 e.target.value = ""
               }}
             />
+            {adjustable && (
+              <button
+                type="button"
+                onClick={() => setEditing(last?.out === value ? { src: last.src, initial: last.adjust } : { src: value })}
+                className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-[var(--color-line)] bg-transparent px-3 text-sm font-semibold text-[var(--color-text)] hover:border-[var(--color-muted)]"
+              >
+                <Crop className="h-4 w-4" aria-hidden />
+                Adjust
+              </button>
+            )}
             {value && (
               <button
                 type="button"
@@ -761,6 +769,9 @@ export function ImageField({
           />
         </div>
       </div>
+      {editing && (
+        <ImageEditor src={editing.src} initial={editing.initial} background={background} onApply={apply} onCancel={() => setEditing(null)} />
+      )}
     </Field>
   )
 }
