@@ -29,13 +29,41 @@ export class RateLimiter {
   }
 }
 
+/** Where daily token counts are kept across restarts (Postgres); optional, memory alone is the fallback. */
+export interface TokenUsageStore {
+  load(tenantId: string, day: string): Promise<number>;
+  add(tenantId: string, day: string, tokens: number): Promise<void>;
+}
+
 export class TokenBudget {
   private used = new Map<string, { day: string; tokens: number }>();
+  private loaded = new Set<string>();
 
-  constructor(private now: () => number = Date.now) {}
+  constructor(
+    private now: () => number = Date.now,
+    private store?: TokenUsageStore,
+    private onError: (error: unknown) => void = () => {},
+  ) {}
 
   private today(): string {
     return new Date(this.now()).toISOString().slice(0, 10);
+  }
+
+  /** Pulls today's persisted count into memory, once per tenant per day (call before `usedToday`). */
+  async load(tenantId: string): Promise<void> {
+    const day = this.today();
+    const key = `${tenantId}:${day}`;
+    if (!this.store || this.loaded.has(key)) return;
+    try {
+      const persisted = await this.store.load(tenantId, day);
+      this.loaded.add(key);
+      // keep whatever was counted here while the read was in flight
+      const local = this.usedToday(tenantId);
+      this.used.set(tenantId, { day, tokens: Math.max(persisted, local) });
+    } catch (error) {
+      this.onError(error); // fail open on the persisted count; the in-memory one still applies
+    }
+    if (this.loaded.size > 10_000) for (const k of this.loaded) if (!k.endsWith(day)) this.loaded.delete(k);
   }
 
   usedToday(tenantId: string): number {
@@ -45,5 +73,6 @@ export class TokenBudget {
 
   record(tenantId: string, tokens: number): void {
     this.used.set(tenantId, { day: this.today(), tokens: this.usedToday(tenantId) + tokens });
+    this.store?.add(tenantId, this.today(), tokens).catch(this.onError);
   }
 }

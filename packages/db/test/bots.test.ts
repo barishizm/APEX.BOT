@@ -4,7 +4,7 @@ import { PGlite } from "@electric-sql/pglite"
 import type { Db } from "../src/db.ts"
 import { migrate } from "../src/migrate.ts"
 import { register } from "../src/auth.ts"
-import { BotError, getBotForUser, listBotsChangedSince, rotateSiteKey, saveBotSettings } from "../src/bots.ts"
+import { BotError, confirmHandoffEmail, getBotForUser, listBotsChangedSince, rotateSiteKey, saveBotSettings, startHandoffVerification } from "../src/bots.ts"
 import {
   BotSettingsError,
   DEFAULT_SETTINGS,
@@ -39,6 +39,8 @@ async function newUser(email = "owner@example.com", username = "owner", company 
     company,
     acceptTerms: true,
   })
+  // dashboard users are always email-verified before they reach the bot
+  await db.query("update app.users set email_verified_at = now() where id = $1", [user.id])
   return user
 }
 
@@ -172,6 +174,43 @@ describe("bots", () => {
     assert.equal(saved.version, 2)
     assert.equal(saved.settings.general.botName, "Ada")
     assert.equal(saved.settings.model.id, "gemini-3.8-flash")
+  })
+
+  test("hand-offs go only to a confirmed address", async () => {
+    const user = await newUser()
+    const bot = await getBotForUser(db, user.id)
+    assert.equal(bot.handoffVerified, true) // the owner's verified account address
+    const other = structuredClone(bot.settings)
+    other.handoff.email = "victim@example.org"
+    await assert.rejects(saveBotSettings(db, user.id, other, bot.version), BotSettingsError)
+
+    const sent = await startHandoffVerification(db, user.id, "Victim@Example.org")
+    assert.equal(sent.email, "victim@example.org")
+    const wrong = sent.code === "000000" ? "000001" : "000000"
+    await assert.rejects(confirmHandoffEmail(db, user.id, wrong), (e: unknown) => e instanceof BotError && e.code === "invalid_code")
+    // codes can't be requested again straight away
+    await assert.rejects(startHandoffVerification(db, user.id, "victim@example.org"), (e: unknown) => e instanceof BotError && e.code === "rate_limited")
+
+    const confirmed = await confirmHandoffEmail(db, user.id, sent.code)
+    assert.equal(confirmed.version, bot.version + 1)
+    const saved = await saveBotSettings(db, user.id, other, confirmed.version)
+    assert.equal(saved.handoffVerified, true)
+    assert.equal((await listBotsChangedSince(db, null))[0].handoffVerified, true)
+
+    // a code is single-use, and changing the address again needs a new confirmation
+    await assert.rejects(confirmHandoffEmail(db, user.id, sent.code), BotError)
+    const again = structuredClone(saved.settings)
+    again.handoff.email = "someone-else@example.org"
+    await assert.rejects(saveBotSettings(db, user.id, again, saved.version), BotSettingsError)
+  })
+
+  test("a code stops working after too many wrong guesses", async () => {
+    const user = await newUser()
+    await getBotForUser(db, user.id)
+    const sent = await startHandoffVerification(db, user.id, "team@example.org")
+    const wrong = sent.code === "000000" ? "000001" : "000000"
+    for (let i = 0; i < 5; i++) await assert.rejects(confirmHandoffEmail(db, user.id, wrong), BotError)
+    await assert.rejects(confirmHandoffEmail(db, user.id, sent.code), (e: unknown) => e instanceof BotError && e.code === "rate_limited")
   })
 
   test("rejects invalid settings without writing", async () => {

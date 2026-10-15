@@ -7,6 +7,7 @@ import { migrate } from "../src/migrate.ts"
 import { register } from "../src/auth.ts"
 import { getBotForUser, saveBotSettings } from "../src/bots.ts"
 import {
+  addTokenUsage,
   conversationStats,
   deleteConversation,
   deleteConversationForUser,
@@ -19,6 +20,7 @@ import {
   setConversationVisitor,
   setMessageFeedback,
   sweepConversations,
+  tokensUsedOn,
 } from "../src/conversations.ts"
 
 let pg: PGlite
@@ -38,6 +40,8 @@ beforeEach(() => db.query("truncate app.users, app.organizations, app.auth_event
 
 async function owner(email = "o@kahve.example", username = "owner") {
   const { user } = await register(db, { email, username, password: "correct horse", accountType: "personal", acceptTerms: true })
+  // dashboard users are always email-verified before they reach the bot
+  await db.query("update app.users set email_verified_at = now() where id = $1", [user.id])
   return { user, bot: await getBotForUser(db, user.id) }
 }
 
@@ -138,5 +142,17 @@ describe("conversations", () => {
     await db.query("update app.conversations set updated_at = now() - interval '8 days' where id = $1", [old.id])
     assert.equal(await sweepConversations(db), 1)
     assert.deepEqual((await listConversations(db, user.id)).conversations.map((c) => c.id), [fresh.id])
+  })
+})
+
+describe("token usage", () => {
+  test("adds up per bot and day", async () => {
+    const { bot } = await owner()
+    assert.equal(await tokensUsedOn(db, bot.id, "2026-10-15"), 0)
+    await addTokenUsage(db, bot.id, "2026-10-15", 1200)
+    await addTokenUsage(db, bot.id, "2026-10-15", 300)
+    await addTokenUsage(db, bot.id, "2026-10-16", 50)
+    assert.equal(await tokensUsedOn(db, bot.id, "2026-10-15"), 1500)
+    assert.equal(await tokensUsedOn(db, bot.id, "2026-10-16"), 50)
   })
 })

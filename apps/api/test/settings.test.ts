@@ -14,10 +14,17 @@ const chat = (app: ReturnType<typeof setup>["app"], body: object) =>
 function bot(patch: (s: BotSettings) => void = () => {}) {
   const settings = parseSettings({ handoff: { email: "team@crest.example" }, security: { allowedOrigins: [A.origin] } });
   patch(settings);
-  return { id: "bot-1", organizationName: "Crest Org", siteKey: "apex_pk_crest", settings };
+  return { id: "bot-1", organizationName: "Crest Org", siteKey: "apex_pk_crest", settings, handoffVerified: true };
 }
 
 describe("tenantFromBot", () => {
+  it("never mails an unconfirmed hand-off address", () => {
+    const b = { ...bot(), handoffVerified: false };
+    const t = tenantFromBot(b, publicWidgetSettings(b.settings));
+    assert.equal(t.handoffEmail, "");
+    assert.equal(t.settings.handoffEnabled, false);
+  });
+
   it("maps dashboard settings onto a tenant", () => {
     const b = bot((s) => {
       s.general.companyName = "Crest Cycles";
@@ -359,6 +366,6 @@ describe("ModelRouter", () => {
 it("defaults stay usable as a tenant", () => {
   const settings = structuredClone(DEFAULT_SETTINGS);
   settings.handoff.email = "x@example.com";
-  const t = tenantFromBot({ id: "b", organizationName: "Org", siteKey: "apex_pk_x", settings }, publicWidgetSettings(settings));
+  const t = tenantFromBot({ id: "b", organizationName: "Org", siteKey: "apex_pk_x", settings, handoffVerified: true }, publicWidgetSettings(settings));
   assert.equal(t.settings.model?.id, "claude-sonnet-5-5");
 });

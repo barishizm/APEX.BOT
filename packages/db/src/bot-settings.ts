@@ -202,7 +202,7 @@ export const LIMITS = {
   historyMessages: { min: 0, max: 30 },
   maxMessageChars: { min: 200, max: 4000 },
   messagesPerMinute: { min: 1, max: 120 },
-  dailyTokenBudget: { min: 10_000, max: 100_000_000 },
+  dailyTokenBudget: { min: 10_000, max: 20_000_000 },
   retentionDays: { min: 1, max: 365 },
 } as const
 

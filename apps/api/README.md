@@ -22,10 +22,18 @@ npm test                                  # api + widget
 Every `/v1` request needs the site key (`x-apex-site-key` header or `site_key` query) and an `Origin` on that tenant's allowlist.
 Error codes the widget localizes: `unknown_site`, `origin_not_allowed`, `rate_limited`, `budget_exhausted`, `message_too_long`, `conversation_full`, `not_found`, `upstream`, `refused`.
 
-Tenants live in `data/tenants.json` and their content in `data/knowledge/<tenant id>.json`.
+The demo tenant lives in `data/tenants.json` (only loaded when `NODE_ENV` is not `production`, or `APEX_DEMO_TENANT=1`) and its content in `data/knowledge/<tenant id>.json`.
 With `DATABASE_URL` set, bots configured in the dashboard (`/dashboard/widget`, table `app.bots`) are synced
 every 30 s as well: their model (Anthropic, OpenAI or Google, with an optional fallback), persona, limits and
 widget look all come from there. Each provider needs its key (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`).
 
 Not production-ready yet (each marked `shortcut:` in the code): conversations, rate limits and token budgets are in memory;
 retrieval is lexical BM25 rather than pgvector hybrid search; handoff emails go to an in-memory outbox until an email provider is chosen.
+
+## Abuse and cost limits
+
+The origin allowlist only protects against other websites using a tenant's key: `Origin` is trivially forged outside a browser and the site key is public. What actually bounds cost is:
+
+- **Daily token budget** per tenant, stored in Postgres (`app.token_usage`) so it survives restarts and holds across instances. Without `DATABASE_URL` it falls back to memory.
+- **`APEX_MAX_DAILY_TOKENS`** (default 20,000,000): platform ceiling applied on top of whatever budget a tenant sets.
+- Per-IP, per-tenant, hand-off and mail rate limits. These are in-memory fixed windows, so a restart resets them (and each instance counts separately); the token budget above is the durable backstop.

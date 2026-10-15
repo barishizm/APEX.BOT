@@ -31,6 +31,7 @@ const chunker = (title: string, content: string) => [{ url: "", title, text: con
 describe("bot sync", () => {
   it("serves a dashboard bot with its knowledge, and follows changes", async () => {
     const { user } = await register(db, { email: "o@kahve.example", username: "owner", password: "correct horse", accountType: "business", company: "Kahve", acceptTerms: true });
+    await db.query("update app.users set email_verified_at = now() where id = $1", [user.id]);
     const bot = await getBotForUser(db, user.id);
     await saveBotSettings(db, user.id, { ...bot.settings, security: { ...bot.settings.security, allowedOrigins: [ORIGIN] } }, bot.version);
     const text = await addTextSource(db, user.id, { title: "İade politikası", content: "Açılmamış paketleri 14 gün içinde ücretsiz iade edebilirsiniz." }, chunker);

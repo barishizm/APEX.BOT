@@ -90,6 +90,18 @@ describe("safeFetch", () => {
 });
 
 describe("robots.txt and sitemaps", () => {
+  it("matches wildcard rules and sitemap locs in linear time", () => {
+    const start = Date.now();
+    const robots = parseRobots("User-agent: *\nDisallow: /*a*a*a*a*a*ab\nDisallow: /*.pdf$");
+    assert.equal(robots.isAllowed("/" + "a".repeat(300)), true);
+    assert.equal(robots.isAllowed("/x/" + "a".repeat(300) + "b"), false);
+    assert.equal(robots.isAllowed("/doc.pdf"), false);
+    assert.equal(robots.isAllowed("/doc.pdf?x=1"), true);
+    const padded = parseSitemap("<loc>" + " ".repeat(1_000_000) + "</loc><loc> https://a.example/ </loc>");
+    assert.deepEqual(padded.pages, ["https://a.example/"]);
+    assert.ok(Date.now() - start < 1000);
+  });
+
   it("applies the most specific rule for our agent group, or *", () => {
     const robots = parseRobots(`
 User-agent: *

@@ -1,4 +1,4 @@
-import { createApp } from "../src/app.ts";
+import { createApp, type AppDeps } from "../src/app.ts";
 import { defaultLimits, type Limits } from "../src/config.ts";
 import { OutboxMailer } from "../src/mailer.ts";
 import type { ChatModel, ChatRequest, ModelEvent } from "../src/model.ts";
@@ -48,7 +48,7 @@ export class FakeModel implements ChatModel {
 export const A = { key: "apex_pk_alpha", origin: "https://alpha.example" };
 export const B = { key: "apex_pk_beta", origin: "https://beta.example" };
 
-export function setup(overrides: Partial<Limits> = {}) {
+export function setup(overrides: Partial<Limits> = {}, deps: Partial<AppDeps> = {}) {
   // BM25 scores are lower on a two-chunk corpus than on a real site, so the floor is lowered here.
   const limits = { ...defaultLimits, minRetrievalScore: 0.3, ...overrides };
   const tenants = new TenantRegistry([tenant("tn_a", A.key, A.origin), tenant("tn_b", B.key, B.origin)]);
@@ -69,6 +69,7 @@ export function setup(overrides: Partial<Limits> = {}) {
     mailer,
     limits,
     clientIp: (c) => c.req.header("x-test-ip") ?? "1.1.1.1",
+    ...deps,
   });
   return { app, store, model, mailer, knowledge, tenants };
 }

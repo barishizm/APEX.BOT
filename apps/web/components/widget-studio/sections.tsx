@@ -723,7 +723,115 @@ export function PersonaSection({ s, set, err, listErr }: SectionProps) {
 
 // ---------- Hand-off ----------
 
-export function HandoffSection({ s, set, err }: SectionProps) {
+/** What the handoff section needs to know about confirmation, beyond the settings themselves. */
+export interface HandoffVerification {
+  /** The address saved on the bot is confirmed. */
+  savedVerified: boolean
+  savedEmail: string
+  /** Called with the new version once a code was accepted (confirming bumps the bot's version). */
+  onConfirmed: (bot: { version: number; handoffVerified: boolean }) => void
+}
+
+const LINK_BUTTON =
+  "inline-flex h-10 cursor-pointer items-center rounded-lg border border-[var(--color-line)] bg-transparent px-3 text-sm font-semibold text-[var(--color-text)] hover:border-[var(--color-muted)] disabled:cursor-not-allowed disabled:opacity-50"
+
+// Hand-offs are only mailed to an address its owner has proven they can read
+function ConfirmAddress({ email, verification }: { email: string; verification: HandoffVerification }) {
+  const [sentTo, setSentTo] = useState<string | null>(null)
+  const [code, setCode] = useState("")
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+  const [confirmed, setConfirmed] = useState<string | null>(null)
+  const address = email.trim().toLowerCase()
+  const verified = (verification.savedVerified && address === verification.savedEmail.toLowerCase()) || confirmed === address
+  if (!address || verified) {
+    return verified && address ? <p className="m-0 text-sm text-[var(--color-muted)]">Confirmed. Hand-offs will be sent to this address.</p> : null
+  }
+
+  const call = async (url: string, body: object) => {
+    setBusy(true)
+    setMessage(null)
+    try {
+      const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) setMessage(data.issues?.[0]?.message ?? data.message ?? "Something went wrong. Try again")
+      return res.ok ? data : null
+    } catch {
+      setMessage("You're offline. Check your connection and try again")
+      return null
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-[var(--color-line)] bg-[var(--color-raised)] p-3">
+      <p className="m-0 text-sm">This address isn&apos;t confirmed yet, so no hand-off emails are sent to it. We&apos;ll email a 6-digit code to it.</p>
+      {sentTo === address ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            maxLength={6}
+            value={code}
+            onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+            aria-label="Confirmation code"
+            placeholder="123456"
+            className="h-10 w-32 rounded-lg border border-[var(--color-line)] bg-transparent px-3 font-mono text-sm"
+          />
+          <button
+            type="button"
+            disabled={busy || code.length !== 6}
+            className={LINK_BUTTON}
+            onClick={async () => {
+              const data = await call("/api/bot/handoff-email/confirm", { code })
+              if (data) {
+                setConfirmed(address)
+                setCode("")
+                verification.onConfirmed({ version: data.version, handoffVerified: data.handoffVerified })
+              }
+            }}
+          >
+            Confirm
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            className={LINK_BUTTON}
+            onClick={async () => {
+              if (await call("/api/bot/handoff-email", { email: address })) setMessage("Sent a new code")
+            }}
+          >
+            Resend
+          </button>
+        </div>
+      ) : (
+        <div>
+          <button
+            type="button"
+            disabled={busy}
+            className={LINK_BUTTON}
+            onClick={async () => {
+              if (await call("/api/bot/handoff-email", { email: address })) {
+                setSentTo(address)
+                setMessage(`Code sent to ${address}. It expires in 15 minutes.`)
+              }
+            }}
+          >
+            Send confirmation code
+          </button>
+        </div>
+      )}
+      {message && (
+        <p role="status" className="m-0 text-sm text-[var(--color-muted)]">
+          {message}
+        </p>
+      )}
+    </div>
+  )
+}
+
+export function HandoffSection({ s, set, err, verification }: SectionProps & { verification: HandoffVerification }) {
   const h = s.handoff
   return (
     <>
@@ -740,6 +848,7 @@ export function HandoffSection({ s, set, err }: SectionProps) {
               placeholder="support@example.com"
               hint="Replying to the email reaches the visitor directly. Never shown to visitors."
             />
+            <ConfirmAddress email={h.email} verification={verification} />
             <Toggle
               label="Offer it when the assistant can't answer"
               description="Shows a “Talk to a human” button right under “I don't know” replies."
