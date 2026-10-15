@@ -42,7 +42,7 @@ let db: Db
 before(async () => {
   pg = new PGlite()
   db = pgliteDb(pg)
-  assert.deepEqual(await migrate(db), ["0001_auth.sql", "0002_function_search_path.sql", "0003_bots.sql"])
+  assert.deepEqual(await migrate(db), ["0001_auth.sql", "0002_function_search_path.sql", "0003_bots.sql", "0004_knowledge.sql", "0005_bot_activity.sql", "0006_account.sql", "0007_conversations.sql"])
 })
 after(() => db.close())
 beforeEach(async () => {
@@ -220,4 +220,15 @@ describe("email verification", () => {
     await backdateCodes()
     await rejects(issueEmailCode(db, user.id, { email: "taken@example.com" }), "email_taken")
   })
+})
+
+test("the apps know every migration, and can tell what a database is missing", async () => {
+  const { readdir } = await import("node:fs/promises")
+  const { MIGRATIONS_DIR } = await import("../src/migrate.ts")
+  const { MIGRATION_NAMES, missingMigrations } = await import("../src/schema-version.ts")
+  assert.deepEqual([...MIGRATION_NAMES], (await readdir(MIGRATIONS_DIR)).filter((f) => f.endsWith(".sql")).sort())
+  assert.deepEqual(await missingMigrations(db), [])
+  const empty = pgliteDb(new PGlite())
+  assert.deepEqual(await missingMigrations(empty), [...MIGRATION_NAMES])
+  await empty.close()
 })

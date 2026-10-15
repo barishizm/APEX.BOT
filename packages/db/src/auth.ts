@@ -101,7 +101,21 @@ function checkPassword(raw: unknown): string {
 const cleanIp = (ip?: string | null) => (ip && isIP(ip) ? ip : null)
 const cleanAgent = (ua?: string | null) => (ua ? ua.slice(0, 512) : null)
 
-type AuthEvent = "register" | "login" | "login_failed" | "logout" | "code_sent" | "email_verified" | "verify_failed"
+type AuthEvent =
+  | "register"
+  | "login"
+  | "login_failed"
+  | "logout"
+  | "code_sent"
+  | "email_verified"
+  | "verify_failed"
+  | "reset_requested"
+  | "reset_failed"
+  | "password_reset"
+  | "password_changed"
+  | "sessions_revoked"
+  | "profile_updated"
+  | "account_deleted"
 
 async function logEvent(q: Queryable, event: AuthEvent, meta: RequestMeta, userId: string | null, email: string | null) {
   await q.query(
@@ -132,16 +146,18 @@ async function createSession(q: Queryable, userId: string, persistent: boolean, 
   return { token, expiresAt, persistent }
 }
 
-// Replaces any live code for this user, so only the newest one works.
-async function insertCode(q: Queryable, userId: string, email: string): Promise<string> {
+type CodePurpose = "email_verify" | "password_reset"
+
+// Replaces any live code for this user and purpose, so only the newest one works.
+async function insertCode(q: Queryable, userId: string, email: string, purpose: CodePurpose = "email_verify"): Promise<string> {
   const code = newVerificationCode()
   await q.query(
-    "update app.verification_codes set consumed_at = now() where user_id = $1 and purpose = 'email_verify' and consumed_at is null",
-    [userId],
+    "update app.verification_codes set consumed_at = now() where user_id = $1 and purpose = $2 and consumed_at is null",
+    [userId, purpose],
   )
   await q.query(
-    "insert into app.verification_codes (user_id, purpose, email, code_hash, expires_at) values ($1, 'email_verify', $2, $3, $4)",
-    [userId, email, sha256(code), new Date(Date.now() + CODE_TTL_MS)],
+    "insert into app.verification_codes (user_id, purpose, email, code_hash, expires_at) values ($1, $2, $3, $4, $5)",
+    [userId, purpose, email, sha256(code), new Date(Date.now() + CODE_TTL_MS)],
   )
   return code
 }
@@ -459,4 +475,195 @@ export async function oauthLogin(
       return { user, session, isNew: true }
     })
     .catch(rethrowTaken)
+}
+
+// ---------- Password reset ----------
+
+/**
+ * Issues a reset code for the account with this email. Returns null when there is no such
+ * account; the caller must answer the same way in both cases so addresses can't be probed.
+ */
+export async function requestPasswordReset(db: Db, rawEmail: unknown, meta: RequestMeta = {}): Promise<{ email: string; code: string } | null> {
+  const email = normalizeEmail(rawEmail)
+  const { rows } = await db.query<{ id: string; last_code_at: Date | null }>(
+    `select u.id,
+            (select max(created_at) from app.verification_codes c where c.user_id = u.id and c.purpose = 'password_reset') as last_code_at
+       from app.users u where u.email = $1`,
+    [email],
+  )
+  const row = rows[0]
+  if (!row) return null
+  if (row.last_code_at) {
+    const wait = Math.ceil(CODE_RESEND_SECONDS - (Date.now() - row.last_code_at.getTime()) / 1000)
+    if (wait > 0) throw new AuthError("too_many_attempts", `Wait ${wait}s before requesting another code`, wait)
+  }
+  return db.transaction(async (tx) => {
+    const code = await insertCode(tx, row.id, email, "password_reset")
+    await logEvent(tx, "reset_requested", meta, row.id, email)
+    return { email, code }
+  })
+}
+
+/** Sets a new password with an emailed code, signs out every device and starts a new session. */
+export async function resetPassword(
+  db: Db,
+  input: { email: unknown; code: unknown; password: unknown },
+  meta: RequestMeta = {},
+): Promise<{ user: User; session: NewSession }> {
+  const email = normalizeEmail(input.email)
+  const code = typeof input.code === "string" ? input.code.trim() : ""
+  if (!/^\d{6}$/.test(code)) throw new AuthError("invalid_input", "Enter the 6-digit code we sent you")
+  const password = checkPassword(input.password)
+  const passwordHash = await hashPassword(password)
+
+  const outcome = await db.transaction(async (tx) => {
+    const { rows } = await tx.query<{ id: string; user_id: string; code_hash: Buffer; attempts: number; expired: boolean }>(
+      `select c.id, c.user_id, c.code_hash, c.attempts, c.expires_at <= now() as expired
+         from app.verification_codes c join app.users u on u.id = c.user_id
+        where u.email = $1 and c.purpose = 'password_reset' and c.consumed_at is null
+        for update of c`,
+      [email],
+    )
+    const live = rows[0]
+    if (!live) return { error: new AuthError("invalid_code", "This code is no longer valid. Request a new one") }
+    if (live.expired) return { error: new AuthError("code_expired", "This code has expired. Request a new one") }
+    if (live.attempts >= CODE_MAX_ATTEMPTS) return { error: new AuthError("too_many_attempts", "Too many incorrect codes. Request a new one") }
+    if (!sha256(code).equals(Buffer.from(live.code_hash))) {
+      await tx.query("update app.verification_codes set attempts = attempts + 1 where id = $1", [live.id])
+      await logEvent(tx, "reset_failed", meta, live.user_id, email)
+      return { error: new AuthError("invalid_code", "Incorrect code. Check your email and try again") }
+    }
+    await tx.query("update app.verification_codes set consumed_at = now() where id = $1", [live.id])
+    // receiving the code proves the inbox, so the address counts as verified too
+    const updated = await tx.query<UserRow>(
+      `update app.users u set password_hash = $2, email_verified_at = coalesce(email_verified_at, now()), last_login_at = now()
+        where u.id = $1 returning ${USER_COLUMNS}`,
+      [live.user_id, passwordHash],
+    )
+    await tx.query("delete from app.sessions where user_id = $1", [live.user_id])
+    const session = await createSession(tx, live.user_id, false, meta)
+    await logEvent(tx, "password_reset", meta, live.user_id, email)
+    return { user: toUser(updated.rows[0]), session }
+  })
+  if ("error" in outcome) throw outcome.error
+  return outcome
+}
+
+// ---------- Account settings ----------
+
+export interface Account {
+  user: User
+  /** False for accounts that only sign in with Google/GitHub. */
+  hasPassword: boolean
+  providers: OAuthProvider[]
+  /** Signed-in devices other than this one. */
+  otherSessions: number
+  allowTraining: boolean
+}
+
+export async function getAccount(db: Db, userId: string, currentSessionId: string): Promise<Account> {
+  const { rows } = await db.query<UserRow & { has_password: boolean; allow_training: boolean; providers: OAuthProvider[] | null; other_sessions: number }>(
+    `select ${USER_COLUMNS}, u.password_hash is not null as has_password, u.allow_training,
+            (select array_agg(provider order by provider) from app.oauth_accounts o where o.user_id = u.id) as providers,
+            (select count(*)::int from app.sessions s where s.user_id = u.id and s.id <> $2 and s.expires_at > now()) as other_sessions
+       from app.users u where u.id = $1`,
+    [userId, currentSessionId],
+  )
+  const row = rows[0]
+  if (!row) throw new AuthError("unauthorized", "Log in again")
+  return { user: toUser(row), hasPassword: row.has_password, providers: row.providers ?? [], otherSessions: row.other_sessions, allowTraining: row.allow_training }
+}
+
+export async function updateProfile(
+  db: Db,
+  userId: string,
+  input: { username?: unknown; allowTraining?: unknown },
+  meta: RequestMeta = {},
+): Promise<User> {
+  const sets: string[] = []
+  const params: unknown[] = [userId]
+  if (input.username !== undefined) {
+    const username = typeof input.username === "string" ? input.username.trim() : ""
+    if (!USERNAME_RE.test(username)) throw new AuthError("invalid_input", "Username must be 3-32 letters, numbers, dots, dashes or underscores")
+    params.push(username)
+    sets.push(`username = $${params.length}`)
+  }
+  if (input.allowTraining !== undefined) {
+    if (typeof input.allowTraining !== "boolean") throw new AuthError("invalid_input", "Choose yes or no")
+    params.push(input.allowTraining)
+    sets.push(`allow_training = $${params.length}`)
+  }
+  if (!sets.length) throw new AuthError("invalid_input", "Nothing to update")
+  return db
+    .transaction(async (tx) => {
+      const { rows } = await tx.query<UserRow>(`update app.users u set ${sets.join(", ")} where u.id = $1 returning ${USER_COLUMNS}`, params)
+      if (!rows[0]) throw new AuthError("unauthorized", "Log in again")
+      await logEvent(tx, "profile_updated", meta, userId, null)
+      return toUser(rows[0])
+    })
+    .catch(rethrowTaken)
+}
+
+/**
+ * Changes (or, for Google/GitHub-only accounts, sets) the password and signs out every
+ * other device. The current password is required whenever one exists.
+ */
+export async function changePassword(
+  db: Db,
+  userId: string,
+  input: { current?: unknown; next: unknown },
+  currentSessionId: string,
+  meta: RequestMeta = {},
+): Promise<{ signedOut: number }> {
+  const next = checkPassword(input.next)
+  const { rows } = await db.query<{ email: string; password_hash: string | null }>("select email, password_hash from app.users where id = $1", [userId])
+  const row = rows[0]
+  if (!row) throw new AuthError("unauthorized", "Log in again")
+  if (row.password_hash) {
+    const current = typeof input.current === "string" ? input.current.slice(0, 200) : ""
+    if (!(await verifyPassword(current, row.password_hash))) {
+      await logEvent(db, "login_failed", meta, userId, row.email)
+      throw new AuthError("invalid_credentials", "Your current password is incorrect")
+    }
+    if (current === next) throw new AuthError("invalid_input", "Choose a password different from your current one")
+  }
+  const passwordHash = await hashPassword(next)
+  return db.transaction(async (tx) => {
+    await tx.query("update app.users set password_hash = $2 where id = $1", [userId, passwordHash])
+    const { rows: gone } = await tx.query("delete from app.sessions where user_id = $1 and id <> $2 returning id", [userId, currentSessionId])
+    await logEvent(tx, "password_changed", meta, userId, row.email)
+    return { signedOut: gone.length }
+  })
+}
+
+/** Signs out every device except the current one. */
+export async function revokeOtherSessions(db: Db, userId: string, currentSessionId: string, meta: RequestMeta = {}): Promise<number> {
+  return db.transaction(async (tx) => {
+    const { rows } = await tx.query("delete from app.sessions where user_id = $1 and id <> $2 returning id", [userId, currentSessionId])
+    await logEvent(tx, "sessions_revoked", meta, userId, null)
+    return rows.length
+  })
+}
+
+/**
+ * Deletes the account (KVKK / GDPR erasure). Workspaces where this user is the only member go
+ * with it, including their bots, knowledge and settings. `confirmEmail` must match the account.
+ */
+export async function deleteAccount(db: Db, userId: string, confirmEmail: unknown, meta: RequestMeta = {}): Promise<void> {
+  await db.transaction(async (tx) => {
+    const { rows } = await tx.query<{ email: string }>("select email from app.users where id = $1 for update", [userId])
+    if (!rows[0]) throw new AuthError("unauthorized", "Log in again")
+    if (typeof confirmEmail !== "string" || confirmEmail.trim().toLowerCase() !== rows[0].email) {
+      throw new AuthError("invalid_input", "Type your email address exactly to confirm")
+    }
+    await tx.query(
+      `delete from app.organizations o
+        where exists (select 1 from app.organization_members m where m.organization_id = o.id and m.user_id = $1)
+          and not exists (select 1 from app.organization_members m where m.organization_id = o.id and m.user_id <> $1)`,
+      [userId],
+    )
+    await tx.query("delete from app.users where id = $1", [userId])
+    // kept without the user id so the log still shows the erasure happened
+    await logEvent(tx, "account_deleted", meta, null, null)
+  })
 }

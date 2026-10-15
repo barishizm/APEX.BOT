@@ -27,7 +27,7 @@ after(async () => {
 })
 
 test("migrations and the auth flow work through pg", async () => {
-  assert.deepEqual(await migrate(db), ["0001_auth.sql", "0002_function_search_path.sql", "0003_bots.sql"])
+  assert.deepEqual(await migrate(db), ["0001_auth.sql", "0002_function_search_path.sql", "0003_bots.sql", "0004_knowledge.sql", "0005_bot_activity.sql", "0006_account.sql", "0007_conversations.sql"])
   assert.deepEqual(await migrate(db), [])
 
   const input = { email: "a@example.com", username: "alice", password: "password1", accountType: "personal", acceptTerms: true }

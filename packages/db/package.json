@@ -4,7 +4,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./bot-settings": "./src/bot-settings.ts"
+    "./bot-settings": "./src/bot-settings.ts",
+    "./migrate": "./src/migrate.ts"
   },
   "scripts": {
     "migrate": "tsx --env-file-if-exists=../../apps/web/.env.local src/migrate.ts",

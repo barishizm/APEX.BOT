@@ -97,6 +97,7 @@ export function WidgetPreview({
   dark,
   view,
   onToggle,
+  height,
 }: {
   settings: BotSettings
   lang: Lang
@@ -105,6 +106,8 @@ export function WidgetPreview({
   dark: boolean
   view: PreviewView
   onToggle: () => void
+  /** Frame height in px; defaults to a full browser window. */
+  height?: number
 }) {
   const { general, appearance: a, messages: m, behavior: b, handoff } = settings
   const t = COPY[lang]
@@ -357,7 +360,7 @@ export function WidgetPreview({
   return (
     <div
       className={`relative mx-auto overflow-hidden border border-[var(--color-line)] ${mobile ? "rounded-[2rem]" : "rounded-xl"}`}
-      style={{ ...root, width: mobile ? 360 : "100%", maxWidth: "100%", height: mobile ? 680 : 700, background: theme === "dark" ? "#0c0c09" : "#eeeee9" }}
+      style={{ ...root, width: mobile ? 360 : "100%", maxWidth: "100%", height: height ?? (mobile ? 680 : 700), background: theme === "dark" ? "#0c0c09" : "#eeeee9" }}
     >
       {/* a stand-in host page, so the widget's position and contrast read in context */}
       <div aria-hidden className="flex items-center gap-1.5 px-3" style={{ height: 34, background: theme === "dark" ? "#1b1b17" : "#ffffff", borderBottom: `1px solid ${c.line}` }}>

@@ -3,7 +3,7 @@ import { cookies, headers } from "next/headers"
 import { redirect } from "next/navigation"
 import { isIP } from "node:net"
 import { AuthError, getSession, type NewSession, type RequestMeta } from "@apex/db"
-import { db } from "@/lib/db"
+import { db, schemaMissing } from "@/lib/db"
 
 export const SESSION_COOKIE = "apex_session"
 
@@ -28,12 +28,35 @@ export const currentSession = cache(async () => {
   return token ? getSession(db(), token) : null
 })
 
+// Marketing pages only switch "Log in" for "Dashboard"; a database hiccup must not break them
+export async function isSignedIn() {
+  if (!(await sessionToken())) return false
+  try {
+    return !!(await currentSession())
+  } catch {
+    return false
+  }
+}
+
 // For pages behind log-in; unverified accounts finish verification first
 export async function requireVerifiedUser() {
+  // a database behind the code would fail on every dashboard query; say so instead
+  if ((await schemaMissing()).length) redirect("/database-update")
   const session = await currentSession()
   if (!session) redirect("/?login=1")
   if (!session.user.emailVerified) redirect("/verify-email")
   return session.user
+}
+
+// API routes: the signed-in session, or a 401 the client can act on
+export async function requireSession() {
+  const session = await currentSession()
+  if (!session) throw new AuthError("unauthorized", "Your session has ended. Log in again")
+  return session
+}
+
+export async function clearSessionCookie() {
+  ;(await cookies()).delete(SESSION_COOKIE)
 }
 
 export async function requestMeta(): Promise<RequestMeta> {

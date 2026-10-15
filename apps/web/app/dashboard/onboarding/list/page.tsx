@@ -1,18 +1,34 @@
 import type { Metadata } from "next";
-import { getBotForUser } from "@apex/db";
-import { DashboardShell } from "@/components/ui/dashboard-shell";
+import { DashboardFrame } from "@/components/dashboard/frame";
 import { OnboardingList } from "@/components/ui/onboarding-list";
+import { buildStages } from "@/lib/setup-steps";
 import { requireVerifiedUser } from "@/lib/auth";
+import { currentBot, currentSources, getSetup } from "@/lib/dashboard";
 import { db } from "@/lib/db";
+import { listConversations } from "@apex/db";
 
-export const metadata: Metadata = { title: "Setup — Apex Bot" };
+export const metadata: Metadata = { title: "Setup" };
 
 export default async function OnboardingListPage() {
   const user = await requireVerifiedUser();
-  const bot = await getBotForUser(db(), user.id);
+  const [bot, sources, setup, conversations] = await Promise.all([
+    currentBot(user.id),
+    currentSources(user.id),
+    getSetup(user.id),
+    listConversations(db(), user.id, { limit: 1 }),
+  ]);
+  const h = bot.settings.handoff;
+  const stages = buildStages({
+    setup,
+    testSite: bot.settings.security.allowedOrigins[0] ?? null,
+    hasText: sources.some((s) => s.kind === "text"),
+    handoffOn: h.enabled && !!h.email,
+    leadOn: h.leadCapture !== "off",
+    hasConversations: conversations.conversations.length > 0,
+  });
   return (
-    <DashboardShell user={{ username: user.username, email: user.email }}>
-      <OnboardingList testSite={bot.settings.security.allowedOrigins[0] ?? null} />
-    </DashboardShell>
+    <DashboardFrame active="Setup">
+      <OnboardingList stages={stages} />
+    </DashboardFrame>
   );
 }

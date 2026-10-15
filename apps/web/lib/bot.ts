@@ -1,5 +1,6 @@
 import { BotError, BotSettingsError, type Bot } from "@apex/db"
 import { authErrorResponse, currentSession } from "@/lib/auth"
+import { schemaMissing } from "@/lib/db"
 
 // What the dashboard receives: the bot minus server-only fields
 export function botJson(bot: Bot) {
@@ -15,6 +16,7 @@ export type BotJson = ReturnType<typeof botJson>
 
 // Same session rules as the pages: signed in and email verified
 export async function requireApiUser() {
+  if ((await schemaMissing()).length) throw new BotApiError(503, "database_outdated", "The database needs an update. Run npm run db:migrate")
   const session = await currentSession()
   if (!session) throw new BotApiError(401, "unauthorized", "Not logged in")
   if (!session.user.emailVerified) throw new BotApiError(403, "unverified", "Verify your email first")

@@ -1,0 +1,22 @@
+{
+  "name": "@apex/knowledge",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./retrieval": "./src/retrieval.ts",
+    "./text": "./src/text.ts"
+  },
+  "scripts": {
+    "test": "tsx --test test/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "node-html-parser": "^9.0.4"
+  }
+}

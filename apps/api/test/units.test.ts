@@ -6,6 +6,7 @@ import { KnowledgeBase } from "../src/retrieval.ts";
 import { ConversationStore } from "../src/store.ts";
 import { detectLang, tokenize } from "../src/text.ts";
 import { RateLimiter } from "../src/limits.ts";
+import { OutboxMailer, ResendMailer, mailerFromEnv } from "../src/mailer.ts";
 import { tenant } from "./helpers.ts";
 
 describe("retrieval", () => {
@@ -99,7 +100,7 @@ describe("prompt", () => {
 describe("store and limits", () => {
   it("sweeps conversations past retention", () => {
     let now = 0;
-    const store = new ConversationStore(() => now);
+    const store = new ConversationStore({ now: () => now });
     const c = store.create("t");
     now = 31 * 86_400_000;
     assert.equal(store.sweep(() => 30), 1);
@@ -113,5 +114,29 @@ describe("store and limits", () => {
     assert.equal(limiter.hit("k").ok, false);
     now = 1000;
     assert.equal(limiter.hit("k").ok, true);
+  });
+});
+
+describe("ResendMailer", () => {
+  it("posts the email with a reply-to and never throws", async () => {
+    const calls: { url: string; init: RequestInit }[] = [];
+    const ok = (async (url: string, init: RequestInit) => {
+      calls.push({ url, init });
+      return new Response("{}", { status: 200 });
+    }) as unknown as typeof fetch;
+    await new ResendMailer("re_test", "Apex <bot@x.example>", ok).send({ to: "team@x.example", replyTo: "v@y.example", subject: "Hi", text: "Body" });
+    assert.equal(calls[0].url, "https://api.resend.com/emails");
+    assert.deepEqual(JSON.parse(String(calls[0].init.body)), { from: "Apex <bot@x.example>", to: ["team@x.example"], reply_to: "v@y.example", subject: "Hi", text: "Body" });
+    assert.equal((calls[0].init.headers as Record<string, string>).authorization, "Bearer re_test");
+
+    const down = (async () => {
+      throw new Error("network down");
+    }) as unknown as typeof fetch;
+    await new ResendMailer("re_test", "x", down).send({ to: "a@b.example", replyTo: "c@d.example", subject: "s", text: "t" });
+  });
+
+  it("is chosen only when a key is configured", () => {
+    assert.ok(mailerFromEnv({ RESEND_API_KEY: "re_x" }) instanceof ResendMailer);
+    assert.ok(mailerFromEnv({}) instanceof OutboxMailer);
   });
 });

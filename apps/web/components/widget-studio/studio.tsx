@@ -14,6 +14,7 @@ import {
   Sparkles,
   type LucideIcon,
 } from "lucide-react"
+import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { checkSettings, type BotSettings, type Lang, type SettingsIssue } from "@apex/db/bot-settings"
 import type { BotJson } from "@/lib/bot"
@@ -62,9 +63,15 @@ export function WidgetStudio({
   initialSection?: string
   guide?: boolean
 }) {
+  const router = useRouter()
   const [bot, setBot] = useState(initial)
   const [draft, setDraft] = useState<BotSettings>(initial.settings)
   const [section, setSection] = useState<SectionId>(() => SECTIONS.find((s) => s.id === initialSection)?.id ?? "general")
+  // the command palette links to ?section= on this same page, which doesn't remount it
+  useEffect(() => {
+    const id = SECTIONS.find((s) => s.id === initialSection)?.id
+    if (id) setSection(id)
+  }, [initialSection])
   const [guiding, setGuiding] = useState(guide)
   const [lang, setLang] = useState<Lang>(initial.settings.general.defaultLang)
   const [save, setSave] = useState<SaveState>({ kind: "idle" })
@@ -158,6 +165,8 @@ export function WidgetStudio({
         setDraft(body.settings)
         setShowIssues(false)
         setSave({ kind: "saved" })
+        // setup progress in the header is server-rendered
+        router.refresh()
         return
       }
       if (body.error === "invalid_settings") {
@@ -168,7 +177,7 @@ export function WidgetStudio({
     } catch {
       setSave({ kind: "error", message: "You're offline. Check your connection and try again" })
     }
-  }, [dirty, save.kind, bot, draft, localIssues])
+  }, [dirty, save.kind, bot, draft, localIssues, router])
 
   const discard = () => {
     setDraft(bot.settings)

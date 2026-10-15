@@ -91,3 +91,16 @@ export class KnowledgeBase {
 function requireTenant(tenantId: string): void {
   if (typeof tenantId !== "string" || tenantId.length === 0) throw new Error("tenantId is required");
 }
+
+/** Retrieval floor multiplier per "answer confidence" setting. */
+export const CONFIDENCE = { strict: 1.5, balanced: 1, lenient: 0.6 } as const;
+export type Confidence = keyof typeof CONFIDENCE;
+
+/**
+ * The hits an answer may use: an absolute floor for the "I don't know" path, plus a relative
+ * cut so weak extras don't show up as sources. Empty means "I don't know".
+ */
+export function relevantHits(ranked: Hit[], minScore: number, confidence: Confidence = "balanced"): Hit[] {
+  const floor = Math.max(minScore * CONFIDENCE[confidence], (ranked[0]?.score ?? 0) * 0.5);
+  return ranked.filter((h) => h.score >= floor);
+}

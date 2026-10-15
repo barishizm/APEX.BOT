@@ -4,7 +4,7 @@ Apex Bot, web sitelerine eklenen bir AI asistanıdır. Ziyaretçilerin soruları
 
 Apex Bot **kapalı kaynaklı, ticari bir SaaS** ürünüdür: birçok müşteri sitesine abonelikle sunulur, tamamı bizim tarafımızda barındırılır. Yapay zekâ modelleri kendi altyapımızda değil, **bulut API'leri üzerinden** çalışır.
 
-> **Durum:** Planlama aşaması. Bu doküman hedefleri, mimariyi ve yol haritasını tanımlar; teknoloji seçimleri başlangıç önerileridir ve kesinleşmemiştir.
+> **Durum:** Kapalı beta / MVP çalışıyor: kayıt ve giriş, site tarama ile bilgi tabanı, widget stüdyosu, konuşma kaydı, insana devir ve lead e-postaları. Embedding/hibrit arama, faturalama ve eval seti henüz yok (aşağıdaki yol haritası). Bu doküman hedefleri ve mimariyi de tanımlar.
 
 ## Verilen kararlar
 
@@ -244,54 +244,72 @@ apex-bot/
 └── README.md
 ```
 
-## Kurulum (taslak)
+## Kurulum
 
-> Kod henüz yazılmadı; aşağıdaki adımlar hedeflenen geliştirici deneyimidir.
+Gereksinimler: Node.js 22+ ve bir PostgreSQL 13+ veritabanı (Supabase veya kendi sunucun; ayrıntılar [`packages/db/README.md`](packages/db/README.md)).
 
 ```bash
-git clone <repo-url> apex-bot && cd apex-bot
-cp .env.example .env        # anahtarları doldur
-docker compose up -d        # Postgres (pgvector) + Redis
-pnpm install
-pnpm db:migrate
-pnpm dev                    # api + worker + dashboard + widget
+npm install
+cp apps/web/.env.example apps/web/.env.local   # DATABASE_URL vb. doldur
+cp apps/api/.env.example apps/api/.env         # aynı DATABASE_URL + model anahtarları
+npm run db:migrate                             # şemayı kurar / günceller (tekrar çalıştırmak güvenli)
+npm run build:widget                           # API'nin servis ettiği widget.js
+npm run dev:api                                # sohbet API'si, http://localhost:8787
+npm run dev:web                                # site + yönetim paneli, http://localhost:3000
 ```
 
-Kayıt / giriş veritabanı (Supabase kurulumu ve kendi sunucuya geçiş dahil): [`packages/db/README.md`](packages/db/README.md).
+Kontroller: `npm run typecheck` ve `npm test` (veritabanı testleri gömülü PostgreSQL ile, ağ gerektirmez).
 
-Ortam değişkenleri (taslak):
+Uygulamalar:
 
-| Değişken | Açıklama |
+| Paket | Görev |
 |---|---|
-| `ANTHROPIC_API_KEY` | Claude API anahtarı |
-| `DATABASE_URL` | PostgreSQL bağlantısı |
-| `REDIS_URL` | Kuyruk için Redis |
-| `EMBEDDING_API_KEY` | Embedding sağlayıcısı anahtarı |
-| `DATABASE_SSL` | `require` / `verify` / `off`; ayrıntılar `packages/db/README.md` |
-| `PUBLIC_WIDGET_URL` | Widget'ın servis edildiği adres |
+| `apps/web` | Pazarlama sitesi, kayıt/giriş, yönetim paneli (genel bakış, bilgi tabanı, konuşmalar, widget stüdyosu, kurulum listesi, hesap ayarları) |
+| `apps/api` | Widget'ın konuştuğu sohbet API'si; panel botlarını, bilgilerini ve ayarlarını 30 sn'de bir veritabanından senkronlar, konuşmaları kaydeder |
+| `apps/widget` | Shadow DOM'lu gömülebilir widget (`widget.js`) |
+| `packages/db` | Şema, migration'lar ve tüm veritabanı erişimi (tenant izolasyonu burada) |
+| `packages/knowledge` | SSRF korumalı site tarayıcı, içerik çıkarma, parçalama ve BM25 retrieval |
+
+Ortam değişkenleri:
+
+| Değişken | Nerede | Açıklama |
+|---|---|---|
+| `DATABASE_URL`, `DATABASE_SSL` | web, api | PostgreSQL bağlantısı (ikisinde de aynı) |
+| `NEXT_PUBLIC_SITE_URL` | web | Sitenin genel adresi (OAuth dönüşleri) |
+| `NEXT_PUBLIC_APEX_API_URL` | web | Sohbet API'sinin genel adresi; gömme kodu ve durum sayfası bunu kullanır |
+| `RESEND_API_KEY`, `MAIL_FROM` | web, api | E-posta (doğrulama/şifre sıfırlama kodları, devir ve lead bildirimleri). Yoksa geliştirmede loga yazılır |
+| `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY` | api | Botların seçtiği model sağlayıcıları |
+| `APEX_MODEL` | api | Varsayılan model; `echo` anahtarsız yerel geliştirme içindir |
+| `APEX_MIN_RETRIEVAL_SCORE` | api, web | "Bilmiyorum" eşiği; panelin "soru dene" aracı da aynı değeri kullanmalı |
+| `APEX_CRAWL_ALLOW_PRIVATE` | web | Sadece yerel geliştirme: tarayıcının yerel ağdaki siteleri okumasına izin verir |
+| `GOOGLE_*`, `GITHUB_*` | web | Google / GitHub ile giriş |
+| `NEXT_PUBLIC_CONTACT_EMAIL` | web | Sitede ve yasal sayfalarda gösterilen iletişim adresi |
 
 ## Yol haritası
 
 **Faz 0 – Temel (1–2 hafta)**
 - [ ] Teknoloji kararlarının kesinleşmesi (ADR'ler)
-- [ ] Monorepo iskeleti, CI, lint/test altyapısı
-- [ ] Tek bir örnek site için elle hazırlanmış bilgi tabanı
+- [x] Monorepo iskeleti ve test altyapısı
+- [ ] CI ve lint
+- [x] Tek bir örnek site için elle hazırlanmış bilgi tabanı
 
 **Faz 1 – MVP (3–5 hafta)**
-- [ ] `/v1/chat` akışlı yanıt, sistem istemi, geçmiş yönetimi
-- [ ] URL tarama → parçalama → embedding → retrieval
-- [ ] Temel widget (aç/kapa, akış, kaynak linkleri)
-- [ ] Site anahtarı + domain izin listesi + rate limit
+- [x] `/v1/chat` akışlı yanıt, sistem istemi, geçmiş yönetimi
+- [x] URL tarama → parçalama → retrieval (BM25)
+- [ ] Embedding ile anlamsal arama
+- [x] Temel widget (aç/kapa, akış, kaynak linkleri)
+- [x] Site anahtarı + domain izin listesi + rate limit
 - [ ] İlk değerlendirme seti
 
 **Faz 2 – Ürünleşme**
-- [ ] Yönetim paneli (kaynaklar, ayarlar, konuşmalar)
-- [ ] Tema ve kişilik özelleştirme
+- [x] Yönetim paneli (kaynaklar, ayarlar, konuşmalar)
+- [x] Tema ve kişilik özelleştirme
 - [ ] Hibrit arama + reranker
-- [ ] Analitik, geri bildirim, yanıtlanamayan soru raporu
-- [ ] İnsana devretme (e-posta formu), lead toplama
+- [x] Geri bildirim ve yanıtlanamayan soru filtresi, 7 günlük özet
+- [ ] Ayrıntılı analitik
+- [x] İnsana devretme (e-posta formu), lead toplama
 - [ ] Hesaplar, planlar, kullanım kotaları ve faturalama (satış için gerekli)
-- [ ] KVKK araçları (silme, saklama süresi)
+- [x] KVKK araçları (silme, saklama süresi)
 
 **Faz 3 – Büyüme**
 - [ ] Araç kullanımı (ör. randevu, sipariş durumu sorgulama)

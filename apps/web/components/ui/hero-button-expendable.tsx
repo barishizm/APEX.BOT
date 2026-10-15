@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { X, Check, ArrowRight, Clock, Languages, BarChart3, Eye, EyeOff } from "lucide-react"
+import { X, Check, ArrowRight, Clock, Languages, LifeBuoy, Eye, EyeOff } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { GodRays, MeshGradient } from "@paper-design/shaders-react"
 
@@ -96,8 +96,11 @@ function PasswordInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
   )
 }
 
-export default function Hero({ modalOnly = false }: { modalOnly?: boolean }) {
+export default function Hero({ modalOnly = false, signedIn = false }: { modalOnly?: boolean; signedIn?: boolean }) {
   const router = useRouter()
+  const dialogRef = useRef<HTMLDivElement>(null)
+  // Focus goes back where it was when the modal closes
+  const returnFocus = useRef<HTMLElement | null>(null)
   const [isExpanded, setIsExpanded] = useState(false)
   const [meshReady, setMeshReady] = useState(false)
   const [accountType, setAccountType] = useState<"business" | "personal">("business")
@@ -128,6 +131,7 @@ export default function Hero({ modalOnly = false }: { modalOnly?: boolean }) {
   const fullRadius = typeof window !== "undefined" ? Math.hypot(window.innerWidth, window.innerHeight) : 2000
 
   const handleExpand = () => {
+    returnFocus.current = document.activeElement as HTMLElement | null
     setOrigin(null)
     setAuthMode("register")
     setIsExpanded(true)
@@ -137,7 +141,9 @@ export default function Hero({ modalOnly = false }: { modalOnly?: boolean }) {
   useEffect(() => {
     const opener = (mode: "login" | "register") => (e: Event) => {
       const { x, y } = (e as CustomEvent<{ x: number; y: number }>).detail
+      returnFocus.current = document.activeElement as HTMLElement | null
       setOrigin({ x, y })
+      setAuthError(null)
       setFormStep("idle")
       setAuthMode(mode)
       setIsExpanded(true)
@@ -152,9 +158,16 @@ export default function Hero({ modalOnly = false }: { modalOnly?: boolean }) {
     }
   }, [])
 
-  // The dashboard guard redirects here with ?login=1
+  // The dashboard guard redirects here with ?login=1; links without JS use ?login=1 / ?signup=1
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
+    if (params.get("signup") === "1") {
+      window.history.replaceState(null, "", window.location.pathname)
+      setFormStep("idle")
+      setAuthMode("register")
+      setIsExpanded(true)
+      return
+    }
     if (params.get("login") !== "1") return
     const oauthErrors: Record<string, string> = {
       oauth_not_configured: "Google/GitHub sign-in isn't set up yet. Use your email instead",
@@ -179,6 +192,7 @@ export default function Hero({ modalOnly = false }: { modalOnly?: boolean }) {
   const handleClose = () => {
     setIsExpanded(false)
     setMeshReady(false)
+    returnFocus.current?.focus?.()
     // Reset form after a brief delay so the user doesn't see it reset while closing
     setTimeout(() => setFormStep("idle"), 500)
   }
@@ -214,11 +228,11 @@ export default function Hero({ modalOnly = false }: { modalOnly?: boolean }) {
         setFormStep("idle")
         return
       }
-      try {
-        sessionStorage.setItem("apex:verify:email", data.user.email)
-      } catch {}
-      setNextPath(data.user.emailVerified ? "/dashboard?welcome=1" : "/verify-email")
+      const next = data.user.emailVerified ? "/dashboard?welcome=1" : "/verify-email"
+      setNextPath(next)
       setFormStep("success")
+      // the success screen is a beat of feedback, not a stop; Continue stays as a fallback
+      setTimeout(() => router.push(next), 1200)
     } catch {
       setAuthError("Couldn't reach the server. Check your connection and try again")
       setFormStep("idle")
@@ -235,20 +249,44 @@ export default function Hero({ modalOnly = false }: { modalOnly?: boolean }) {
     return () => { document.body.style.overflow = "unset" }
   }, [isExpanded])
 
-  // Close on Escape
+  // Escape closes; Tab stays inside the modal while it is open
   useEffect(() => {
     if (!isExpanded) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") handleClose()
+      if (e.key === "Escape") return handleClose()
+      if (e.key !== "Tab" || !dialogRef.current) return
+      const focusable = [...dialogRef.current.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled])',
+      )].filter((el) => el.offsetParent !== null)
+      if (!focusable.length) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (!dialogRef.current.contains(document.activeElement)) {
+        e.preventDefault()
+        first.focus()
+      } else if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault()
+        first.focus()
+      }
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
   }, [isExpanded])
 
+  // Move focus into the dialog once its content has faded in
+  useEffect(() => {
+    if (!isExpanded) return
+    const t = setTimeout(() => dialogRef.current?.querySelector<HTMLInputElement>("form input:not([type=checkbox])")?.focus(), 350)
+    return () => clearTimeout(t)
+  }, [isExpanded, authMode])
+
   return (
     <>
       {!modalOnly && (
-      <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-white dark:bg-zinc-950 px-4 sm:px-6 py-12 sm:py-20 transition-colors duration-300">
+      <div className="relative flex min-h-[100svh] flex-col items-center justify-center overflow-hidden bg-[var(--color-surface)] px-4 sm:px-6 pb-12 pt-28 sm:pb-20 sm:pt-32">
 
         {/* GodRays Background - Adjusted to be subtle in both modes */}
         <div className="absolute inset-0 pointer-events-none">
@@ -285,8 +323,8 @@ export default function Hero({ modalOnly = false }: { modalOnly?: boolean }) {
             transition={{ duration: 0.6 }}
             className="inline-flex items-center rounded-full border border-zinc-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/50 px-3 py-1 text-sm font-medium text-zinc-800 dark:text-zinc-200 backdrop-blur-sm"
           >
-            <span className="flex h-2 w-2 rounded-full bg-zinc-500 mr-2"></span>
-            New: We are Close Beta!
+            <span className="mr-2 flex h-2 w-2 rounded-full bg-[var(--color-secondary)]" aria-hidden="true"></span>
+            Now in closed beta · Turkish &amp; English
           </motion.div>
 
           <motion.h1
@@ -307,11 +345,20 @@ export default function Hero({ modalOnly = false }: { modalOnly?: boolean }) {
             transition={{ duration: 0.6, delay: 0.2 }}
             className="text-base sm:text-lg md:text-xl text-zinc-600 dark:text-zinc-400 max-w-4xl px-4 leading-relaxed"
           >
-            Give every visitor instant answers without hiring more staff.{" "}
+            Apex answers your visitors from your own website, around the clock.{" "}
             <br className="hidden md:block" />
-            Set up in minutes, customize to your brand, and start supporting customers today.
+            Set it up in minutes, match it to your brand and install it with one line of code.
           </motion.p>
 
+          {signedIn ? (
+            <a
+              href="/dashboard"
+              className="relative mt-4 inline-flex h-14 items-center gap-2 rounded-full bg-zinc-900 px-8 text-lg font-medium tracking-wide text-white no-underline transition-opacity hover:opacity-90 dark:bg-zinc-100 dark:text-zinc-900"
+            >
+              Go to your dashboard
+              <ArrowRight className="h-5 w-5" aria-hidden="true" />
+            </a>
+          ) : (
           <AnimatePresence initial={false}>
             {!isExpanded && (
               <motion.div className="inline-block relative mt-4">
@@ -331,11 +378,13 @@ export default function Hero({ modalOnly = false }: { modalOnly?: boolean }) {
                   className="relative flex items-center gap-2 h-14 px-8 py-3 bg-transparent border-0 cursor-pointer text-lg font-medium text-white dark:text-zinc-900 tracking-wide hover:opacity-90 transition-opacity"
                 >
                   Start building now
-                  <ArrowRight className="w-5 h-5" />
+                  <ArrowRight className="w-5 h-5" aria-hidden="true" />
                 </motion.button>
               </motion.div>
             )}
           </AnimatePresence>
+          )}
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">Free during the beta · No credit card needed</p>
         </div>
       </div>
       )}
@@ -345,7 +394,13 @@ export default function Hero({ modalOnly = false }: { modalOnly?: boolean }) {
       */}
       <AnimatePresence initial={false}>
         {isExpanded && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4">
+          <div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label={authMode === "login" ? "Log in" : "Create your account"}
+            className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4"
+          >
             <motion.div
               layoutId={origin ? undefined : "cta-card"}
               initial={origin ? { clipPath: clipAt(0) } : undefined}
@@ -415,7 +470,7 @@ export default function Hero({ modalOnly = false }: { modalOnly?: boolean }) {
                   aria-hidden={authMode !== "register"}
                   className={`flex min-w-0 flex-col overflow-hidden max-lg:!grow-0 lg:basis-0 ${authMode === "login" ? "max-lg:hidden pointer-events-none" : ""}`}
                 >
-                <div className={`flex flex-1 shrink-0 flex-col justify-center p-8 pb-0 sm:p-12 sm:pb-0 lg:pb-16 lg:w-[40rem] lg:py-16 lg:pl-16 lg:pr-6 gap-8 text-zinc-900 dark:text-white`}>
+                <div className={`flex flex-1 shrink-0 flex-col justify-center p-8 pb-0 sm:p-12 sm:pb-0 lg:pb-16 lg:w-full lg:max-w-[40rem] lg:py-16 lg:pl-16 lg:pr-6 gap-8 text-zinc-900 dark:text-white`}>
                   {authMode === "register" && (
                     <span className="logo__mark block max-lg:mx-auto max-lg:[@media(max-height:700px)]:hidden" style={{ height: 28, width: 216 }} aria-label="Apex Bot" role="img" />
                   )}
@@ -448,25 +503,25 @@ export default function Hero({ modalOnly = false }: { modalOnly?: boolean }) {
                       <div>
                         <h3 className="font-semibold text-lg">Speaks Your Customers' Language</h3>
                         <p className="text-zinc-600 dark:text-zinc-200/80 text-sm leading-relaxed mt-1">
-                          Reply in English, German and more, grounded in your own docs and knowledge base.
+                          Replies in Turkish or English, whichever your visitor writes in, using only your own content.
                         </p>
                       </div>
                     </div>
                     <div className="flex gap-4 items-start">
                       <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-black/5 dark:bg-white/10 backdrop-blur-sm flex items-center justify-center border border-black/10 dark:border-white/10">
-                        <BarChart3 className="w-6 h-6 text-zinc-600 dark:text-zinc-300" />
+                        <LifeBuoy className="w-6 h-6 text-zinc-600 dark:text-zinc-300" />
                       </div>
                       <div>
-                        <h3 className="font-semibold text-lg">Insights That Improve Support</h3>
+                        <h3 className="font-semibold text-lg">Hands Off to Your Team</h3>
                         <p className="text-zinc-600 dark:text-zinc-200/80 text-sm leading-relaxed mt-1">
-                          Track resolution rates, top questions and knowledge gaps to keep getting better.
+                          When it can't answer, visitors reach you by email with the whole conversation attached.
                         </p>
                       </div>
                     </div>
                   </div>
                   </div>
 
-                  <div className="pt-8 border-t border-black/10 dark:border-white/20 max-lg:hidden">
+                  <div className="pt-8 border-t border-black/10 dark:border-white/20 max-lg:hidden [@media(max-height:820px)]:hidden">
                     <figure className="m-0">
                       <blockquote className="mx-0 mt-0 max-w-md text-base font-medium leading-relaxed mb-6">
                         "We built Apex so every customer gets an instant, accurate answer at any hour, and support teams can finally focus on the hard cases."
@@ -485,8 +540,9 @@ export default function Hero({ modalOnly = false }: { modalOnly?: boolean }) {
                 </div>
                 </motion.div>
 
-                {/* Right Side: Form */}
-                <div className="relative isolate flex-1 flex flex-col gap-8 items-center justify-center p-4 sm:p-12 lg:p-16">
+                {/* Right Side: Form. Centered when it fits; on short screens it scrolls instead of
+                    being clipped (auto margins, not justify-center, keep the top reachable) */}
+                <div className="relative isolate flex flex-1 flex-col items-center gap-8 p-4 sm:p-12 lg:overflow-y-auto lg:px-16 lg:py-10 [&>*:first-child]:mt-auto [&>*:last-child]:mb-auto">
                     {authMode === "login" && formStep !== "success" && (
                       <span
                         key="logo"
@@ -652,6 +708,9 @@ export default function Hero({ modalOnly = false }: { modalOnly?: boolean }) {
                               name="username"
                               autoComplete="username"
                               minLength={3}
+                              maxLength={32}
+                              pattern="[A-Za-z0-9_.\-]{3,32}"
+                              title="3-32 letters, numbers, dots, dashes or underscores"
                               placeholder="janedoe"
                               className="w-full px-4 py-2.5 rounded-lg bg-white dark:bg-zinc-950/40 border border-zinc-300 dark:border-zinc-400/20 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-white/30 focus:outline-none focus:border-zinc-500 dark:focus:border-white/40 transition-all text-sm"
                             />
@@ -695,10 +754,10 @@ export default function Hero({ modalOnly = false }: { modalOnly?: boolean }) {
                                 name="companySize"
                                 className="w-full px-4 py-2.5 rounded-lg bg-white dark:bg-zinc-950/40 border border-zinc-300 dark:border-zinc-400/20 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-white/30 focus:outline-none focus:border-zinc-500 dark:focus:border-white/40 transition-all text-sm appearance-none cursor-pointer"
                               >
-                                <option className="bg-zinc-900">1-50</option>
-                                <option className="bg-zinc-900">51-200</option>
-                                <option className="bg-zinc-900">201-1000</option>
-                                <option className="bg-zinc-900">1000+</option>
+                                <option>1-50</option>
+                                <option>51-200</option>
+                                <option>201-1000</option>
+                                <option>1000+</option>
                               </select>
                             </div>
                           </div>

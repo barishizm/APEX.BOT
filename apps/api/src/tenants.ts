@@ -48,6 +48,8 @@ export interface Tenant {
   retentionDays: number;
   settings: TenantSettings;
   limits?: TenantLimits;
+  /** Managed in the dashboard (a row in app.bots), as opposed to data/tenants.json. */
+  managed?: boolean;
 }
 
 /** The subset of settings the widget may see. Never includes the handoff address or limits. */
@@ -61,6 +63,7 @@ export function tenantFromBot(bot: { id: string; organizationName: string; siteK
   const s = bot.settings;
   return {
     id: bot.id,
+    managed: true,
     siteKey: bot.siteKey,
     name: s.general.companyName || bot.organizationName,
     allowedOrigins: s.security.allowedOrigins,
