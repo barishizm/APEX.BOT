@@ -32,3 +32,4 @@ skills-lock.json
 # Editor / local
 .vscode/
 .idea/
+.neon
