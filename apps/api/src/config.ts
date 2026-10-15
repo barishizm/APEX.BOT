@@ -9,12 +9,19 @@ function num(name: string, fallback: number): number {
   return value;
 }
 
+/** TRUST_PROXY: "0"/unset = none, "1" = one proxy hop, "2" = two, ... (legacy "true" = 1) */
+function trustedHops(raw: string | undefined): number {
+  if (raw === "true") return 1;
+  const n = Number(raw ?? 0);
+  return Number.isInteger(n) && n > 0 ? n : 0;
+}
+
 export type Effort = "low" | "medium" | "high" | "xhigh" | "max";
 
 export interface Config {
   port: number;
-  /** Trust X-Forwarded-For for the client IP. Only enable behind a proxy you control. */
-  trustProxy: boolean;
+  /** Number of proxies of ours in front of the API (0 = none). The client IP is the Nth entry from the right of X-Forwarded-For. */
+  trustProxy: number;
   model: string;
   effort: Effort;
   maxOutputTokens: number;
@@ -34,6 +41,13 @@ export interface Limits {
   ipMessagesPerMinute: number;
   tenantMessagesPerMinute: number;
   handoffsPerHour: number;
+  /** Hand-off and lead emails one tenant may trigger, whoever the visitors are. */
+  mailsPerTenantPerHour: number;
+  mailsPerTenantPerDay: number;
+  /** Emails to one recipient address across all tenants. */
+  mailsPerRecipientPerHour: number;
+  /** Platform ceiling on any tenant's dailyTokenBudget, whatever the tenant set. */
+  maxDailyTokensPerTenant: number;
 }
 
 export const defaultLimits: Limits = {
@@ -45,6 +59,10 @@ export const defaultLimits: Limits = {
   ipMessagesPerMinute: 15,
   tenantMessagesPerMinute: 300,
   handoffsPerHour: 5,
+  mailsPerTenantPerHour: 30,
+  mailsPerTenantPerDay: 100,
+  mailsPerRecipientPerHour: 40,
+  maxDailyTokensPerTenant: 20_000_000,
 };
 
 export function loadConfig(): Config {
@@ -54,7 +72,7 @@ export function loadConfig(): Config {
   }
   return {
     port: num("PORT", 8787),
-    trustProxy: process.env.TRUST_PROXY === "1",
+    trustProxy: trustedHops(process.env.TRUST_PROXY),
     model: process.env.APEX_MODEL || "claude-haiku-5-5",
     effort,
     maxOutputTokens: num("APEX_MAX_OUTPUT_TOKENS", 8000),
@@ -63,6 +81,7 @@ export function loadConfig(): Config {
     limits: {
       ...defaultLimits,
       minRetrievalScore: num("APEX_MIN_RETRIEVAL_SCORE", defaultLimits.minRetrievalScore),
+      maxDailyTokensPerTenant: num("APEX_MAX_DAILY_TOKENS", defaultLimits.maxDailyTokensPerTenant),
     },
   };
 }

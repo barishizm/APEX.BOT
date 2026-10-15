@@ -4,7 +4,7 @@ import { Hono, type Context } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { streamSSE } from "hono/streaming";
 import type { Limits } from "./config.ts";
-import { RateLimiter, TokenBudget } from "./limits.ts";
+import { RateLimiter, TokenBudget, type TokenUsageStore } from "./limits.ts";
 import { log } from "./log.ts";
 import type { Mailer } from "./mailer.ts";
 import type { ChatModel } from "./model.ts";
@@ -23,6 +23,8 @@ export interface AppDeps {
   limits: Limits;
   clientIp: (c: Context) => string;
   now?: () => number;
+  /** Persists daily token counts so the budget survives restarts. */
+  tokenUsage?: TokenUsageStore;
   /** Called when the widget loads its config on an allowed site. */
   onWidgetSeen?: (tenant: Tenant, origin: string) => void;
   /** Extra fields for /health (no secrets: the status page shows them publicly). */
@@ -53,7 +55,22 @@ export function createApp(deps: AppDeps) {
   const ipLimiter = new RateLimiter(limits.ipMessagesPerMinute, 60_000, now);
   const tenantLimiter = new RateLimiter(limits.tenantMessagesPerMinute, 60_000, now);
   const handoffLimiter = new RateLimiter(limits.handoffsPerHour, 3_600_000, now);
-  const budget = new TokenBudget(now);
+  const tenantMailHourly = new RateLimiter(limits.mailsPerTenantPerHour, 3_600_000, now);
+  const tenantMailDaily = new RateLimiter(limits.mailsPerTenantPerDay, 86_400_000, now);
+  const recipientMail = new RateLimiter(limits.mailsPerRecipientPerHour, 3_600_000, now);
+  const budget = new TokenBudget(now, deps.tokenUsage, (error) => log("warn", "token usage store failed", { error }));
+
+  /** Caps the mail one tenant, and one recipient, can cause: the IP limit alone is easy to dodge. */
+  const mailAllowed = (tenant: Tenant) => {
+    for (const check of [
+      tenantMailHourly.hit(`mail:${tenant.id}`),
+      tenantMailDaily.hit(`mail:${tenant.id}`),
+      recipientMail.hit(`rcpt:${tenant.handoffEmail.toLowerCase()}`),
+    ]) {
+      if (!check.ok) return check;
+    }
+    return { ok: true as const };
+  };
 
   const app = new Hono<Env>();
 
@@ -121,7 +138,8 @@ export function createApp(deps: AppDeps) {
     for (const check of [ipCheck, tenantLimiter.hit(`tenant:${tenant.id}`)]) {
       if (!check.ok) return fail(c, "rate_limited", 429, check.retryAfter);
     }
-    if (budget.usedToday(tenant.id) >= tenant.dailyTokenBudget) {
+    await budget.load(tenant.id);
+    if (budget.usedToday(tenant.id) >= Math.min(tenant.dailyTokenBudget, limits.maxDailyTokensPerTenant)) {
       log("warn", "daily token budget exhausted", { tenant: tenant.id });
       return fail(c, "budget_exhausted", 429);
     }
@@ -205,6 +223,11 @@ export function createApp(deps: AppDeps) {
 
     const limit = handoffLimiter.hit(`handoff:${deps.clientIp(c)}`);
     if (!limit.ok) return fail(c, "rate_limited", 429, limit.retryAfter);
+    const mailLimit = mailAllowed(tenant);
+    if (!mailLimit.ok) {
+      log("warn", "handoff mail cap reached", { tenant: tenant.id });
+      return fail(c, "rate_limited", 429, mailLimit.retryAfter);
+    }
 
     const conversation = typeof body.conversationId === "string" ? await store.getOrLoad(tenant.id, body.conversationId) : undefined;
     const lang = tenant.settings.defaultLang;
@@ -237,7 +260,10 @@ export function createApp(deps: AppDeps) {
     conversation ??= store.create(tenant.id, c.get("origin"));
     store.setVisitor(conversation, { email, ...(name ? { name } : {}), ...(phone ? { phone } : {}) });
 
-    if (tenant.handoffEmail) {
+    // The lead is kept in the inbox either way; over the cap only the notification email is skipped
+    const mailLimit = tenant.handoffEmail ? mailAllowed(tenant) : { ok: false as const, retryAfter: 0 };
+    if (tenant.handoffEmail && !mailLimit.ok) log("warn", "lead mail cap reached", { tenant: tenant.id });
+    if (tenant.handoffEmail && mailLimit.ok) {
       const lang = tenant.settings.defaultLang;
       await mailer.send({
         to: tenant.handoffEmail,

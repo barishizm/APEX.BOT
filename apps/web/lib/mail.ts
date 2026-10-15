@@ -46,3 +46,19 @@ export function sendPasswordResetCode(email: string, code: string) {
     text: `Someone asked to reset the password for your Apex Bot account.\n\nYour code is ${code}\n\nEnter it on the reset page to choose a new password. It expires in 15 minutes.${footer}`,
   })
 }
+
+export function sendHandoffConfirmationCode(email: string, code: string) {
+  return send({
+    to: email,
+    subject: `${code} is your Apex Bot hand-off confirmation code`,
+    text: `Someone asked to send chatbot hand-off emails to this address.\n\nYour confirmation code is ${code}\n\nEnter it in the Apex Bot dashboard to confirm. It expires in 15 minutes. If you don't recognise this, ignore this email and no hand-offs will be sent here.${footer}`,
+  })
+}
+
+export function sendAccountExistsNotice(email: string) {
+  return send({
+    to: email,
+    subject: "You already have an Apex Bot account",
+    text: `Someone tried to sign up for Apex Bot with this email address, but an account already exists.\n\nIf it was you, just log in. If you forgot your password, use "Forgot password" on the login page. No changes were made to your account.${footer}`,
+  })
+}

@@ -136,6 +136,29 @@ describe("POST /v1/chat", () => {
     assert.equal(((await res.json()) as { error: string }).error, "budget_exhausted");
   });
 
+  it("keeps the daily token count across a restart when a usage store is wired", async () => {
+    const rows = new Map<string, number>();
+    const tokenUsage = {
+      load: async (id: string, day: string) => rows.get(`${id}:${day}`) ?? 0,
+      add: async (id: string, day: string, n: number) => void rows.set(`${id}:${day}`, (rows.get(`${id}:${day}`) ?? 0) + n),
+    };
+    const first = setup({}, { tokenUsage });
+    first.model.tokens = 2_000_000;
+    await readSSE(await chat(first.app, { message: "iade" }));
+    const restarted = setup({}, { tokenUsage }); // fresh in-memory counters
+    const res = await chat(restarted.app, { message: "iade" });
+    assert.equal(res.status, 429);
+    assert.equal(((await res.json()) as { error: string }).error, "budget_exhausted");
+  });
+
+  it("caps a tenant's own budget at the platform ceiling", async () => {
+    const { app, model } = setup({ maxDailyTokensPerTenant: 500 });
+    model.tokens = 600; // well under the tenant's 1M budget, over the ceiling
+    await readSSE(await chat(app, { message: "iade" }));
+    const res = await chat(app, { message: "iade" });
+    assert.equal(res.status, 429);
+  });
+
   it("reports upstream failures and refusals as error events", async () => {
     const { app, model, store } = setup();
     model.fail = true;
@@ -200,5 +223,35 @@ describe("feedback, handoff and erasure", () => {
     assert.equal((await app.request(`/v1/conversations/${id}`, { method: "DELETE", headers: headers(B) })).status, 404);
     assert.equal((await app.request(`/v1/conversations/${id}`, { method: "DELETE", headers: headers(A) })).status, 204);
     assert.equal(store.get("tn_a", id), undefined);
+  });
+});
+
+describe("mail caps", () => {
+  // each request comes from its own IP, as a spoofed X-Forwarded-For would let an attacker do
+  const post = (app: ReturnType<typeof setup>["app"], path: string, n: number) =>
+    app.request(path, { method: "POST", headers: headers(A, { "x-test-ip": `9.9.9.${n}` }), body: JSON.stringify({ email: `v${n}@example.org`, name: "V" }) });
+
+  it("caps hand-off emails per tenant even when the IP changes", async () => {
+    const { app, mailer } = setup({ mailsPerTenantPerHour: 3 });
+    const statuses: number[] = [];
+    for (let n = 0; n < 5; n++) statuses.push((await post(app, "/v1/handoff", n)).status);
+    assert.deepEqual(statuses, [200, 200, 200, 429, 429]);
+    assert.equal(mailer.outbox.length, 3);
+  });
+
+  it("caps lead notification emails per tenant but still stores the lead", async () => {
+    const { app, mailer } = setup({ mailsPerTenantPerHour: 2 });
+    for (let n = 0; n < 4; n++) {
+      const res = await post(app, "/v1/lead", n);
+      assert.equal(res.status, 200);
+      assert.ok(((await res.json()) as { conversationId?: string }).conversationId);
+    }
+    assert.equal(mailer.outbox.length, 2);
+  });
+
+  it("caps emails per recipient address", async () => {
+    const { app, mailer } = setup({ mailsPerRecipientPerHour: 2 });
+    for (let n = 0; n < 4; n++) await post(app, "/v1/lead", n);
+    assert.equal(mailer.outbox.length, 2);
   });
 });

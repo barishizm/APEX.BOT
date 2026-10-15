@@ -61,8 +61,11 @@ export async function clearSessionCookie() {
 
 export async function requestMeta(): Promise<RequestMeta> {
   const h = await headers()
-  // Client-supplied X-Forwarded-For is only trustworthy behind our own proxy
-  const forwarded = process.env.TRUST_PROXY === "1" ? h.get("x-forwarded-for")?.split(",")[0]?.trim() : undefined
+  // Only the rightmost X-Forwarded-For entries (added by our proxies) are trustworthy; the rest
+  // is client-supplied. TRUST_PROXY is the number of proxy hops in front of the app.
+  const trusted = Number(process.env.TRUST_PROXY === "true" ? 1 : process.env.TRUST_PROXY ?? 0)
+  const hops = (h.get("x-forwarded-for") ?? "").split(",").map((v) => v.trim()).filter(Boolean)
+  const forwarded = Number.isInteger(trusted) && trusted > 0 ? hops[hops.length - trusted] : undefined
   return { ip: forwarded && isIP(forwarded) ? forwarded : null, userAgent: h.get("user-agent") }
 }
 

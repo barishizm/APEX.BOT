@@ -277,3 +277,19 @@ export async function conversationStats(db: Db, userId: string, days = 7): Promi
   )
   return rows[0]
 }
+
+// ---------- Daily token usage (chat API) ----------
+
+/** Tokens a bot has spent on the given UTC day (YYYY-MM-DD). */
+export async function tokensUsedOn(db: Queryable, botId: string, day: string): Promise<number> {
+  const { rows } = await db.query<{ tokens: string }>("select tokens from app.token_usage where bot_id = $1 and day = $2::date", [botId, day])
+  return rows[0] ? Number(rows[0].tokens) : 0
+}
+
+export async function addTokenUsage(db: Queryable, botId: string, day: string, tokens: number): Promise<void> {
+  await db.query(
+    `insert into app.token_usage (bot_id, day, tokens) values ($1, $2::date, $3)
+     on conflict (bot_id, day) do update set tokens = app.token_usage.tokens + excluded.tokens`,
+    [botId, day, Math.max(0, Math.round(tokens))],
+  )
+}

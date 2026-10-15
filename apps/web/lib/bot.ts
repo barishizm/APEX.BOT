@@ -10,6 +10,7 @@ export function botJson(bot: Bot) {
     version: bot.version,
     updatedAt: bot.updatedAt.toISOString(),
     canEdit: bot.role === "owner" || bot.role === "admin",
+    handoffVerified: bot.handoffVerified,
   }
 }
 export type BotJson = ReturnType<typeof botJson>
@@ -33,7 +34,7 @@ class BotApiError extends Error {
   }
 }
 
-const STATUS = { not_found: 404, forbidden: 403, conflict: 409 } as const
+const STATUS = { not_found: 404, forbidden: 403, conflict: 409, invalid_code: 400, rate_limited: 429 } as const
 
 export function botErrorResponse(err: unknown) {
   if (err instanceof BotApiError) return Response.json({ error: err.code, message: err.message }, { status: err.status })

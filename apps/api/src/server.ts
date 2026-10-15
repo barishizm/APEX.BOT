@@ -2,6 +2,7 @@
 // and in development also serves the widget bundle and a demo page.
 import { readFile } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
+import { isIP } from "node:net";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { serve } from "@hono/node-server";
@@ -15,13 +16,19 @@ import { startBotSync, type BotSync } from "./bot-sync.ts";
 import { ClaudeChatModel, EchoChatModel, GeminiChatModel, ModelRouter, OpenAIChatModel, type ChatModel } from "./model.ts";
 import { KnowledgeBase, type ChunkInput } from "./retrieval.ts";
 import { postgresPersistence } from "./persistence.ts";
+import type { TokenUsageStore } from "./limits.ts";
 import { ConversationStore } from "./store.ts";
 import { TenantRegistry, type Tenant } from "./tenants.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const config = loadConfig();
 
-const tenants = new TenantRegistry(JSON.parse(readFileSync(join(root, "data/tenants.json"), "utf8")) as Tenant[]);
+// data/tenants.json is the local demo tenant (localhost origins, large token budget). In production
+// anyone could call it with a forged Origin and spend tokens, so it is only loaded outside production
+// (or when APEX_DEMO_TENANT=1 asks for it explicitly).
+const loadDemoTenants = process.env.NODE_ENV !== "production" || process.env.APEX_DEMO_TENANT === "1";
+const tenants = new TenantRegistry(loadDemoTenants ? (JSON.parse(readFileSync(join(root, "data/tenants.json"), "utf8")) as Tenant[]) : []);
+if (!loadDemoTenants) log("info", "demo tenant not loaded (production)");
 const knowledge = new KnowledgeBase();
 for (const tenant of tenants.all()) {
   const file = join(root, "data/knowledge", `${tenant.id}.json`);
@@ -31,18 +38,24 @@ for (const tenant of tenants.all()) {
 }
 
 // Dashboard bots, their knowledge and their conversations live in the database (same
-// DATABASE_URL as the web app); without one, only data/tenants.json is served, from memory.
+// DATABASE_URL as the web app); without one, only data/tenants.json (outside production) is served, from memory.
 let botSync: BotSync | null = null;
 let onWidgetSeen: ((tenant: Tenant, origin: string) => void) | undefined;
+let tokenUsage: TokenUsageStore | undefined;
 let store = new ConversationStore();
 if (process.env.DATABASE_URL) {
-  const { createDbFromEnv, missingMigrations, recordWidgetSeen, sweepConversations } = await import("@apex/db");
+  const { addTokenUsage, createDbFromEnv, missingMigrations, tokensUsedOn, recordWidgetSeen, sweepConversations } = await import("@apex/db");
   const db = createDbFromEnv();
   const missing = await missingMigrations(db).catch((error) => {
     log("error", "database not reachable at startup", { error });
     return [];
   });
   if (missing.length) log("error", "the database needs an update: run npm run db:migrate", { missing });
+  // only dashboard bots have a row to count against; the local demo tenant stays in memory
+  tokenUsage = {
+    load: (id, day) => (tenants.findById(id)?.managed ? tokensUsedOn(db, id, day) : Promise.resolve(0)),
+    add: (id, day, tokens) => (tenants.findById(id)?.managed ? addTokenUsage(db, id, day, tokens) : Promise.resolve()),
+  };
   botSync = startBotSync(db, tenants, knowledge);
   log("info", "syncing dashboard bots from the database");
 
@@ -76,9 +89,12 @@ function chatModel(): ChatModel {
 }
 
 function clientIp(c: Context): string {
-  if (config.trustProxy) {
-    const forwarded = c.req.header("x-forwarded-for")?.split(",")[0]?.trim();
-    if (forwarded) return forwarded;
+  if (config.trustProxy > 0) {
+    // Proxies append the peer they saw, so only the rightmost entries are ours; anything left of
+    // them is client-supplied and spoofable. Count trusted hops from the right.
+    const hops = (c.req.header("x-forwarded-for") ?? "").split(",").map((h) => h.trim()).filter(Boolean);
+    const forwarded = hops[hops.length - config.trustProxy];
+    if (forwarded && isIP(forwarded)) return forwarded;
   }
   try {
     return getConnInfo(c).remote.address ?? "unknown";
@@ -95,6 +111,7 @@ const app = createApp({
   mailer: mailerFromEnv(),
   limits: config.limits,
   clientIp,
+  tokenUsage,
   onWidgetSeen,
   health: () => ({ botSync: botSync ? botSync.status() : "off" }),
 });

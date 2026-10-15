@@ -5,12 +5,15 @@ import type { Db, Queryable } from "../src/db.ts"
 import { migrate } from "../src/migrate.ts"
 import {
   AuthError,
+  CODE_FAIL_LIMIT,
   CODE_MAX_ATTEMPTS,
   getSession,
   issueEmailCode,
   login,
   logout,
   register,
+  requestPasswordReset,
+  resetPassword,
   verifyEmail,
   type RegisterInput,
 } from "../src/auth.ts"
@@ -42,7 +45,7 @@ let db: Db
 before(async () => {
   pg = new PGlite()
   db = pgliteDb(pg)
-  assert.deepEqual(await migrate(db), ["0001_auth.sql", "0002_function_search_path.sql", "0003_bots.sql", "0004_knowledge.sql", "0005_bot_activity.sql", "0006_account.sql", "0007_conversations.sql"])
+  assert.deepEqual(await migrate(db), ["0001_auth.sql", "0002_function_search_path.sql", "0003_bots.sql", "0004_knowledge.sql", "0005_bot_activity.sql", "0006_account.sql", "0007_conversations.sql", "0008_handoff_verification.sql", "0009_token_usage.sql"])
 })
 after(() => db.close())
 beforeEach(async () => {
@@ -152,6 +155,23 @@ describe("login", () => {
     }
     await rejects(login(db, { email: "jane@example.com", password: "correct horse" }, meta), "too_many_attempts")
   })
+
+  test("a stranger's failures from another address don't lock the owner out", async () => {
+    await register(db, input())
+    const attacker = { ip: "198.51.100.77" }
+    for (let i = 0; i < 10; i++) {
+      await rejects(login(db, { email: "jane@example.com", password: "wrong pass" }, attacker), "invalid_credentials")
+    }
+    await rejects(login(db, { email: "jane@example.com", password: "wrong pass" }, attacker), "too_many_attempts")
+    const owner = await login(db, { email: "jane@example.com", password: "correct horse" }, { ip: "203.0.113.5" })
+    assert.equal(owner.user.username, "janedoe")
+  })
+
+  test("a taken username is reported the same whether or not the email is taken", async () => {
+    await register(db, input())
+    await rejects(register(db, input({ email: "fresh@example.com" })), "username_taken")
+    await rejects(register(db, input()), "username_taken")
+  })
 })
 
 describe("sessions", () => {
@@ -188,6 +208,26 @@ describe("email verification", () => {
     await rejects(verifyEmail(db, user.id, code), "too_many_attempts")
   })
 
+  test("wrong password-reset codes are counted across resends, not per code", async () => {
+    const { user, code } = await register(db, input())
+    await verifyEmail(db, user.id, code)
+    const email = "jane@example.com"
+    const reset = { email, password: "another horse 99" }
+    let issued = (await requestPasswordReset(db, email))!
+    const wrong = issued.code === "000000" ? "111111" : "000000"
+    for (let i = 0; i < CODE_FAIL_LIMIT.max; i++) {
+      // a fresh code (fresh per-code counter) every round, as an attacker would request
+      await rejects(resetPassword(db, { ...reset, code: wrong }), "invalid_code")
+      if (i % 2 === 1 && i < CODE_FAIL_LIMIT.max - 1) {
+        await backdateCodes()
+        issued = (await requestPasswordReset(db, email))!
+      }
+    }
+    await backdateCodes()
+    issued = (await requestPasswordReset(db, email))!
+    await rejects(resetPassword(db, { ...reset, code: issued.code }), "too_many_attempts")
+  })
+
   test("expired code is rejected", async () => {
     const { user, code } = await register(db, input())
     await db.query("update app.verification_codes set expires_at = now() - interval '1 second'")
@@ -201,6 +241,22 @@ describe("email verification", () => {
     const { code: second } = await issueEmailCode(db, user.id)
     if (first !== second) await rejects(verifyEmail(db, user.id, first), "invalid_code")
     assert.equal((await verifyEmail(db, user.id, second)).emailVerified, true)
+  })
+
+  test("resend is capped per account per hour", async () => {
+    const { user } = await register(db, input())
+    for (let i = 0; i < 4; i++) {
+      await backdateCodes()
+      await issueEmailCode(db, user.id, {}, { ip: `198.51.100.${i + 1}` })
+    }
+    await backdateCodes()
+    await rejects(issueEmailCode(db, user.id, {}, { ip: "198.51.100.99" }), "too_many_attempts")
+  })
+
+  test("signups are capped per IP per hour", async () => {
+    for (let i = 0; i < 5; i++) await register(db, input({ email: `u${i}@example.com`, username: `user${i}` }), meta)
+    await rejects(register(db, input({ email: "u9@example.com", username: "user9" }), meta), "too_many_attempts")
+    await register(db, input({ email: "other@example.com", username: "other" }), { ip: "203.0.113.8" })
   })
 
   test("correcting the address before verification updates the account", async () => {

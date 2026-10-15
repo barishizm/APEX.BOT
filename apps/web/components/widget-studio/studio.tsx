@@ -322,7 +322,16 @@ export function WidgetStudio({
             {section === "behavior" && <BehaviorSection {...props} />}
             {section === "model" && <ModelSection {...props} />}
             {section === "persona" && <PersonaSection {...props} />}
-            {section === "handoff" && <HandoffSection {...props} />}
+            {section === "handoff" && (
+              <HandoffSection
+                {...props}
+                verification={{
+                  savedVerified: bot.handoffVerified,
+                  savedEmail: bot.settings.handoff.email,
+                  onConfirmed: (next) => setBot((b) => ({ ...b, ...next })),
+                }}
+              />
+            )}
             {section === "install" && (
               <InstallSection {...props} siteKey={bot.siteKey} widgetUrl={widgetUrl} canEdit={bot.canEdit} dirty={dirty} onRotate={rotate} />
             )}

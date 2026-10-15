@@ -59,7 +59,7 @@ export function publicSettings(tenant: Tenant) {
 }
 
 /** Maps a dashboard-managed bot to a tenant. */
-export function tenantFromBot(bot: { id: string; organizationName: string; siteKey: string; settings: BotSettings }, ui: PublicWidgetSettings): Tenant {
+export function tenantFromBot(bot: { id: string; organizationName: string; siteKey: string; settings: BotSettings; handoffVerified: boolean }, ui: PublicWidgetSettings): Tenant {
   const s = bot.settings;
   return {
     id: bot.id,
@@ -67,7 +67,8 @@ export function tenantFromBot(bot: { id: string; organizationName: string; siteK
     siteKey: bot.siteKey,
     name: s.general.companyName || bot.organizationName,
     allowedOrigins: s.security.allowedOrigins,
-    handoffEmail: s.handoff.email,
+    // only a confirmed address is ever mailed; otherwise hand-off and lead mail stay off
+    handoffEmail: bot.handoffVerified ? s.handoff.email : "",
     dailyTokenBudget: s.security.dailyTokenBudget,
     retentionDays: s.security.retentionDays,
     limits: {
@@ -98,7 +99,7 @@ export function tenantFromBot(bot: { id: string; organizationName: string; siteK
       instructions: s.persona.instructions,
       unknownAnswer: s.messages.unknownAnswer,
       confidence: s.persona.confidence,
-      handoffEnabled: s.handoff.enabled && !!s.handoff.email,
+      handoffEnabled: s.handoff.enabled && bot.handoffVerified && !!s.handoff.email,
       offerHandoffWhenUnsure: s.handoff.offerWhenUnsure,
       ui,
     },

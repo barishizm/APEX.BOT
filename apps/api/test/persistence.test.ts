@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
 import { PGlite } from "@electric-sql/pglite";
-import { getBotForUser, listConversations, register, saveBotSettings, type Db } from "@apex/db";
+import { confirmHandoffEmail, getBotForUser, listConversations, register, saveBotSettings, startHandoffVerification, type Db } from "@apex/db";
 import { migrate } from "@apex/db/migrate";
 import { createApp } from "../src/app.ts";
 import { startBotSync } from "../src/bot-sync.ts";
@@ -32,11 +32,14 @@ describe("conversation persistence", () => {
   it("writes conversations through and reloads them after a restart", async () => {
     const { user } = await register(db, { email: "o@kahve.example", username: "owner", password: "correct horse", accountType: "personal", acceptTerms: true });
     const bot = await getBotForUser(db, user.id);
+    const sent = await startHandoffVerification(db, user.id, "team@kahve.example");
+    await confirmHandoffEmail(db, user.id, sent.code);
+    const confirmed = await getBotForUser(db, user.id);
     await saveBotSettings(
       db,
       user.id,
       { ...bot.settings, handoff: { ...bot.settings.handoff, email: "team@kahve.example" }, security: { ...bot.settings.security, allowedOrigins: [ORIGIN] } },
-      bot.version,
+      confirmed.version,
     );
     const tenants = new TenantRegistry([]);
     const sync = startBotSync(db, tenants, new KnowledgeBase(), 3_600_000);

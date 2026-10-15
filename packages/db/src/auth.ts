@@ -14,8 +14,15 @@ export const SESSION_TTL_MS = { persistent: 30 * DAY_MS, browser: DAY_MS }
 export const CODE_TTL_MS = 15 * 60 * 1000
 export const CODE_MAX_ATTEMPTS = 5
 export const CODE_RESEND_SECONDS = 30
-// Failed log-ins counted over the last 15 minutes
-const LOGIN_FAIL_LIMIT = { email: 10, ip: 50 }
+// Wrong codes allowed per account across ALL codes in the window. The per-code
+// limit alone is reset by every resend, so this caps total guessing.
+export const CODE_FAIL_LIMIT = { max: 10, windowMinutes: 60 }
+// Failed log-ins counted over the last 15 minutes. The lock is per email AND address, so a stranger
+// can't lock the owner out from elsewhere; `email` is a high backstop against spread-out guessing.
+const LOGIN_FAIL_LIMIT = { emailAndIp: 10, email: 100, ip: 50 }
+// Outbound verification mail caps, so register/resend can't be used to mail arbitrary addresses
+const SIGNUP_LIMIT = { perIp: 5, windowMinutes: 60 }
+const CODE_SEND_LIMIT = { perUser: 5, perIp: 15, windowMinutes: 60 }
 export const TERMS_VERSION = "2026-10"
 export const COMPANY_SIZES = ["1-50", "51-200", "201-1000", "1000+"] as const
 
@@ -124,6 +131,40 @@ async function logEvent(q: Queryable, event: AuthEvent, meta: RequestMeta, userI
   )
 }
 
+// Throws once an account has had too many wrong codes recently, whichever code they were for.
+async function assertCodeGuessesLeft(q: Queryable, userId: string, event: "verify_failed" | "reset_failed") {
+  const { rows } = await q.query<{ n: number }>(
+    `select count(*)::int as n from app.auth_events
+      where user_id = $1 and event = $2 and created_at > now() - make_interval(mins => $3)`,
+    [userId, event, CODE_FAIL_LIMIT.windowMinutes],
+  )
+  if (rows[0].n >= CODE_FAIL_LIMIT.max) {
+    throw new AuthError("too_many_attempts", "Too many incorrect codes. Try again later", CODE_FAIL_LIMIT.windowMinutes * 60)
+  }
+}
+
+// Throws when the caller (by IP, and by account for code mail) has triggered too many events recently.
+async function assertEventBudget(
+  q: Queryable,
+  event: "register" | "code_sent",
+  ip: string | null,
+  userId: string | null,
+  limit: { perIp: number; perUser?: number; windowMinutes: number },
+) {
+  const { rows } = await q.query<{ by_ip: number; by_user: number }>(
+    `select count(*) filter (where $2::inet is not null and ip = $2::inet)::int as by_ip,
+            count(*) filter (where $3::uuid is not null and user_id = $3::uuid)::int as by_user
+       from app.auth_events
+      where event = $1 and created_at > now() - make_interval(mins => $4)
+        and (ip = $2::inet or user_id = $3::uuid)`,
+    [event, ip, userId, limit.windowMinutes],
+  )
+  if (rows[0].by_ip >= limit.perIp || (limit.perUser !== undefined && rows[0].by_user >= limit.perUser)) {
+    const secs = limit.windowMinutes * 60
+    throw new AuthError("too_many_attempts", "Too many requests. Try again later", secs)
+  }
+}
+
 function uniqueViolation(err: unknown): string | null {
   const e = err as { code?: string; constraint?: string }
   return e?.code === "23505" ? (e.constraint ?? "") : null
@@ -195,7 +236,15 @@ export async function register(
     throw new AuthError("invalid_input", "Choose a company size")
   }
 
+  await assertEventBudget(db, "register", cleanIp(meta.ip), null, SIGNUP_LIMIT)
   const passwordHash = await hashPassword(password)
+
+  // Checked first so the answer for a taken username never depends on whether the email is taken too
+  const nameTaken = await db.query("select 1 from app.users where lower(username) = lower($1)", [username])
+  if (nameTaken.rows.length) {
+    await logEvent(db, "register", meta, null, email)
+    throw new AuthError("username_taken", "This username is taken")
+  }
 
   return db
     .transaction(async (tx) => {
@@ -219,7 +268,11 @@ export async function register(
       await logEvent(tx, "code_sent", meta, user.id, email)
       return { user, session, code }
     })
-    .catch(rethrowTaken)
+    .catch(async (err) => {
+      // a taken email or username still counts against the signup limit, or it could be probed freely
+      if (uniqueViolation(err)) await logEvent(db, "register", meta, null, email).catch(() => {})
+      return rethrowTaken(err)
+    })
 }
 
 export async function login(
@@ -231,15 +284,18 @@ export async function login(
   const password = typeof input.password === "string" ? input.password.slice(0, 200) : ""
   const ip = cleanIp(meta.ip)
 
-  const { rows: fails } = await db.query<{ by_email: number; by_ip: number }>(
+  const { rows: fails } = await db.query<{ by_email: number; by_email_ip: number; by_ip: number }>(
     `select count(*) filter (where email = $1)::int as by_email,
-            count(*) filter (where ip = $2::inet)::int as by_ip
+            count(*) filter (where email = $1 and $2::inet is not null and ip = $2::inet)::int as by_email_ip,
+            count(*) filter (where $2::inet is not null and ip = $2::inet)::int as by_ip
        from app.auth_events
       where event = 'login_failed' and created_at > now() - interval '15 minutes'
         and (email = $1 or ip = $2::inet)`,
     [email, ip],
   )
-  if (fails[0].by_email >= LOGIN_FAIL_LIMIT.email || fails[0].by_ip >= LOGIN_FAIL_LIMIT.ip) {
+  // Without a known address only the email counts, so unknown callers share the stricter limit
+  const emailLimit = ip ? LOGIN_FAIL_LIMIT.email : LOGIN_FAIL_LIMIT.emailAndIp
+  if (fails[0].by_email_ip >= LOGIN_FAIL_LIMIT.emailAndIp || fails[0].by_email >= emailLimit || fails[0].by_ip >= LOGIN_FAIL_LIMIT.ip) {
     throw new AuthError("too_many_attempts", "Too many failed attempts. Try again in 15 minutes", 15 * 60)
   }
 
@@ -316,6 +372,8 @@ export async function issueEmailCode(
     if (wait > 0) throw new AuthError("too_many_attempts", `Wait ${wait}s before requesting another code`, wait)
   }
 
+  await assertEventBudget(db, "code_sent", cleanIp(meta.ip), userId, CODE_SEND_LIMIT)
+
   return db
     .transaction(async (tx) => {
       if (target !== row.email) {
@@ -353,6 +411,11 @@ export async function verifyEmail(db: Db, userId: string, rawCode: unknown, meta
       if (live.expired) return { error: new AuthError("code_expired", "This code has expired. Request a new one") }
       if (live.attempts >= CODE_MAX_ATTEMPTS) {
         return { error: new AuthError("too_many_attempts", "Too many incorrect codes. Request a new one") }
+      }
+      try {
+        await assertCodeGuessesLeft(tx, userId, "verify_failed")
+      } catch (error) {
+        return { error: error as AuthError }
       }
       if (!sha256(code).equals(Buffer.from(live.code_hash))) {
         await tx.query("update app.verification_codes set attempts = attempts + 1 where id = $1", [live.id])
@@ -528,6 +591,11 @@ export async function resetPassword(
     if (!live) return { error: new AuthError("invalid_code", "This code is no longer valid. Request a new one") }
     if (live.expired) return { error: new AuthError("code_expired", "This code has expired. Request a new one") }
     if (live.attempts >= CODE_MAX_ATTEMPTS) return { error: new AuthError("too_many_attempts", "Too many incorrect codes. Request a new one") }
+    try {
+      await assertCodeGuessesLeft(tx, live.user_id, "reset_failed")
+    } catch (error) {
+      return { error: error as AuthError }
+    }
     if (!sha256(code).equals(Buffer.from(live.code_hash))) {
       await tx.query("update app.verification_codes set attempts = attempts + 1 where id = $1", [live.id])
       await logEvent(tx, "reset_failed", meta, live.user_id, email)

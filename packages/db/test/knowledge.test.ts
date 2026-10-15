@@ -36,6 +36,8 @@ beforeEach(() => db.query("truncate app.users, app.organizations, app.auth_event
 
 async function newUser(email = "owner@example.com", username = "owner") {
   const { user } = await register(db, { email, username, password: "correct horse", accountType: "business", company: username, acceptTerms: true })
+  // dashboard users are always email-verified before they reach the bot
+  await db.query("update app.users set email_verified_at = now() where id = $1", [user.id])
   return user
 }
 

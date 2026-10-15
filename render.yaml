@@ -13,10 +13,13 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 24
+      # keeps the demo tenant (data/tenants.json) from loading
+      - key: NODE_ENV
+        value: production
       - key: DATABASE_URL
         sync: false
       - key: DATABASE_SSL
-        value: require
+        value: verify
       - key: TRUST_PROXY
         value: "1"
       - key: ANTHROPIC_API_KEY
