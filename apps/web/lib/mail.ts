@@ -20,7 +20,7 @@ async function send(mail: Mail) {
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
-    body: JSON.stringify({ from: process.env.MAIL_FROM || "Apex Bot <no-reply@apex.bot>", to: [mail.to], subject: mail.subject, text: mail.text }),
+    body: JSON.stringify({ from: process.env.MAIL_FROM || "Apex Bot <no-reply@apexbot.eu>", to: [mail.to], subject: mail.subject, text: mail.text }),
     signal: AbortSignal.timeout(10_000),
   }).catch((err: unknown) => {
     console.error("[mail] couldn't reach the email provider:", err instanceof Error ? err.message : err)

@@ -54,7 +54,7 @@ const PLANS: Plan[] = [
     features: [
       "Unlimited websites and knowledge",
       "Custom usage limits and budgets",
-      "Data processing agreement (KVKK / GDPR)",
+      "Data processing agreement (Turkey\u2019s KVKK and EU GDPR)",
       "Custom retention periods",
       "Onboarding with our team",
     ],
