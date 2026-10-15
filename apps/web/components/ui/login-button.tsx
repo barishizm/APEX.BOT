@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "@/components/i18n/provider";
+
 type AuthMode = "login" | "register";
 
 // The auth modal lives in the page's Hero; it grows out of the clicked element.
@@ -13,32 +15,34 @@ export function openAuth(mode: AuthMode, from?: Element | null) {
 }
 
 // Without JS the link still works: /login opens the same modal after hydration
-export default function LoginButton({ className = "bar__link", children = "Log in" }: { className?: string; children?: React.ReactNode }) {
+export default function LoginButton({ className = "bar__link", children }: { className?: string; children?: React.ReactNode }) {
+  const { t, href } = useI18n();
   return (
     <a
-      href="/login"
+      href={href("/login")}
       className={className}
       onClick={(e) => {
         e.preventDefault();
         openAuth("login", e.currentTarget);
       }}
     >
-      {children}
+      {children ?? t.common.logIn}
     </a>
   );
 }
 
-export function RegisterButton({ className = "bar__cta", children = "Get started" }: { className?: string; children?: React.ReactNode }) {
+export function RegisterButton({ className = "bar__cta", children }: { className?: string; children?: React.ReactNode }) {
+  const { t, href } = useI18n();
   return (
     <a
-      href="/signup"
+      href={href("/signup")}
       className={className}
       onClick={(e) => {
         e.preventDefault();
         openAuth("register", e.currentTarget);
       }}
     >
-      {children}
+      {children ?? t.common.getStarted}
     </a>
   );
 }
