@@ -160,7 +160,7 @@ Hedef kullanım:
 
 ```html
 <script
-  src="https://cdn.apex.bot/widget.js"
+  src="https://api.apexbot.eu/widget.js"
   data-site-key="apex_pk_xxxxxxxx"
   async
 ></script>

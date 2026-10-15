@@ -7,7 +7,7 @@ import https from "node:https";
 import { BlockList, isIP } from "node:net";
 import zlib from "node:zlib";
 
-export const USER_AGENT = "ApexBot/1.0 (+https://apex.bot/docs#knowledge)";
+export const USER_AGENT = "ApexBot/1.0 (+https://www.apexbot.eu/docs#knowledge)";
 
 const blocked = new BlockList();
 for (const [net, prefix] of [

@@ -48,6 +48,6 @@ export class ResendMailer implements Mailer {
 }
 
 export function mailerFromEnv(env: NodeJS.ProcessEnv = process.env): Mailer {
-  if (env.RESEND_API_KEY) return new ResendMailer(env.RESEND_API_KEY, env.MAIL_FROM || "Apex Bot <no-reply@apex.bot>");
+  if (env.RESEND_API_KEY) return new ResendMailer(env.RESEND_API_KEY, env.MAIL_FROM || "Apex Bot <no-reply@apexbot.eu>");
   return new OutboxMailer();
 }

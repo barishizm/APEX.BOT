@@ -33,3 +33,5 @@ skills-lock.json
 .vscode/
 .idea/
 .neon
+.vercel
+.env*
