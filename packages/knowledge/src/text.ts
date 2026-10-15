@@ -18,11 +18,11 @@ const STOPWORDS = new Set(
     // tr
     "acaba", "ama", "bana", "ben", "bir", "biz", "bu", "da", "de", "diye", "gibi", "hangi", "icin", "ile", "ise",
     "kac", "mi", "mu", "nasil", "ne", "neden", "nedir", "o", "olan", "olarak", "siz", "size", "sizin", "su", "var",
-    "ve", "veya", "ya", "yok", "zaman", "merhaba", "lutfen", "tesekkurler",
+    "ve", "veya", "ya", "yok", "zaman", "merhaba", "lutfen", "tesekkurler", "kim", "kimdir", "kimin", "hakkinda", "anlat", "anlatir", "misin", "musun",
     // en
     "a", "an", "and", "are", "can", "could", "do", "does", "for", "from", "have", "how", "i", "if", "in", "is", "it",
     "me", "my", "of", "on", "or", "please", "the", "there", "to", "what", "when", "where", "which", "why", "will",
-    "with", "would", "you", "your", "hi", "hello", "thanks",
+    "with", "would", "you", "your", "hi", "hello", "thanks", "who", "whom", "whose", "about", "tell", "was", "this", "that", "he", "she", "his", "her", "am", "be",
   ].map(fold),
 );
 
