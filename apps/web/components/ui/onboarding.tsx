@@ -70,7 +70,7 @@ export default function Onboarding() {
         body: JSON.stringify({ kind: "website", url: normalized, allowOrigin: true }),
       })
       const data = await res.json().catch(() => ({}))
-      if (res.status === 401) return router.replace("/?login=1")
+      if (res.status === 401) return router.replace("/login")
       if (!res.ok) {
         setServerError(data.message ?? "Couldn't add this website. Try again")
         return

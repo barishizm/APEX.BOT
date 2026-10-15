@@ -1,19 +1,10 @@
-import { LandingSections } from "@/components/landing/sections";
-import { SiteFooter } from "@/components/site-footer";
-import { SiteHeader } from "@/components/site-header";
-import Hero from "@/components/ui/hero-button-expendable";
-import { isSignedIn } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import { Home } from "@/components/landing/home";
 
-export default async function Home() {
-  const signedIn = await isSignedIn();
-  return (
-    <>
-      <SiteHeader />
-      <main id="main">
-        <Hero signedIn={signedIn} />
-        <LandingSections signedIn={signedIn} />
-      </main>
-      <SiteFooter />
-    </>
-  );
+// Old modal links (/?login=1, /?signup=1) land on the clean routes
+export default async function HomePage({ searchParams }: { searchParams: Promise<{ login?: string; signup?: string; error?: string }> }) {
+  const { login, signup, error } = await searchParams;
+  if (signup === "1") redirect("/signup");
+  if (login === "1") redirect(error ? `/login?error=${encodeURIComponent(error)}` : "/login");
+  return <Home />;
 }

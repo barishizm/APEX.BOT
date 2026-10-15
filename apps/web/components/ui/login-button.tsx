@@ -12,11 +12,11 @@ export function openAuth(mode: AuthMode, from?: Element | null) {
   );
 }
 
-// Without JS the link still works: /?login=1 opens the same modal after hydration
+// Without JS the link still works: /login opens the same modal after hydration
 export default function LoginButton({ className = "bar__link", children = "Log in" }: { className?: string; children?: React.ReactNode }) {
   return (
     <a
-      href="/?login=1"
+      href="/login"
       className={className}
       onClick={(e) => {
         e.preventDefault();
@@ -31,7 +31,7 @@ export default function LoginButton({ className = "bar__link", children = "Log i
 export function RegisterButton({ className = "bar__cta", children = "Get started" }: { className?: string; children?: React.ReactNode }) {
   return (
     <a
-      href="/?signup=1"
+      href="/signup"
       className={className}
       onClick={(e) => {
         e.preventDefault();

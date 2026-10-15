@@ -96,7 +96,18 @@ function PasswordInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
   )
 }
 
-export default function Hero({ modalOnly = false, signedIn = false }: { modalOnly?: boolean; signedIn?: boolean }) {
+export default function Hero({
+  modalOnly = false,
+  signedIn = false,
+  initialAuth,
+  initialError,
+}: {
+  modalOnly?: boolean
+  signedIn?: boolean
+  // set by the /login and /signup routes to open the modal on load
+  initialAuth?: "login" | "register"
+  initialError?: string
+}) {
   const router = useRouter()
   const dialogRef = useRef<HTMLDivElement>(null)
   // Focus goes back where it was when the modal closes
@@ -158,30 +169,22 @@ export default function Hero({ modalOnly = false, signedIn = false }: { modalOnl
     }
   }, [])
 
-  // The dashboard guard redirects here with ?login=1; links without JS use ?login=1 / ?signup=1
+  // /login and /signup render the landing page with the modal already open
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    if (params.get("signup") === "1") {
-      window.history.replaceState(null, "", window.location.pathname)
-      setFormStep("idle")
-      setAuthMode("register")
-      setIsExpanded(true)
-      return
-    }
-    if (params.get("login") !== "1") return
+    if (!initialAuth) return
     const oauthErrors: Record<string, string> = {
       oauth_not_configured: "Google/GitHub sign-in isn't set up yet. Use your email instead",
       oauth_denied: "Sign-in was cancelled. Try again or use your email",
       oauth_email_unverified: "Your provider has no verified email for this account. Verify it there and try again",
       oauth_failed: "Couldn't sign you in with that provider. Try again or use your email",
     }
-    const error = params.get("error")
-    setAuthError(error ? (oauthErrors[error] ?? null) : null)
+    setAuthError(initialAuth === "login" && initialError ? (oauthErrors[initialError] ?? null) : null)
+    // drop ?error= so a refresh doesn't replay it
     window.history.replaceState(null, "", window.location.pathname)
     setFormStep("idle")
-    setAuthMode("login")
+    setAuthMode(initialAuth)
     setIsExpanded(true)
-  }, [])
+  }, [initialAuth, initialError])
 
   const switchMode = (mode: "register" | "login") => {
     setFormStep("idle")
