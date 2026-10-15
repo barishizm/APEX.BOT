@@ -310,6 +310,9 @@ export const tr: Dictionary = {
     previewScreen: "Önizleme ekranı",
     answer: "Yanıt",
     welcome: "Karşılama",
+    panel: "Sohbet paneli önizlemesi",
+    openPanel: "Önizleme panelini aç",
+    closePanel: "Önizleme panelini kapat",
   },
 
   pricing: {

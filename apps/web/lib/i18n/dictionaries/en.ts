@@ -310,6 +310,9 @@ export const en = {
     previewScreen: "Preview screen",
     answer: "Answer",
     welcome: "Welcome",
+    panel: "Chat panel preview",
+    openPanel: "Open preview panel",
+    closePanel: "Close preview panel",
   },
 
   pricing: {

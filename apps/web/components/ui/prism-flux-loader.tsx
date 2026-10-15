@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { PlusIcon } from "lucide-react"
-
-const STATUSES = ["Fetching", "Fixing", "Updating", "Placing", "Syncing", "Processing"]
+import { useAppI18n } from "@/components/i18n/app-provider"
 
 interface PrismFluxLoaderProps {
   size?: number // cube size in px
@@ -11,6 +10,7 @@ interface PrismFluxLoaderProps {
 }
 
 export function PrismFluxLoader({ size = 30, speed = 5 }: PrismFluxLoaderProps) {
+  const statuses = useAppI18n().t.setup.loader
   const [time, setTime] = useState(0)
   const [statusIndex, setStatusIndex] = useState(0)
 
@@ -22,9 +22,9 @@ export function PrismFluxLoader({ size = 30, speed = 5 }: PrismFluxLoaderProps) 
 
   // Status text changes every 600ms
   useEffect(() => {
-    const id = setInterval(() => setStatusIndex((i) => (i + 1) % STATUSES.length), 600)
+    const id = setInterval(() => setStatusIndex((i) => (i + 1) % statuses.length), 600)
     return () => clearInterval(id)
-  }, [])
+  }, [statuses.length])
 
   const half = size / 2
   const faces = [
@@ -65,7 +65,7 @@ export function PrismFluxLoader({ size = 30, speed = 5 }: PrismFluxLoaderProps) 
       </div>
 
       <div className="text-sm font-semibold tracking-wide text-[var(--color-text)]">
-        {STATUSES[statusIndex]}...
+        {statuses[statusIndex]}...
       </div>
     </div>
   )

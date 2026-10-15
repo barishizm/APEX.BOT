@@ -1,6 +1,9 @@
 import { KNOWLEDGE_LIMITS, KnowledgeError, failSync, finishSync, type KnowledgeSource } from "@apex/db"
 import { CrawlError, chunkPage, crawlSite } from "@apex/knowledge"
+import { errorJson } from "@/lib/auth"
 import { botErrorResponse } from "@/lib/bot"
+import type { Locale } from "@/lib/i18n"
+import { translateMessage } from "@/lib/i18n/messages"
 import { db } from "@/lib/db"
 
 // Same floor the chat API uses (APEX_MIN_RETRIEVAL_SCORE there), for the dashboard's search preview
@@ -23,16 +26,17 @@ export async function crawlInto(sourceId: string, url: string) {
   }
 }
 
-export function sourceJson(s: KnowledgeSource) {
-  return { ...s, syncedAt: s.syncedAt?.toISOString() ?? null, createdAt: s.createdAt.toISOString(), updatedAt: s.updatedAt.toISOString() }
+// The stored error is English (it's written by a background job); show it in the reader's language
+export function sourceJson(s: KnowledgeSource, locale: Locale) {
+  return { ...s, error: s.error && translateMessage(s.error, locale), syncedAt: s.syncedAt?.toISOString() ?? null, createdAt: s.createdAt.toISOString(), updatedAt: s.updatedAt.toISOString() }
 }
 export type SourceJson = ReturnType<typeof sourceJson>
 
 const STATUS = { invalid_input: 400, limit: 409, not_found: 404, forbidden: 403, busy: 409 } as const
 
-export function knowledgeErrorResponse(err: unknown) {
-  if (err instanceof KnowledgeError) return Response.json({ error: err.code, message: err.message }, { status: STATUS[err.code] })
-  if (err instanceof CrawlError) return Response.json({ error: "invalid_input", message: err.message }, { status: 400 })
+export async function knowledgeErrorResponse(err: unknown) {
+  if (err instanceof KnowledgeError) return errorJson(err.code, err.message, { status: STATUS[err.code] })
+  if (err instanceof CrawlError) return errorJson("invalid_input", err.message, { status: 400 })
   // session, bot and unexpected errors
   return botErrorResponse(err)
 }

@@ -1,13 +1,17 @@
 import type { Metadata } from "next";
 import { DashboardFrame } from "@/components/dashboard/frame";
 import { OnboardingList } from "@/components/ui/onboarding-list";
+import { getAppDictionary } from "@/lib/i18n/app";
+import { requestLocale } from "@/lib/i18n/server";
 import { buildStages } from "@/lib/setup-steps";
 import { requireVerifiedUser } from "@/lib/auth";
 import { currentBot, currentSources, getSetup } from "@/lib/dashboard";
 import { db } from "@/lib/db";
 import { listConversations } from "@apex/db";
 
-export const metadata: Metadata = { title: "Setup" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: getAppDictionary(await requestLocale()).shell.nav.setup };
+}
 
 export default async function OnboardingListPage() {
   const user = await requireVerifiedUser();
@@ -18,7 +22,7 @@ export default async function OnboardingListPage() {
     listConversations(db(), user.id, { limit: 1 }),
   ]);
   const h = bot.settings.handoff;
-  const stages = buildStages({
+  const stages = buildStages(getAppDictionary(await requestLocale()).setup, {
     setup,
     testSite: bot.settings.security.allowedOrigins[0] ?? null,
     hasText: sources.some((s) => s.kind === "text"),

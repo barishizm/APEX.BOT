@@ -5,8 +5,12 @@ import { DashboardFrame } from "@/components/dashboard/frame"
 import { AccountSettings } from "@/components/settings/account-settings"
 import { currentSession } from "@/lib/auth"
 import { db } from "@/lib/db"
+import { getAppDictionary } from "@/lib/i18n/app"
+import { requestLocale } from "@/lib/i18n/server"
 
-export const metadata: Metadata = { title: "Account settings" }
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: getAppDictionary(await requestLocale()).settings.title }
+}
 
 export default async function SettingsPage() {
   const session = await currentSession()

@@ -2,6 +2,9 @@
 
 import { CircleAlert, Crop, Plus, X } from "lucide-react"
 import { useId, useState, type ReactNode } from "react"
+import { useAppI18n } from "@/components/i18n/app-provider"
+import { format } from "@/lib/i18n"
+import { translateMessage } from "@/lib/i18n/messages"
 import { cn } from "@/lib/utils"
 import { bake, ImageEditor, type Adjust } from "./image-editor"
 
@@ -473,6 +476,7 @@ export function ListEditor({
   errors?: Record<string, string>
   mono?: boolean
 }) {
+  const t = useAppI18n().t.studio.fields
   const id = useId()
   const [text, setText] = useState("")
   const full = items.length >= max
@@ -506,7 +510,7 @@ export function ListEditor({
                 <span className="truncate">{item}</span>
                 <button
                   type="button"
-                  aria-label={`Remove ${item}`}
+                  aria-label={format(t.remove, { item })}
                   onClick={() => onChange(items.filter((_, j) => j !== i))}
                   className="grid h-6 w-6 shrink-0 cursor-pointer place-items-center rounded-full border-0 bg-transparent text-[var(--color-muted)] hover:bg-[var(--color-bubble)] hover:text-[var(--color-text)]"
                 >
@@ -530,7 +534,7 @@ export function ListEditor({
           value={text}
           maxLength={maxLength}
           disabled={full}
-          placeholder={full ? `Limit of ${max} reached` : placeholder}
+          placeholder={full ? format(t.limitReached, { n: max }) : placeholder}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
@@ -547,7 +551,7 @@ export function ListEditor({
           className="inline-flex h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-[var(--color-line)] bg-transparent px-3 text-sm font-semibold text-[var(--color-text)] transition-colors hover:border-[var(--color-muted)] disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Plus className="h-4 w-4" aria-hidden />
-          Add
+          {t.add}
         </button>
       </div>
     </Field>
@@ -569,6 +573,7 @@ export function ColorField({
   error?: string
   hint?: ReactNode
 }) {
+  const t = useAppI18n().t.studio.fields
   const id = useId()
   const [text, setText] = useState<string | null>(null)
   const valid = /^#[0-9a-f]{6}$/i.test(value)
@@ -577,7 +582,7 @@ export function ColorField({
       <div className="flex flex-wrap items-center gap-2">
         <input
           type="color"
-          aria-label="Pick a color"
+          aria-label={t.pickColor}
           value={valid ? value : "#000000"}
           onChange={(e) => {
             setText(null)
@@ -599,12 +604,12 @@ export function ColorField({
           onBlur={() => setText(null)}
           className={cn(inputClass, "h-10 w-28 font-mono uppercase", borderFor(error))}
         />
-        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Preset colors">
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label={t.presets}>
           {SWATCHES.map((c) => (
             <button
               key={c}
               type="button"
-              aria-label={`Use ${c}`}
+              aria-label={format(t.useColor, { color: c })}
               aria-pressed={value.toLowerCase() === c}
               onClick={() => {
                 setText(null)
@@ -653,6 +658,8 @@ export function ImageField({
   /** Shown behind the thumbnail, e.g. the launcher color. */
   background?: string
 }) {
+  const { t: app, locale } = useAppI18n()
+  const t = app.studio.fields
   const id = useId()
   const [problem, setProblem] = useState<string | null>(null)
   const [dragging, setDragging] = useState(false)
@@ -671,7 +678,7 @@ export function ImageField({
       if (original.length > MAX_DATA_URL) throw new Error("This GIF is too large. Keep it under 85 KB")
       onChange(original)
     } catch (e) {
-      setProblem(e instanceof Error ? e.message : "Couldn't use this image")
+      setProblem(e instanceof Error ? translateMessage(e.message, locale) : t.imageFailed)
     }
   }
   const apply = (img: HTMLImageElement, adjust: Adjust) => {
@@ -683,7 +690,7 @@ export function ImageField({
       setProblem(null)
       onChange(out)
     } catch (e) {
-      setProblem(e instanceof Error ? e.message : "Couldn't use this image")
+      setProblem(e instanceof Error ? translateMessage(e.message, locale) : t.imageFailed)
     }
   }
   return (
@@ -710,7 +717,7 @@ export function ImageField({
         >
           {value ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={value} alt="Launcher image preview" className="h-3/5 w-3/5 object-contain" />
+            <img src={value} alt={t.imagePreview} className="h-3/5 w-3/5 object-contain" />
           ) : (
             <Plus className="h-5 w-5 text-[var(--color-muted)]" aria-hidden />
           )}
@@ -721,7 +728,7 @@ export function ImageField({
               htmlFor={id}
               className="inline-flex h-9 cursor-pointer items-center rounded-lg border border-[var(--color-line)] bg-transparent px-3 text-sm font-semibold text-[var(--color-text)] hover:border-[var(--color-muted)]"
             >
-              {value ? "Replace image" : "Upload image"}
+              {value ? t.replaceImage : t.uploadImage}
             </label>
             <input
               id={id}
@@ -740,7 +747,7 @@ export function ImageField({
                 className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-[var(--color-line)] bg-transparent px-3 text-sm font-semibold text-[var(--color-text)] hover:border-[var(--color-muted)]"
               >
                 <Crop className="h-4 w-4" aria-hidden />
-                Adjust
+                {t.adjust}
               </button>
             )}
             {value && (
@@ -752,14 +759,14 @@ export function ImageField({
                 }}
                 className="h-9 cursor-pointer rounded-lg border-0 bg-transparent px-3 text-sm font-semibold text-[var(--color-muted)] hover:text-[var(--color-text)]"
               >
-                Remove
+                {t.removeImage}
               </button>
             )}
           </div>
           <input
             type="url"
-            aria-label="Or an image URL"
-            placeholder="…or paste an https:// image URL"
+            aria-label={t.imageUrl}
+            placeholder={t.imageUrlPlaceholder}
             value={uploaded ? "" : value}
             onChange={(e) => {
               setProblem(null)

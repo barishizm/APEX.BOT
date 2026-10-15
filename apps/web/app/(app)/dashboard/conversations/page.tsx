@@ -6,8 +6,12 @@ import { requireVerifiedUser } from "@/lib/auth"
 import { parseFilter, summaryJson } from "@/lib/conversations"
 import { currentBot } from "@/lib/dashboard"
 import { db } from "@/lib/db"
+import { getAppDictionary } from "@/lib/i18n/app"
+import { requestLocale } from "@/lib/i18n/server"
 
-export const metadata: Metadata = { title: "Conversations" }
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: getAppDictionary(await requestLocale()).inbox.title }
+}
 
 export default async function ConversationsPage({ searchParams }: { searchParams: Promise<{ filter?: string }> }) {
   const user = await requireVerifiedUser()

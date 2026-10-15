@@ -5,12 +5,14 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
 import { ArrowLeft, Check, CircleAlert, Inbox, LoaderCircle, Mail, Sparkles } from "lucide-react"
+import { useAppI18n } from "@/components/i18n/app-provider"
+import { format, localizePath } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
 const CODE_LENGTH = 6
 const RESEND_SECONDS = 30
 
-async function postJson(path: string, body: object): Promise<{ ok: boolean; status: number; data: any }> {
+async function postJson(path: string, body: object, networkError: string): Promise<{ ok: boolean; status: number; data: any }> {
   try {
     const res = await fetch(path, {
       method: "POST",
@@ -19,11 +21,15 @@ async function postJson(path: string, body: object): Promise<{ ok: boolean; stat
     })
     return { ok: res.ok, status: res.status, data: await res.json().catch(() => ({})) }
   } catch {
-    return { ok: false, status: 0, data: { message: "Couldn't reach the server. Check your connection and try again" } }
+    return { ok: false, status: 0, data: { message: networkError } }
   }
 }
 
 export default function VerifyEmail({ initialEmail }: { initialEmail: string }) {
+  const { t: app, locale } = useAppI18n()
+  const a = app.account
+  const t = a.verify
+  const toLogin = localizePath("/login", locale)
   const router = useRouter()
   const [email, setEmail] = useState(initialEmail)
   const [digits, setDigits] = useState<string[]>(Array(CODE_LENGTH).fill(""))
@@ -78,15 +84,15 @@ export default function VerifyEmail({ initialEmail }: { initialEmail: string }) 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (code.length < CODE_LENGTH) {
-      setError("Enter the 6-digit code we sent you")
+      setError(t.enterCode)
       return
     }
     setVerifying(true)
-    const { ok, status, data } = await postJson("/api/auth/verify-email", { code })
+    const { ok, status, data } = await postJson("/api/auth/verify-email", { code }, a.network)
     setVerifying(false)
-    if (status === 401) return router.replace("/login")
+    if (status === 401) return router.replace(toLogin)
     if (!ok) {
-      setError(data.message ?? "Something went wrong. Try again")
+      setError(data.message ?? a.generic)
       setShakeKey((k) => k + 1)
       return
     }
@@ -103,37 +109,37 @@ export default function VerifyEmail({ initialEmail }: { initialEmail: string }) 
   const saveEmail = async () => {
     const next = draft.trim()
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(next)) {
-      setEmailError("Enter a valid email address")
+      setEmailError(a.invalidEmail)
       return
     }
     setSaving(true)
-    const { ok, status, data } = await postJson("/api/auth/resend-code", { email: next })
+    const { ok, status, data } = await postJson("/api/auth/resend-code", { email: next }, a.network)
     setSaving(false)
-    if (status === 401) return router.replace("/login")
+    if (status === 401) return router.replace(toLogin)
     if (!ok) {
-      setEmailError(data.message ?? "Something went wrong. Try again")
+      setEmailError(data.message ?? a.generic)
       return
     }
     setEmail(data.email)
     setEditing(false)
     setDigits(Array(CODE_LENGTH).fill(""))
     setError(null)
-    setNotice(`New code sent to ${data.email}`)
+    setNotice(format(t.newCodeTo, { email: data.email }))
     setCooldown(RESEND_SECONDS)
     inputs.current[0]?.focus()
   }
 
   const resend = async () => {
     if (cooldown > 0) return
-    const { ok, status, data } = await postJson("/api/auth/resend-code", {})
-    if (status === 401) return router.replace("/login")
+    const { ok, status, data } = await postJson("/api/auth/resend-code", {}, a.network)
+    if (status === 401) return router.replace(toLogin)
     if (!ok) {
-      setError(data.message ?? "Something went wrong. Try again")
+      setError(data.message ?? a.generic)
       return
     }
     setDigits(Array(CODE_LENGTH).fill(""))
     setError(null)
-    setNotice("New code sent. Check your inbox and spam folder")
+    setNotice(t.newCode)
     setCooldown(RESEND_SECONDS)
     inputs.current[0]?.focus()
   }
@@ -144,7 +150,7 @@ export default function VerifyEmail({ initialEmail }: { initialEmail: string }) 
       className="grid min-h-screen gap-3 bg-[var(--color-surface)] p-3 text-[var(--color-text)] lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]"
     >
       <section className="relative flex min-h-[calc(100vh-24px)] flex-col rounded-2xl border border-[var(--color-line)] bg-[var(--color-raised)] px-6 py-8 sm:px-10 lg:px-12">
-        <Link href="/" className="logo" aria-label="Apex Bot home">
+        <Link href={localizePath("/", locale)} className="logo" aria-label={a.home}>
           <span className="logo__mark" />
         </Link>
 
@@ -181,7 +187,7 @@ export default function VerifyEmail({ initialEmail }: { initialEmail: string }) 
                   style={{ marginTop: 28 }}
                   className="text-[clamp(2rem,3.2vw,2.75rem)] font-semibold leading-[1.1] tracking-tight"
                 >
-                  Verified
+                  {t.verified}
                 </motion.h1>
                 <motion.p
                   initial={{ opacity: 0 }}
@@ -190,16 +196,16 @@ export default function VerifyEmail({ initialEmail }: { initialEmail: string }) 
                   style={{ marginTop: 16 }}
                   className="whitespace-nowrap text-lg text-[var(--color-muted)]"
                 >
-                  Taking you to the next step...
+                  {t.next}
                 </motion.p>
               </div>
             ) : (
               <>
             <h1 className="text-[clamp(2rem,3.2vw,2.75rem)] font-semibold leading-[1.1] tracking-tight">
-              Check your email
+              {t.checkEmail}
             </h1>
             <p className="mt-4 text-lg leading-snug text-[var(--color-muted)]">
-              We sent a 6-digit verification code to
+              {t.sentTo}
             </p>
             {editing ? (
               <div className="mt-2">
@@ -219,7 +225,7 @@ export default function VerifyEmail({ initialEmail }: { initialEmail: string }) 
                       if (e.key === "Escape") setEditing(false)
                     }}
                     autoFocus
-                    aria-label="Email address"
+                    aria-label={t.emailLabel}
                     aria-invalid={!!emailError}
                     className={cn(
                       "h-11 min-w-0 flex-1 rounded-lg border bg-transparent px-3 text-base text-[var(--color-text)] outline-none transition-colors",
@@ -232,14 +238,14 @@ export default function VerifyEmail({ initialEmail }: { initialEmail: string }) 
                     disabled={saving}
                     className="h-11 cursor-pointer rounded-lg border-0 bg-[var(--color-primary)] px-5 text-sm font-semibold text-[var(--color-on-primary)] transition-opacity hover:opacity-85 disabled:cursor-wait disabled:opacity-60"
                   >
-                    {saving ? "Sending…" : "Save"}
+                    {saving ? t.sending : t.save}
                   </button>
                   <button
                     type="button"
                     onClick={() => setEditing(false)}
                     className="h-11 cursor-pointer rounded-lg border-0 bg-transparent px-3 text-sm font-semibold text-[var(--color-muted)] transition-opacity hover:opacity-70"
                   >
-                    Cancel
+                    {t.cancel}
                   </button>
                 </div>
                 {emailError && (
@@ -251,14 +257,14 @@ export default function VerifyEmail({ initialEmail }: { initialEmail: string }) 
               </div>
             ) : (
               <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
-                <span className="break-all text-lg font-medium leading-snug">{email || "your email"}</span>
+                <span className="break-all text-lg font-medium leading-snug">{email || t.yourEmail}</span>
                 <button
                   type="button"
                   onClick={startEdit}
                   disabled={verifying}
                   className="cursor-pointer border-0 bg-transparent p-0 text-sm font-semibold text-[var(--color-secondary)] underline underline-offset-4 transition-opacity hover:opacity-70 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Change email
+                  {t.change}
                 </button>
               </div>
             )}
@@ -286,7 +292,7 @@ export default function VerifyEmail({ initialEmail }: { initialEmail: string }) 
                   autoFocus={i === 0}
                   maxLength={1}
                   readOnly={verifying}
-                  aria-label={`Digit ${i + 1}`}
+                  aria-label={format(t.digit, { n: i + 1 })}
                   aria-invalid={!!error}
                   className={cn(
                     "h-14 w-full min-w-0 rounded-lg border bg-transparent text-center text-2xl font-semibold text-[var(--color-text)] outline-none transition-colors",
@@ -315,7 +321,7 @@ export default function VerifyEmail({ initialEmail }: { initialEmail: string }) 
                 className="inline-flex h-12 cursor-pointer items-center gap-2 rounded-lg border-0 bg-[var(--color-primary)] px-7 text-[0.9375rem] font-semibold text-[var(--color-on-primary)] transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:bg-[var(--color-bubble)] disabled:text-[var(--color-muted)] disabled:opacity-100"
               >
                 {verifying && <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />}
-                {verifying ? "Verifying..." : "Verify"}
+                {verifying ? t.verifying : t.verify}
               </button>
               <button
                 type="button"
@@ -323,7 +329,7 @@ export default function VerifyEmail({ initialEmail }: { initialEmail: string }) 
                 disabled={cooldown > 0 || verifying}
                 className="h-12 cursor-pointer rounded-lg border-0 bg-transparent px-5 text-[0.9375rem] font-semibold text-[var(--color-text)] transition-opacity hover:opacity-70 disabled:cursor-not-allowed disabled:text-[var(--color-muted)] disabled:hover:opacity-100"
               >
-                {cooldown > 0 ? `Resend code in ${cooldown}s` : "Resend code"}
+                {cooldown > 0 ? format(t.resendIn, { s: cooldown }) : t.resend}
               </button>
             </div>
               </>
@@ -344,6 +350,8 @@ const LAST_PHASE = PHASE_DELAYS.length - 1
 
 // A mail app receives the code, opens it and types it into the verify form, then it loops
 function MailPreview() {
+  const { t: app } = useAppI18n()
+  const t = app.account.verify
   const reduceMotion = useReducedMotion()
   const [phase, setPhase] = useState(0)
 
@@ -360,7 +368,7 @@ function MailPreview() {
 
   return (
     <aside
-      aria-label="Verification email preview"
+      aria-label={t.preview.label}
       className="relative hidden flex-col items-center justify-center gap-10 overflow-hidden rounded-2xl bg-[var(--color-secondary)] p-8 lg:flex"
     >
       <div
@@ -385,7 +393,7 @@ function MailPreview() {
           </div>
           <div className="flex flex-1 items-center gap-2 text-xs font-medium text-[var(--color-muted)]">
             {opened ? <ArrowLeft className="h-3.5 w-3.5" /> : <Inbox className="h-3.5 w-3.5" />}
-            {opened ? "Message" : "Inbox"}
+            {opened ? t.preview.message : t.preview.inbox}
           </div>
           <Mail className="h-3.5 w-3.5 text-[var(--color-muted)]" />
         </div>
@@ -419,9 +427,9 @@ function MailPreview() {
                         <div className="min-w-0 flex-1 text-sm leading-tight">
                           <div className="flex justify-between gap-2">
                             <span className="font-semibold">Apex Bot</span>
-                            <span className="text-xs text-[var(--color-muted)]">now</span>
+                            <span className="text-xs text-[var(--color-muted)]">{t.preview.now}</span>
                           </div>
-                          <p className="truncate text-xs text-[var(--color-muted)]">Your verification code</p>
+                          <p className="truncate text-xs text-[var(--color-muted)]">{t.preview.subject}</p>
                         </div>
                       </div>
                     </motion.li>
@@ -451,12 +459,12 @@ function MailPreview() {
                     <Sparkles className="h-3.5 w-3.5" />
                   </span>
                   <div className="text-sm leading-tight">
-                    <p className="font-semibold">Your verification code</p>
-                    <p className="text-xs text-[var(--color-muted)]">Apex Bot · now</p>
+                    <p className="font-semibold">{t.preview.subject}</p>
+                    <p className="text-xs text-[var(--color-muted)]">Apex Bot · {t.preview.now}</p>
                   </div>
                 </div>
 
-                <p className="mt-4 text-xs text-[var(--color-muted)]">Use this code to verify your email:</p>
+                <p className="mt-4 text-xs text-[var(--color-muted)]">{t.preview.useCode}</p>
                 <p className="mt-1 font-mono text-2xl font-semibold tracking-[0.35em]">{DEMO_CODE}</p>
 
                 {/* the verify form the code gets typed into */}
@@ -501,10 +509,10 @@ function MailPreview() {
                   >
                     {verified ? (
                       <motion.span initial={{ scale: 0.6 }} animate={{ scale: 1 }} className="flex items-center gap-1.5">
-                        <Check className="h-3.5 w-3.5" /> Verified
+                        <Check className="h-3.5 w-3.5" /> {t.verified}
                       </motion.span>
                     ) : (
-                      "Verify"
+                      t.verify
                     )}
                   </div>
                 </div>

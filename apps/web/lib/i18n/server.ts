@@ -1,8 +1,9 @@
 // Server-side only: imports every dictionary.
 import type { Metadata } from "next"
+import { cookies, headers } from "next/headers"
 import { notFound } from "next/navigation"
 import { siteUrl } from "@/lib/site"
-import { DEFAULT_LOCALE, isLocale, LOCALE_META, LOCALES, localizePath, type Locale } from "./config"
+import { DEFAULT_LOCALE, isLocale, LOCALE_COOKIE, LOCALE_META, LOCALES, localizePath, matchLocale, type Locale } from "./config"
 import { en, type Dictionary } from "./dictionaries/en"
 import { tr } from "./dictionaries/tr"
 
@@ -15,6 +16,14 @@ export async function resolveLocale(params: Promise<{ lang: string }>): Promise<
   const { lang } = await params
   if (!isLocale(lang)) notFound()
   return lang
+}
+
+// Language of an app page or API request (no locale in the URL): the visitor's choice or the
+// last language they browsed the site in (cookie), else their browser's languages
+export async function requestLocale(): Promise<Locale> {
+  const chosen = (await cookies()).get(LOCALE_COOKIE)?.value
+  if (isLocale(chosen)) return chosen
+  return matchLocale((await headers()).get("accept-language")) ?? DEFAULT_LOCALE
 }
 
 export const generateLocaleParams = () => LOCALES.map((lang) => ({ lang }))

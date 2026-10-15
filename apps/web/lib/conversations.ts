@@ -1,15 +1,10 @@
 import type { ConversationFilter, ConversationSummary, StoredConversation } from "@apex/db"
 
-export const FILTERS: { id: ConversationFilter; label: string }[] = [
-  { id: "all", label: "All" },
-  { id: "unanswered", label: "Unanswered" },
-  { id: "handoff", label: "Hand-offs" },
-  { id: "leads", label: "Leads" },
-  { id: "negative", label: "Thumbs down" },
-]
+// Labels live in the inbox dictionary (lib/i18n/app/inbox.ts)
+export const FILTERS: ConversationFilter[] = ["all", "unanswered", "handoff", "leads", "negative"]
 
 export const parseFilter = (raw: string | null | undefined): ConversationFilter =>
-  FILTERS.some((f) => f.id === raw) ? (raw as ConversationFilter) : "all"
+  FILTERS.includes(raw as ConversationFilter) ? (raw as ConversationFilter) : "all"
 
 export function summaryJson(c: ConversationSummary) {
   return { ...c, handoffAt: c.handoffAt?.toISOString() ?? null, createdAt: c.createdAt.toISOString(), updatedAt: c.updatedAt.toISOString() }

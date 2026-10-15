@@ -2,6 +2,8 @@
 
 import { Crosshair, Expand, FlipHorizontal2, FlipVertical2, RotateCcw, RotateCw, Shrink, Undo2, X, type LucideIcon } from "lucide-react"
 import { useEffect, useRef, useState, type CSSProperties } from "react"
+import { useAppI18n } from "@/components/i18n/app-provider"
+import { translateMessage } from "@/lib/i18n/messages"
 import { cn } from "@/lib/utils"
 import { Slider } from "./fields"
 
@@ -127,6 +129,8 @@ export function ImageEditor({
   onApply: (img: HTMLImageElement, a: Adjust) => void
   onCancel: () => void
 }) {
+  const { t: app, locale } = useAppI18n()
+  const t = app.studio.editor
   const dialog = useRef<HTMLDialogElement>(null)
   const stage = useRef<HTMLDivElement>(null)
   const drag = useRef<{ x: number; y: number; ax: number; ay: number } | null>(null)
@@ -170,13 +174,13 @@ export function ImageEditor({
         <div className="flex items-start justify-between gap-4">
           <div className="flex flex-col gap-1">
             <h2 id="image-editor-title" className="text-base font-semibold">
-              Adjust launcher image
+              {t.title}
             </h2>
-            <p className="text-sm text-[var(--color-muted)]">Drag to move, then zoom, rotate or flip. Only what's inside the circle is kept.</p>
+            <p className="text-sm text-[var(--color-muted)]">{t.hint}</p>
           </div>
           <button
             type="button"
-            aria-label="Close"
+            aria-label={t.close}
             onClick={onCancel}
             className="grid h-8 w-8 shrink-0 cursor-pointer place-items-center rounded-lg border-0 bg-transparent text-[var(--color-muted)] hover:text-[var(--color-text)]"
           >
@@ -185,13 +189,13 @@ export function ImageEditor({
         </div>
 
         {problem ? (
-          <p className="text-sm text-red-500">{problem}</p>
+          <p className="text-sm text-red-500">{translateMessage(problem, locale)}</p>
         ) : (
           <div className="flex flex-wrap items-center justify-center gap-6">
             <div
               ref={stage}
               role="application"
-              aria-label="Image position. Arrow keys move it, plus and minus zoom."
+              aria-label={t.stage}
               tabIndex={0}
               onPointerDown={(e) => {
                 if (!a) return
@@ -237,25 +241,25 @@ export function ImageEditor({
                 {/* the widget draws the image at 60% of the button */}
                 <span className="relative h-[60%] w-[60%] overflow-hidden rounded-full">{img && a && <Framed src={src} size={size} a={a} />}</span>
               </span>
-              <span className="text-xs text-[var(--color-muted)]">Preview</span>
+              <span className="text-xs text-[var(--color-muted)]">{t.preview}</span>
             </div>
           </div>
         )}
 
         {a && img && (
           <>
-            <div className="flex flex-wrap gap-2" role="toolbar" aria-label="Image tools">
-              <ToolButton icon={RotateCcw} label="Rotate left 90°" onClick={() => update({ rotate: wrap(a.rotate - 90) })} />
-              <ToolButton icon={RotateCw} label="Rotate right 90°" onClick={() => update({ rotate: wrap(a.rotate + 90) })} />
-              <ToolButton icon={FlipHorizontal2} label="Flip horizontally" pressed={a.flipX} onClick={() => update({ flipX: !a.flipX })} />
-              <ToolButton icon={FlipVertical2} label="Flip vertically" pressed={a.flipY} onClick={() => update({ flipY: !a.flipY })} />
-              <ToolButton icon={Crosshair} label="Center" onClick={() => update({ x: 0, y: 0 })} />
-              <ToolButton icon={Shrink} label="Fit whole image" onClick={() => update({ zoom: zoomFor(size, a.rotate, "fit"), x: 0, y: 0 })} />
-              <ToolButton icon={Expand} label="Fill the circle" onClick={() => update({ zoom: zoomFor(size, a.rotate, "fill"), x: 0, y: 0 })} />
-              <ToolButton icon={Undo2} label="Reset" onClick={() => setA(defaultAdjust(img))} />
+            <div className="flex flex-wrap gap-2" role="toolbar" aria-label={t.tools}>
+              <ToolButton icon={RotateCcw} label={t.rotateLeft} onClick={() => update({ rotate: wrap(a.rotate - 90) })} />
+              <ToolButton icon={RotateCw} label={t.rotateRight} onClick={() => update({ rotate: wrap(a.rotate + 90) })} />
+              <ToolButton icon={FlipHorizontal2} label={t.flipX} pressed={a.flipX} onClick={() => update({ flipX: !a.flipX })} />
+              <ToolButton icon={FlipVertical2} label={t.flipY} pressed={a.flipY} onClick={() => update({ flipY: !a.flipY })} />
+              <ToolButton icon={Crosshair} label={t.center} onClick={() => update({ x: 0, y: 0 })} />
+              <ToolButton icon={Shrink} label={t.fit} onClick={() => update({ zoom: zoomFor(size, a.rotate, "fit"), x: 0, y: 0 })} />
+              <ToolButton icon={Expand} label={t.fill} onClick={() => update({ zoom: zoomFor(size, a.rotate, "fill"), x: 0, y: 0 })} />
+              <ToolButton icon={Undo2} label={t.reset} onClick={() => setA(defaultAdjust(img))} />
             </div>
-            <Slider label="Zoom" value={a.zoom} min={MIN_ZOOM} max={MAX_ZOOM} step={0.01} onChange={(zoom) => update({ zoom })} format={(v) => `${Math.round(v * 100)}%`} />
-            <Slider label="Rotation" value={a.rotate} min={-180} max={180} step={1} onChange={(rotate) => update({ rotate })} unit="°" />
+            <Slider label={t.zoom} value={a.zoom} min={MIN_ZOOM} max={MAX_ZOOM} step={0.01} onChange={(zoom) => update({ zoom })} format={(v) => `${Math.round(v * 100)}%`} />
+            <Slider label={t.rotation} value={a.rotate} min={-180} max={180} step={1} onChange={(rotate) => update({ rotate })} unit="°" />
           </>
         )}
 
@@ -265,7 +269,7 @@ export function ImageEditor({
             onClick={onCancel}
             className="h-9 cursor-pointer rounded-lg border border-[var(--color-line)] bg-transparent px-4 text-sm font-semibold text-[var(--color-text)] hover:border-[var(--color-muted)]"
           >
-            Cancel
+            {t.cancel}
           </button>
           <button
             type="button"
@@ -273,7 +277,7 @@ export function ImageEditor({
             onClick={() => img && a && onApply(img, a)}
             className="h-9 cursor-pointer rounded-lg border-0 bg-[var(--color-primary)] px-4 text-sm font-semibold text-[var(--color-on-primary)] disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Use image
+            {t.apply}
           </button>
         </div>
       </div>
