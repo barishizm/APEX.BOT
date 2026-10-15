@@ -26,6 +26,17 @@ describe("retrieval", () => {
     assert.equal(hits.length, 1);
   });
 
+  it("does not let a question word in a title outrank the page about the person", () => {
+    const kb = new KnowledgeBase();
+    kb.load("t", [
+      { url: "blog", title: "Who are These Agents?", text: "A post by Barış Akıntı about AI agents." },
+      { url: "about", title: "About", text: "I am Barış, a developer from Istanbul who builds chatbots and web apps." },
+    ]);
+    const hits = kb.search("t", [{ text: "Who is baris?", weight: 1 }], 3);
+    assert.equal(hits[0].chunk.url, "about");
+    assert.deepEqual(kb.search("t", [{ text: "kim bu?", weight: 1 }], 3), []);
+  });
+
   it("returns nothing for stopword-only queries", () => {
     const kb = new KnowledgeBase();
     kb.load("t", [{ url: "u", title: "x", text: "merhaba nasıl" }]);
