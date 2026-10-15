@@ -2,37 +2,20 @@
 
 import { X } from "lucide-react"
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
+import { useAppI18n } from "@/components/i18n/app-provider"
+import { format } from "@/lib/i18n"
 
 // Step-by-step bubbles over the Install section, started from onboarding's
 // "Place widget on your website". Each step points at an element marked with data-tour.
 
-const STEPS: { target: string; title: string; body: string }[] = [
-  {
-    target: "origins",
-    title: "Add your website",
-    body: "Type your site's address, e.g. https://www.example.com. The widget only loads on the sites listed here, so add every variant visitors use (with and without www).",
-  },
-  {
-    target: "save",
-    title: "Save your changes",
-    body: "Click Save changes so your website is allowed. It goes live within a minute.",
-  },
-  {
-    target: "embed",
-    title: "Copy the embed code",
-    body: "Click Copy to grab this one-line script. It loads the chat on your site.",
-  },
-  {
-    target: "embed",
-    title: "Paste it into your site",
-    body: "Put it just before the closing </body> tag on every page. On WordPress, Shopify, Webflow or Wix, paste it into the custom code or footer scripts setting.",
-  },
-  {
-    target: "embed",
-    title: "Check that it works",
-    body: "Open your website. The chat button appears in the corner. Send a test message to see your agent answer.",
-  },
-]
+// Titles and texts come from the studio dictionary (guide.steps)
+const STEPS = [
+  { key: "origins", target: "origins" },
+  { key: "save", target: "save" },
+  { key: "copy", target: "embed" },
+  { key: "paste", target: "embed" },
+  { key: "check", target: "embed" },
+] as const
 
 const GAP = 12
 const PAD = 6
@@ -41,12 +24,13 @@ const WIDTH = 320
 type Box = { top: number; left: number; width: number; height: number }
 
 export function InstallGuide({ onClose }: { onClose: () => void }) {
+  const t = useAppI18n().t.studio.guide
   const [step, setStep] = useState(0)
   const [box, setBox] = useState<Box | null>(null)
   const [bubbleH, setBubbleH] = useState(200)
   const bubble = useRef<HTMLDivElement>(null)
   const next = useRef<HTMLButtonElement>(null)
-  const current = STEPS[step]
+  const current = { ...STEPS[step], ...t.steps[STEPS[step].key] }
   const last = step === STEPS.length - 1
 
   // Bring the target into view, then follow it every frame while the page scrolls or reflows
@@ -125,7 +109,7 @@ export function InstallGuide({ onClose }: { onClose: () => void }) {
         <div className="flex items-start justify-between gap-3">
           <div className="flex flex-col gap-1">
             <span className="text-xs font-semibold text-[var(--color-secondary)]">
-              Step {step + 1} of {STEPS.length}
+              {format(t.step, { n: step + 1, total: STEPS.length })}
             </span>
             <h3 id="install-guide-title" className="text-sm font-semibold">
               {current.title}
@@ -133,7 +117,7 @@ export function InstallGuide({ onClose }: { onClose: () => void }) {
           </div>
           <button
             type="button"
-            aria-label="Close guide"
+            aria-label={t.close}
             onClick={onClose}
             className="grid h-7 w-7 shrink-0 cursor-pointer place-items-center rounded-lg border-0 bg-transparent text-[var(--color-muted)] hover:text-[var(--color-text)]"
           >
@@ -156,7 +140,7 @@ export function InstallGuide({ onClose }: { onClose: () => void }) {
                 onClick={() => setStep(step - 1)}
                 className="h-8 cursor-pointer rounded-lg border border-[var(--color-line)] bg-transparent px-3 text-xs font-semibold text-[var(--color-text)] hover:border-[var(--color-muted)]"
               >
-                Back
+                {t.back}
               </button>
             )}
             <button
@@ -165,7 +149,7 @@ export function InstallGuide({ onClose }: { onClose: () => void }) {
               onClick={() => (last ? onClose() : setStep(step + 1))}
               className="h-8 cursor-pointer rounded-lg border-0 bg-[var(--color-primary)] px-3 text-xs font-semibold text-[var(--color-on-primary)]"
             >
-              {last ? "Done" : "Next"}
+              {last ? t.done : t.next}
             </button>
           </div>
         </div>

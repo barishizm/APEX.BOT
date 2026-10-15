@@ -15,6 +15,9 @@ import {
   type ModelInfo,
   type Provider,
 } from "@apex/db/bot-settings"
+import { useAppI18n } from "@/components/i18n/app-provider"
+import { format, LOCALE_META, type Locale } from "@/lib/i18n"
+import { formatNumber, plural } from "@/lib/i18n/format"
 import { cn } from "@/lib/utils"
 import {
   ChoiceCards,
@@ -45,7 +48,6 @@ export interface SectionProps {
   listErr: (path: string) => Record<string, string> | undefined
 }
 
-const LANG_NAME: Record<Lang, string> = { tr: "Turkish", en: "English" }
 const other = (lang: Lang): Lang => (lang === "tr" ? "en" : "tr")
 
 function LangTag({ lang }: { lang: Lang }) {
@@ -57,10 +59,13 @@ function LangTag({ lang }: { lang: Lang }) {
 }
 
 /** Hint under a translated field when the other language still needs text. */
-function missingHint(value: Localized, lang: Lang, hint?: ReactNode): ReactNode {
-  const o = other(lang)
-  if (value[lang].trim() && !value[o].trim()) return `${LANG_NAME[o]} version is empty. Switch the editing language above to fill it in.`
-  return hint
+function useMissingHint() {
+  const t = useAppI18n().t.studio
+  return (value: Localized, lang: Lang, hint?: ReactNode): ReactNode => {
+    const o = other(lang)
+    if (value[lang].trim() && !value[o].trim()) return format(t.missingOther, { lang: t.langNames[o] })
+    return hint
+  }
 }
 
 function LocalizedInput({
@@ -84,6 +89,7 @@ function LocalizedInput({
   placeholder?: string
   multiline?: boolean
 }) {
+  const missingHint = useMissingHint()
   const props = {
     label: (
       <>
@@ -106,51 +112,52 @@ const grid2 = "grid gap-5 sm:grid-cols-2"
 // ---------- General ----------
 
 export function GeneralSection({ s, set, lang, err }: SectionProps) {
+  const t = useAppI18n().t.studio.general
   const g = s.general
   return (
     <>
-      <Group title="Identity" description="How the assistant introduces itself to visitors.">
+      <Group title={t.identity} description={t.identityHint}>
         <div className={grid2}>
-          <TextInput label="Bot name" value={g.botName} onChange={(botName) => set("general", { botName })} max={LIMITS.botName} error={err("general.botName")} placeholder="Apex" />
+          <TextInput label={t.botName} value={g.botName} onChange={(botName) => set("general", { botName })} max={LIMITS.botName} error={err("general.botName")} placeholder="Apex" />
           <TextInput
-            label="Company name"
+            label={t.companyName}
             value={g.companyName}
             onChange={(companyName) => set("general", { companyName })}
             max={LIMITS.companyName}
             error={err("general.companyName")}
             placeholder="Crest Cycles"
-            hint="Used in the header and when the assistant refers to your business."
+            hint={t.companyHint}
           />
         </div>
         <LocalizedInput
-          label="Header subtitle"
+          label={t.subtitle}
           value={g.subtitle}
           lang={lang}
           onChange={(subtitle) => set("general", { subtitle })}
           max={LIMITS.subtitle}
           error={err(`general.subtitle.${lang}`)}
           placeholder={lang === "tr" ? "Genelde birkaç saniyede yanıtlar" : "Usually replies in seconds"}
-          hint="Leave empty to show “AI assistant · company name”."
+          hint={t.subtitleHint}
         />
       </Group>
-      <Group title="Language" description="The widget speaks Turkish and English. The assistant replies in the visitor's language.">
+      <Group title={t.language} description={t.languageHint}>
         <Segmented
-          label="Default language"
+          label={t.defaultLang}
           value={g.defaultLang}
           onChange={(defaultLang) => set("general", { defaultLang })}
           options={[
             { value: "tr", label: "Türkçe" },
             { value: "en", label: "English" },
           ]}
-          hint="Used for the interface and for hand-off emails when the visitor's language can't be detected."
+          hint={t.defaultLangHint}
         />
         <ChoiceCards
-          label="Interface language"
+          label={t.interfaceLang}
           value={g.languageMode}
           onChange={(languageMode) => set("general", { languageMode })}
           options={[
-            { value: "auto", title: "Follow the visitor", description: "Uses the browser's language when it's Turkish or English, otherwise the default." },
-            { value: "fixed", title: "Always the default", description: "Every visitor sees the default language, whatever their browser says." },
+            { value: "auto", ...t.auto },
+            { value: "fixed", ...t.fixed },
           ]}
         />
       </Group>
@@ -161,149 +168,150 @@ export function GeneralSection({ s, set, lang, err }: SectionProps) {
 // ---------- Appearance ----------
 
 export function AppearanceSection({ s, set, lang, err }: SectionProps) {
+  const t = useAppI18n().t.studio.appearance
   const a = s.appearance
   return (
     <>
-      <Group title="Colors and theme">
+      <Group title={t.colors}>
         <ColorField
-          label="Brand color"
+          label={t.brandColor}
           value={a.primaryColor}
           onChange={(primaryColor) => set("appearance", { primaryColor })}
           error={err("appearance.primaryColor")}
-          hint="Used for the launcher, your visitors' messages and buttons. Text on it switches between black and white for contrast."
+          hint={t.brandColorHint}
         />
         <Segmented
-          label="Theme"
+          label={t.theme}
           value={a.theme}
           onChange={(theme) => set("appearance", { theme })}
           options={[
-            { value: "auto", label: "Match visitor's device" },
-            { value: "light", label: "Light" },
-            { value: "dark", label: "Dark" },
+            { value: "auto", label: t.themes.auto },
+            { value: "light", label: t.themes.light },
+            { value: "dark", label: t.themes.dark },
           ]}
         />
       </Group>
 
-      <Group title="Launcher" description="The button visitors click to open the chat.">
+      <Group title={t.launcher} description={t.launcherHint}>
         <ChoiceCards
-          label="Icon"
+          label={t.icon}
           columns={5}
           value={a.launcherIcon}
           onChange={(launcherIcon) => set("appearance", { launcherIcon })}
           options={[
             ...(Object.keys(LAUNCHER_ICONS) as (keyof typeof LAUNCHER_ICONS)[]).map((key) => {
               const Icon = LAUNCHER_ICONS[key]
-              return { value: key, title: { chat: "Chat", sparkle: "Sparkle", help: "Help", headset: "Support" }[key], icon: <Icon className="h-4 w-4" aria-hidden /> }
+              return { value: key, title: t.icons[key], icon: <Icon className="h-4 w-4" aria-hidden /> }
             }),
-            { value: "custom" as const, title: "Your image", icon: <ImageIcon className="h-4 w-4" aria-hidden /> },
+            { value: "custom" as const, title: t.icons.custom, icon: <ImageIcon className="h-4 w-4" aria-hidden /> },
           ]}
         />
         {a.launcherIcon === "custom" && (
           <ImageField
-            label="Launcher image"
+            label={t.launcherImage}
             value={a.launcherImage}
             onChange={(launcherImage) => set("appearance", { launcherImage })}
             error={err("appearance.launcherImage")}
             background={a.primaryColor}
-            hint="Drop a PNG, JPEG, WebP or GIF here. You can crop, rotate and position it after uploading. A transparent logo or mascot on your brand color works best."
+            hint={t.launcherImageHint}
           />
         )}
         <div className={grid2}>
           <LocalizedInput
-            label="Button label"
+            label={t.buttonLabel}
             value={a.launcherLabel}
             lang={lang}
             onChange={(launcherLabel) => set("appearance", { launcherLabel })}
             max={LIMITS.launcherLabel}
             error={err(`appearance.launcherLabel.${lang}`)}
             placeholder={lang === "tr" ? "Bize sorun" : "Ask us"}
-            hint="Leave empty for a round, icon-only button."
+            hint={t.buttonLabelHint}
           />
           <Segmented
-            label="Size"
+            label={t.size}
             value={a.launcherSize}
             onChange={(launcherSize) => set("appearance", { launcherSize })}
             options={[
-              { value: "small", label: "Small" },
-              { value: "medium", label: "Medium" },
-              { value: "large", label: "Large" },
+              { value: "small", label: t.sizes.small },
+              { value: "medium", label: t.sizes.medium },
+              { value: "large", label: t.sizes.large },
             ]}
           />
         </div>
         <Segmented
-          label="Position"
+          label={t.position}
           value={a.position}
           onChange={(position) => set("appearance", { position })}
           options={[
-            { value: "bottom-left", label: <><AlignLeft className="h-4 w-4" aria-hidden /> Bottom left</> },
-            { value: "bottom-right", label: <><AlignRight className="h-4 w-4" aria-hidden /> Bottom right</> },
+            { value: "bottom-left", label: <><AlignLeft className="h-4 w-4" aria-hidden /> {t.positions.left}</> },
+            { value: "bottom-right", label: <><AlignRight className="h-4 w-4" aria-hidden /> {t.positions.right}</> },
           ]}
         />
         <div className={grid2}>
-          <Slider label="Side spacing" value={a.offsetX} onChange={(offsetX) => set("appearance", { offsetX })} min={LIMITS.offset.min} max={LIMITS.offset.max} unit="px" error={err("appearance.offsetX")} />
+          <Slider label={t.sideSpacing} value={a.offsetX} onChange={(offsetX) => set("appearance", { offsetX })} min={LIMITS.offset.min} max={LIMITS.offset.max} unit="px" error={err("appearance.offsetX")} />
           <Slider
-            label="Bottom spacing"
+            label={t.bottomSpacing}
             value={a.offsetY}
             onChange={(offsetY) => set("appearance", { offsetY })}
             min={LIMITS.offset.min}
             max={LIMITS.offset.max}
             unit="px"
             error={err("appearance.offsetY")}
-            hint="Raise it if the launcher covers a cookie banner or another floating button."
+            hint={t.bottomSpacingHint}
           />
         </div>
       </Group>
 
-      <Group title="Chat window">
+      <Group title={t.window}>
         <div className={grid2}>
           <Segmented
-            label="Avatar"
+            label={t.avatar}
             value={a.avatar}
             onChange={(avatar) => set("appearance", { avatar })}
             options={[
-              { value: "initial", label: "Initial" },
-              { value: "icon", label: "Bot icon" },
-              { value: "image", label: "Image" },
+              { value: "initial", label: t.avatars.initial },
+              { value: "icon", label: t.avatars.icon },
+              { value: "image", label: t.avatars.image },
             ]}
           />
           <Segmented
-            label="Width"
+            label={t.width}
             value={a.panelWidth}
             onChange={(panelWidth) => set("appearance", { panelWidth })}
             options={[
-              { value: "compact", label: "Compact" },
-              { value: "standard", label: "Standard" },
-              { value: "wide", label: "Wide" },
+              { value: "compact", label: t.widths.compact },
+              { value: "standard", label: t.widths.standard },
+              { value: "wide", label: t.widths.wide },
             ]}
           />
         </div>
         {a.avatar === "image" && (
           <TextInput
-            label="Avatar image URL"
+            label={t.avatarUrl}
             type="url"
             value={a.avatarUrl}
             onChange={(avatarUrl) => set("appearance", { avatarUrl })}
             error={err("appearance.avatarUrl")}
             placeholder="https://example.com/logo.png"
-            hint="A square image over https, at least 64×64 px."
+            hint={t.avatarUrlHint}
             mono
           />
         )}
-        <Slider label="Corner radius" value={a.radius} onChange={(radius) => set("appearance", { radius })} min={LIMITS.radius.min} max={LIMITS.radius.max} unit="px" error={err("appearance.radius")} />
+        <Slider label={t.radius} value={a.radius} onChange={(radius) => set("appearance", { radius })} min={LIMITS.radius.min} max={LIMITS.radius.max} unit="px" error={err("appearance.radius")} />
         <ChoiceCards
-          label="Font"
+          label={t.font}
           columns={4}
           value={a.font}
           onChange={(font) => set("appearance", { font })}
           options={(["system", "rounded", "serif", "mono"] as const).map((f) => ({
             value: f,
-            title: <span style={{ fontFamily: FONT_STACKS[f] }}>{{ system: "System", rounded: "Rounded", serif: "Serif", mono: "Mono" }[f]}</span>,
+            title: <span style={{ fontFamily: FONT_STACKS[f] }}>{t.fonts[f]}</span>,
             description: <span style={{ fontFamily: FONT_STACKS[f] }}>Aa Ğğ Şş 123</span>,
           }))}
         />
         <Toggle
-          label="Show “Powered by Apex Bot”"
-          description="A small line under the message box."
+          label={t.branding}
+          description={t.brandingHint}
           checked={a.showBranding}
           onChange={(showBranding) => set("appearance", { showBranding })}
         />
@@ -315,15 +323,16 @@ export function AppearanceSection({ s, set, lang, err }: SectionProps) {
 // ---------- Messages ----------
 
 export function MessagesSection({ s, set, lang, err, listErr }: SectionProps) {
+  const t = useAppI18n().t.studio.messages
   const m = s.messages
   return (
     <>
-      <Group title="Welcome" description="The first thing visitors see when they open the chat.">
-        <LocalizedInput label="Greeting" multiline value={m.greeting} lang={lang} onChange={(greeting) => set("messages", { greeting })} max={LIMITS.greeting} error={err(`messages.greeting.${lang}`)} />
+      <Group title={t.welcome} description={t.welcomeHint}>
+        <LocalizedInput label={t.greeting} multiline value={m.greeting} lang={lang} onChange={(greeting) => set("messages", { greeting })} max={LIMITS.greeting} error={err(`messages.greeting.${lang}`)} />
         <ListEditor
           label={
             <>
-              Suggested questions
+              {t.suggestions}
               <LangTag lang={lang} />
             </>
           }
@@ -332,36 +341,36 @@ export function MessagesSection({ s, set, lang, err, listErr }: SectionProps) {
           max={LIMITS.suggestions}
           maxLength={LIMITS.suggestion}
           placeholder={lang === "tr" ? "Kargo ne kadar sürer?" : "How long does shipping take?"}
-          hint="One-tap questions shown under the greeting until the visitor sends a message."
+          hint={t.suggestionsHint}
           errors={listErr(`messages.suggestions.${lang}`)}
         />
-        <LocalizedInput label="Message box placeholder" value={m.placeholder} lang={lang} onChange={(placeholder) => set("messages", { placeholder })} max={LIMITS.placeholder} error={err(`messages.placeholder.${lang}`)} />
+        <LocalizedInput label={t.placeholder} value={m.placeholder} lang={lang} onChange={(placeholder) => set("messages", { placeholder })} max={LIMITS.placeholder} error={err(`messages.placeholder.${lang}`)} />
       </Group>
-      <Group title="When there's no answer">
+      <Group title={t.noAnswer}>
         <LocalizedInput
-          label="“I don't know” reply"
+          label={t.unknown}
           multiline
           value={m.unknownAnswer}
           lang={lang}
           onChange={(unknownAnswer) => set("messages", { unknownAnswer })}
           max={LIMITS.unknownAnswer}
           error={err(`messages.unknownAnswer.${lang}`)}
-          hint="The assistant says this, in its own words, when your knowledge base doesn't cover the question. It never guesses."
+          hint={t.unknownHint}
         />
       </Group>
-      <Group title="Footer">
-        <Toggle label="AI disclaimer" description="Tells visitors the answers come from AI. Recommended, and required in some regions." checked={m.showDisclaimer} onChange={(showDisclaimer) => set("messages", { showDisclaimer })} />
+      <Group title={t.footer}>
+        <Toggle label={t.disclaimer} description={t.disclaimerHint} checked={m.showDisclaimer} onChange={(showDisclaimer) => set("messages", { showDisclaimer })} />
         {m.showDisclaimer && (
-          <LocalizedInput label="Disclaimer text" value={m.disclaimer} lang={lang} onChange={(disclaimer) => set("messages", { disclaimer })} max={LIMITS.disclaimer} error={err(`messages.disclaimer.${lang}`)} />
+          <LocalizedInput label={t.disclaimerText} value={m.disclaimer} lang={lang} onChange={(disclaimer) => set("messages", { disclaimer })} max={LIMITS.disclaimer} error={err(`messages.disclaimer.${lang}`)} />
         )}
         <TextInput
-          label="Privacy policy URL"
+          label={t.privacyUrl}
           type="url"
           value={m.privacyUrl}
           onChange={(privacyUrl) => set("messages", { privacyUrl })}
           error={err("messages.privacyUrl")}
           placeholder="https://example.com/privacy"
-          hint="Adds a “Privacy” link to the footer (KVKK / GDPR)."
+          hint={t.privacyUrlHint}
           mono
         />
       </Group>
@@ -372,63 +381,64 @@ export function MessagesSection({ s, set, lang, err, listErr }: SectionProps) {
 // ---------- Behavior ----------
 
 export function BehaviorSection({ s, set, lang, err, listErr }: SectionProps) {
+  const t = useAppI18n().t.studio.behavior
   const b = s.behavior
   return (
     <>
-      <Group title="Opening" description="Proactive prompts lift engagement, but use them sparingly.">
+      <Group title={t.opening} description={t.openingHint}>
         <Segmented
-          label="Open automatically"
+          label={t.autoOpen}
           value={b.autoOpen}
           onChange={(autoOpen) => set("behavior", { autoOpen })}
           options={[
-            { value: "never", label: "Never" },
-            { value: "delay", label: "After a delay" },
+            { value: "never", label: t.autoOpenOptions.never },
+            { value: "delay", label: t.autoOpenOptions.delay },
           ]}
-          hint="Opens once per visit, and never after the visitor closed the chat."
+          hint={t.autoOpenHint}
         />
         {b.autoOpen === "delay" && (
           <>
-            <Slider label="Delay" value={b.autoOpenDelay} onChange={(autoOpenDelay) => set("behavior", { autoOpenDelay })} min={LIMITS.autoOpenDelay.min} max={LIMITS.autoOpenDelay.max} unit=" s" error={err("behavior.autoOpenDelay")} />
-            <Toggle label="Also on phones" description="On small screens the chat covers the page, so this is off by default." checked={b.autoOpenOnMobile} onChange={(autoOpenOnMobile) => set("behavior", { autoOpenOnMobile })} />
+            <Slider label={t.delay} value={b.autoOpenDelay} onChange={(autoOpenDelay) => set("behavior", { autoOpenDelay })} min={LIMITS.autoOpenDelay.min} max={LIMITS.autoOpenDelay.max} unit={t.seconds} error={err("behavior.autoOpenDelay")} />
+            <Toggle label={t.onPhones} description={t.onPhonesHint} checked={b.autoOpenOnMobile} onChange={(autoOpenOnMobile) => set("behavior", { autoOpenOnMobile })} />
           </>
         )}
         <LocalizedInput
-          label="Teaser bubble"
+          label={t.teaser}
           value={b.teaser}
           lang={lang}
           onChange={(teaser) => set("behavior", { teaser })}
           max={LIMITS.teaser}
           error={err(`behavior.teaser.${lang}`)}
           placeholder={lang === "tr" ? "Sorunuz mu var? Hemen yanıtlayalım 👋" : "Questions? We answer in seconds 👋"}
-          hint="A short message above the closed launcher. Leave empty for none."
+          hint={t.teaserHint}
         />
       </Group>
-      <Group title="In the conversation">
-        <Toggle label="Show sources" description="Links to the pages each answer is based on. Builds trust and sends visitors to the right page." checked={b.showSources} onChange={(showSources) => set("behavior", { showSources })} />
-        <Toggle label="Answer feedback" description="Thumbs up / down under each answer, so you can find weak answers later." checked={b.showFeedback} onChange={(showFeedback) => set("behavior", { showFeedback })} />
-        <Toggle label="Sound on reply" description="A soft chime when an answer arrives while the visitor is in another tab." checked={b.soundOnReply} onChange={(soundOnReply) => set("behavior", { soundOnReply })} />
-        <Toggle label="Full screen on phones" description="Recommended. Turn off to keep the floating window on small screens." checked={b.mobileFullscreen} onChange={(mobileFullscreen) => set("behavior", { mobileFullscreen })} />
+      <Group title={t.conversation}>
+        <Toggle label={t.sources} description={t.sourcesHint} checked={b.showSources} onChange={(showSources) => set("behavior", { showSources })} />
+        <Toggle label={t.feedback} description={t.feedbackHint} checked={b.showFeedback} onChange={(showFeedback) => set("behavior", { showFeedback })} />
+        <Toggle label={t.sound} description={t.soundHint} checked={b.soundOnReply} onChange={(soundOnReply) => set("behavior", { soundOnReply })} />
+        <Toggle label={t.fullscreen} description={t.fullscreenHint} checked={b.mobileFullscreen} onChange={(mobileFullscreen) => set("behavior", { mobileFullscreen })} />
         <ChoiceCards
-          label="Remember the conversation"
+          label={t.remember}
           columns={3}
           value={b.persistence}
           onChange={(persistence) => set("behavior", { persistence })}
           options={[
-            { value: "tab", title: "This tab", description: "Survives page changes, ends when the tab closes." },
-            { value: "browser", title: "This browser", description: "Visitors pick up where they left off on their next visit." },
-            { value: "none", title: "Don't remember", description: "Every page load starts a fresh conversation." },
+            { value: "tab", ...t.persistence.tab },
+            { value: "browser", ...t.persistence.browser },
+            { value: "none", ...t.persistence.none },
           ]}
         />
       </Group>
-      <Group title="Where it appears">
+      <Group title={t.where}>
         <ListEditor
-          label="Hide on these pages"
+          label={t.hide}
           items={b.hiddenPaths}
           onChange={(hiddenPaths) => set("behavior", { hiddenPaths })}
           max={LIMITS.hiddenPaths}
           maxLength={200}
           placeholder="/checkout"
-          hint="Path prefixes. “/checkout” also hides it on /checkout/payment."
+          hint={t.hideHint}
           errors={listErr("behavior.hiddenPaths")}
           mono
         />
@@ -439,17 +449,17 @@ export function BehaviorSection({ s, set, lang, err, listErr }: SectionProps) {
 
 // ---------- Model ----------
 
-const TIER: Record<ModelInfo["tier"], string> = { flagship: "Most capable", balanced: "Balanced", fast: "Fast & cheap" }
-
 // Rough per-message token use: system prompt + retrieved excerpts + history in, a short answer out
 const EST_INPUT_TOKENS = 3000
 const EST_OUTPUT_TOKENS = 300
 
-function estimate(model: ModelInfo, maxOutput: number): string | null {
+function estimate(model: ModelInfo, maxOutput: number, locale: Locale): string | null {
   if (!model.price) return null
   const out = Math.min(EST_OUTPUT_TOKENS, maxOutput)
   const per1000 = ((EST_INPUT_TOKENS * model.price.input + out * model.price.output) / 1_000_000) * 1000
-  return per1000 < 1 ? `≈ $${per1000.toFixed(2)}` : `≈ $${per1000.toFixed(per1000 < 10 ? 1 : 0)}`
+  const digits = per1000 < 1 ? 2 : per1000 < 10 ? 1 : 0
+  const usd = new Intl.NumberFormat(LOCALE_META[locale].intl, { style: "currency", currency: "USD", currencyDisplay: "narrowSymbol", minimumFractionDigits: digits, maximumFractionDigits: digits })
+  return `≈ ${usd.format(per1000)}`
 }
 
 function Badge({ children, tone = "muted" }: { children: ReactNode; tone?: "muted" | "accent" | "warn" }) {
@@ -468,6 +478,8 @@ function Badge({ children, tone = "muted" }: { children: ReactNode; tone?: "mute
 }
 
 export function ModelSection({ s, set, err }: SectionProps) {
+  const { t: app, locale } = useAppI18n()
+  const t = app.studio.model
   const mo = s.model
   const current = findModel(mo.provider, mo.id)
   const list = MODELS.filter((m) => m.provider === mo.provider)
@@ -480,8 +492,8 @@ export function ModelSection({ s, set, err }: SectionProps) {
 
   return (
     <>
-      <Group title="Provider" description="Choose whose model writes the answers. You can switch any time; conversations continue on the new model.">
-        <div role="radiogroup" aria-label="Provider" className="grid gap-2 sm:grid-cols-3">
+      <Group title={t.provider} description={t.providerHint}>
+        <div role="radiogroup" aria-label={t.provider} className="grid gap-2 sm:grid-cols-3">
           {PROVIDERS.map((p) => {
             const on = p.id === mo.provider
             return (
@@ -500,18 +512,18 @@ export function ModelSection({ s, set, err }: SectionProps) {
                   {p.label}
                   {on && <Check className="h-4 w-4 text-[var(--color-secondary)]" aria-hidden />}
                 </span>
-                <span className="text-xs text-[var(--color-muted)]">{MODELS.filter((m) => m.provider === p.id).length} models</span>
+                <span className="text-xs text-[var(--color-muted)]">{plural(MODELS.filter((m) => m.provider === p.id).length, t.modelCount, locale)}</span>
               </button>
             )
           })}
         </div>
       </Group>
 
-      <Group title="Model" description={err("model.id") ?? "Faster models answer in about a second; the most capable ones think longer before replying."}>
-        <div role="radiogroup" aria-label="Model" className="flex flex-col gap-2">
+      <Group title={t.model} description={err("model.id") ?? t.modelHint}>
+        <div role="radiogroup" aria-label={t.model} className="flex flex-col gap-2">
           {list.map((m) => {
             const on = m.id === mo.id
-            const cost = estimate(m, mo.maxOutputTokens)
+            const cost = estimate(m, mo.maxOutputTokens, locale)
             return (
               <button
                 key={m.id}
@@ -536,20 +548,16 @@ export function ModelSection({ s, set, err }: SectionProps) {
                 <span className="flex min-w-0 flex-1 flex-col gap-1">
                   <span className="flex flex-wrap items-center gap-1.5 text-sm font-semibold text-[var(--color-text)]">
                     {m.label}
-                    <Badge>{TIER[m.tier]}</Badge>
-                    {m.recommended && <Badge tone="accent">Recommended</Badge>}
-                    {m.preview && <Badge tone="warn">Preview</Badge>}
+                    <Badge>{t.tiers[m.tier]}</Badge>
+                    {m.recommended && <Badge tone="accent">{t.recommended}</Badge>}
+                    {m.preview && <Badge tone="warn">{t.previewBadge}</Badge>}
                   </span>
-                  <span className="text-xs leading-relaxed text-[var(--color-muted)]">{m.description}</span>
+                  <span className="text-xs leading-relaxed text-[var(--color-muted)]">{t.descriptions[m.id] ?? m.description}</span>
                   <span className="flex flex-wrap gap-x-3 gap-y-0.5 font-mono text-[0.6875rem] text-[var(--color-muted)]">
                     <span>{m.id}</span>
-                    {m.context && <span>{m.context} context</span>}
-                    {m.price && (
-                      <span>
-                        ${m.price.input} / ${m.price.output} per 1M tokens
-                      </span>
-                    )}
-                    {cost && <span>{cost} per 1,000 messages</span>}
+                    {m.context && <span>{format(t.context, { n: m.context })}</span>}
+                    {m.price && <span>{format(t.price, { input: m.price.input, output: m.price.output })}</span>}
+                    {cost && <span>{format(t.perThousand, { cost })}</span>}
                   </span>
                 </span>
               </button>
@@ -559,79 +567,79 @@ export function ModelSection({ s, set, err }: SectionProps) {
         {current?.preview && (
           <p className="flex items-start gap-2 rounded-lg bg-amber-500/10 p-3 text-xs leading-relaxed text-amber-700 dark:text-amber-300">
             <TriangleAlert className="mt-px h-4 w-4 shrink-0" aria-hidden />
-            Preview models can change or be retired at short notice. Turn on a fallback below if you use one in production.
+            {t.previewWarning}
           </p>
         )}
         <p className="text-xs leading-relaxed text-[var(--color-muted)]">
-          The chat server needs a <code className="font-mono">{PROVIDERS.find((p) => p.id === mo.provider)!.envKey}</code> for this provider. Cost estimates assume about{" "}
-          {EST_INPUT_TOKENS.toLocaleString("en")} input and {EST_OUTPUT_TOKENS} output tokens per message and exclude prompt-cache savings.
+          {t.envPre} <code className="font-mono">{PROVIDERS.find((p) => p.id === mo.provider)!.envKey}</code>
+          {format(t.envPost, { input: formatNumber(EST_INPUT_TOKENS, locale), output: EST_OUTPUT_TOKENS })}
         </p>
       </Group>
 
-      <Group title="Generation">
+      <Group title={t.generation}>
         <Slider
-          label="Creativity (temperature)"
+          label={t.temperature}
           value={current?.temperature ? mo.temperature : 0}
           onChange={(temperature) => set("model", { temperature })}
           min={0}
           max={MAX_TEMPERATURE[mo.provider]}
           step={0.1}
-          format={(v) => v.toFixed(1)}
+          format={(v) => v.toLocaleString(LOCALE_META[locale].intl, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
           disabled={!current?.temperature}
           error={err("model.temperature")}
           hint={
             current?.temperature
-              ? "Lower is more consistent and literal; higher varies wording more. 0.2–0.5 suits customer support."
-              : `${current?.label ?? "This model"} manages its own sampling. Use answer depth below instead.`
+              ? t.temperatureHint
+              : format(t.noTemperature, { model: current?.label ?? t.thisModel })
           }
         />
         <Segmented
-          label="Answer depth (reasoning)"
+          label={t.reasoning}
           value={mo.reasoning}
           onChange={(reasoning) => set("model", { reasoning })}
           disabled={!current?.reasoning}
           options={[
-            { value: "low", label: "Quick" },
-            { value: "medium", label: "Balanced" },
-            { value: "high", label: "Thorough" },
+            { value: "low", label: t.reasoningOptions.low },
+            { value: "medium", label: t.reasoningOptions.medium },
+            { value: "high", label: t.reasoningOptions.high },
           ]}
           hint={
             current?.reasoning
-              ? "How long the model thinks before answering. “Quick” keeps replies fast and cheap and is enough for most FAQ questions."
-              : `${current?.label ?? "This model"} doesn't think before answering, so this setting doesn't apply.`
+              ? t.reasoningHint
+              : format(t.noReasoning, { model: current?.label ?? t.thisModel })
           }
         />
         <div className={grid2}>
           <Slider
-            label="Max answer length"
+            label={t.maxLength}
             value={mo.maxOutputTokens}
             onChange={(maxOutputTokens) => set("model", { maxOutputTokens })}
             min={LIMITS.maxOutputTokens.min}
             max={LIMITS.maxOutputTokens.max}
             step={256}
-            format={(v) => v.toLocaleString("en")}
-            unit=" tok"
+            format={(v) => formatNumber(v, locale)}
+            unit={t.tokensUnit}
             error={err("model.maxOutputTokens")}
-            hint="A hard ceiling, including the model's thinking. Answers are usually far shorter."
+            hint={t.maxLengthHint}
           />
           <Slider
-            label="Conversation memory"
+            label={t.memory}
             value={mo.historyMessages}
             onChange={(historyMessages) => set("model", { historyMessages })}
             min={LIMITS.historyMessages.min}
             max={LIMITS.historyMessages.max}
-            unit=" msgs"
+            unit={t.messagesUnit}
             error={err("model.historyMessages")}
-            hint="Earlier messages sent with each question. More context, more cost."
+            hint={t.memoryHint}
           />
         </div>
       </Group>
 
-      <Group title="Fallback model" description="If the primary model errors, refuses or is overloaded, the turn is retried once on this model.">
-        <Toggle label="Use a fallback" checked={mo.fallback.enabled} onChange={(enabled) => set("model", { fallback: { ...mo.fallback, enabled } })} />
+      <Group title={t.fallback} description={t.fallbackHint}>
+        <Toggle label={t.useFallback} checked={mo.fallback.enabled} onChange={(enabled) => set("model", { fallback: { ...mo.fallback, enabled } })} />
         {mo.fallback.enabled && (
           <Select
-            label="Fallback"
+            label={t.fallbackLabel}
             value={`${mo.fallback.provider}:${mo.fallback.id}`}
             onChange={(v) => {
               const [provider, ...rest] = v.split(":")
@@ -639,11 +647,11 @@ export function ModelSection({ s, set, err }: SectionProps) {
             }}
             options={MODELS.filter((m) => !(m.provider === mo.provider && m.id === mo.id)).map((m) => ({
               value: `${m.provider}:${m.id}`,
-              label: `${m.label}${m.preview ? " (preview)" : ""}`,
+              label: `${m.label}${m.preview ? t.previewSuffix : ""}`,
               group: PROVIDERS.find((p) => p.id === m.provider)!.label,
             }))}
             error={err("model.fallback.id")}
-            hint="A model from another provider also covers a provider-wide outage."
+            hint={t.fallbackSelectHint}
           />
         )}
       </Group>
@@ -654,66 +662,62 @@ export function ModelSection({ s, set, err }: SectionProps) {
 // ---------- Persona ----------
 
 export function PersonaSection({ s, set, err, listErr }: SectionProps) {
+  const t = useAppI18n().t.studio.persona
   const p = s.persona
   return (
     <>
-      <Group title="Voice">
+      <Group title={t.voice}>
         <ChoiceCards
-          label="Tone"
+          label={t.tone}
           value={p.tone}
           onChange={(tone) => set("persona", { tone })}
-          options={[
-            { value: "friendly", title: "Friendly", description: "Warm and approachable, still professional." },
-            { value: "formal", title: "Formal", description: "Polite and reserved. Addresses visitors as “siz”." },
-            { value: "concise", title: "Concise", description: "Straight to the point, no small talk." },
-            { value: "detailed", title: "Detailed", description: "Walks through steps and specifics." },
-          ]}
+          options={(["friendly", "formal", "concise", "detailed"] as const).map((value) => ({ value, ...t.tones[value] }))}
         />
         <Segmented
-          label="Answer length"
+          label={t.length}
           value={p.responseLength}
           onChange={(responseLength) => set("persona", { responseLength })}
           options={[
-            { value: "short", label: "Short" },
-            { value: "balanced", label: "Balanced" },
-            { value: "detailed", label: "Detailed" },
+            { value: "short", label: t.lengths.short },
+            { value: "balanced", label: t.lengths.balanced },
+            { value: "detailed", label: t.lengths.detailed },
           ]}
-          hint="Short: one or two sentences. Balanced: two to five. Detailed: as long as the answer needs."
+          hint={t.lengthHint}
         />
-        <Toggle label="Use emoji" description="An occasional emoji in friendly replies. Never in formal ones." checked={p.useEmoji} onChange={(useEmoji) => set("persona", { useEmoji })} />
+        <Toggle label={t.emoji} description={t.emojiHint} checked={p.useEmoji} onChange={(useEmoji) => set("persona", { useEmoji })} />
       </Group>
-      <Group title="Instructions" description="Your own rules, added to the assistant's instructions. Safety and grounding rules always come first.">
+      <Group title={t.instructions} description={t.instructionsHint}>
         <TextArea
-          label="Custom instructions"
+          label={t.custom}
           rows={7}
           value={p.instructions}
           onChange={(instructions) => set("persona", { instructions })}
           max={LIMITS.instructions}
           error={err("persona.instructions")}
-          placeholder={"- Recommend the Urban Pro when visitors ask about commuting.\n- Mention free shipping over $50 when it's relevant.\n- Always end order questions with a link to the order tracking page."}
-          hint="Write rules as short bullet points. The assistant still only states facts from your knowledge base."
+          placeholder={t.customPlaceholder}
+          hint={t.customHint}
         />
         <ListEditor
-          label="Topics to decline"
+          label={t.decline}
           items={p.blockedTopics}
           onChange={(blockedTopics) => set("persona", { blockedTopics })}
           max={LIMITS.blockedTopics}
           maxLength={LIMITS.blockedTopic}
-          placeholder="Competitors' prices"
-          hint="The assistant politely declines these and steers back to how it can help."
+          placeholder={t.declinePlaceholder}
+          hint={t.declineHint}
           errors={listErr("persona.blockedTopics")}
         />
       </Group>
-      <Group title="Answer confidence" description="How closely your content must match a question before the assistant answers from it.">
+      <Group title={t.confidence} description={t.confidenceHint}>
         <ChoiceCards
-          label="Match threshold"
+          label={t.threshold}
           columns={3}
           value={p.confidence}
           onChange={(confidence) => set("persona", { confidence })}
           options={[
-            { value: "strict", title: "Strict", description: "Answers only clear matches. Fewest wrong answers, more “I don't know”." },
-            { value: "balanced", title: "Balanced", description: "Recommended for most sites." },
-            { value: "lenient", title: "Lenient", description: "Tries more questions. Better for small knowledge bases." },
+            { value: "strict", ...t.confidenceOptions.strict },
+            { value: "balanced", ...t.confidenceOptions.balanced },
+            { value: "lenient", ...t.confidenceOptions.lenient },
           ]}
         />
       </Group>
@@ -737,6 +741,8 @@ const LINK_BUTTON =
 
 // Hand-offs are only mailed to an address its owner has proven they can read
 function ConfirmAddress({ email, verification }: { email: string; verification: HandoffVerification }) {
+  const { t: app } = useAppI18n()
+  const t = app.studio.handoff
   const [sentTo, setSentTo] = useState<string | null>(null)
   const [code, setCode] = useState("")
   const [busy, setBusy] = useState(false)
@@ -745,7 +751,7 @@ function ConfirmAddress({ email, verification }: { email: string; verification: 
   const address = email.trim().toLowerCase()
   const verified = (verification.savedVerified && address === verification.savedEmail.toLowerCase()) || confirmed === address
   if (!address || verified) {
-    return verified && address ? <p className="m-0 text-sm text-[var(--color-muted)]">Confirmed. Hand-offs will be sent to this address.</p> : null
+    return verified && address ? <p className="m-0 text-sm text-[var(--color-muted)]">{t.confirmed}</p> : null
   }
 
   const call = async (url: string, body: object) => {
@@ -754,10 +760,10 @@ function ConfirmAddress({ email, verification }: { email: string; verification: 
     try {
       const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) setMessage(data.issues?.[0]?.message ?? data.message ?? "Something went wrong. Try again")
+      if (!res.ok) setMessage(data.issues?.[0]?.message ?? data.message ?? app.studio.generic)
       return res.ok ? data : null
     } catch {
-      setMessage("You're offline. Check your connection and try again")
+      setMessage(app.studio.offline)
       return null
     } finally {
       setBusy(false)
@@ -766,7 +772,7 @@ function ConfirmAddress({ email, verification }: { email: string; verification: 
 
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-[var(--color-line)] bg-[var(--color-raised)] p-3">
-      <p className="m-0 text-sm">This address isn&apos;t confirmed yet, so no hand-off emails are sent to it. We&apos;ll email a 6-digit code to it.</p>
+      <p className="m-0 text-sm">{t.unconfirmed}</p>
       {sentTo === address ? (
         <div className="flex flex-wrap items-center gap-2">
           <input
@@ -775,7 +781,7 @@ function ConfirmAddress({ email, verification }: { email: string; verification: 
             maxLength={6}
             value={code}
             onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-            aria-label="Confirmation code"
+            aria-label={t.code}
             placeholder="123456"
             className="h-10 w-32 rounded-lg border border-[var(--color-line)] bg-transparent px-3 font-mono text-sm"
           />
@@ -792,17 +798,17 @@ function ConfirmAddress({ email, verification }: { email: string; verification: 
               }
             }}
           >
-            Confirm
+            {t.confirm}
           </button>
           <button
             type="button"
             disabled={busy}
             className={LINK_BUTTON}
             onClick={async () => {
-              if (await call("/api/bot/handoff-email", { email: address })) setMessage("Sent a new code")
+              if (await call("/api/bot/handoff-email", { email: address })) setMessage(t.newCode)
             }}
           >
-            Resend
+            {t.resend}
           </button>
         </div>
       ) : (
@@ -814,11 +820,11 @@ function ConfirmAddress({ email, verification }: { email: string; verification: 
             onClick={async () => {
               if (await call("/api/bot/handoff-email", { email: address })) {
                 setSentTo(address)
-                setMessage(`Code sent to ${address}. It expires in 15 minutes.`)
+                setMessage(format(t.codeSent, { email: address }))
               }
             }}
           >
-            Send confirmation code
+            {t.sendCode}
           </button>
         </div>
       )}
@@ -832,53 +838,54 @@ function ConfirmAddress({ email, verification }: { email: string; verification: 
 }
 
 export function HandoffSection({ s, set, err, verification }: SectionProps & { verification: HandoffVerification }) {
+  const t = useAppI18n().t.studio.handoff
   const h = s.handoff
   return (
     <>
-      <Group title="Human hand-off" description="Visitors can send their question and the conversation to your team by email.">
-        <Toggle label="Allow hand-off to a human" description="Adds “Talk to a human” to the chat footer." checked={h.enabled} onChange={(enabled) => set("handoff", { enabled })} />
+      <Group title={t.title} description={t.hint}>
+        <Toggle label={t.allow} description={t.allowHint} checked={h.enabled} onChange={(enabled) => set("handoff", { enabled })} />
         {h.enabled && (
           <>
             <TextInput
-              label="Send hand-offs to"
+              label={t.sendTo}
               type="email"
               value={h.email}
               onChange={(email) => set("handoff", { email })}
               error={err("handoff.email")}
               placeholder="support@example.com"
-              hint="Replying to the email reaches the visitor directly. Never shown to visitors."
+              hint={t.sendToHint}
             />
             <ConfirmAddress email={h.email} verification={verification} />
             <Toggle
-              label="Offer it when the assistant can't answer"
-              description="Shows a “Talk to a human” button right under “I don't know” replies."
+              label={t.offer}
+              description={t.offerHint}
               checked={h.offerWhenUnsure}
               onChange={(offerWhenUnsure) => set("handoff", { offerWhenUnsure })}
             />
           </>
         )}
       </Group>
-      <Group title="Lead capture" description="Collect contact details so no conversation is lost.">
+      <Group title={t.leads} description={t.leadsHint}>
         <ChoiceCards
-          label="Ask for contact details"
+          label={t.ask}
           value={h.leadCapture}
           onChange={(leadCapture) => set("handoff", { leadCapture })}
           options={[
-            { value: "off", title: "Only on hand-off", description: "Visitors share details when they ask for a human." },
-            { value: "before-chat", title: "Before the chat starts", description: "A short form appears before the first message." },
+            { value: "off", ...t.leadOptions.off },
+            { value: "before-chat", ...t.leadOptions.before },
           ]}
         />
         {h.leadCapture === "before-chat" && (
           <>
-            <Field label="Fields" hint="Email is always asked for.">
+            <Field label={t.fields} hint={t.fieldsHint}>
               <div className="flex flex-col gap-3 rounded-lg border border-[var(--color-line)] bg-[var(--color-raised)] p-3">
-                <Toggle label="Name" checked={h.leadFields.name} onChange={(name) => set("handoff", { leadFields: { ...h.leadFields, name } })} />
-                <Toggle label="Phone number" checked={h.leadFields.phone} onChange={(phone) => set("handoff", { leadFields: { ...h.leadFields, phone } })} />
+                <Toggle label={t.name} checked={h.leadFields.name} onChange={(name) => set("handoff", { leadFields: { ...h.leadFields, name } })} />
+                <Toggle label={t.phone} checked={h.leadFields.phone} onChange={(phone) => set("handoff", { leadFields: { ...h.leadFields, phone } })} />
               </div>
             </Field>
             <Toggle
-              label="Required"
-              description="Off: visitors can skip the form. On: they must fill it in to chat, which lowers the number of conversations."
+              label={t.required}
+              description={t.requiredHint}
               checked={h.leadRequired}
               onChange={(leadRequired) => set("handoff", { leadRequired })}
             />
@@ -892,6 +899,7 @@ export function HandoffSection({ s, set, err, verification }: SectionProps & { v
 // ---------- Install & security ----------
 
 function CodeBlock({ code, label }: { code: string; label: string }) {
+  const t = useAppI18n().t.studio.install
   const [copied, setCopied] = useState(false)
   return (
     <div className="flex flex-col gap-1.5">
@@ -910,7 +918,7 @@ function CodeBlock({ code, label }: { code: string; label: string }) {
           className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md border border-[var(--color-line)] bg-transparent px-2.5 text-xs font-semibold text-[var(--color-text)] hover:border-[var(--color-muted)]"
         >
           {copied ? <Check className="h-3.5 w-3.5" aria-hidden /> : <Copy className="h-3.5 w-3.5" aria-hidden />}
-          {copied ? "Copied" : "Copy"}
+          {copied ? t.copied : t.copy}
         </button>
       </div>
       <pre className="overflow-x-auto rounded-lg border border-[var(--color-line)] bg-[var(--color-raised)] p-3 font-mono text-[0.8125rem] leading-relaxed">
@@ -931,51 +939,54 @@ export function InstallSection({
   dirty,
   onRotate,
 }: SectionProps & { siteKey: string; widgetUrl: string; canEdit: boolean; dirty: boolean; onRotate: () => Promise<void> }) {
+  const t = useAppI18n().t.studio.install
+  const c = t.apiComments
   const sec = s.security
   const [confirming, setConfirming] = useState(false)
   const [rotating, setRotating] = useState(false)
   const snippet = `<script src="${widgetUrl}" data-site-key="${siteKey}" async></script>`
-  const api = `// Optional: control the widget from your own code
-Apex.open()                       // open the chat
-Apex.send("Where is my order?")   // open and ask a question
+  const ask = `Apex.send("${c.question}")`
+  const api = `// ${c.intro}
+${"Apex.open()".padEnd(ask.length + 3)}// ${c.open}
+${ask}   // ${c.send}
 Apex.identify({ name: "Ada", email: "ada@example.com" })
 Apex.on("message", (m) => console.log(m.text))`
 
   return (
     <>
-      <Group title="Install" description="Paste this before the closing </body> tag on every page where the chat should appear.">
+      <Group title={t.title} description={t.hint}>
         <div data-tour="embed">
-          <CodeBlock label="Embed code" code={snippet} />
+          <CodeBlock label={t.embed} code={snippet} />
         </div>
         {sec.allowedOrigins.length === 0 && (
           <p className="flex items-start gap-2 rounded-lg bg-amber-500/10 p-3 text-xs leading-relaxed text-amber-700 dark:text-amber-300">
             <TriangleAlert className="mt-px h-4 w-4 shrink-0" aria-hidden />
-            Add your website under “Allowed websites” below. Until then the widget refuses to load anywhere.
+            {t.noOrigins}
           </p>
         )}
-        <CodeBlock label="JavaScript API" code={api} />
+        <CodeBlock label={t.api} code={api} />
       </Group>
 
-      <Group title="Allowed websites" description="The widget only answers on these sites, so a copied embed code is useless elsewhere.">
+      <Group title={t.allowed} description={t.allowedHint}>
         <div data-tour="origins">
           <ListEditor
-            label="Website addresses"
+            label={t.addresses}
             items={sec.allowedOrigins}
             onChange={(allowedOrigins) => set("security", { allowedOrigins })}
             max={LIMITS.origins}
             maxLength={LIMITS.url}
             placeholder="https://www.example.com"
-            hint="Include every variant visitors use: with and without www, and staging sites."
+            hint={t.addressesHint}
             errors={listErr("security.allowedOrigins")}
             mono
           />
         </div>
       </Group>
 
-      <Group title="Usage limits" description="Guards against abuse and runaway costs.">
+      <Group title={t.limits} description={t.limitsHint}>
         <div className={grid2}>
           <NumberInput
-            label="Messages per visitor per minute"
+            label={t.perMinute}
             value={sec.messagesPerMinute}
             onChange={(messagesPerMinute) => set("security", { messagesPerMinute })}
             min={LIMITS.messagesPerMinute.min}
@@ -983,8 +994,8 @@ Apex.on("message", (m) => console.log(m.text))`
             error={err("security.messagesPerMinute")}
           />
           <NumberInput
-            label="Longest message"
-            unit="characters"
+            label={t.longest}
+            unit={t.characters}
             value={sec.maxMessageChars}
             onChange={(maxMessageChars) => set("security", { maxMessageChars })}
             min={LIMITS.maxMessageChars.min}
@@ -992,30 +1003,30 @@ Apex.on("message", (m) => console.log(m.text))`
             error={err("security.maxMessageChars")}
           />
           <NumberInput
-            label="Daily token budget"
-            unit="tokens"
+            label={t.budget}
+            unit={t.tokens}
             step={10000}
             value={sec.dailyTokenBudget}
             onChange={(dailyTokenBudget) => set("security", { dailyTokenBudget })}
             min={LIMITS.dailyTokenBudget.min}
             max={LIMITS.dailyTokenBudget.max}
             error={err("security.dailyTokenBudget")}
-            hint="When it runs out, the chat offers a hand-off until midnight UTC."
+            hint={t.budgetHint}
           />
           <NumberInput
-            label="Keep conversations for"
-            unit="days"
+            label={t.retention}
+            unit={t.days}
             value={sec.retentionDays}
             onChange={(retentionDays) => set("security", { retentionDays })}
             min={LIMITS.retentionDays.min}
             max={LIMITS.retentionDays.max}
             error={err("security.retentionDays")}
-            hint="Deleted automatically afterwards (KVKK / GDPR)."
+            hint={t.retentionHint}
           />
         </div>
       </Group>
 
-      <Group title="Site key" description="The public key in your embed code. Rotate it if it's being used somewhere it shouldn't be.">
+      <Group title={t.siteKey} description={t.siteKeyHint}>
         <div className="flex flex-wrap items-center gap-3">
           <code className="min-w-0 flex-1 truncate rounded-lg border border-[var(--color-line)] bg-[var(--color-raised)] px-3 py-2.5 font-mono text-[0.8125rem]">{siteKey}</code>
           {!confirming ? (
@@ -1026,15 +1037,15 @@ Apex.on("message", (m) => console.log(m.text))`
               className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-lg border border-[var(--color-line)] bg-transparent px-3 text-sm font-semibold text-[var(--color-text)] hover:border-[var(--color-muted)] disabled:cursor-not-allowed disabled:opacity-50"
             >
               <KeyRound className="h-4 w-4" aria-hidden />
-              Rotate key
+              {t.rotate}
             </button>
           ) : null}
         </div>
         {confirming && (
-          <div role="alertdialog" aria-label="Confirm key rotation" className="flex flex-col gap-3 rounded-lg border border-red-500/40 bg-red-500/5 p-3">
+          <div role="alertdialog" aria-label={t.confirmRotation} className="flex flex-col gap-3 rounded-lg border border-red-500/40 bg-red-500/5 p-3">
             <p className="text-sm">
-              The current embed code stops working immediately. You'll need to update the snippet on every site.
-              {dirty && " Save or discard your other changes first."}
+              {t.rotateWarning}
+              {dirty && t.saveFirst}
             </p>
             <div className="flex gap-2">
               <button
@@ -1051,10 +1062,10 @@ Apex.on("message", (m) => console.log(m.text))`
                 }}
                 className="h-9 cursor-pointer rounded-lg border-0 bg-red-600 px-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {rotating ? "Rotating…" : "Rotate now"}
+                {rotating ? t.rotating : t.rotateNow}
               </button>
               <button type="button" onClick={() => setConfirming(false)} className="h-9 cursor-pointer rounded-lg border border-[var(--color-line)] bg-transparent px-3 text-sm font-semibold text-[var(--color-text)]">
-                Cancel
+                {t.cancel}
               </button>
             </div>
           </div>

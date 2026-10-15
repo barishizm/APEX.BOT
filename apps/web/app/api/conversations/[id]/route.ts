@@ -1,9 +1,10 @@
 import { deleteConversationForUser, getConversationForUser } from "@apex/db"
+import { errorJson } from "@/lib/auth"
 import { botErrorResponse, requireApiUser } from "@/lib/bot"
 import { conversationJson } from "@/lib/conversations"
 import { db } from "@/lib/db"
 
-const notFound = () => Response.json({ error: "not_found", message: "This conversation doesn't exist or was deleted" }, { status: 404 })
+const notFound = () => errorJson("not_found", "This conversation doesn't exist or was deleted", { status: 404 })
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {

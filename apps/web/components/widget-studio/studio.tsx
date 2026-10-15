@@ -17,7 +17,11 @@ import {
 import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { checkSettings, type BotSettings, type Lang, type SettingsIssue } from "@apex/db/bot-settings"
+import { useAppI18n } from "@/components/i18n/app-provider"
 import type { BotJson } from "@/lib/bot"
+import { format } from "@/lib/i18n"
+import { formatDate, plural } from "@/lib/i18n/format"
+import { translateIssues } from "@/lib/i18n/messages"
 import { cn } from "@/lib/utils"
 import { InstallGuide } from "./install-guide"
 import { WidgetPreview, type PreviewView } from "./preview"
@@ -36,15 +40,16 @@ import {
 
 type SectionId = "general" | "appearance" | "messages" | "behavior" | "model" | "persona" | "handoff" | "install"
 
-const SECTIONS: { id: SectionId; label: string; icon: LucideIcon; blurb: string; covers: (keyof BotSettings)[] }[] = [
-  { id: "general", label: "General", icon: Settings2, blurb: "Name, company and language.", covers: ["general"] },
-  { id: "appearance", label: "Appearance", icon: Palette, blurb: "Colors, launcher, window and font.", covers: ["appearance"] },
-  { id: "messages", label: "Messages", icon: MessageSquareText, blurb: "Greeting, suggestions and footer text.", covers: ["messages"] },
-  { id: "behavior", label: "Behavior", icon: MousePointerClick, blurb: "When it opens, what it shows, where it appears.", covers: ["behavior"] },
-  { id: "model", label: "AI model", icon: Cpu, blurb: "Provider, model and generation settings.", covers: ["model"] },
-  { id: "persona", label: "Persona", icon: Sparkles, blurb: "Tone, instructions and answer rules.", covers: ["persona"] },
-  { id: "handoff", label: "Hand-off & leads", icon: LifeBuoy, blurb: "Human hand-off and contact capture.", covers: ["handoff"] },
-  { id: "install", label: "Install & security", icon: Code2, blurb: "Embed code, allowed sites and limits.", covers: ["security"] },
+// Labels and blurbs come from the studio dictionary
+const SECTIONS: { id: SectionId; icon: LucideIcon; covers: (keyof BotSettings)[] }[] = [
+  { id: "general", icon: Settings2, covers: ["general"] },
+  { id: "appearance", icon: Palette, covers: ["appearance"] },
+  { id: "messages", icon: MessageSquareText, covers: ["messages"] },
+  { id: "behavior", icon: MousePointerClick, covers: ["behavior"] },
+  { id: "model", icon: Cpu, covers: ["model"] },
+  { id: "persona", icon: Sparkles, covers: ["persona"] },
+  { id: "handoff", icon: LifeBuoy, covers: ["handoff"] },
+  { id: "install", icon: Code2, covers: ["security"] },
 ]
 
 type SaveState = { kind: "idle" } | { kind: "saving" } | { kind: "saved" } | { kind: "error"; message: string }
@@ -63,6 +68,8 @@ export function WidgetStudio({
   initialSection?: string
   guide?: boolean
 }) {
+  const { t: app, locale } = useAppI18n()
+  const t = app.studio
   const router = useRouter()
   const [bot, setBot] = useState(initial)
   const [draft, setDraft] = useState<BotSettings>(initial.settings)
@@ -98,7 +105,7 @@ export function WidgetStudio({
   }, [])
 
   const dirty = !same(draft, bot.settings)
-  const localIssues = useMemo(() => checkSettings(draft), [draft])
+  const localIssues = useMemo(() => translateIssues(checkSettings(draft), locale), [draft, locale])
   const issues = serverIssues ?? localIssues
   const issueMap = useMemo(() => new Map(issues.map((i) => [i.path, i.message])), [issues])
 
@@ -149,7 +156,7 @@ export function WidgetStudio({
       setShowIssues(true)
       const first = SECTIONS.find((s) => s.covers.some((c) => localIssues.some((i) => i.path.startsWith(c))))
       if (first) setSection(first.id)
-      setSave({ kind: "error", message: `Fix ${localIssues.length === 1 ? "1 setting" : `${localIssues.length} settings`} before saving` })
+      setSave({ kind: "error", message: plural(localIssues.length, t.fixBeforeSaving, locale) })
       return
     }
     setSave({ kind: "saving" })
@@ -173,11 +180,11 @@ export function WidgetStudio({
         setServerIssues(body.issues)
         setShowIssues(true)
       }
-      setSave({ kind: "error", message: body.message ?? "Couldn't save. Try again" })
+      setSave({ kind: "error", message: body.message ?? t.saveFailed })
     } catch {
-      setSave({ kind: "error", message: "You're offline. Check your connection and try again" })
+      setSave({ kind: "error", message: t.offline })
     }
-  }, [dirty, save.kind, bot, draft, localIssues, router])
+  }, [dirty, save.kind, bot, draft, localIssues, router, t, locale])
 
   const discard = () => {
     setDraft(bot.settings)
@@ -190,7 +197,7 @@ export function WidgetStudio({
     const res = await fetch("/api/bot/site-key", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })
     const body = await res.json().catch(() => ({}))
     if (!res.ok) {
-      setSave({ kind: "error", message: body.message ?? "Couldn't rotate the key" })
+      setSave({ kind: "error", message: body.message ?? t.rotateFailed })
       return
     }
     setBot(body)
@@ -216,22 +223,22 @@ export function WidgetStudio({
   }, [dirty])
 
   const props: SectionProps = { s: draft, set, lang, err, listErr }
-  const current = SECTIONS.find((s) => s.id === section)!
+  const current = t.sections[section]
 
   const status =
     save.kind === "saving" ? (
       <span className="flex items-center gap-1.5">
         <LoaderCircle className="h-3.5 w-3.5 animate-spin" aria-hidden />
-        Saving…
+        {t.saving}
       </span>
     ) : save.kind === "error" ? (
       <span className="text-red-500">{save.message}</span>
     ) : dirty ? (
-      "Unsaved changes"
+      t.unsaved
     ) : save.kind === "saved" ? (
-      "All changes saved. Live on your site within a minute."
+      t.saved
     ) : (
-      `Last saved ${new Date(bot.updatedAt).toLocaleString("en", { dateStyle: "medium", timeStyle: "short" })}`
+      format(t.lastSaved, { date: formatDate(bot.updatedAt, locale, { dateStyle: "medium", timeStyle: "short" }) })
     )
 
   const pill = (on: boolean) =>
@@ -244,12 +251,12 @@ export function WidgetStudio({
     <div className="flex min-h-full flex-col">
       <header className="sticky top-0 z-10 flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-[var(--color-line)] bg-[var(--color-raised)]/95 px-4 py-3 backdrop-blur sm:px-6">
         <div className="flex min-w-0 flex-1 flex-col">
-          <h1 className="text-lg font-semibold">Customize widget</h1>
+          <h1 className="text-lg font-semibold">{t.title}</h1>
           <p role="status" aria-live="polite" className="truncate text-xs text-[var(--color-muted)]">
-            {bot.canEdit ? status : "View only. Ask a workspace owner or admin to make changes."}
+            {bot.canEdit ? status : t.viewOnly}
           </p>
         </div>
-        <div role="radiogroup" aria-label="Editing language" className="flex rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] p-0.5">
+        <div role="radiogroup" aria-label={t.editingLanguage} className="flex rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] p-0.5">
           {(["tr", "en"] as const).map((l) => (
             <button key={l} type="button" role="radio" aria-checked={lang === l} onClick={() => setLang(l)} className={pill(lang === l)}>
               {l === "tr" ? "Türkçe" : "English"}
@@ -263,25 +270,25 @@ export function WidgetStudio({
             disabled={!dirty || save.kind === "saving"}
             className="h-9 cursor-pointer rounded-lg border border-[var(--color-line)] bg-transparent px-4 text-sm font-semibold text-[var(--color-text)] transition-colors hover:border-[var(--color-muted)] disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Discard
+            {t.discard}
           </button>
           <button
             type="button"
             onClick={() => void doSave()}
             disabled={!dirty || save.kind === "saving" || !bot.canEdit}
             data-tour="save"
-            title="Save (⌘S)"
+            title={t.saveTitle}
             className="h-9 cursor-pointer rounded-lg border-0 bg-[var(--color-primary)] px-4 text-sm font-semibold text-[var(--color-on-primary)] transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {save.kind === "saving" ? "Saving…" : "Save changes"}
+            {save.kind === "saving" ? t.saving : t.save}
           </button>
         </div>
       </header>
 
       <div className="grid flex-1 gap-6 p-4 sm:p-6 lg:grid-cols-[13rem_minmax(0,1fr)] 2xl:grid-cols-[13rem_minmax(0,1fr)_minmax(24rem,30rem)]">
-        <nav aria-label="Settings sections" className="lg:sticky lg:top-24 lg:self-start">
+        <nav aria-label={t.sectionsLabel} className="lg:sticky lg:top-24 lg:self-start">
           <ul className="flex gap-1 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible lg:pb-0">
-            {SECTIONS.map(({ id, label, icon: Icon }) => {
+            {SECTIONS.map(({ id, icon: Icon }) => {
               const n = countFor(id)
               return (
                 <li key={id} className="shrink-0">
@@ -297,9 +304,9 @@ export function WidgetStudio({
                     )}
                   >
                     <Icon className="h-4 w-4 shrink-0" aria-hidden />
-                    <span className="flex-1">{label}</span>
+                    <span className="flex-1">{t.sections[id].label}</span>
                     {n > 0 && (
-                      <span className="grid h-5 min-w-5 place-items-center rounded-full bg-red-500 px-1 text-[0.6875rem] font-semibold text-white" aria-label={`${n} to fix`}>
+                      <span className="grid h-5 min-w-5 place-items-center rounded-full bg-red-500 px-1 text-[0.6875rem] font-semibold text-white" aria-label={format(t.toFix, { n })}>
                         {n}
                       </span>
                     )}
@@ -347,24 +354,24 @@ export function WidgetStudio({
           )}
         </div>
 
-        <aside aria-label="Live preview" className="flex flex-col gap-3 lg:col-start-2 2xl:col-start-auto 2xl:sticky 2xl:top-24 2xl:self-start">
+        <aside aria-label={t.preview.label} className="flex flex-col gap-3 lg:col-start-2 2xl:col-start-auto 2xl:sticky 2xl:top-24 2xl:self-start">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold">Live preview</h2>
+            <h2 className="text-sm font-semibold">{t.preview.label}</h2>
             <div className="flex flex-wrap gap-1">
-              <div className="flex rounded-lg border border-[var(--color-line)] p-0.5" role="radiogroup" aria-label="Preview screen">
-                <button type="button" role="radio" aria-checked={device === "desktop"} aria-label="Desktop" onClick={() => setDevice("desktop")} className={pill(device === "desktop")}>
+              <div className="flex rounded-lg border border-[var(--color-line)] p-0.5" role="radiogroup" aria-label={t.preview.screen}>
+                <button type="button" role="radio" aria-checked={device === "desktop"} aria-label={t.preview.desktop} onClick={() => setDevice("desktop")} className={pill(device === "desktop")}>
                   <Monitor className="h-3.5 w-3.5" aria-hidden />
                 </button>
-                <button type="button" role="radio" aria-checked={device === "mobile"} aria-label="Phone" onClick={() => setDevice("mobile")} className={pill(device === "mobile")}>
+                <button type="button" role="radio" aria-checked={device === "mobile"} aria-label={t.preview.phone} onClick={() => setDevice("mobile")} className={pill(device === "mobile")}>
                   <Smartphone className="h-3.5 w-3.5" aria-hidden />
                 </button>
               </div>
-              <div className="flex rounded-lg border border-[var(--color-line)] p-0.5" role="radiogroup" aria-label="Preview content">
+              <div className="flex rounded-lg border border-[var(--color-line)] p-0.5" role="radiogroup" aria-label={t.preview.content}>
                 {(
                   [
-                    ["welcome", "Welcome"],
-                    ["conversation", "Chat"],
-                    ...(draft.handoff.leadCapture === "before-chat" ? [["lead", "Lead form"]] : []),
+                    ["welcome", t.preview.welcome],
+                    ["conversation", t.preview.chat],
+                    ...(draft.handoff.leadCapture === "before-chat" ? [["lead", t.preview.lead]] : []),
                   ] as [PreviewView, string][]
                 ).map(([v, label]) => (
                   <button
@@ -382,7 +389,7 @@ export function WidgetStudio({
                   </button>
                 ))}
                 <button type="button" role="radio" aria-checked={!previewOpen} onClick={() => setPreviewOpen(false)} className={pill(!previewOpen)}>
-                  Closed
+                  {t.preview.closed}
                 </button>
               </div>
             </div>
@@ -397,8 +404,9 @@ export function WidgetStudio({
             onToggle={() => setPreviewOpen((o) => !o)}
           />
           <p className="text-xs leading-relaxed text-[var(--color-muted)]">
-            Showing the {lang === "tr" ? "Turkish" : "English"} version
-            {draft.appearance.theme === "auto" ? `, in ${systemDark ? "dark" : "light"} mode like your device` : ""}. Click the launcher to open and close it.
+            {format(t.preview.showing, { lang: t.langNames[lang] })}
+            {draft.appearance.theme === "auto" ? format(t.preview.deviceMode, { mode: systemDark ? t.preview.dark : t.preview.light }) : ""}
+            {t.preview.toggleHint}
           </p>
         </aside>
       </div>

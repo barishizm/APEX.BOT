@@ -1,6 +1,6 @@
 import { getBotForUser, listKnowledgeChunks } from "@apex/db"
 import { CONFIDENCE, KnowledgeBase, relevantHits } from "@apex/knowledge"
-import { readJson } from "@/lib/auth"
+import { errorJson, readJson } from "@/lib/auth"
 import { requireApiUser } from "@/lib/bot"
 import { db } from "@/lib/db"
 import { knowledgeErrorResponse, minRetrievalScore } from "@/lib/knowledge"
@@ -11,7 +11,7 @@ export async function POST(request: Request) {
     const user = await requireApiUser()
     const { query } = await readJson(request)
     const text = typeof query === "string" ? query.trim().slice(0, 500) : ""
-    if (!text) return Response.json({ error: "invalid_input", message: "Type a question" }, { status: 400 })
+    if (!text) return errorJson("invalid_input", "Type a question", { status: 400 })
     const bot = await getBotForUser(db(), user.id)
     const index = new KnowledgeBase()
     index.load(bot.id, await listKnowledgeChunks(db(), bot.id))

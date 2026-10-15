@@ -1,3 +1,4 @@
+import { requestLocale } from "@/lib/i18n/server"
 import { randomBytes } from "node:crypto"
 import { AuthError, register } from "@apex/db"
 import { db } from "@/lib/db"
@@ -20,14 +21,14 @@ export async function POST(request: Request) {
     try {
       const { user, session, code } = await register(db(), input, await requestMeta())
       await setSessionCookie(session)
-      await sendVerificationCode(user.email, code)
+      await sendVerificationCode(user.email, code, await requestLocale())
       return Response.json({ user }, { status: 201 })
     } catch (err) {
       if (!(err instanceof AuthError && err.code === "email_taken")) throw err
       // Answer exactly like a success so the form can't be used to probe which emails have accounts.
       // The owner is told by email; the cookie is a decoy that no session matches.
       const email = String(b.email ?? "").trim().toLowerCase()
-      await sendAccountExistsNotice(email)
+      await sendAccountExistsNotice(email, await requestLocale())
       await setSessionCookie({ token: randomBytes(32).toString("base64url"), expiresAt: new Date(Date.now() + 86_400_000), persistent: true })
       const username = String(b.username ?? "")
       return Response.json(

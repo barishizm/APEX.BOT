@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useI18n } from "@/components/i18n/provider";
 
 export function CopySnippet({ code }: { code: string }) {
+  const { t } = useI18n();
   const [copied, setCopied] = useState(false);
 
   async function copy() {
@@ -17,7 +19,7 @@ export function CopySnippet({ code }: { code: string }) {
     <div className="snippet">
       <code>{code}</code>
       <button type="button" onClick={copy} aria-live="polite">
-        {copied ? "Copied" : "Copy"}
+        {copied ? t.common.copied : t.common.copy}
       </button>
     </div>
   );
