@@ -602,6 +602,17 @@ button:not(:focus-visible) {
   border-top: 1px solid var(--color-line);
 }
 
+.steps__img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  margin-bottom: var(--space-5);
+  border-radius: 12px;
+  background: var(--color-line);
+}
+
 .steps__n {
   display: block;
   margin-bottom: var(--space-4);
@@ -795,23 +806,110 @@ button:not(:focus-visible) {
   color: var(--color-muted);
 }
 
+/* ---------- After-hours band ---------- */
+
+/* The photos are dark in both themes, so text on them is always light. */
+.night {
+  max-width: 1200px;
+  margin-inline: auto;
+  padding: var(--space-section) var(--gutter) 0;
+}
+.night__frame {
+  position: relative;
+  margin: 0;
+  overflow: hidden;
+  border-radius: 20px;
+  background: #0c0c09;
+}
+.night__img {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 420px;
+  object-fit: cover;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .night__img {
+    animation: night-drift 24s ease-in-out infinite alternate;
+  }
+}
+@keyframes night-drift {
+  from { transform: scale(1); }
+  to { transform: scale(1.06) translateX(-1.5%); }
+}
+.night__caption {
+  position: absolute;
+  inset: auto 0 0 0;
+  display: grid;
+  gap: var(--space-3);
+  padding: clamp(24px, 5vw, 56px);
+  max-width: 32rem;
+  color: #f4f4f1;
+}
+.night__frame::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top right, rgb(12 12 9 / 0.85), rgb(12 12 9 / 0.35) 55%, transparent);
+  pointer-events: none;
+}
+.night__caption {
+  z-index: 1;
+}
+.night__caption .eyebrow {
+  color: #a9a4f2;
+}
+.night__caption h2 {
+  font-size: var(--text-h2);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+}
+.night__caption p:last-child {
+  color: rgb(244 244 241 / 0.78);
+  font-size: 1.0625rem;
+}
+
 /* ---------- Closing + footer ---------- */
 
 .closing {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: var(--space-4);
   text-align: center;
-  max-width: 1200px;
-  margin-inline: auto;
-  padding: var(--space-section) var(--gutter);
+  width: min(calc(1200px - 2 * var(--gutter)), calc(100% - 2 * var(--gutter)));
+  margin: var(--space-section) auto;
+  padding: clamp(56px, 8vw, 112px) var(--gutter) clamp(160px, 22vw, 280px);
+  border-radius: 20px;
+  background: #0c0c09;
+  color: #f4f4f1;
+}
+.closing__bg {
+  z-index: -1;
+  object-fit: cover;
+  object-position: center bottom;
 }
 .closing .lede {
   margin-top: 0;
+  color: rgb(244 244 241 / 0.78);
 }
 .closing .actions {
   margin-top: var(--space-3);
+}
+.closing .btn--primary {
+  background: #f4f4f1;
+  color: #0c0c09;
+}
+.closing .btn--ghost {
+  border-color: rgb(244 244 241 / 0.4);
+  color: #f4f4f1;
+}
+.closing .btn--ghost:hover {
+  border-color: #f4f4f1;
 }
 
 .site-foot {
