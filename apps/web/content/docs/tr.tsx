@@ -32,7 +32,7 @@ Apex.identify({ name: "Ada", email: "ada@example.com" })
 Apex.on("message", (m) => console.log(m.text, m.sources))
 Apex.on("open", () => analytics.track("chat_opened"))`;
 
-// The dashboard is still English-only, so menu paths keep the labels people see on screen
+// Menu paths use the dashboard's Turkish labels (lib/i18n/app), so they match the screen
 function Body() {
   const snippet = embedSnippet("apex_pk_…");
   return (
@@ -48,11 +48,11 @@ function Body() {
           bilgileri metin olarak ekleyin.
         </li>
         <li>
-          <em>Dashboard → Widget</em> altında <strong>widget'ı özelleştirin</strong>: isim, renkler, karşılama mesajı, üslup ve
+          <em>Panel → Widget</em> altında <strong>widget'ı özelleştirin</strong>: isim, renkler, karşılama mesajı, üslup ve
           model.
         </li>
         <li>
-          <em>Install &amp; security</em> altında <strong>web sitenize izin verin</strong>. Widget yalnızca orada listelenen
+          <em>Kurulum ve güvenlik</em> altında <strong>web sitenize izin verin</strong>. Widget yalnızca orada listelenen
           adreslerde çalışır.
         </li>
         <li>
@@ -60,12 +60,12 @@ function Body() {
         </li>
       </ol>
       <p>
-        Panelinizdeki <em>Setup</em> kontrol listesi bu adımları sizin için takip eder.
+        Panelinizdeki <em>Kurulum</em> kontrol listesi bu adımları sizin için takip eder.
       </p>
 
       <h2 id="knowledge">Bilgi tabanı</h2>
       <p>
-        Apex yalnızca ona verdiğiniz içerikten yanıt verir. <em>Dashboard → Knowledge</em> altında iki tür kaynak ekleyebilirsiniz:
+        Apex yalnızca ona verdiğiniz içerikten yanıt verir. <em>Panel → Bilgi tabanı</em> altında iki tür kaynak ekleyebilirsiniz:
       </p>
       <ul>
         <li>
@@ -80,8 +80,8 @@ function Body() {
       </ul>
       <p>
         Bilgi tabanınızdaki hiçbir şey bir soruyla yeterince eşleşmediğinde asistan tahmin yürütmek yerine bilmediğini
-        söyler ve açtıysanız ekibinize devretmeyi önerir. Eşleşmenin ne kadar yakın olması gerektiğini <em>Persona</em>{" "}
-        altındaki <em>Answer confidence</em> ayarı belirler.
+        söyler ve açtıysanız ekibinize devretmeyi önerir. Eşleşmenin ne kadar yakın olması gerektiğini <em>Kişilik</em>{" "}
+        altındaki <em>Yanıt güveni</em> ayarı belirler.
       </p>
 
       <h2 id="customize">Özelleştirme</h2>
@@ -95,31 +95,31 @@ function Body() {
         </thead>
         <tbody>
           <tr>
-            <td>General</td>
+            <td>Genel</td>
             <td>Bot ve şirket adı, başlık altyazısı, varsayılan dil ve arayüz dili</td>
           </tr>
           <tr>
-            <td>Appearance</td>
+            <td>Görünüm</td>
             <td>Marka rengi, tema, açılış simgesi, etiketi ve konumu, pencere genişliği, köşe yuvarlaklığı ve yazı tipi</td>
           </tr>
           <tr>
-            <td>Messages</td>
+            <td>Mesajlar</td>
             <td>Karşılama mesajı, önerilen sorular, “bilmiyorum” yanıtı, uyarı metni ve gizlilik bağlantısı</td>
           </tr>
           <tr>
-            <td>Behavior</td>
+            <td>Davranış</td>
             <td>Otomatik açılma, tanıtım balonu, kaynaklar, geri bildirim, sohbetlerin ne kadar süre hatırlanacağı ve gizlenecek sayfalar</td>
           </tr>
           <tr>
-            <td>AI model</td>
+            <td>Yapay zekâ modeli</td>
             <td>Sağlayıcı, model, yaratıcılık, yanıt derinliği, yanıt uzunluğu, bellek ve yedek model</td>
           </tr>
           <tr>
-            <td>Persona</td>
+            <td>Kişilik</td>
             <td>Üslup, yanıt uzunluğu, emoji, kendi talimatlarınız, reddedilecek konular ve yanıt güveni</td>
           </tr>
           <tr>
-            <td>Hand-off &amp; leads</td>
+            <td>Devir ve potansiyel müşteriler</td>
             <td>Devir taleplerini alan e-posta adresi ve sohbet öncesi isteğe bağlı iletişim formu</td>
           </tr>
         </tbody>
@@ -128,7 +128,7 @@ function Body() {
 
       <h2 id="install">Widget'ı yükleyin</h2>
       <p>
-        Yerleştirme kodunu <em>Dashboard → Widget → Install &amp; security</em> ekranından kopyalayın. Kodda size özel site
+        Yerleştirme kodunu <em>Panel → Widget → Kurulum ve güvenlik</em> ekranından kopyalayın. Kodda size özel site
         anahtarınız hazır olarak bulunur ve şöyle görünür:
       </p>
       <pre>
@@ -137,7 +137,7 @@ function Body() {
       <p>
         Sohbetin görünmesini istediğiniz her sayfada kodu kapanış <code>&lt;/body&gt;</code> etiketinin hemen önüne
         yapıştırın. Ardından ziyaretçilerin kullandığı her adresi, örneğin <code>https://example.com</code> ve{" "}
-        <code>https://www.example.com</code>, <em>Allowed websites</em> altına ekleyin.
+        <code>https://www.example.com</code>, <em>İzinli web siteleri</em> altına ekleyin.
       </p>
       <p className="callout">
         Site anahtarı tasarım gereği herkese açıktır: yalnızca izin verdiğiniz web sitelerinde çalışır. Kötüye kullanıldığını
@@ -223,16 +223,16 @@ function Body() {
       <h2 id="privacy">Gizlilik ayarları</h2>
       <ul>
         <li>
-          Konuşmalar, <em>Install &amp; security</em> altında belirlediğiniz saklama süresinin sonunda otomatik olarak silinir
+          Konuşmalar, <em>Kurulum ve güvenlik</em> altında belirlediğiniz saklama süresinin sonunda otomatik olarak silinir
           (varsayılan 30 gün).
         </li>
         <li>
           Ziyaretçiler istedikleri zaman yeni bir sohbet başlatabilir; bu, eski sohbeti tarayıcılarından temizler. Kayıtlı
-          herhangi bir konuşmayı <em>Conversations</em> sayfasından silebilirsiniz.
+          herhangi bir konuşmayı <em>Konuşmalar</em> sayfasından silebilirsiniz.
         </li>
         <li>E-posta adresleri, telefon ve kart numaraları kayıtlarımızda maskelenir.</li>
         <li>
-          Widget'ın alt kısmında göstermek için gizlilik politikanızın bağlantısını <em>Messages</em> altına ekleyin.
+          Widget'ın alt kısmında göstermek için gizlilik politikanızın bağlantısını <em>Mesajlar</em> altına ekleyin.
         </li>
       </ul>
 
@@ -240,12 +240,12 @@ function Body() {
       <h3>Açılış düğmesi görünmüyor</h3>
       <ul>
         <li>
-          Sayfanın tam adresinin (<code>www</code> ve <code>https</code> dahil) <em>Allowed websites</em> altında
+          Sayfanın tam adresinin (<code>www</code> ve <code>https</code> dahil) <em>İzinli web siteleri</em> altında
           listelendiğini kontrol edin. Listelenmemişse tarayıcı konsolunda{" "}
           <code>[Apex] Widget disabled: origin_not_allowed</code> mesajı görünür.
         </li>
         <li>
-          Sayfanın <em>Behavior → Hide on these pages</em> altındaki yollardan birinde olmadığını kontrol edin.
+          Sayfanın <em>Davranış → Bu sayfalarda gizle</em> altındaki yollardan birinde olmadığını kontrol edin.
         </li>
         <li>
           Koddaki <code>src</code> değerinin <code>{apiUrl()}/widget.js</code> adresini gösterdiğinden ve site anahtarının
@@ -255,16 +255,16 @@ function Body() {
       <h3>Çok sık “bilmiyorum” diyor</h3>
       <ul>
         <li>
-          <em>Knowledge</em> sayfasını kontrol edin: başarısız olan ya da az sayfa bulan bir web sitesi kaynağı nedenini gösterir.
+          <em>Bilgi tabanı</em> sayfasını kontrol edin: başarısız olan ya da az sayfa bulan bir web sitesi kaynağı nedenini gösterir.
         </li>
         <li>Eksik bilgileri metin kaynağı olarak ekleyin.</li>
         <li>
-          Küçük bilgi tabanları için <em>Persona → Answer confidence</em> ayarını <em>Lenient</em> yapın.
+          Küçük bilgi tabanları için <em>Kişilik → Yanıt güveni</em> ayarını <em>Esnek</em> yapın.
         </li>
       </ul>
       <h3>Yanıtlar durdu</h3>
       <p>
-        <em>Install &amp; security</em> altındaki günlük token bütçesi dolmuş olabilir; bu durumda sohbet UTC gece yarısına kadar
+        <em>Kurulum ve güvenlik</em> altındaki günlük token bütçesi dolmuş olabilir; bu durumda sohbet UTC gece yarısına kadar
         insana devir önerir. <a href={localizePath("/status", "tr")}>Sistem durumu</a> sayfasına da göz atabilirsiniz.
       </p>
     </>

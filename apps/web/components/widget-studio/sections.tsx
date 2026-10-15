@@ -16,7 +16,7 @@ import {
   type Provider,
 } from "@apex/db/bot-settings"
 import { useAppI18n } from "@/components/i18n/app-provider"
-import { format } from "@/lib/i18n"
+import { format, LOCALE_META, type Locale } from "@/lib/i18n"
 import { formatNumber, plural } from "@/lib/i18n/format"
 import { cn } from "@/lib/utils"
 import {
@@ -453,11 +453,13 @@ export function BehaviorSection({ s, set, lang, err, listErr }: SectionProps) {
 const EST_INPUT_TOKENS = 3000
 const EST_OUTPUT_TOKENS = 300
 
-function estimate(model: ModelInfo, maxOutput: number): string | null {
+function estimate(model: ModelInfo, maxOutput: number, locale: Locale): string | null {
   if (!model.price) return null
   const out = Math.min(EST_OUTPUT_TOKENS, maxOutput)
   const per1000 = ((EST_INPUT_TOKENS * model.price.input + out * model.price.output) / 1_000_000) * 1000
-  return per1000 < 1 ? `≈ $${per1000.toFixed(2)}` : `≈ $${per1000.toFixed(per1000 < 10 ? 1 : 0)}`
+  const digits = per1000 < 1 ? 2 : per1000 < 10 ? 1 : 0
+  const usd = new Intl.NumberFormat(LOCALE_META[locale].intl, { style: "currency", currency: "USD", currencyDisplay: "narrowSymbol", minimumFractionDigits: digits, maximumFractionDigits: digits })
+  return `≈ ${usd.format(per1000)}`
 }
 
 function Badge({ children, tone = "muted" }: { children: ReactNode; tone?: "muted" | "accent" | "warn" }) {
@@ -521,7 +523,7 @@ export function ModelSection({ s, set, err }: SectionProps) {
         <div role="radiogroup" aria-label={t.model} className="flex flex-col gap-2">
           {list.map((m) => {
             const on = m.id === mo.id
-            const cost = estimate(m, mo.maxOutputTokens)
+            const cost = estimate(m, mo.maxOutputTokens, locale)
             return (
               <button
                 key={m.id}
@@ -582,7 +584,7 @@ export function ModelSection({ s, set, err }: SectionProps) {
           min={0}
           max={MAX_TEMPERATURE[mo.provider]}
           step={0.1}
-          format={(v) => v.toLocaleString(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+          format={(v) => v.toLocaleString(LOCALE_META[locale].intl, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
           disabled={!current?.temperature}
           error={err("model.temperature")}
           hint={
