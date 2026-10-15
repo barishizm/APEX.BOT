@@ -7,7 +7,7 @@ services:
     plan: free
     region: frankfurt
     branch: main
-    buildCommand: npm ci && npm run build -w @apex/widget
+    buildCommand: npm ci --include=dev && npm run build -w @apex/widget
     startCommand: npm start -w @apex/api
     healthCheckPath: /health
     envVars:
