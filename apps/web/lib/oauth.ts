@@ -7,7 +7,7 @@ export const PROVIDERS: readonly OAuthProvider[] = ["google", "github"]
 export const isProvider = (v: string): v is OAuthProvider => (PROVIDERS as readonly string[]).includes(v)
 
 // Public origin the provider redirects back to; must match what is registered with the provider
-export const siteOrigin = () => (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000").replace(/\/$/, "")
+export const siteOrigin = () => (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/$/, "")
 export const redirectUri = (p: OAuthProvider) => `${siteOrigin()}/api/auth/oauth/${p}/callback`
 
 export function credentials(p: OAuthProvider) {

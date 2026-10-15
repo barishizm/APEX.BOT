@@ -10,7 +10,7 @@ const mono = Inconsolata({ subsets: ["latin", "latin-ext"], variable: "--font-mo
 const serif = Instrument_Serif({ subsets: ["latin", "latin-ext"], weight: "400", style: ["normal", "italic"], variable: "--font-serif", display: "swap" });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
   title: { default: "Apex Bot — The assistant that knows your site", template: "%s — Apex Bot" },
   description:
     "Apex Bot answers your visitors' questions using only the information on your site. Installs with a single line of code.",
