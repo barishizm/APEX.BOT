@@ -84,10 +84,10 @@ export function MobileMenu({ signedIn }: { signedIn: boolean }) {
               </a>
             ) : (
               <>
-                <a href="/?signup=1" className="btn btn--primary" onClick={auth("register")}>
+                <a href="/signup" className="btn btn--primary" onClick={auth("register")}>
                   Get started free
                 </a>
-                <a href="/?login=1" className="btn btn--ghost" onClick={auth("login")}>
+                <a href="/login" className="btn btn--ghost" onClick={auth("login")}>
                   Log in
                 </a>
               </>

@@ -7,7 +7,7 @@ export const metadata: Metadata = { title: "Verify your email" };
 
 export default async function VerifyEmailPage() {
   const session = await currentSession();
-  if (!session) redirect("/?login=1");
+  if (!session) redirect("/login");
   if (session.user.emailVerified) redirect("/dashboard");
   return <VerifyEmail initialEmail={session.user.email} />;
 }

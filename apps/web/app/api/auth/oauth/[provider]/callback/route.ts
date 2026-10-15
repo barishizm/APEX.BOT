@@ -7,7 +7,7 @@ import { requestMeta, setSessionCookie } from "@/lib/auth"
 import { OAUTH_COOKIE, credentials, fetchProfile, isProvider, siteOrigin } from "@/lib/oauth"
 
 const to = (path: string) => NextResponse.redirect(`${siteOrigin()}${path}`)
-const fail = (error: string) => to(`/?login=1&error=${error}`)
+const fail = (error: string) => to(`/login?error=${error}`)
 
 const sameString = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b))
 

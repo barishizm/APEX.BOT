@@ -2,7 +2,7 @@ import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import { OAUTH_COOKIE, authorizeUrl, credentials, isProvider, newState, siteOrigin } from "@/lib/oauth"
 
-const back = (error: string) => NextResponse.redirect(`${siteOrigin()}/?login=1&error=${error}`)
+const back = (error: string) => NextResponse.redirect(`${siteOrigin()}/login?error=${error}`)
 
 // Starts the flow: remember a one-time state (+ PKCE verifier) and send the browser to the provider
 export async function GET(request: Request, { params }: { params: Promise<{ provider: string }> }) {

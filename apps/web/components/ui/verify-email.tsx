@@ -84,7 +84,7 @@ export default function VerifyEmail({ initialEmail }: { initialEmail: string }) 
     setVerifying(true)
     const { ok, status, data } = await postJson("/api/auth/verify-email", { code })
     setVerifying(false)
-    if (status === 401) return router.replace("/?login=1")
+    if (status === 401) return router.replace("/login")
     if (!ok) {
       setError(data.message ?? "Something went wrong. Try again")
       setShakeKey((k) => k + 1)
@@ -109,7 +109,7 @@ export default function VerifyEmail({ initialEmail }: { initialEmail: string }) 
     setSaving(true)
     const { ok, status, data } = await postJson("/api/auth/resend-code", { email: next })
     setSaving(false)
-    if (status === 401) return router.replace("/?login=1")
+    if (status === 401) return router.replace("/login")
     if (!ok) {
       setEmailError(data.message ?? "Something went wrong. Try again")
       return
@@ -126,7 +126,7 @@ export default function VerifyEmail({ initialEmail }: { initialEmail: string }) 
   const resend = async () => {
     if (cooldown > 0) return
     const { ok, status, data } = await postJson("/api/auth/resend-code", {})
-    if (status === 401) return router.replace("/?login=1")
+    if (status === 401) return router.replace("/login")
     if (!ok) {
       setError(data.message ?? "Something went wrong. Try again")
       return

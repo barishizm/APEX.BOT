@@ -43,7 +43,7 @@ export async function requireVerifiedUser() {
   // a database behind the code would fail on every dashboard query; say so instead
   if ((await schemaMissing()).length) redirect("/database-update")
   const session = await currentSession()
-  if (!session) redirect("/?login=1")
+  if (!session) redirect("/login")
   if (!session.user.emailVerified) redirect("/verify-email")
   return session.user
 }

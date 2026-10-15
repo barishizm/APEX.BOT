@@ -10,7 +10,7 @@ export const metadata: Metadata = { title: "Account settings" }
 
 export default async function SettingsPage() {
   const session = await currentSession()
-  if (!session) redirect("/?login=1")
+  if (!session) redirect("/login")
   const account = await getAccount(db(), session.user.id, session.sessionId)
   return (
     <DashboardFrame active="Settings">

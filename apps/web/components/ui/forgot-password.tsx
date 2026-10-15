@@ -100,7 +100,7 @@ export default function ForgotPassword() {
                   {busy && <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />}
                   Send code
                 </button>
-                <Link href="/?login=1" className="inline-flex items-center gap-1.5 text-sm font-semibold no-underline hover:opacity-70">
+                <Link href="/login" className="inline-flex items-center gap-1.5 text-sm font-semibold no-underline hover:opacity-70">
                   <ArrowLeft className="h-4 w-4" aria-hidden="true" />
                   Back to log in
                 </Link>
