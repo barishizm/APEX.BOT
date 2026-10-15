@@ -77,7 +77,7 @@ export const NAV: NavEntry[] = [
 ];
 
 // Shown wherever visitors can reach us; set NEXT_PUBLIC_CONTACT_EMAIL per deployment
-export const CONTACT_EMAIL = process.env.NEXT_PUBLIC_CONTACT_EMAIL || "hello@apex.bot";
+export const CONTACT_EMAIL = process.env.NEXT_PUBLIC_CONTACT_EMAIL || "hello@apexbot.eu";
 
 export const FOOTER: { heading: string; links: { label: string; href: string }[] }[] = [
   {

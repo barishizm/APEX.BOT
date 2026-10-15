@@ -88,7 +88,7 @@ const SECURITY: { icon: LucideIcon; title: string; text: string }[] = [
   {
     icon: Timer,
     title: "Retention you control",
-    text: "Conversations are deleted automatically after the period you choose, and you can delete any of them from your dashboard (KVKK / GDPR).",
+    text: "Conversations are deleted automatically after the period you choose, and you can delete any of them from your dashboard (Turkey\u2019s KVKK and the EU\u2019s GDPR).",
   },
 ];
 
