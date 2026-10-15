@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation"
 import { X, Check, ArrowRight, Clock, Languages, LifeBuoy, Eye, EyeOff } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { GodRays, MeshGradient } from "@paper-design/shaders-react"
+import { useI18n } from "@/components/i18n/provider"
+import { format } from "@/lib/i18n"
+import { useSignedIn } from "@/lib/signed-in"
 
 function GoogleLogo() {
   return (
@@ -26,11 +29,12 @@ function GitHubLogo() {
 }
 
 function SocialButtons({ verb, accountType }: { verb: string; accountType?: "business" | "personal" }) {
+  const { t, href } = useI18n()
   return (
     <>
       <div className="flex items-center gap-3 text-xs uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
         <span className="h-px flex-1 bg-black/10 dark:bg-white/15" />
-        or
+        {t.auth.or}
         <span className="h-px flex-1 bg-black/10 dark:bg-white/15" />
       </div>
 
@@ -45,15 +49,15 @@ function SocialButtons({ verb, accountType }: { verb: string; accountType?: "bus
             className="w-full flex items-center justify-center gap-3 px-8 py-2.5 rounded-lg border border-zinc-300 dark:border-white/20 bg-white dark:bg-zinc-950 text-sm font-medium text-zinc-900 dark:text-white hover:bg-zinc-50 dark:hover:bg-zinc-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 transition-colors cursor-pointer"
           >
             {logo}
-            {verb} with {name}
+            {format(t.auth.withProvider, { verb, provider: name })}
           </a>
         ))}
       </div>
       {accountType && (
         <p className="text-center text-xs text-zinc-500 dark:text-zinc-400">
-          By continuing with Google or GitHub you agree to the{" "}
-          <a href="/terms" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">Terms of Service</a> and{" "}
-          <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">Privacy Policy</a>.
+          {t.auth.oauthConsentPre}{" "}
+          <a href={href("/terms")} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">{t.nav.terms}</a> {t.auth.and}{" "}
+          <a href={href("/privacy")} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">{t.nav.privacy}</a>.
         </p>
       )}
     </>
@@ -72,6 +76,7 @@ const noExtensionUi = {
 // The reveal button sits beside the input (not over it), so password-manager
 // icons injected at the input's right edge (Proton Pass etc.) can't cover it.
 function PasswordInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
+  const { t } = useI18n()
   const [visible, setVisible] = useState(false)
   return (
     <div className="flex items-center rounded-lg bg-white dark:bg-zinc-950/40 border border-zinc-300 dark:border-zinc-400/20 focus-within:border-zinc-500 dark:focus-within:border-white/40 transition-all">
@@ -84,7 +89,7 @@ function PasswordInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
       />
       <button
         type="button"
-        aria-label={visible ? "Hide password" : "Show password"}
+        aria-label={visible ? t.auth.hidePassword : t.auth.showPassword}
         aria-pressed={visible}
         onMouseDown={(e) => e.preventDefault()}
         onClick={() => setVisible((v) => !v)}
@@ -98,16 +103,14 @@ function PasswordInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
 
 export default function Hero({
   modalOnly = false,
-  signedIn = false,
   initialAuth,
-  initialError,
 }: {
   modalOnly?: boolean
-  signedIn?: boolean
   // set by the /login and /signup routes to open the modal on load
   initialAuth?: "login" | "register"
-  initialError?: string
 }) {
+  const { t, href } = useI18n()
+  const signedIn = useSignedIn()
   const router = useRouter()
   const dialogRef = useRef<HTMLDivElement>(null)
   // Focus goes back where it was when the modal closes
@@ -169,22 +172,24 @@ export default function Hero({
     }
   }, [])
 
-  // /login and /signup render the landing page with the modal already open
+  // /login and /signup render the landing page with the modal already open. They are
+  // prerendered, so the OAuth callback's ?error= is read here rather than on the server.
   useEffect(() => {
     if (!initialAuth) return
     const oauthErrors: Record<string, string> = {
-      oauth_not_configured: "Google/GitHub sign-in isn't set up yet. Use your email instead",
-      oauth_denied: "Sign-in was cancelled. Try again or use your email",
-      oauth_email_unverified: "Your provider has no verified email for this account. Verify it there and try again",
-      oauth_failed: "Couldn't sign you in with that provider. Try again or use your email",
+      oauth_not_configured: t.auth.errors.oauth_not_configured,
+      oauth_denied: t.auth.errors.oauth_denied,
+      oauth_email_unverified: t.auth.errors.oauth_email_unverified,
+      oauth_failed: t.auth.errors.oauth_failed,
     }
-    setAuthError(initialAuth === "login" && initialError ? (oauthErrors[initialError] ?? null) : null)
+    const error = new URLSearchParams(window.location.search).get("error")
+    setAuthError(initialAuth === "login" && error ? (oauthErrors[error] ?? null) : null)
     // drop ?error= so a refresh doesn't replay it
     window.history.replaceState(null, "", window.location.pathname)
     setFormStep("idle")
     setAuthMode(initialAuth)
     setIsExpanded(true)
-  }, [initialAuth, initialError])
+  }, [initialAuth, t])
 
   const switchMode = (mode: "register" | "login") => {
     setFormStep("idle")
@@ -227,7 +232,7 @@ export default function Hero({
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setAuthError(data.message ?? "Something went wrong. Try again")
+        setAuthError(data.message ?? t.auth.errors.generic)
         setFormStep("idle")
         return
       }
@@ -237,7 +242,7 @@ export default function Hero({
       // the success screen is a beat of feedback, not a stop; Continue stays as a fallback
       setTimeout(() => router.push(next), 1200)
     } catch {
-      setAuthError("Couldn't reach the server. Check your connection and try again")
+      setAuthError(t.auth.errors.network)
       setFormStep("idle")
     }
   }
@@ -320,45 +325,39 @@ export default function Hero({
         </div>
 
         <div className="relative z-10 flex flex-col items-center gap-6 sm:gap-8 text-center">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="inline-flex items-center rounded-full border border-zinc-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/50 px-3 py-1 text-sm font-medium text-zinc-800 dark:text-zinc-200 backdrop-blur-sm"
+          {/* CSS-animated, not framer-motion: the headline must paint before hydration (LCP) */}
+          <div
+            className="hero-in inline-flex items-center rounded-full border border-zinc-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/50 px-3 py-1 text-sm font-medium text-zinc-800 dark:text-zinc-200 backdrop-blur-sm"
           >
             <span className="mr-2 flex h-2 w-2 rounded-full bg-[var(--color-secondary)]" aria-hidden="true"></span>
-            Now in closed beta · Turkish &amp; English
-          </motion.div>
+            {t.hero.badge}
+          </div>
 
-          <motion.h1
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.1 }}
-            className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 max-w-4xl"
+          <h1
+            style={{ animationDelay: "0.1s" }}
+            className="hero-in text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 max-w-4xl"
           >
-            Support that{" "}
+            {t.hero.titleStart}{" "}
             <span className="text-transparent bg-clip-text bg-gradient-to-br from-zinc-900 to-zinc-500 dark:from-zinc-100 dark:to-zinc-500">
-              never sleeps.
+              {t.hero.titleAccent}
             </span>
-          </motion.h1>
+          </h1>
 
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="text-base sm:text-lg md:text-xl text-zinc-600 dark:text-zinc-400 max-w-4xl px-4 leading-relaxed"
+          <p
+            style={{ animationDelay: "0.2s" }}
+            className="hero-in text-base sm:text-lg md:text-xl text-zinc-600 dark:text-zinc-400 max-w-4xl px-4 leading-relaxed"
           >
-            Apex answers your visitors from your own website, around the clock.{" "}
+            {t.hero.lede1}{" "}
             <br className="hidden md:block" />
-            Set it up in minutes, match it to your brand and install it with one line of code.
-          </motion.p>
+            {t.hero.lede2}
+          </p>
 
           {signedIn ? (
             <a
               href="/dashboard"
               className="relative mt-4 inline-flex h-14 items-center gap-2 rounded-full bg-zinc-900 px-8 text-lg font-medium tracking-wide text-white no-underline transition-opacity hover:opacity-90 dark:bg-zinc-100 dark:text-zinc-900"
             >
-              Go to your dashboard
+              {t.hero.ctaSignedIn}
               <ArrowRight className="h-5 w-5" aria-hidden="true" />
             </a>
           ) : (
@@ -380,14 +379,14 @@ export default function Hero({
                   onClick={handleExpand}
                   className="relative flex items-center gap-2 h-14 px-8 py-3 bg-transparent border-0 cursor-pointer text-lg font-medium text-white dark:text-zinc-900 tracking-wide hover:opacity-90 transition-opacity"
                 >
-                  Start building now
+                  {t.hero.cta}
                   <ArrowRight className="w-5 h-5" aria-hidden="true" />
                 </motion.button>
               </motion.div>
             )}
           </AnimatePresence>
           )}
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">Free during the beta · No credit card needed</p>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">{t.hero.note}</p>
         </div>
       </div>
       )}
@@ -401,7 +400,7 @@ export default function Hero({
             ref={dialogRef}
             role="dialog"
             aria-modal="true"
-            aria-label={authMode === "login" ? "Log in" : "Create your account"}
+            aria-label={authMode === "login" ? t.auth.dialogLogin : t.auth.dialogRegister}
             className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4"
           >
             <motion.div
@@ -447,7 +446,7 @@ export default function Hero({
               {/* Close Button */}
               <motion.button
                 type="button"
-                aria-label="Close"
+                aria-label={t.common.close}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.2, duration: 0.25 }}
@@ -480,10 +479,10 @@ export default function Hero({
                   <div className="flex flex-1 flex-col justify-center gap-8 max-lg:hidden">
                   <div className="space-y-4">
                     <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold leading-tight tracking-tight">
-                      Ready to build?
+                      {t.auth.pitch.title}
                     </h2>
                     <p className="text-zinc-600 dark:text-zinc-200 text-lg max-w-md">
-                      Join today and start supporting your customers with Apex
+                      {t.auth.pitch.text}
                     </p>
                   </div>
 
@@ -493,9 +492,9 @@ export default function Hero({
                         <Clock className="w-6 h-6 text-zinc-600 dark:text-zinc-300" />
                       </div>
                       <div>
-                        <h3 className="font-semibold text-lg">Always On, 24/7</h3>
+                        <h3 className="font-semibold text-lg">{t.auth.pitch.items[0].title}</h3>
                         <p className="text-zinc-600 dark:text-zinc-200/80 text-sm leading-relaxed mt-1">
-                          Answer customer questions instantly, any time of day, without growing your team.
+                          {t.auth.pitch.items[0].text}
                         </p>
                       </div>
                     </div>
@@ -504,9 +503,9 @@ export default function Hero({
                         <Languages className="w-6 h-6 text-zinc-600 dark:text-zinc-300" />
                       </div>
                       <div>
-                        <h3 className="font-semibold text-lg">Speaks Your Customers' Language</h3>
+                        <h3 className="font-semibold text-lg">{t.auth.pitch.items[1].title}</h3>
                         <p className="text-zinc-600 dark:text-zinc-200/80 text-sm leading-relaxed mt-1">
-                          Replies in Turkish or English, whichever your visitor writes in, using only your own content.
+                          {t.auth.pitch.items[1].text}
                         </p>
                       </div>
                     </div>
@@ -515,9 +514,9 @@ export default function Hero({
                         <LifeBuoy className="w-6 h-6 text-zinc-600 dark:text-zinc-300" />
                       </div>
                       <div>
-                        <h3 className="font-semibold text-lg">Hands Off to Your Team</h3>
+                        <h3 className="font-semibold text-lg">{t.auth.pitch.items[2].title}</h3>
                         <p className="text-zinc-600 dark:text-zinc-200/80 text-sm leading-relaxed mt-1">
-                          When it can't answer, visitors reach you by email with the whole conversation attached.
+                          {t.auth.pitch.items[2].text}
                         </p>
                       </div>
                     </div>
@@ -527,7 +526,7 @@ export default function Hero({
                   <div className="pt-8 border-t border-black/10 dark:border-white/20 max-lg:hidden [@media(max-height:820px)]:hidden">
                     <figure className="m-0">
                       <blockquote className="mx-0 mt-0 max-w-md text-base font-medium leading-relaxed mb-6">
-                        "We built Apex so every customer gets an instant, accurate answer at any hour, and support teams can finally focus on the hard cases."
+                        “{t.auth.pitch.quote}”
                       </blockquote>
                       <figcaption className="flex items-center gap-4">
                         <div className="h-12 w-12 rounded-full bg-gradient-to-tr from-orange-400 to-pink-500 flex items-center justify-center text-lg font-bold text-white">
@@ -535,7 +534,7 @@ export default function Hero({
                         </div>
                         <div>
                           <div className="font-semibold">M. Barış Akıntı</div>
-                          <div className="text-sm text-zinc-600 dark:text-zinc-300">CEO of APEX BOT</div>
+                          <div className="text-sm text-zinc-600 dark:text-zinc-300">{t.auth.pitch.quoteRole}</div>
                         </div>
                       </figcaption>
                     </figure>
@@ -580,27 +579,27 @@ export default function Hero({
                           {needsVerify ? <ArrowRight className="w-10 h-10 text-white" /> : <Check className="w-10 h-10 text-white" />}
                         </div>
                         <div>
-                          <h3 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">{!needsVerify ? "Welcome back!" : "Verify your email"}</h3>
-                          <p className="text-zinc-600 dark:text-zinc-200">{!needsVerify ? "You're logged in to Apex." : "You'll be redirected to the next step to verify your email."}</p>
+                          <h3 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">{!needsVerify ? t.auth.success.welcomeBack : t.auth.success.verifyTitle}</h3>
+                          <p className="text-zinc-600 dark:text-zinc-200">{!needsVerify ? t.auth.success.loggedIn : t.auth.success.verifyText}</p>
                         </div>
                         <button
                           onClick={() => router.push(nextPath)}
                           className="cursor-pointer px-6 py-2 bg-black/10 hover:bg-black/15 text-zinc-900 dark:bg-white/20 dark:hover:bg-white/30 dark:text-white rounded-lg transition-colors text-sm font-medium"
                         >
-                          Continue
+                          {t.auth.success.continue}
                         </button>
                       </motion.div>
                     ) : authMode === "login" ? (
                       <form onSubmit={handleSubmit} className="space-y-4">
                         <div className="space-y-1 pb-1 text-center text-zinc-900 dark:text-white">
-                          <h2 className="text-4xl font-normal tracking-tight" style={{ fontFamily: "var(--font-serif), Georgia, serif" }}>Welcome back</h2>
-                          <p className="text-lg italic text-zinc-600 dark:text-zinc-300" style={{ fontFamily: "var(--font-serif), Georgia, serif" }}>Log in to manage your support bot.</p>
+                          <h2 className="text-4xl font-normal tracking-tight" style={{ fontFamily: "var(--font-serif), Georgia, serif" }}>{t.auth.login.title}</h2>
+                          <p className="text-lg italic text-zinc-600 dark:text-zinc-300" style={{ fontFamily: "var(--font-serif), Georgia, serif" }}>{t.auth.login.subtitle}</p>
                         </div>
 
                         <div className="space-y-4">
                           <div>
                             <label htmlFor="login-email" className="block text-xs font-medium text-zinc-600 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">
-                              Email
+                              {t.auth.login.email}
                             </label>
                             <input
                               required
@@ -608,15 +607,15 @@ export default function Hero({
                               id="login-email" {...noExtensionUi}
                               name="email"
                               autoComplete="email"
-                              placeholder="jane@company.com"
+                              placeholder={t.auth.login.emailPlaceholder}
                               className="w-full px-4 py-2.5 rounded-lg bg-white dark:bg-zinc-950/40 border border-zinc-300 dark:border-zinc-400/20 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-white/30 focus:outline-none focus:border-zinc-500 dark:focus:border-white/40 transition-all text-sm"
                             />
                           </div>
                           <div>
                             <label htmlFor="login-password" className="block text-xs font-medium text-zinc-600 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">
-                              Password
+                              {t.auth.login.password}
                             </label>
-                            <PasswordInput required id="login-password" name="password" autoComplete="current-password" placeholder="Your password" />
+                            <PasswordInput required id="login-password" name="password" autoComplete="current-password" placeholder={t.auth.login.passwordPlaceholder} />
                           </div>
                           <div className="flex items-center justify-between gap-3">
                           <label htmlFor="remember-me" className="flex items-center gap-3 text-xs text-zinc-800 dark:text-zinc-100 cursor-pointer">
@@ -626,9 +625,9 @@ export default function Hero({
                               name="rememberMe"
                               className="h-4 w-4 shrink-0 rounded border-zinc-300 dark:border-zinc-400/30 accent-zinc-900 dark:accent-white cursor-pointer"
                             />
-                            Keep me signed in
+                            {t.auth.login.remember}
                           </label>
-                          <a href="/forgot-password" className="text-xs text-zinc-600 dark:text-zinc-300 underline underline-offset-2 hover:text-zinc-900 dark:hover:text-white">Forgot password?</a>
+                          <a href="/forgot-password" className="text-xs text-zinc-600 dark:text-zinc-300 underline underline-offset-2 hover:text-zinc-900 dark:hover:text-white">{t.auth.login.forgot}</a>
                           </div>
                         </div>
 
@@ -644,36 +643,36 @@ export default function Hero({
                           {formStep === "submitting" ? (
                             <span className="flex items-center gap-2">
                               <span className="h-4 w-4 border-2 border-white/70 dark:border-zinc-600 border-t-transparent rounded-full animate-spin"></span>
-                              Logging in...
+                              {t.auth.login.submitting}
                             </span>
-                          ) : "Log in"}
+                          ) : t.auth.login.submit}
                         </button>
 
-                        <SocialButtons verb="Log in" />
+                        <SocialButtons verb={t.auth.login.verb} />
 
                         <p className="text-center text-sm text-zinc-600 dark:text-zinc-300">
-                          Don't have an account?{" "}
+                          {t.auth.login.noAccount}{" "}
                           <button
                             type="button"
                             onClick={() => switchMode("register")}
                             className="cursor-pointer border-0 bg-transparent p-0 font-medium underline underline-offset-2 text-zinc-900 dark:text-white"
                           >
-                            Create one
+                            {t.auth.login.createOne}
                           </button>
                         </p>
                       </form>
                     ) : (
                       <form onSubmit={handleSubmit} className="space-y-4">
                         <div className="space-y-1 pb-1 text-center text-zinc-900 dark:text-white">
-                          <h2 className="text-4xl font-normal tracking-tight" style={{ fontFamily: "var(--font-serif), Georgia, serif" }}>Create your account</h2>
+                          <h2 className="text-4xl font-normal tracking-tight" style={{ fontFamily: "var(--font-serif), Georgia, serif" }}>{t.auth.register.title}</h2>
                           <p className="text-lg italic text-zinc-600 dark:text-zinc-300" style={{ fontFamily: "var(--font-serif), Georgia, serif" }}>
-                            Set up Apex for your own site in minutes.
+                            {t.auth.register.subtitle}
                           </p>
                         </div>
 
                         <div
                           role="tablist"
-                          aria-label="Account type"
+                          aria-label={t.auth.register.accountType}
                           className="relative grid grid-cols-2 rounded-lg bg-black/5 dark:bg-white/10 p-1"
                         >
                           {(["personal", "business"] as const).map((type) => (
@@ -693,7 +692,7 @@ export default function Hero({
                                 />
                               )}
                               <span className={accountType === type ? "text-zinc-900 dark:text-white" : "text-zinc-500 dark:text-zinc-400"}>
-                                {type === "business" ? "Business" : "Personal"}
+                                {type === "business" ? t.auth.register.business : t.auth.register.personal}
                               </span>
                             </button>
                           ))}
@@ -702,7 +701,7 @@ export default function Hero({
                         <div className="space-y-4">
                           <div>
                             <label htmlFor="username" className="block text-xs font-medium text-zinc-600 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">
-                              Username
+                              {t.auth.register.username}
                             </label>
                             <input
                               required
@@ -713,15 +712,15 @@ export default function Hero({
                               minLength={3}
                               maxLength={32}
                               pattern="[A-Za-z0-9_.\-]{3,32}"
-                              title="3-32 letters, numbers, dots, dashes or underscores"
-                              placeholder="janedoe"
+                              title={t.auth.register.usernameHint}
+                              placeholder={t.auth.register.usernamePlaceholder}
                               className="w-full px-4 py-2.5 rounded-lg bg-white dark:bg-zinc-950/40 border border-zinc-300 dark:border-zinc-400/20 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-white/30 focus:outline-none focus:border-zinc-500 dark:focus:border-white/40 transition-all text-sm"
                             />
                           </div>
 
                           <div>
                             <label htmlFor="email" className="block text-xs font-medium text-zinc-600 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">
-                              {isBusiness ? "Work Email" : "Personal Email"}
+                              {isBusiness ? t.auth.register.workEmail : t.auth.register.personalEmail}
                             </label>
                             <input
                               required
@@ -729,7 +728,7 @@ export default function Hero({
                               id="email" {...noExtensionUi}
                               name="email"
                               autoComplete="email"
-                              placeholder={isBusiness ? "jane@company.com" : "jane@example.com"}
+                              placeholder={isBusiness ? t.auth.register.workEmailPlaceholder : t.auth.register.personalEmailPlaceholder}
                               className="w-full px-4 py-2.5 rounded-lg bg-white dark:bg-zinc-950/40 border border-zinc-300 dark:border-zinc-400/20 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-white/30 focus:outline-none focus:border-zinc-500 dark:focus:border-white/40 transition-all text-sm"
                             />
                           </div>
@@ -738,19 +737,19 @@ export default function Hero({
                           <div className="grid grid-cols-2 gap-4">
                             <div>
                               <label htmlFor="company" className="block text-xs font-medium text-zinc-600 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">
-                                Company
+                                {t.auth.register.company}
                               </label>
                               <input
                                 type="text"
                                 id="company"
                                 name="company"
-                                placeholder="Acme Inc"
+                                placeholder={t.auth.register.companyPlaceholder}
                                 className="w-full px-4 py-2.5 rounded-lg bg-white dark:bg-zinc-950/40 border border-zinc-300 dark:border-zinc-400/20 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-white/30 focus:outline-none focus:border-zinc-500 dark:focus:border-white/40 transition-all text-sm"
                               />
                             </div>
                             <div>
                               <label htmlFor="size" className="block text-xs font-medium text-zinc-600 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">
-                                Size
+                                {t.auth.register.size}
                               </label>
                               <select
                                 id="size"
@@ -768,9 +767,9 @@ export default function Hero({
 
                           <div>
                             <label htmlFor="password" className="block text-xs font-medium text-zinc-600 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">
-                              Password
+                              {t.auth.register.password}
                             </label>
-                            <PasswordInput required id="password" name="password" minLength={8} autoComplete="new-password" placeholder="At least 8 characters" />
+                            <PasswordInput required id="password" name="password" minLength={8} autoComplete="new-password" placeholder={t.auth.register.passwordPlaceholder} />
                           </div>
                         </div>
 
@@ -783,7 +782,7 @@ export default function Hero({
                               aria-labelledby="accept-terms-label"
                               className="mt-0.5 h-4 w-4 shrink-0 rounded border-zinc-300 dark:border-zinc-400/30 accent-zinc-900 dark:accent-white cursor-pointer"
                             />
-                            <span id="accept-terms-label">I agree to the <a href="/terms" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-zinc-900 dark:hover:text-white">Terms of Service</a> and <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-zinc-900 dark:hover:text-white">Privacy Policy</a>.</span>
+                            <span id="accept-terms-label">{t.auth.register.acceptPre} <a href={href("/terms")} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-zinc-900 dark:hover:text-white">{t.nav.terms}</a> {t.auth.and} <a href={href("/privacy")} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-zinc-900 dark:hover:text-white">{t.nav.privacy}</a>.</span>
                           </div>
                           <div className="flex items-start gap-3 text-xs leading-relaxed text-zinc-800 dark:text-zinc-100">
                             <input
@@ -793,7 +792,7 @@ export default function Hero({
                               defaultChecked
                               className="mt-0.5 h-4 w-4 shrink-0 rounded border-zinc-300 dark:border-zinc-400/30 accent-zinc-900 dark:accent-white cursor-pointer"
                             />
-                            <span id="allow-training-label">Allow Apex to use my bots and conversations to improve and train its models (optional).</span>
+                            <span id="allow-training-label">{t.auth.register.allowTraining}</span>
                           </div>
                         </div>
 
@@ -809,21 +808,21 @@ export default function Hero({
                           {formStep === "submitting" ? (
                              <span className="flex items-center gap-2">
                                <span className="h-4 w-4 border-2 border-white/70 dark:border-zinc-600 border-t-transparent rounded-full animate-spin"></span>
-                               Creating account...
+                               {t.auth.register.submitting}
                              </span>
-                          ) : "Create account"}
+                          ) : t.auth.register.submit}
                         </button>
 
-                        <SocialButtons verb="Sign up" accountType={accountType} />
+                        <SocialButtons verb={t.auth.register.verb} accountType={accountType} />
 
                         <p className="text-center text-sm text-zinc-600 dark:text-zinc-300">
-                          Already have an account?{" "}
+                          {t.auth.register.haveAccount}{" "}
                           <button
                             type="button"
                             onClick={() => switchMode("login")}
                             className="cursor-pointer border-0 bg-transparent p-0 font-medium underline underline-offset-2 text-zinc-900 dark:text-white"
                           >
-                            Log in
+                            {t.auth.register.logIn}
                           </button>
                         </p>
 

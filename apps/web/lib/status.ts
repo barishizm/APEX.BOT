@@ -4,19 +4,22 @@ import { apiUrl } from "@/lib/site"
 
 export type ServiceState = "operational" | "degraded" | "down"
 
+export type ServiceId = "dashboard" | "database" | "chat" | "widget"
+// Shown instead of the description when something is off; the page translates these
+export type ServiceDetail = "timeout" | "unreachable" | "migrations" | "syncDelayed"
+
 export interface ServiceCheck {
-  name: string
-  description: string
+  id: ServiceId
   state: ServiceState
   latencyMs: number | null
-  detail?: string
+  detail?: ServiceDetail
 }
 
 const TIMEOUT_MS = 4000
 // Slower than this still works, but visitors will notice
 const SLOW_MS = 1500
 
-async function timed(fn: (signal: AbortSignal) => Promise<string | void>) {
+async function timed(fn: (signal: AbortSignal) => Promise<ServiceDetail | void>) {
   const started = performance.now()
   try {
     const detail = await fn(AbortSignal.timeout(TIMEOUT_MS))
@@ -24,7 +27,7 @@ async function timed(fn: (signal: AbortSignal) => Promise<string | void>) {
     return { state: latencyMs > SLOW_MS ? ("degraded" as const) : ("operational" as const), latencyMs, detail: detail || undefined }
   } catch (err) {
     const timeout = err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError")
-    return { state: "down" as const, latencyMs: null, detail: timeout ? "Timed out" : "Not reachable" }
+    return { state: "down" as const, latencyMs: null, detail: timeout ? ("timeout" as const) : ("unreachable" as const) }
   }
 }
 
@@ -43,13 +46,13 @@ export async function checkServices(): Promise<ServiceCheck[]> {
   const [database, chat, widget] = await Promise.all([
     timed(async (signal) => {
       const missing = await withTimeout(missingMigrations(db()), signal)
-      if (missing.length) return "Reachable, but waiting for a database update"
+      if (missing.length) return "migrations"
     }),
     timed(async (signal) => {
       const res = await fetch(`${api}/health`, { signal, cache: "no-store" })
       const body = await res.json().catch(() => null)
       if (!res.ok || !body?.ok) throw new Error(`health ${res.status}`)
-      if (body.botSync === "failing") return "Dashboard changes are delayed"
+      if (body.botSync === "failing") return "syncDelayed"
     }),
     timed(async (signal) => {
       const res = await fetch(`${api}/widget.js`, { method: "HEAD", signal, cache: "no-store" })
@@ -57,19 +60,17 @@ export async function checkServices(): Promise<ServiceCheck[]> {
     }),
   ])
   return [
-    { name: "Dashboard", description: "Sign-in, settings and this website", state: "operational", latencyMs: null },
+    { id: "dashboard", state: "operational", latencyMs: null },
     {
-      name: "Database",
-      description: "Accounts and bot settings",
+      id: "database",
       ...database,
       state: database.state === "operational" && database.detail ? "degraded" : database.state,
     },
     {
-      name: "Chat API",
-      description: "Answers in the widget",
+      id: "chat",
       ...chat,
       state: chat.state === "operational" && chat.detail ? "degraded" : chat.state,
     },
-    { name: "Widget script", description: "The embed code on customer sites", ...widget },
+    { id: "widget", ...widget },
   ]
 }

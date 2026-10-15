@@ -1,13 +1,7 @@
-import type { Metadata } from "next";
-import { ProsePage } from "@/components/prose-page";
 import { apiUrl, embedSnippet } from "@/lib/site";
+import type { ProseContent } from "../types";
 
-export const metadata: Metadata = {
-  title: "Docs",
-  description: "Set up Apex Bot: add your knowledge, customize the widget, install it on your site and control it with JavaScript.",
-};
-
-const TOC = [
+const TOC: ProseContent["toc"] = [
   { id: "setup", label: "Setup guide" },
   { id: "knowledge", label: "Knowledge" },
   { id: "customize", label: "Customize" },
@@ -37,15 +31,10 @@ Apex.identify({ name: "Ada", email: "ada@example.com" })
 Apex.on("message", (m) => console.log(m.text, m.sources))
 Apex.on("open", () => analytics.track("chat_opened"))`;
 
-export default function DocsPage() {
+function Body() {
   const snippet = embedSnippet("apex_pk_…");
   return (
-    <ProsePage
-      eyebrow="Docs"
-      title="Set up Apex Bot"
-      intro="Everything you need to go from sign-up to a live assistant on your website. Most sites are done in under ten minutes."
-      toc={TOC}
-    >
+    <>
       <h2 id="setup">Setup guide</h2>
       <ol>
         <li>
@@ -272,6 +261,14 @@ export default function DocsPage() {
         The daily token budget under <em>Install &amp; security</em> may have run out; the chat offers hand-off until midnight
         UTC. You can also check the <a href="/status">system status</a> page.
       </p>
-    </ProsePage>
+    </>
   );
 }
+
+export const docs: ProseContent = {
+  eyebrow: "Docs",
+  title: "Set up Apex Bot",
+  intro: "Everything you need to go from sign-up to a live assistant on your website. Most sites are done in under ten minutes.",
+  toc: TOC,
+  body: Body,
+};

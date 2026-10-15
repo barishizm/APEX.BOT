@@ -318,12 +318,104 @@ button:not(:focus-visible) {
     animation: sheet-in 0.2s ease-out;
   }
 }
+/* Hero copy fades in with CSS, not JS, so it paints (and counts for LCP) before hydration */
+@media (prefers-reduced-motion: no-preference) {
+  .hero-in {
+    animation: hero-in 0.6s ease-out both;
+  }
+}
+@keyframes hero-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+}
+
 @keyframes sheet-in {
   from {
     opacity: 0;
     transform: translateY(-6px);
   }
 }
+/* ---------- Language switcher ---------- */
+
+.lang {
+  position: relative;
+}
+.lang__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+.lang__toggle::-webkit-details-marker {
+  display: none;
+}
+.lang__menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 50;
+  min-width: 140px;
+  padding: 4px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-raised);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.12);
+}
+.lang__menu a {
+  display: block;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  color: var(--color-muted);
+  font-size: 14px;
+  text-decoration: none;
+}
+.lang__menu a:hover,
+.lang__menu a[aria-current] {
+  background: color-mix(in srgb, var(--color-text) 7%, transparent);
+  color: var(--color-text);
+}
+/* Below this width the header only has room for the essentials; the mobile menu and
+   footer carry the language links. */
+@media (max-width: 639px) {
+  .lang--bar {
+    display: none;
+  }
+}
+
+.lang-links {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-muted);
+}
+.lang-links a {
+  color: inherit;
+  text-decoration: none;
+}
+.lang-links a:hover,
+.lang-links a[aria-current] {
+  color: var(--color-text);
+}
+.lang-links a[aria-current] {
+  font-weight: 600;
+}
+.mobile-menu__lang {
+  font-size: 15px;
+}
+
 .mobile-menu__nav {
   display: grid;
   gap: var(--space-5);
@@ -947,6 +1039,11 @@ button:not(:focus-visible) {
 }
 .site-foot__legal {
   grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-5);
   padding-top: var(--space-5);
   border-top: 1px solid var(--color-line);
 }

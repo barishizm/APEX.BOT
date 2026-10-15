@@ -1,16 +1,9 @@
-import type { Metadata } from "next";
-import { ProsePage } from "@/components/prose-page";
 import { CONTACT_EMAIL } from "@/components/site-nav";
+import type { ProseContent } from "../types";
 
-export const metadata: Metadata = { title: "Privacy Policy", description: "How Apex Bot collects, uses and protects personal data." };
-
-export default function PrivacyPage() {
+function Body() {
   return (
-    <ProsePage
-      eyebrow="Legal"
-      title="Privacy Policy"
-      intro="What we collect, why, and the choices you have. Written to meet KVKK (Turkey) and GDPR (EU) expectations."
-    >
+    <>
       <h2>Who this covers</h2>
       <ul>
         <li>
@@ -74,8 +67,9 @@ export default function PrivacyPage() {
 
       <h2>Cookies</h2>
       <p>
-        The dashboard uses one essential cookie to keep you signed in. The chat widget doesn't set cookies; it may keep the
-        current conversation in the visitor's browser storage, depending on the customer's settings.
+        The dashboard uses one essential cookie to keep you signed in, plus a small companion cookie that lets our pages show
+        you're signed in. If you pick a language, we remember that choice in a cookie. The chat widget doesn't set cookies;
+        it may keep the current conversation in the visitor's browser storage, depending on the customer's settings.
       </p>
 
       <h2>Your rights</h2>
@@ -91,6 +85,13 @@ export default function PrivacyPage() {
         Data is encrypted in transit, access is restricted per workspace, and passwords are hashed with scrypt. No system is
         perfectly secure; if a breach affects you, we'll tell you as the law requires.
       </p>
-    </ProsePage>
+    </>
   );
 }
+
+export const privacy: ProseContent = {
+  eyebrow: "Legal",
+  title: "Privacy Policy",
+  intro: "What we collect, why, and the choices you have. Written to meet KVKK (Turkey) and GDPR (EU) expectations.",
+  body: Body,
+};

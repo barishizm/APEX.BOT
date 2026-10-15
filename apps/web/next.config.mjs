@@ -11,13 +11,30 @@ const securityHeaders = [
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
 ];
 
+// Files in public/ change name rarely; let browsers and CDNs keep them for a day
+const assetCache = [{ key: "Cache-Control", value: "public, max-age=86400, stale-while-revalidate=604800" }];
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   allowedDevOrigins: ["172.20.10.*", "*.local"],
   // the workspace packages ship TypeScript source
   transpilePackages: ["@apex/db", "@apex/knowledge"],
+  poweredByHeader: false,
+  images: {
+    // smaller than WebP where the browser supports it; the marketing photos are the heaviest bytes on the site
+    formats: ["image/avif", "image/webp"],
+    minimumCacheTTL: 2678400,
+  },
+  experimental: {
+    // one 404 for URLs outside both root layouts (app/[lang] and app/(app))
+    globalNotFound: true,
+  },
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }];
+    return [
+      { source: "/:path*", headers: securityHeaders },
+      { source: "/marketing/:path*", headers: assetCache },
+      { source: "/brand/:path*", headers: assetCache },
+    ];
   },
 };
 

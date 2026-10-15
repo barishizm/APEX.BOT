@@ -1,17 +1,10 @@
-import type { Metadata } from "next";
 import { TERMS_VERSION } from "@apex/db";
-import { ProsePage } from "@/components/prose-page";
 import { CONTACT_EMAIL } from "@/components/site-nav";
+import type { ProseContent } from "../types";
 
-export const metadata: Metadata = { title: "Terms of Service", description: "The terms that apply when you use Apex Bot." };
-
-export default function TermsPage() {
+function Body() {
   return (
-    <ProsePage
-      eyebrow="Legal"
-      title="Terms of Service"
-      intro={`Version ${TERMS_VERSION}. These terms apply to your use of Apex Bot, including the dashboard and the chat widget you install on your website.`}
-    >
+    <>
       <h2>1. The service</h2>
       <p>
         Apex Bot (“Apex”, “we”) provides an AI assistant that answers your website visitors' questions using content you
@@ -78,6 +71,13 @@ export default function TermsPage() {
         We may update these terms; for material changes we'll notify you before they take effect. Questions:{" "}
         <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.
       </p>
-    </ProsePage>
+    </>
   );
 }
+
+export const terms: ProseContent = {
+  eyebrow: "Legal",
+  title: "Terms of Service",
+  intro: `Version ${TERMS_VERSION}. These terms apply to your use of Apex Bot, including the dashboard and the chat widget you install on your website.`,
+  body: Body,
+};

@@ -33,8 +33,9 @@ Apex Bot **kapalı kaynaklı, ticari bir SaaS** ürünüdür: birçok müşteri 
 11. [Maliyet kontrolü](#maliyet-kontrolü)
 12. [Proje yapısı](#proje-yapısı)
 13. [Kurulum (taslak)](#kurulum-taslak)
-14. [Yol haritası](#yol-haritası)
-15. [Açık sorular](#açık-sorular)
+14. [Çok dilli site (i18n)](#çok-dilli-site-i18n)
+15. [Yol haritası](#yol-haritası)
+16. [Açık sorular](#açık-sorular)
 
 ---
 
@@ -275,7 +276,7 @@ Ortam değişkenleri:
 | Değişken | Nerede | Açıklama |
 |---|---|---|
 | `DATABASE_URL`, `DATABASE_SSL` | web, api | PostgreSQL bağlantısı (ikisinde de aynı) |
-| `NEXT_PUBLIC_SITE_URL` | web | Sitenin genel adresi (OAuth dönüşleri) |
+| `NEXT_PUBLIC_SITE_URL` | web | Sitenin genel adresi (OAuth dönüşleri; canonical, hreflang, sitemap ve Open Graph adresleri) |
 | `NEXT_PUBLIC_APEX_API_URL` | web | Sohbet API'sinin genel adresi; gömme kodu ve durum sayfası bunu kullanır |
 | `RESEND_API_KEY`, `MAIL_FROM` | web, api | E-posta (doğrulama/şifre sıfırlama kodları, devir ve lead bildirimleri). Yoksa geliştirmede loga yazılır |
 | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY` | api | Botların seçtiği model sağlayıcıları |
@@ -284,6 +285,22 @@ Ortam değişkenleri:
 | `APEX_CRAWL_ALLOW_PRIVATE` | web | Sadece yerel geliştirme: tarayıcının yerel ağdaki siteleri okumasına izin verir |
 | `GOOGLE_*`, `GITHUB_*` | web | Google / GitHub ile giriş |
 | `NEXT_PUBLIC_CONTACT_EMAIL` | web | Sitede ve yasal sayfalarda gösterilen iletişim adresi |
+
+## Çok dilli site (i18n)
+
+Herkese açık sayfalar (ana sayfa, fiyatlandırma, dokümantasyon, durum, yasal sayfalar, giriş/kayıt) İngilizce ve Türkçe yayınlanır. Panel (`/dashboard`, `/onboarding`, hesap akışları) henüz yalnızca İngilizcedir.
+
+**URL'ler.** Varsayılan dil (İngilizce) öneksizdir: `/pricing`. Diğer diller önek alır: `/tr/pricing`. `/en/...` adresleri tek kanonik adrese (`/...`) 308 ile yönlendirilir. `apps/web/proxy.ts` öneksiz istekleri içeride `app/[lang]` altındaki varsayılan dile yönlendirir (rewrite); dil seçmemiş ve tarayıcısı Türkçe isteyen ziyaretçiyi `/tr/...` sayfasına gönderir. Dil seçicide yapılan seçim `NEXT_LOCALE` çerezinde saklanır ve tarayıcı dilinden önceliklidir. Arama motoru botları çerez/Accept-Language göndermediği için her zaman kanonik sayfayı görür.
+
+**SEO.** Her sayfa dile özel `<html lang>`, başlık, açıklama, canonical, `hreflang` alternatifleri (`x-default` dahil), Open Graph ve Twitter etiketleri üretir (`lib/i18n/server.ts` → `pageMetadata`). `sitemap.xml` her sayfayı her dilde, `hreflang` bağlantılarıyla listeler. Ana sayfada Organization, WebSite, SoftwareApplication ve FAQPage JSON-LD'si vardır. Pazarlama sayfaları build sırasında her dil için statik HTML olarak üretilir; "giriş yapılmış mı" bilgisi sunucuda değil, tarayıcıda `apex_signed_in` ipucu çerezinden okunur (yetki vermez, yalnızca "Giriş yap" yerine "Panel" butonunu gösterir).
+
+**Yeni dil eklemek** (ör. Almanca):
+
+1. `apps/web/lib/i18n/config.ts`: `LOCALES` listesine `"de"` ekleyin ve `LOCALE_META` içine adını, `hreflang`, Open Graph ve `Intl` kodunu yazın.
+2. `apps/web/lib/i18n/dictionaries/de.ts`: `en.ts`'i kopyalayıp çevirin (`Dictionary` tipiyle; eksik anahtar tip hatası verir) ve `lib/i18n/server.ts` içindeki `DICTIONARIES`'e ekleyin.
+3. `apps/web/content/{docs,privacy,terms}/de.tsx`: uzun sayfaları çevirip `content/index.ts`'e ekleyin.
+
+`npm run typecheck` eksik kalan her yeri gösterir; sayfalar, yönlendirmeler, dil seçici ve sitemap yeni dili kendiliğinden kullanır.
 
 ## Yol haritası
 
