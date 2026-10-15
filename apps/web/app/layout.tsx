@@ -11,7 +11,7 @@ const serif = Instrument_Serif({ subsets: ["latin", "latin-ext"], weight: "400",
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
-  title: "Apex Bot — The assistant that knows your site",
+  title: { default: "Apex Bot — The assistant that knows your site", template: "%s — Apex Bot" },
   description:
     "Apex Bot answers your visitors' questions using only the information on your site. Installs with a single line of code.",
 };
@@ -23,8 +23,9 @@ export const viewport: Viewport = {
   ],
 };
 
-// Runs before first paint so the saved theme never flashes the wrong colors.
-const themeScript = `(function(){try{var t=localStorage.getItem("theme");if(t==="light"||t==="dark"){document.documentElement.dataset.theme=t;document.documentElement.classList.toggle("dark",t==="dark")}}catch(e){}})()`;
+// Runs before first paint so the saved theme never flashes the wrong colors. The `dark`
+// class drives Tailwind's dark: utilities, so it also follows the OS when nothing is saved.
+const themeScript = `(function(){var d=document.documentElement,m=window.matchMedia("(prefers-color-scheme: dark)");function a(){var t=null;try{t=localStorage.getItem("theme")}catch(e){}if(t==="light"||t==="dark")d.dataset.theme=t;d.classList.toggle("dark",t==="dark"||(t!=="light"&&m.matches))}a();m.addEventListener("change",function(){if(!d.dataset.theme)a()})})()`;
 
 // Our own Apex widget on the marketing site; unset NEXT_PUBLIC_APEX_WIDGET_SRC to hide it.
 const widgetSrc = process.env.NEXT_PUBLIC_APEX_WIDGET_SRC;

@@ -1,20 +1,14 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
-import { ArrowUp, CircleAlert, CircleCheck, LoaderCircle, Plus, Sparkles } from "lucide-react"
+import { ArrowUp, CircleAlert, CircleCheck, Circle, LoaderCircle, Plus, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { KNOWLEDGE_KEY } from "./onboarding-list"
 
-const BENEFITS = [
-  "Create AI Agent",
-  "Simplify installation process",
-  "Use website as knowledge",
-  "Set language",
-  "Style widget",
-]
+type Source = { id: string; status: "pending" | "syncing" | "ready" | "failed"; pages: number; chunks: number; error: string | null }
+type Phase = "form" | "reading" | "ready" | "failed"
 
 // Accepts "example.com", "www.example.com/path" or a full http(s) URL
 function normalizeUrl(raw: string): string | null {
@@ -28,39 +22,95 @@ function normalizeUrl(raw: string): string | null {
   }
 }
 
+function Progress({ state, children }: { state: "done" | "active" | "todo" | "failed"; children: React.ReactNode }) {
+  const Icon = state === "done" ? CircleCheck : state === "active" ? LoaderCircle : state === "failed" ? CircleAlert : Circle
+  return (
+    <li className={cn("flex items-center gap-2.5", state === "todo" && "text-[var(--color-muted)]")}>
+      <Icon
+        className={cn(
+          "h-4 w-4 shrink-0",
+          state === "done" && "text-green-600",
+          state === "active" && "animate-spin",
+          state === "failed" && "text-red-500",
+          state === "todo" && "opacity-50",
+        )}
+        aria-hidden="true"
+      />
+      {children}
+    </li>
+  )
+}
+
 export default function Onboarding() {
   const router = useRouter()
-  const [running, setRunning] = useState(false)
-  const [done, setDone] = useState(0)
   const [url, setUrl] = useState("")
   const [touched, setTouched] = useState(false)
+  const [phase, setPhase] = useState<Phase>("form")
+  const [serverError, setServerError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [source, setSource] = useState<Source | null>(null)
+  const [host, setHost] = useState("")
+  const poll = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   const normalized = normalizeUrl(url)
-  const error = touched && !normalized
-    ? url.trim()
-      ? "Enter a valid website URL, like www.example.com"
-      : "Enter your website URL to customize your setup"
-    : null
+  const error =
+    serverError ??
+    (touched && !normalized ? (url.trim() ? "Enter a valid website URL, like www.example.com" : "Enter your website URL to customize your setup") : null)
 
-  const finish = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     setTouched(true)
-    if (!normalized) return
+    setServerError(null)
+    if (!normalized || submitting) return
+    setSubmitting(true)
     try {
-      localStorage.setItem(KNOWLEDGE_KEY, normalized)
-    } catch {}
-    setRunning(true)
+      const res = await fetch("/api/knowledge", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ kind: "website", url: normalized, allowOrigin: true }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.status === 401) return router.replace("/?login=1")
+      if (!res.ok) {
+        setServerError(data.message ?? "Couldn't add this website. Try again")
+        return
+      }
+      setHost(new URL(normalized).hostname)
+      setSource(data.source)
+      setPhase(data.source.status === "ready" ? "ready" : data.source.status === "syncing" ? "reading" : "failed")
+    } catch {
+      setServerError("Couldn't reach the server. Check your connection and try again")
+    } finally {
+      setSubmitting(false)
+    }
   }
 
-  // Tick the checklist one item at a time, then head to the app
+  // Follow the crawl until it finishes
   useEffect(() => {
-    if (!running) return
-    const t = setTimeout(
-      () => (done < BENEFITS.length ? setDone(done + 1) : router.push("/dashboard?welcome=1")),
-      done < BENEFITS.length ? 800 : 600
-    )
+    if (phase !== "reading" || !source) return
+    poll.current = setTimeout(async () => {
+      try {
+        const res = await fetch("/api/knowledge")
+        const data = await res.json()
+        const next: Source | undefined = data.sources?.find((s: Source) => s.id === source.id)
+        if (!next) return setPhase("failed")
+        setSource(next)
+        if (next.status === "ready") setPhase("ready")
+        else if (next.status === "failed") setPhase("failed")
+      } catch {
+        setSource({ ...source }) // retry on the next tick
+      }
+    }, 2000)
+    return () => clearTimeout(poll.current)
+  }, [phase, source])
+
+  useEffect(() => {
+    if (phase !== "ready") return
+    const t = setTimeout(() => router.push("/dashboard?welcome=1"), 2200)
     return () => clearTimeout(t)
-  }, [running, done, router])
+  }, [phase, router])
+
+  const busy = phase === "reading" || phase === "ready"
 
   return (
     <main
@@ -74,7 +124,7 @@ export default function Onboarding() {
 
         <div className="flex flex-1 items-center">
           <motion.form
-            onSubmit={finish}
+            onSubmit={submit}
             noValidate
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
@@ -82,83 +132,99 @@ export default function Onboarding() {
             className="mx-auto w-full max-w-[30rem] py-12"
           >
             <h1 className="text-[clamp(2rem,3.2vw,2.75rem)] font-semibold leading-[1.1] tracking-tight">
-              Confirm your website
-              <br />
-              for a quick start
+              {phase === "form" ? (
+                <>
+                  Confirm your website
+                  <br />
+                  for a quick start
+                </>
+              ) : phase === "failed" ? (
+                "We couldn't read that site"
+              ) : (
+                "Learning your website"
+              )}
             </h1>
             <p style={{ marginTop: 20 }} className="text-lg leading-relaxed text-[var(--color-muted)]">
-              Apex will learn your products, policies, and tone in seconds. It stays private until you launch it.
+              {phase === "failed"
+                ? "You can try another address, or continue and add your content as text in the dashboard."
+                : "Apex reads your pages to learn your products, policies and tone. Your assistant stays private until you add it to your site."}
             </p>
 
-            <label htmlFor="website-url" className="mt-10 block text-sm font-medium">
-              Your website URL
-            </label>
-            <input
-              id="website-url"
-              name="url"
-              type="text"
-              inputMode="url"
-              autoComplete="url"
-              autoFocus
-              spellCheck={false}
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-                  readOnly={running}
-              onBlur={() => setTouched(true)}
-              placeholder="www.example-website.com"
-              aria-invalid={!!error}
-              aria-describedby={error ? "website-url-error" : undefined}
-              className={cn(
-                "mt-2 h-14 w-full rounded-lg border bg-transparent px-4 text-base text-[var(--color-text)] outline-none transition-colors placeholder:text-[var(--color-muted)]/70",
-                error
-                  ? "border-red-500"
-                  : "border-[var(--color-line)] focus:border-[var(--color-secondary)]"
-              )}
-            />
-            {error && (
-              <p id="website-url-error" role="alert" style={{ marginTop: 8 }} className="flex items-center gap-2 text-sm text-red-500">
-                <CircleAlert className="h-4 w-4 shrink-0" aria-hidden="true" />
-                {error}
-              </p>
+            {phase === "form" || phase === "failed" ? (
+              <>
+                <label htmlFor="website-url" className="mt-10 block text-sm font-medium">
+                  Your website URL
+                </label>
+                <input
+                  id="website-url"
+                  name="url"
+                  type="text"
+                  inputMode="url"
+                  autoComplete="url"
+                  autoFocus
+                  spellCheck={false}
+                  value={url}
+                  onChange={(e) => {
+                    setUrl(e.target.value)
+                    setServerError(null)
+                  }}
+                  onBlur={() => setTouched(true)}
+                  placeholder="www.example-website.com"
+                  aria-invalid={!!error}
+                  aria-describedby={error ? "website-url-error" : undefined}
+                  className={cn(
+                    "mt-2 h-14 w-full rounded-lg border bg-transparent px-4 text-base text-[var(--color-text)] outline-none transition-colors placeholder:text-[var(--color-muted)]/70",
+                    error ? "border-red-500" : "border-[var(--color-line)] focus:border-[var(--color-secondary)]",
+                  )}
+                />
+                {(error || (phase === "failed" && source?.error)) && (
+                  <p id="website-url-error" role="alert" style={{ marginTop: 8 }} className="flex items-center gap-2 text-sm text-red-500">
+                    <CircleAlert className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    {error ?? source?.error}
+                  </p>
+                )}
+              </>
+            ) : (
+              <ul role="status" aria-live="polite" style={{ marginTop: 32 }} className="flex flex-col gap-3 text-[0.9375rem]">
+                <Progress state="done">Created your assistant</Progress>
+                <Progress state="done">Allowed {host} to show the widget</Progress>
+                <Progress state={phase === "ready" ? "done" : "active"}>
+                  {phase === "ready"
+                    ? `Read ${source?.pages ?? 0} page${source?.pages === 1 ? "" : "s"} from your website`
+                    : "Reading your pages… this usually takes under a minute"}
+                </Progress>
+                <Progress state={phase === "ready" ? "done" : "todo"}>{phase === "ready" ? "All set. Opening your dashboard…" : "Ready to answer"}</Progress>
+              </ul>
             )}
 
-            <ul style={{ marginTop: 28 }} className="flex flex-wrap gap-x-4 gap-y-2.5 text-[0.9375rem] text-[var(--color-muted)]">
-              {BENEFITS.map((b, i) => (
-                <li key={b} className="flex items-center gap-2">
-                  {running && i < done ? (
-                    <CircleCheck className="h-4 w-4 shrink-0 text-green-500" aria-hidden="true" />
-                  ) : running && i === done ? (
-                    <LoaderCircle className="h-4 w-4 shrink-0 animate-spin" aria-hidden="true" />
-                  ) : (
-                    <CircleCheck className="h-4 w-4 shrink-0 opacity-70" aria-hidden="true" />
-                  )}
-                  {b}
-                </li>
-              ))}
-            </ul>
-
-            <div className="mt-8 flex items-center gap-3">
-              <button
-                type="submit"
-                disabled={!normalized || running}
-                className="h-12 cursor-pointer rounded-lg border-0 bg-[var(--color-primary)] px-7 text-[0.9375rem] font-semibold text-[var(--color-on-primary)] transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:bg-[var(--color-bubble)] disabled:text-[var(--color-muted)] disabled:opacity-100"
-              >
-                {running ? "Setting up..." : "Finish"}
-              </button>
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              {phase === "ready" ? (
+                <button
+                  type="button"
+                  onClick={() => router.push("/dashboard?welcome=1")}
+                  className="h-12 cursor-pointer rounded-lg border-0 bg-[var(--color-primary)] px-7 text-[0.9375rem] font-semibold text-[var(--color-on-primary)] transition-opacity hover:opacity-85"
+                >
+                  Go to dashboard
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={!normalized || busy || submitting}
+                  className="inline-flex h-12 cursor-pointer items-center gap-2 rounded-lg border-0 bg-[var(--color-primary)] px-7 text-[0.9375rem] font-semibold text-[var(--color-on-primary)] transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:bg-[var(--color-bubble)] disabled:text-[var(--color-muted)] disabled:opacity-100"
+                >
+                  {(submitting || busy) && <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />}
+                  {busy ? "Setting up…" : phase === "failed" ? "Try again" : "Continue"}
+                </button>
+              )}
+              {phase !== "ready" && (
               <button
                 type="button"
-                onClick={() => {
-                  // Skipped the website step, so the agent still needs training
-                  try {
-                    localStorage.removeItem(KNOWLEDGE_KEY)
-                  } catch {}
-                  router.push("/")
-                }}
-                disabled={running}
+                onClick={() => router.push(phase === "reading" ? "/dashboard/knowledge" : "/dashboard")}
                 className="h-12 cursor-pointer rounded-lg border-0 bg-transparent px-5 text-[0.9375rem] font-semibold text-[var(--color-text)] transition-opacity hover:opacity-70"
               >
-                Skip
+                {phase === "reading" ? "Continue in the background" : phase === "failed" ? "Continue anyway" : "Skip for now"}
               </button>
+              )}
             </div>
           </motion.form>
         </div>

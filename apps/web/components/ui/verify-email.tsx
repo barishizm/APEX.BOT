@@ -23,9 +23,9 @@ async function postJson(path: string, body: object): Promise<{ ok: boolean; stat
   }
 }
 
-export default function VerifyEmail() {
+export default function VerifyEmail({ initialEmail }: { initialEmail: string }) {
   const router = useRouter()
-  const [email, setEmail] = useState("")
+  const [email, setEmail] = useState(initialEmail)
   const [digits, setDigits] = useState<string[]>(Array(CODE_LENGTH).fill(""))
   const [error, setError] = useState<string | null>(null)
   const [verifying, setVerifying] = useState(false)
@@ -34,22 +34,10 @@ export default function VerifyEmail() {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState("")
   const [emailError, setEmailError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
   const [cooldown, setCooldown] = useState(RESEND_SECONDS)
   const inputs = useRef<(HTMLInputElement | null)[]>([])
-
-  useEffect(() => {
-    try {
-      setEmail(sessionStorage.getItem("apex:verify:email") ?? "")
-    } catch {}
-    // The account is the source of truth (e.g. after logging in on another tab)
-    fetch("/api/auth/me")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data?.user?.emailVerified) router.replace("/dashboard")
-        else if (data?.user?.email) setEmail(data.user.email)
-      })
-      .catch(() => {})
-  }, [router])
 
   useEffect(() => {
     if (cooldown <= 0) return
@@ -61,6 +49,7 @@ export default function VerifyEmail() {
 
   const setAt = (i: number, value: string) => {
     setError(null)
+    setNotice(null)
     setDigits((d) => d.map((x, idx) => (idx === i ? value : x)))
   }
 
@@ -117,19 +106,19 @@ export default function VerifyEmail() {
       setEmailError("Enter a valid email address")
       return
     }
+    setSaving(true)
     const { ok, status, data } = await postJson("/api/auth/resend-code", { email: next })
+    setSaving(false)
     if (status === 401) return router.replace("/?login=1")
     if (!ok) {
       setEmailError(data.message ?? "Something went wrong. Try again")
       return
     }
-    try {
-      sessionStorage.setItem("apex:verify:email", data.email)
-    } catch {}
     setEmail(data.email)
     setEditing(false)
     setDigits(Array(CODE_LENGTH).fill(""))
     setError(null)
+    setNotice(`New code sent to ${data.email}`)
     setCooldown(RESEND_SECONDS)
     inputs.current[0]?.focus()
   }
@@ -144,6 +133,7 @@ export default function VerifyEmail() {
     }
     setDigits(Array(CODE_LENGTH).fill(""))
     setError(null)
+    setNotice("New code sent. Check your inbox and spam folder")
     setCooldown(RESEND_SECONDS)
     inputs.current[0]?.focus()
   }
@@ -239,9 +229,10 @@ export default function VerifyEmail() {
                   <button
                     type="button"
                     onClick={saveEmail}
-                    className="h-11 cursor-pointer rounded-lg border-0 bg-[var(--color-primary)] px-5 text-sm font-semibold text-[var(--color-on-primary)] transition-opacity hover:opacity-85"
+                    disabled={saving}
+                    className="h-11 cursor-pointer rounded-lg border-0 bg-[var(--color-primary)] px-5 text-sm font-semibold text-[var(--color-on-primary)] transition-opacity hover:opacity-85 disabled:cursor-wait disabled:opacity-60"
                   >
-                    Save
+                    {saving ? "Sending…" : "Save"}
                   </button>
                   <button
                     type="button"
@@ -304,6 +295,12 @@ export default function VerifyEmail() {
                 />
               ))}
             </motion.div>
+            {notice && !error && (
+              <p role="status" style={{ marginTop: 20 }} className="flex items-center gap-2 text-sm text-[var(--color-muted)]">
+                <Check className="h-4 w-4 shrink-0 text-green-600" aria-hidden="true" />
+                {notice}
+              </p>
+            )}
             {error && (
               <p role="alert" style={{ marginTop: 20 }} className="flex items-center gap-2 text-sm text-red-500">
                 <CircleAlert className="h-4 w-4 shrink-0" aria-hidden="true" />

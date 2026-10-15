@@ -6,7 +6,7 @@ Kayıt / giriş için veritabanı şeması, migration çalıştırıcısı ve au
 
 Şemanın düz PostgreSQL'de çalıştığı testlerle kanıtlanıyor: testler, Supabase rolleri ya da eklentileri olmayan gömülü gerçek bir PostgreSQL'de (PGlite) koşuyor; biri de üretimdeki `pg` sürücüsüyle TCP üzerinden bağlanıyor.
 
-## Tablolar (`migrations/0001_auth.sql`)
+## Tablolar (`migrations/`)
 
 | Tablo | Ne tutar |
 |---|---|
@@ -15,8 +15,12 @@ Kayıt / giriş için veritabanı şeması, migration çalıştırıcısı ve au
 | `app.organization_members` | kullanıcı ↔ organizasyon, rol (`owner` / `admin` / `member`) |
 | `app.sessions` | Oturumlar. Cookie'de rastgele token, tabloda sadece SHA-256'sı. "Beni hatırla" → 30 gün, değilse 1 gün + tarayıcı oturumu cookie'si |
 | `app.verification_codes` | 6 haneli kodlar (hash'li), 15 dk geçerli, en fazla 5 deneme, kullanıcı başına tek canlı kod. `password_reset` amacı da şemada hazır |
-| `app.oauth_accounts` | Google / GitHub bağlantıları için hazır (akış henüz bağlı değil) |
+| `app.oauth_accounts` | Google / GitHub ile giriş bağlantıları |
 | `app.auth_events` | Güvenlik logu; başarısız girişler de burada sayılıp kısıtlanıyor (15 dk'da e-posta başına 10, IP başına 50) |
+| `app.bots` | Çalışma alanı başına bir bot: ayarlar (JSON, uygulama doğrular), herkese açık `site_key`, `version` (iyimser kilit), `knowledge_version` |
+| `app.knowledge_sources` / `app.knowledge_chunks` | Bilgi tabanı: web sitesi (taranır) veya metin kaynakları ve retrieval parçaları; her parça `bot_id` taşır |
+| `app.bot_activity` | Widget'ın en son hangi sitede ve ne zaman yüklendiği (sohbet API'si yazar) |
+| `app.conversations` / `app.messages` | Panel botlarının konuşmaları; botun saklama süresi dolunca saatlik temizlikle silinir |
 | `app.schema_migrations` | Hangi migration'ların uygulandığı |
 
 Tüm tablolarda RLS açık ve hiç politika yok: Supabase'in `anon` / `authenticated` rolleri (REST API) hiçbir şeye erişemez; sunucu tablo sahibi olarak bağlandığı için etkilenmez. `app` şeması Supabase'in REST API'sinde zaten açık değil.
@@ -37,7 +41,7 @@ Tüm tablolarda RLS açık ve hiç politika yok: Supabase'in `anon` / `authentic
    ```
 5. Kontrol: Supabase → **Table Editor** → şema seçicisinden `app`'i seç; tablolar orada olmalı.
 
-E-posta gönderimi henüz bağlı değil: geliştirmede doğrulama kodu `npm run dev:web` çıktısına `[mail] verification code for …` olarak yazılır. Üretimden önce `apps/web/lib/mail.ts` bir sağlayıcıya (Resend, Postmark, SES, SMTP) bağlanmalı.
+E-posta: `RESEND_API_KEY` (ve `MAIL_FROM`) ayarlıysa kodlar Resend ile gönderilir. Anahtar yoksa geliştirmede e-postalar `npm run dev:web` çıktısına yazılır; üretimde gönderilmez ve hata loglanır.
 
 ## Google / GitHub ile giriş
 

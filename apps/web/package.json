@@ -4,10 +4,12 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@apex/db": "*",
+    "@apex/knowledge": "*",
     "@paper-design/shaders-react": "^0.0.81",
     "clsx": "^2.1.1",
     "framer-motion": "^14.1.0",

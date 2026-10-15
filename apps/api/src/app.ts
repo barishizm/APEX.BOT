@@ -9,7 +9,7 @@ import { log } from "./log.ts";
 import type { Mailer } from "./mailer.ts";
 import type { ChatModel } from "./model.ts";
 import { buildMessages, buildSystem } from "./prompt.ts";
-import type { Hit, KnowledgeBase } from "./retrieval.ts";
+import { relevantHits, type Hit, type KnowledgeBase } from "./retrieval.ts";
 import type { Conversation, ConversationStore, Source } from "./store.ts";
 import { normalizeOrigin, publicSettings, type Tenant, type TenantRegistry } from "./tenants.ts";
 import type { Lang } from "./text.ts";
@@ -23,6 +23,10 @@ export interface AppDeps {
   limits: Limits;
   clientIp: (c: Context) => string;
   now?: () => number;
+  /** Called when the widget loads its config on an allowed site. */
+  onWidgetSeen?: (tenant: Tenant, origin: string) => void;
+  /** Extra fields for /health (no secrets: the status page shows them publicly). */
+  health?: () => Record<string, unknown>;
 }
 
 type Env = { Variables: { tenant: Tenant; origin: string } };
@@ -43,9 +47,6 @@ type ErrorCode =
 const EMAIL = /^[^\s@]{1,64}@[^\s@]+\.[^\s@]{2,}$/;
 const PHONE = /^\+?[\d\s().-]{7,40}$/;
 
-/** Retrieval floor multiplier per "answer confidence" setting. */
-const CONFIDENCE = { strict: 1.5, balanced: 1, lenient: 0.6 } as const;
-
 export function createApp(deps: AppDeps) {
   const { tenants, knowledge, store, model, mailer, limits } = deps;
   const now = deps.now ?? Date.now;
@@ -56,7 +57,10 @@ export function createApp(deps: AppDeps) {
 
   const app = new Hono<Env>();
 
-  app.get("/health", (c) => c.json({ ok: true }));
+  const startedAt = now();
+  app.get("/health", (c) =>
+    c.json({ ok: true, uptimeSeconds: Math.round((now() - startedAt) / 1000), ...deps.health?.() }, 200, { "Cache-Control": "no-store" }),
+  );
 
   // Preflights carry no site key, so they pass for any origin some tenant allows;
   // the real request is then checked against its own tenant.
@@ -97,7 +101,10 @@ export function createApp(deps: AppDeps) {
     return c.json({ error: code }, status);
   };
 
-  app.get("/v1/widget/config", (c) => c.json(publicSettings(c.get("tenant"))));
+  app.get("/v1/widget/config", (c) => {
+    deps.onWidgetSeen?.(c.get("tenant"), c.get("origin"));
+    return c.json(publicSettings(c.get("tenant")));
+  });
 
   app.post("/v1/chat", async (c) => {
     const tenant = c.get("tenant");
@@ -120,8 +127,8 @@ export function createApp(deps: AppDeps) {
     }
 
     let conversation: Conversation | undefined;
-    if (typeof body.conversationId === "string") conversation = store.get(tenant.id, body.conversationId);
-    conversation ??= store.create(tenant.id);
+    if (typeof body.conversationId === "string") conversation = await store.getOrLoad(tenant.id, body.conversationId);
+    conversation ??= store.create(tenant.id, c.get("origin"));
     if (conversation.messages.length >= limits.maxConversationMessages) return fail(c, "conversation_full", 409);
 
     const historyCount = tenant.limits?.historyMessages ?? limits.historyMessages;
@@ -130,10 +137,7 @@ export function createApp(deps: AppDeps) {
     const query = [{ text: message, weight: 1 }];
     if (previousQuestion) query.push({ text: previousQuestion, weight: 0.5 });
     const ranked = knowledge.search(tenant.id, query, limits.retrievalTopK);
-    // Absolute floor for the "I don't know" path, plus a relative cut so weak extras don't show as sources.
-    const minScore = limits.minRetrievalScore * CONFIDENCE[tenant.settings.confidence ?? "balanced"];
-    const floor = Math.max(minScore, (ranked[0]?.score ?? 0) * 0.5);
-    const hits = ranked.filter((h) => h.score >= floor);
+    const hits = relevantHits(ranked, limits.minRetrievalScore, tenant.settings.confidence);
 
     const request = { system: buildSystem(tenant), messages: buildMessages(history, message, hits), model: tenant.settings.model };
     const userMessage = store.append(conversation, { role: "user", content: message });
@@ -185,7 +189,8 @@ export function createApp(deps: AppDeps) {
     if (typeof conversationId !== "string" || typeof messageId !== "string" || (rating !== "up" && rating !== "down")) {
       return fail(c, "bad_request", 400);
     }
-    if (!store.setFeedback(c.get("tenant").id, conversationId, messageId, rating)) return fail(c, "not_found", 404);
+    const conversation = await store.getOrLoad(c.get("tenant").id, conversationId);
+    if (!conversation || !store.setFeedback(conversation, messageId, rating)) return fail(c, "not_found", 404);
     return c.json({ ok: true });
   });
 
@@ -201,7 +206,7 @@ export function createApp(deps: AppDeps) {
     const limit = handoffLimiter.hit(`handoff:${deps.clientIp(c)}`);
     if (!limit.ok) return fail(c, "rate_limited", 429, limit.retryAfter);
 
-    const conversation = typeof body.conversationId === "string" ? store.get(tenant.id, body.conversationId) : undefined;
+    const conversation = typeof body.conversationId === "string" ? await store.getOrLoad(tenant.id, body.conversationId) : undefined;
     const lang = tenant.settings.defaultLang;
     await mailer.send({
       to: tenant.handoffEmail,
@@ -209,7 +214,7 @@ export function createApp(deps: AppDeps) {
       subject: HANDOFF_SUBJECT[lang](tenant.name),
       text: handoffBody(lang, { email, name, note, phone: conversation?.visitor?.phone ?? "", conversation }),
     });
-    if (conversation) conversation.handoffSent = true;
+    if (conversation) store.markHandoff(conversation);
     return c.json({ ok: true });
   });
 
@@ -228,9 +233,9 @@ export function createApp(deps: AppDeps) {
     if (!limit.ok) return fail(c, "rate_limited", 429, limit.retryAfter);
 
     let conversation: Conversation | undefined;
-    if (typeof body.conversationId === "string") conversation = store.get(tenant.id, body.conversationId);
-    conversation ??= store.create(tenant.id);
-    conversation.visitor = { email, ...(name ? { name } : {}), ...(phone ? { phone } : {}) };
+    if (typeof body.conversationId === "string") conversation = await store.getOrLoad(tenant.id, body.conversationId);
+    conversation ??= store.create(tenant.id, c.get("origin"));
+    store.setVisitor(conversation, { email, ...(name ? { name } : {}), ...(phone ? { phone } : {}) });
 
     if (tenant.handoffEmail) {
       const lang = tenant.settings.defaultLang;
@@ -244,8 +249,8 @@ export function createApp(deps: AppDeps) {
     return c.json({ conversationId: conversation.id });
   });
 
-  app.get("/v1/conversations/:id", (c) => {
-    const conversation = store.get(c.get("tenant").id, c.req.param("id"));
+  app.get("/v1/conversations/:id", async (c) => {
+    const conversation = await store.getOrLoad(c.get("tenant").id, c.req.param("id"));
     if (!conversation) return fail(c, "not_found", 404);
     return c.json({
       id: conversation.id,
@@ -254,8 +259,8 @@ export function createApp(deps: AppDeps) {
   });
 
   // KVKK/GDPR: visitors can erase their conversation.
-  app.delete("/v1/conversations/:id", (c) => {
-    if (!store.delete(c.get("tenant").id, c.req.param("id"))) return fail(c, "not_found", 404);
+  app.delete("/v1/conversations/:id", async (c) => {
+    if (!(await store.delete(c.get("tenant").id, c.req.param("id")))) return fail(c, "not_found", 404);
     return c.body(null, 204);
   });
 
@@ -281,7 +286,8 @@ async function readJson(c: Context): Promise<Record<string, unknown>> {
 
 function uniqueSources(hits: Hit[]): Source[] {
   const seen = new Map<string, Source>();
-  for (const { chunk } of hits) if (!seen.has(chunk.url)) seen.set(chunk.url, { url: chunk.url, title: chunk.title });
+  // pasted text sources have no page to link to
+  for (const { chunk } of hits) if (chunk.url && !seen.has(chunk.url)) seen.set(chunk.url, { url: chunk.url, title: chunk.title });
   return [...seen.values()].slice(0, 3);
 }
 

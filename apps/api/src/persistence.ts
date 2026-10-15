@@ -1,0 +1,58 @@
+// Durable copy of dashboard bots' conversations in Postgres (see store.ts).
+import {
+  deleteConversation,
+  insertConversation,
+  insertMessage,
+  loadConversation,
+  markConversationHandoff,
+  setConversationVisitor,
+  setMessageFeedback,
+  type Db,
+} from "@apex/db";
+import type { Conversation, ConversationPersistence } from "./store.ts";
+
+export function postgresPersistence(db: Db): ConversationPersistence {
+  return {
+    created: (c) => insertConversation(db, { id: c.id, botId: c.tenantId, origin: c.origin ?? null, createdAt: new Date(c.createdAt) }),
+    appended: (c, m) =>
+      insertMessage(db, {
+        id: m.id,
+        conversationId: c.id,
+        botId: c.tenantId,
+        role: m.role,
+        content: m.content,
+        sources: m.sources,
+        unanswered: m.unanswered,
+        createdAt: new Date(m.createdAt),
+      }),
+    visitor: (c) => (c.visitor ? setConversationVisitor(db, c.tenantId, c.id, c.visitor) : Promise.resolve()),
+    handoff: (c) => markConversationHandoff(db, c.tenantId, c.id),
+    feedback: (c, m) => (m.feedback ? setMessageFeedback(db, c.tenantId, c.id, m.id, m.feedback) : Promise.resolve()),
+    deleted: (tenantId, id) => deleteConversation(db, tenantId, id),
+    async load(tenantId, id) {
+      const stored = await loadConversation(db, tenantId, id);
+      if (!stored) return undefined;
+      const conversation: Conversation = {
+        id: stored.id,
+        tenantId: stored.botId,
+        createdAt: stored.createdAt.getTime(),
+        updatedAt: stored.updatedAt.getTime(),
+        ...(stored.origin ? { origin: stored.origin } : {}),
+        ...(stored.handoffAt ? { handoffSent: true } : {}),
+        ...(stored.visitor
+          ? { visitor: { email: stored.visitor.email, ...(stored.visitor.name ? { name: stored.visitor.name } : {}), ...(stored.visitor.phone ? { phone: stored.visitor.phone } : {}) } }
+          : {}),
+        messages: stored.messages.map((m) => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          createdAt: m.createdAt.getTime(),
+          ...(m.sources.length ? { sources: m.sources } : {}),
+          ...(m.unanswered ? { unanswered: true } : {}),
+          ...(m.feedback ? { feedback: m.feedback } : {}),
+        })),
+      };
+      return conversation;
+    },
+  };
+}

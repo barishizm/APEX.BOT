@@ -1,7 +1,8 @@
 "use client"
 
 import { AnimatePresence, motion } from "framer-motion"
-import { Contrast, Info, Monitor, Moon, Power, Smartphone, Sun } from "lucide-react"
+import { BookOpen, Contrast, Moon, Power, Settings, Sun } from "lucide-react"
+import Link from "next/link"
 import { useEffect, useRef, useState } from "react"
 
 type Theme = "light" | "dark" | "system"
@@ -37,54 +38,8 @@ const row =
 const rowButton = `${row} cursor-pointer transition-colors hover:bg-[color-mix(in_srgb,var(--color-text)_6%,transparent)]`
 const divider = "border-t border-[var(--color-surface)]"
 
-function Switch({
-  label,
-  checked,
-  onChange,
-}: {
-  label: string
-  checked: boolean
-  onChange: (v: boolean) => void
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      onClick={() => onChange(!checked)}
-      className={rowButton}
-    >
-      <span>{label}</span>
-      <span
-        aria-hidden
-        className={`relative h-6 w-10 shrink-0 rounded-full transition-colors duration-200 ${
-          checked ? "bg-green-600" : "bg-[var(--color-line)]"
-        }`}
-      >
-        <span
-          className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 ${
-            checked ? "translate-x-[1.125rem]" : "translate-x-0.5"
-          }`}
-        />
-      </span>
-    </button>
-  )
-}
-
-export function ProfileMenu({
-  name,
-  email,
-  resolutionsUsed = 0,
-  resolutionsLimit = 100,
-}: {
-  name: string
-  email: string
-  resolutionsUsed?: number
-  resolutionsLimit?: number
-}) {
+export function ProfileMenu({ name, email }: { name: string; email: string }) {
   const [open, setOpen] = useState(false)
-  const [acceptChats, setAcceptChats] = useState(true)
-  const [autoAssign, setAutoAssign] = useState(true)
   const [theme, setTheme] = useState<Theme>("system")
   const rootRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -123,7 +78,6 @@ export function ProfileMenu({
   }
 
   const initial = name.charAt(0).toUpperCase()
-  const pct = resolutionsLimit ? Math.round((resolutionsUsed / resolutionsLimit) * 100) : 0
 
   return (
     <div ref={rootRef} className="relative mb-1">
@@ -137,12 +91,6 @@ export function ProfileMenu({
         className="relative flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border-0 bg-[var(--color-secondary)] text-sm font-semibold text-[var(--color-surface)] transition-transform active:scale-95"
       >
         {initial}
-        <span
-          aria-hidden
-          className={`absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full border-2 border-[var(--color-surface)] transition-colors ${
-            acceptChats ? "bg-green-500" : "bg-[var(--color-muted)]"
-          }`}
-        />
       </button>
 
       <AnimatePresence>
@@ -168,46 +116,6 @@ export function ProfileMenu({
             </div>
 
             <div className="flex flex-col gap-3">
-              <div className={group}>
-                <Switch label="Accept chats" checked={acceptChats} onChange={setAcceptChats} />
-                <div className={divider}>
-                  <Switch label="Auto-assign tickets" checked={autoAssign} onChange={setAutoAssign} />
-                </div>
-              </div>
-
-              {/* not `group`: its overflow-hidden would clip the tooltip */}
-              <div className="rounded-xl bg-[var(--color-bubble)] px-4 py-3">
-                <div className="flex items-center gap-2 text-[0.95rem] font-medium">
-                  AI resolutions
-                  <span
-                    tabIndex={0}
-                    aria-describedby="ai-resolutions-tip"
-                    className="group/info relative flex rounded-full text-[var(--color-muted)] outline-none transition-colors hover:text-[var(--color-text)] focus-visible:text-[var(--color-text)]"
-                  >
-                    <Info className="h-4 w-4" aria-label="About AI resolutions" />
-                    <span
-                      id="ai-resolutions-tip"
-                      role="tooltip"
-                      className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 w-56 -translate-x-1/2 translate-y-1 rounded-lg bg-[var(--color-primary)] px-3 py-2 text-center text-xs font-normal leading-snug text-[var(--color-on-primary)] opacity-0 shadow-lg transition-[opacity,translate] duration-150 group-hover/info:translate-y-0 group-hover/info:opacity-100 group-focus-visible/info:translate-y-0 group-focus-visible/info:opacity-100"
-                    >
-                      {resolutionsLimit} included in your trial. Need more?{" "}
-                      <span className="font-semibold">Start a paid plan</span>
-                    </span>
-                  </span>
-                </div>
-                <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[var(--color-line)]">
-                  <motion.div
-                    className="h-full rounded-full bg-green-500"
-                    initial={{ width: 0 }}
-                    animate={{ width: `${pct}%` }}
-                    transition={{ duration: 0.6, ease: "easeOut", delay: 0.1 }}
-                  />
-                </div>
-                <p className="mt-2 text-sm text-[var(--color-muted)]">
-                  {resolutionsUsed} / {resolutionsLimit} ({pct}% used)
-                </p>
-              </div>
-
               <div className={group}>
                 <div className={row}>
                   <span>Choose theme</span>
@@ -243,36 +151,17 @@ export function ProfileMenu({
                     ))}
                   </div>
                 </div>
-                <button type="button" className={`${rowButton} ${divider}`}>
-                  Notifications
-                </button>
               </div>
 
               <div className={group}>
-                <div className={row}>
-                  <span>Download apps</span>
-                  <div className="-mr-1 flex gap-1">
-                    <button
-                      type="button"
-                      aria-label="Mobile app"
-                      title="Mobile app"
-                      className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border-0 bg-transparent text-[var(--color-text)] hover:bg-[var(--color-surface)]"
-                    >
-                      <Smartphone className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      aria-label="Desktop app"
-                      title="Desktop app"
-                      className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border-0 bg-transparent text-[var(--color-text)] hover:bg-[var(--color-surface)]"
-                    >
-                      <Monitor className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-                <button type="button" className={`${rowButton} ${divider}`}>
-                  Billing
-                </button>
+                <Link href="/dashboard/settings" onClick={() => setOpen(false)} className={`${rowButton} no-underline`}>
+                  Account settings
+                  <Settings className="h-4 w-4 text-[var(--color-muted)]" aria-hidden />
+                </Link>
+                <a href="/docs" target="_blank" rel="noopener noreferrer" className={`${rowButton} ${divider} no-underline`}>
+                  Help &amp; docs
+                  <BookOpen className="h-4 w-4 text-[var(--color-muted)]" aria-hidden />
+                </a>
               </div>
 
               <button type="button" onClick={logOut} className={`${rowButton} rounded-xl`}>
