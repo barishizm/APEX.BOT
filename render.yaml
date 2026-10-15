@@ -7,7 +7,8 @@ services:
     plan: free
     region: frankfurt
     branch: main
-    buildCommand: npm ci --include=dev && npm run build -w @apex/widget
+       # migrations run at build time (preDeployCommand needs a paid plan); the runner is idempotent
+    buildCommand: npm ci --include=dev && npm run db:migrate && npm run build -w @apex/widget
     startCommand: npm start -w @apex/api
     healthCheckPath: /health
     envVars:
