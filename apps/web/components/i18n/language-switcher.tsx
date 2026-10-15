@@ -6,7 +6,7 @@ import { useEffect, useRef } from "react"
 import { useI18n } from "@/components/i18n/provider"
 import { LOCALE_COOKIE, LOCALE_META, LOCALES, localizePath, splitLocale, type Locale } from "@/lib/i18n"
 
-// Remember the choice so the proxy stops redirecting by Accept-Language
+// Remember the choice; the proxy prefers it over Accept-Language
 function remember(locale: Locale) {
   document.cookie = `${LOCALE_COOKIE}=${locale}; path=/; max-age=31536000; samesite=lax`
 }

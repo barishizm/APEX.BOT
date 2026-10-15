@@ -4,13 +4,16 @@ import { AnimatePresence, motion } from "framer-motion"
 import { BookOpen, Contrast, Moon, Power, Settings, Sun } from "lucide-react"
 import Link from "next/link"
 import { useEffect, useRef, useState } from "react"
+import { useAppI18n } from "@/components/i18n/app-provider"
+import { useSetLocale } from "@/components/i18n/use-set-locale"
+import { LOCALE_META, LOCALES, localizePath } from "@/lib/i18n"
 
 type Theme = "light" | "dark" | "system"
 
 const THEMES = [
-  { value: "light", label: "Light", icon: Sun },
-  { value: "dark", label: "Dark", icon: Moon },
-  { value: "system", label: "System", icon: Contrast },
+  { value: "light", icon: Sun },
+  { value: "dark", icon: Moon },
+  { value: "system", icon: Contrast },
 ] as const
 
 function savedTheme(): Theme {
@@ -39,6 +42,9 @@ const rowButton = `${row} cursor-pointer transition-colors hover:bg-[color-mix(i
 const divider = "border-t border-[var(--color-surface)]"
 
 export function ProfileMenu({ name, email }: { name: string; email: string }) {
+  const { t: app, locale, href } = useAppI18n()
+  const t = app.shell.profile
+  const setLocale = useSetLocale()
   const [open, setOpen] = useState(false)
   const [theme, setTheme] = useState<Theme>("system")
   const rootRef = useRef<HTMLDivElement>(null)
@@ -74,7 +80,7 @@ export function ProfileMenu({ name, email }: { name: string; email: string }) {
     // the session cookie is httpOnly, so only the server can clear it
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => {})
     // replace, so Back doesn't return to the dashboard
-    window.location.replace("/")
+    window.location.replace(localizePath("/", locale))
   }
 
   const initial = name.charAt(0).toUpperCase()
@@ -84,7 +90,7 @@ export function ProfileMenu({ name, email }: { name: string; email: string }) {
       <button
         ref={triggerRef}
         type="button"
-        aria-label="Profile menu"
+        aria-label={t.open}
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
@@ -97,7 +103,7 @@ export function ProfileMenu({ name, email }: { name: string; email: string }) {
         {open && (
           <motion.div
             role="dialog"
-            aria-label="Profile"
+            aria-label={t.dialog}
             initial={{ opacity: 0, scale: 0.96, x: -8, y: 8 }}
             animate={{ opacity: 1, scale: 1, x: 0, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, x: -8, y: 8 }}
@@ -118,13 +124,15 @@ export function ProfileMenu({ name, email }: { name: string; email: string }) {
             <div className="flex flex-col gap-3">
               <div className={group}>
                 <div className={row}>
-                  <span>Choose theme</span>
+                  <span>{t.theme}</span>
                   <div
                     role="radiogroup"
-                    aria-label="Theme"
+                    aria-label={t.themeGroup}
                     className="-mr-2 flex rounded-lg bg-[var(--color-surface)] p-0.5"
                   >
-                    {THEMES.map(({ value, label, icon: Icon }) => (
+                    {THEMES.map(({ value, icon: Icon }) => {
+                      const label = t[value]
+                      return (
                       <button
                         key={value}
                         type="button"
@@ -148,6 +156,31 @@ export function ProfileMenu({ name, email }: { name: string; email: string }) {
                         )}
                         <Icon className="relative h-4 w-4" />
                       </button>
+                      )
+                    })}
+                  </div>
+                </div>
+                <div className={`${row} ${divider}`}>
+                  <span>{t.language}</span>
+                  <div role="radiogroup" aria-label={t.language} className="-mr-2 flex rounded-lg bg-[var(--color-surface)] p-0.5">
+                    {LOCALES.map((l) => (
+                      <button
+                        key={l}
+                        type="button"
+                        role="radio"
+                        aria-checked={locale === l}
+                        lang={LOCALE_META[l].hreflang}
+                        aria-label={LOCALE_META[l].name}
+                        title={LOCALE_META[l].name}
+                        onClick={() => setLocale(l)}
+                        className={`h-8 cursor-pointer rounded-md border-0 px-2.5 text-xs font-semibold transition-colors ${
+                          locale === l
+                            ? "bg-[var(--color-raised)] text-[var(--color-text)] shadow-sm"
+                            : "bg-transparent text-[var(--color-muted)] hover:text-[var(--color-text)]"
+                        }`}
+                      >
+                        {l.toUpperCase()}
+                      </button>
                     ))}
                   </div>
                 </div>
@@ -155,17 +188,17 @@ export function ProfileMenu({ name, email }: { name: string; email: string }) {
 
               <div className={group}>
                 <Link href="/dashboard/settings" onClick={() => setOpen(false)} className={`${rowButton} no-underline`}>
-                  Account settings
+                  {t.settings}
                   <Settings className="h-4 w-4 text-[var(--color-muted)]" aria-hidden />
                 </Link>
-                <a href="/docs" target="_blank" rel="noopener noreferrer" className={`${rowButton} ${divider} no-underline`}>
-                  Help &amp; docs
+                <a href={href("/docs")} target="_blank" rel="noopener noreferrer" className={`${rowButton} ${divider} no-underline`}>
+                  {t.help}
                   <BookOpen className="h-4 w-4 text-[var(--color-muted)]" aria-hidden />
                 </a>
               </div>
 
               <button type="button" onClick={logOut} className={`${rowButton} rounded-xl`}>
-                Log out
+                {t.logOut}
                 <Power className="h-4 w-4 text-[var(--color-muted)]" aria-hidden />
               </button>
             </div>

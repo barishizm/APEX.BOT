@@ -3,7 +3,11 @@
 import { Check, LoaderCircle } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
+import { useAppI18n } from "@/components/i18n/app-provider"
+import { useSetLocale } from "@/components/i18n/use-set-locale"
 import { Group, TextInput, Toggle } from "@/components/widget-studio/fields"
+import { format, isLocale, LOCALE_META, LOCALES, localizePath } from "@/lib/i18n"
+import { formatDate, plural } from "@/lib/i18n/format"
 
 type Account = {
   username: string
@@ -18,13 +22,13 @@ type Account = {
 
 type Status = { kind: "idle" } | { kind: "busy" } | { kind: "ok"; message: string } | { kind: "error"; message: string }
 
-async function call(path: string, method: string, body?: object) {
+async function call(path: string, method: string, offline: string, body?: object) {
   try {
     const res = await fetch(path, { method, headers: body ? { "content-type": "application/json" } : undefined, body: body ? JSON.stringify(body) : undefined })
     const data = res.status === 204 ? {} : await res.json().catch(() => ({}))
     return { ok: res.ok, status: res.status, data }
   } catch {
-    return { ok: false, status: 0, data: { message: "You're offline. Check your connection and try again" } }
+    return { ok: false, status: 0, data: { message: offline } }
   }
 }
 
@@ -52,6 +56,10 @@ function StatusText({ status }: { status: Status }) {
 const PROVIDER_NAME: Record<string, string> = { google: "Google", github: "GitHub" }
 
 export function AccountSettings({ initial }: { initial: Account }) {
+  const { t: app, locale } = useAppI18n()
+  const t = app.settings
+  const setLocale = useSetLocale()
+  const send = (path: string, method: string, body?: object) => call(path, method, t.offline, body)
   const router = useRouter()
   const [account, setAccount] = useState(initial)
   const [username, setUsername] = useState(initial.username)
@@ -72,84 +80,102 @@ export function AccountSettings({ initial }: { initial: Account }) {
   const saveProfile = async (e: React.FormEvent) => {
     e.preventDefault()
     setProfile({ kind: "busy" })
-    const { ok, data } = await call("/api/account", "PATCH", { username })
-    if (!ok) return setProfile({ kind: "error", message: data.message ?? "Couldn't save" })
+    const { ok, data } = await send("/api/account", "PATCH", { username })
+    if (!ok) return setProfile({ kind: "error", message: data.message ?? t.couldntSave })
     setAccount((a) => ({ ...a, username: data.user.username }))
-    setProfile({ kind: "ok", message: "Saved" })
+    setProfile({ kind: "ok", message: t.saved })
     router.refresh()
   }
 
   const savePassword = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (next.length < 8) return setPassword({ kind: "error", message: "Use at least 8 characters" })
-    if (next !== confirm) return setPassword({ kind: "error", message: "The new passwords don't match" })
+    if (next.length < 8) return setPassword({ kind: "error", message: t.passwordShort })
+    if (next !== confirm) return setPassword({ kind: "error", message: t.passwordMismatch })
     setPassword({ kind: "busy" })
-    const { ok, data } = await call("/api/account/password", "POST", { current, next })
-    if (!ok) return setPassword({ kind: "error", message: data.message ?? "Couldn't change the password" })
+    const { ok, data } = await send("/api/account/password", "POST", { current, next })
+    if (!ok) return setPassword({ kind: "error", message: data.message ?? t.passwordFailed })
     setCurrent("")
     setNext("")
     setConfirm("")
     setAccount((a) => ({ ...a, hasPassword: true, otherSessions: 0 }))
-    setPassword({ kind: "ok", message: data.signedOut ? `Password changed. ${data.signedOut} other device${data.signedOut === 1 ? " was" : "s were"} signed out.` : "Password changed." })
+    setPassword({ kind: "ok", message: data.signedOut ? plural(data.signedOut, t.passwordChangedSignedOut, locale) : t.passwordChanged })
   }
 
   const signOutOthers = async () => {
     setSessions({ kind: "busy" })
-    const { ok, data } = await call("/api/account/sessions", "DELETE")
-    if (!ok) return setSessions({ kind: "error", message: data.message ?? "Couldn't sign out other devices" })
+    const { ok, data } = await send("/api/account/sessions", "DELETE")
+    if (!ok) return setSessions({ kind: "error", message: data.message ?? t.signOutFailed })
     setAccount((a) => ({ ...a, otherSessions: 0 }))
-    setSessions({ kind: "ok", message: `Signed out ${data.signedOut} device${data.signedOut === 1 ? "" : "s"}` })
+    setSessions({ kind: "ok", message: plural(data.signedOut, t.signedOut, locale) })
   }
 
   const setAllowTraining = async (allowTraining: boolean) => {
     setAccount((a) => ({ ...a, allowTraining }))
     setTraining({ kind: "busy" })
-    const { ok, data } = await call("/api/account", "PATCH", { allowTraining })
+    const { ok, data } = await send("/api/account", "PATCH", { allowTraining })
     if (!ok) {
       setAccount((a) => ({ ...a, allowTraining: !allowTraining }))
-      return setTraining({ kind: "error", message: data.message ?? "Couldn't save" })
+      return setTraining({ kind: "error", message: data.message ?? t.couldntSave })
     }
-    setTraining({ kind: "ok", message: "Saved" })
+    setTraining({ kind: "ok", message: t.saved })
   }
 
   const deleteNow = async () => {
     setDanger({ kind: "busy" })
-    const { ok, data } = await call("/api/account", "DELETE", { confirmEmail })
-    if (!ok) return setDanger({ kind: "error", message: data.message ?? "Couldn't delete the account" })
-    window.location.replace("/")
+    const { ok, data } = await send("/api/account", "DELETE", { confirmEmail })
+    if (!ok) return setDanger({ kind: "error", message: data.message ?? t.deleteFailed })
+    window.location.replace(localizePath("/", locale))
   }
 
   return (
     <div className="flex min-h-full flex-col">
       <header className="sticky top-0 z-10 border-b border-[var(--color-line)] bg-[var(--color-raised)]/95 px-4 py-3 backdrop-blur sm:px-6">
-        <h1 className="text-lg font-semibold">Account settings</h1>
+        <h1 className="text-lg font-semibold">{t.title}</h1>
         <p className="text-xs text-[var(--color-muted)]">
-          {account.email} · {account.accountType === "business" ? "Business" : "Personal"} account since{" "}
-          {new Date(account.createdAt).toLocaleDateString("en", { dateStyle: "medium" })}
+          {format(t.summary, {
+            email: account.email,
+            type: account.accountType === "business" ? t.business : t.personal,
+            date: formatDate(account.createdAt, locale),
+          })}
         </p>
       </header>
 
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 p-4 sm:p-6">
-        <Group title="Profile">
+        <Group title={t.profile}>
           <form onSubmit={saveProfile} className="flex flex-col gap-4">
-            <TextInput label="Username" value={username} onChange={setUsername} hint="3-32 letters, numbers, dots, dashes or underscores." />
-            <TextInput label="Email" value={account.email} onChange={() => {}} disabled hint="Write to us if you need to change your account email." />
+            <TextInput label={t.username} value={username} onChange={setUsername} hint={t.usernameHint} />
+            <TextInput label={t.email} value={account.email} onChange={() => {}} disabled hint={t.emailHint} />
             <div className="flex items-center gap-3">
               <button type="submit" className={primary} disabled={profile.kind === "busy" || username.trim() === account.username}>
                 {profile.kind === "busy" && <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />}
-                Save
+                {t.save}
               </button>
               <StatusText status={profile} />
             </div>
           </form>
         </Group>
 
+        <Group title={t.language} description={t.languageHint}>
+          <select
+            aria-label={t.language}
+            value={locale}
+            onChange={(e) => isLocale(e.target.value) && setLocale(e.target.value)}
+            className="h-10 w-fit cursor-pointer rounded-lg border border-[var(--color-line)] bg-[var(--color-raised)] px-3 text-sm outline-none focus:border-[var(--color-secondary)]"
+          >
+            {LOCALES.map((l) => (
+              <option key={l} value={l} lang={LOCALE_META[l].hreflang}>
+                {LOCALE_META[l].name}
+              </option>
+            ))}
+          </select>
+        </Group>
+
         <Group
-          title={account.hasPassword ? "Change password" : "Set a password"}
+          title={account.hasPassword ? t.changePassword : t.setPasswordTitle}
           description={
             account.hasPassword
-              ? "Other devices are signed out when you change it."
-              : `You sign in with ${account.providers.map((p) => PROVIDER_NAME[p] ?? p).join(" or ")}. Add a password to also sign in with your email.`
+              ? t.changePasswordHint
+              : format(t.setPasswordHint, { providers: account.providers.map((p) => PROVIDER_NAME[p] ?? p).join(t.or) })
           }
         >
           <form onSubmit={savePassword} className="flex flex-col gap-4">
@@ -157,7 +183,7 @@ export function AccountSettings({ initial }: { initial: Account }) {
             <input type="text" name="username" autoComplete="username" value={account.email} readOnly hidden />
             {account.hasPassword && (
               <label className="flex flex-col gap-1.5 text-sm font-medium">
-                Current password
+                {t.currentPassword}
                 <input
                   type="password"
                   autoComplete="current-password"
@@ -169,18 +195,18 @@ export function AccountSettings({ initial }: { initial: Account }) {
             )}
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="flex flex-col gap-1.5 text-sm font-medium">
-                New password
+                {t.newPassword}
                 <input
                   type="password"
                   autoComplete="new-password"
                   value={next}
                   onChange={(e) => setNext(e.target.value)}
-                  placeholder="At least 8 characters"
+                  placeholder={t.passwordPlaceholder}
                   className="h-10 rounded-lg border border-[var(--color-line)] bg-[var(--color-raised)] px-3 text-sm font-normal outline-none placeholder:text-[var(--color-muted)]/70 focus:border-[var(--color-secondary)]"
                 />
               </label>
               <label className="flex flex-col gap-1.5 text-sm font-medium">
-                Confirm new password
+                {t.confirmPassword}
                 <input
                   type="password"
                   autoComplete="new-password"
@@ -193,33 +219,33 @@ export function AccountSettings({ initial }: { initial: Account }) {
             <div className="flex flex-wrap items-center gap-3">
               <button type="submit" className={primary} disabled={password.kind === "busy" || !next || (account.hasPassword && !current)}>
                 {password.kind === "busy" && <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />}
-                {account.hasPassword ? "Change password" : "Set password"}
+                {account.hasPassword ? t.changePassword : t.setPassword}
               </button>
               <StatusText status={password} />
             </div>
           </form>
         </Group>
 
-        <Group title="Sign-in" description="Where your account is signed in and how.">
+        <Group title={t.signIn} description={t.signInHint}>
           <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
-            <dt className="text-[var(--color-muted)]">Methods</dt>
-            <dd className="m-0">{[account.hasPassword && "Email and password", ...account.providers.map((p) => PROVIDER_NAME[p] ?? p)].filter(Boolean).join(", ")}</dd>
-            <dt className="text-[var(--color-muted)]">Other devices</dt>
-            <dd className="m-0">{account.otherSessions === 0 ? "None. Only this browser is signed in." : `${account.otherSessions} signed in`}</dd>
+            <dt className="text-[var(--color-muted)]">{t.methods}</dt>
+            <dd className="m-0">{[account.hasPassword && t.emailAndPassword, ...account.providers.map((p) => PROVIDER_NAME[p] ?? p)].filter(Boolean).join(", ")}</dd>
+            <dt className="text-[var(--color-muted)]">{t.otherDevices}</dt>
+            <dd className="m-0">{account.otherSessions === 0 ? t.noOtherDevices : format(t.devicesSignedIn, { n: account.otherSessions })}</dd>
           </dl>
           <div className="flex flex-wrap items-center gap-3">
             <button type="button" onClick={signOutOthers} className={ghost} disabled={account.otherSessions === 0 || sessions.kind === "busy"}>
               {sessions.kind === "busy" && <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />}
-              Sign out other devices
+              {t.signOutOthers}
             </button>
             <StatusText status={sessions} />
           </div>
         </Group>
 
-        <Group title="Privacy">
+        <Group title={t.privacy}>
           <Toggle
-            label="Help improve Apex"
-            description="Allow Apex to use your bots and conversations to improve its models. Optional, and off unless you choose it."
+            label={t.training}
+            description={t.trainingHint}
             checked={account.allowTraining}
             onChange={setAllowTraining}
             disabled={training.kind === "busy"}
@@ -229,20 +255,17 @@ export function AccountSettings({ initial }: { initial: Account }) {
 
         <section className="flex flex-col gap-4 rounded-2xl border border-red-500/40 p-5 sm:p-6">
           <div className="flex flex-col gap-1">
-            <h2 className="text-base font-semibold">Delete account</h2>
-            <p className="text-sm text-[var(--color-muted)]">
-              Permanently deletes your account, and the workspaces where you're the only member: their assistant, knowledge and settings. The widget stops
-              working on your website. This can't be undone.
-            </p>
+            <h2 className="text-base font-semibold">{t.deleteTitle}</h2>
+            <p className="text-sm text-[var(--color-muted)]">{t.deleteText}</p>
           </div>
           {!deleting ? (
             <button type="button" onClick={() => setDeleting(true)} className={`${ghost} border-red-500/50 text-red-600 hover:border-red-500 dark:text-red-400`}>
-              Delete my account
+              {t.deleteStart}
             </button>
           ) : (
             <div className="flex flex-col gap-3">
               <label className="flex flex-col gap-1.5 text-sm font-medium">
-                Type {account.email} to confirm
+                {format(t.deleteConfirm, { email: account.email })}
                 <input
                   value={confirmEmail}
                   onChange={(e) => setConfirmEmail(e.target.value)}
@@ -258,7 +281,7 @@ export function AccountSettings({ initial }: { initial: Account }) {
                   className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg border-0 bg-red-600 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {danger.kind === "busy" && <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />}
-                  Delete permanently
+                  {t.deleteNow}
                 </button>
                 <button
                   type="button"
@@ -269,7 +292,7 @@ export function AccountSettings({ initial }: { initial: Account }) {
                   }}
                   className={ghost}
                 >
-                  Cancel
+                  {t.cancel}
                 </button>
                 <StatusText status={danger} />
               </div>

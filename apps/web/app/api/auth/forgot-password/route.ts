@@ -1,3 +1,4 @@
+import { requestLocale } from "@/lib/i18n/server"
 import { AuthError, requestPasswordReset } from "@apex/db"
 import { db } from "@/lib/db"
 import { authErrorResponse, readJson, requestMeta } from "@/lib/auth"
@@ -9,7 +10,7 @@ export async function POST(request: Request) {
     const { email } = await readJson(request)
     try {
       const sent = await requestPasswordReset(db(), email, await requestMeta())
-      if (sent) await sendPasswordResetCode(sent.email, sent.code)
+      if (sent) await sendPasswordResetCode(sent.email, sent.code, await requestLocale())
     } catch (err) {
       // only existing accounts are rate limited, so saying so would reveal the account
       if (!(err instanceof AuthError && err.code === "too_many_attempts")) throw err

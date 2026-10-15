@@ -24,6 +24,7 @@ import {
   type Lang,
   type LauncherIcon,
 } from "@apex/db/bot-settings"
+import { useI18n } from "@/components/i18n/provider"
 
 export type PreviewView = "welcome" | "conversation" | "lead"
 
@@ -109,6 +110,8 @@ export function WidgetPreview({
   /** Frame height in px; defaults to a full browser window. */
   height?: number
 }) {
+  // the site dictionary: this preview also runs on the marketing pages
+  const { t: site } = useI18n()
   const { general, appearance: a, messages: m, behavior: b, handoff } = settings
   const t = COPY[lang]
   const theme = a.theme === "auto" ? (dark ? "dark" : "light") : a.theme
@@ -273,7 +276,7 @@ export function WidgetPreview({
 
   const panel = open && (
     <section
-      aria-label="Chat panel preview"
+      aria-label={site.showcase.panel}
       className="absolute flex flex-col overflow-hidden"
       style={
         fullscreen
@@ -303,7 +306,7 @@ export function WidgetPreview({
           </span>
         </span>
         <RotateCcw className="h-4 w-4" style={{ color: c.muted }} />
-        <button type="button" onClick={onToggle} aria-label="Close preview panel" className="grid h-7 w-7 cursor-pointer place-items-center rounded-md border-0 bg-transparent" style={{ color: c.muted }}>
+        <button type="button" onClick={onToggle} aria-label={site.showcase.closePanel} className="grid h-7 w-7 cursor-pointer place-items-center rounded-md border-0 bg-transparent" style={{ color: c.muted }}>
           <X className="h-4 w-4" />
         </button>
       </div>
@@ -335,7 +338,7 @@ export function WidgetPreview({
     <button
       type="button"
       onClick={onToggle}
-      aria-label={open ? "Close preview panel" : "Open preview panel"}
+      aria-label={open ? site.showcase.closePanel : site.showcase.openPanel}
       className="absolute flex cursor-pointer items-center justify-center gap-2 border-0 font-semibold transition-transform hover:scale-105"
       style={{
         ...side(edgeX),

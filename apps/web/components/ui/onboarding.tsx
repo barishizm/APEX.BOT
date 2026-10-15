@@ -5,6 +5,9 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { ArrowUp, CircleAlert, CircleCheck, Circle, LoaderCircle, Plus, Sparkles } from "lucide-react"
+import { useAppI18n } from "@/components/i18n/app-provider"
+import { format, localizePath } from "@/lib/i18n"
+import { plural } from "@/lib/i18n/format"
 import { cn } from "@/lib/utils"
 
 type Source = { id: string; status: "pending" | "syncing" | "ready" | "failed"; pages: number; chunks: number; error: string | null }
@@ -42,6 +45,8 @@ function Progress({ state, children }: { state: "done" | "active" | "todo" | "fa
 }
 
 export default function Onboarding() {
+  const { t: app, locale } = useAppI18n()
+  const t = app.setup.onboarding
   const router = useRouter()
   const [url, setUrl] = useState("")
   const [touched, setTouched] = useState(false)
@@ -55,7 +60,7 @@ export default function Onboarding() {
   const normalized = normalizeUrl(url)
   const error =
     serverError ??
-    (touched && !normalized ? (url.trim() ? "Enter a valid website URL, like www.example.com" : "Enter your website URL to customize your setup") : null)
+    (touched && !normalized ? (url.trim() ? t.urlInvalid : t.urlMissing) : null)
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -70,16 +75,16 @@ export default function Onboarding() {
         body: JSON.stringify({ kind: "website", url: normalized, allowOrigin: true }),
       })
       const data = await res.json().catch(() => ({}))
-      if (res.status === 401) return router.replace("/login")
+      if (res.status === 401) return router.replace(localizePath("/login", locale))
       if (!res.ok) {
-        setServerError(data.message ?? "Couldn't add this website. Try again")
+        setServerError(data.message ?? t.addFailed)
         return
       }
       setHost(new URL(normalized).hostname)
       setSource(data.source)
       setPhase(data.source.status === "ready" ? "ready" : data.source.status === "syncing" ? "reading" : "failed")
     } catch {
-      setServerError("Couldn't reach the server. Check your connection and try again")
+      setServerError(t.network)
     } finally {
       setSubmitting(false)
     }
@@ -118,7 +123,7 @@ export default function Onboarding() {
       className="grid min-h-screen gap-3 bg-[var(--color-surface)] p-3 text-[var(--color-text)] lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]"
     >
       <section className="relative flex min-h-[calc(100vh-24px)] flex-col rounded-2xl border border-[var(--color-line)] bg-[var(--color-raised)] px-6 py-8 sm:px-10 lg:px-12">
-        <Link href="/" className="logo" aria-label="Apex Bot home">
+        <Link href={localizePath("/", locale)} className="logo" aria-label={t.home}>
           <span className="logo__mark" />
         </Link>
 
@@ -134,26 +139,24 @@ export default function Onboarding() {
             <h1 className="text-[clamp(2rem,3.2vw,2.75rem)] font-semibold leading-[1.1] tracking-tight">
               {phase === "form" ? (
                 <>
-                  Confirm your website
+                  {t.titleForm[0]}
                   <br />
-                  for a quick start
+                  {t.titleForm[1]}
                 </>
               ) : phase === "failed" ? (
-                "We couldn't read that site"
+                t.titleFailed
               ) : (
-                "Learning your website"
+                t.titleReading
               )}
             </h1>
             <p style={{ marginTop: 20 }} className="text-lg leading-relaxed text-[var(--color-muted)]">
-              {phase === "failed"
-                ? "You can try another address, or continue and add your content as text in the dashboard."
-                : "Apex reads your pages to learn your products, policies and tone. Your assistant stays private until you add it to your site."}
+              {phase === "failed" ? t.ledeFailed : t.lede}
             </p>
 
             {phase === "form" || phase === "failed" ? (
               <>
                 <label htmlFor="website-url" className="mt-10 block text-sm font-medium">
-                  Your website URL
+                  {t.urlLabel}
                 </label>
                 <input
                   id="website-url"
@@ -169,7 +172,7 @@ export default function Onboarding() {
                     setServerError(null)
                   }}
                   onBlur={() => setTouched(true)}
-                  placeholder="www.example-website.com"
+                  placeholder={t.urlPlaceholder}
                   aria-invalid={!!error}
                   aria-describedby={error ? "website-url-error" : undefined}
                   className={cn(
@@ -186,14 +189,12 @@ export default function Onboarding() {
               </>
             ) : (
               <ul role="status" aria-live="polite" style={{ marginTop: 32 }} className="flex flex-col gap-3 text-[0.9375rem]">
-                <Progress state="done">Created your assistant</Progress>
-                <Progress state="done">Allowed {host} to show the widget</Progress>
+                <Progress state="done">{t.created}</Progress>
+                <Progress state="done">{format(t.allowed, { host })}</Progress>
                 <Progress state={phase === "ready" ? "done" : "active"}>
-                  {phase === "ready"
-                    ? `Read ${source?.pages ?? 0} page${source?.pages === 1 ? "" : "s"} from your website`
-                    : "Reading your pages… this usually takes under a minute"}
+                  {phase === "ready" ? plural(source?.pages ?? 0, t.readPages, locale) : t.reading}
                 </Progress>
-                <Progress state={phase === "ready" ? "done" : "todo"}>{phase === "ready" ? "All set. Opening your dashboard…" : "Ready to answer"}</Progress>
+                <Progress state={phase === "ready" ? "done" : "todo"}>{phase === "ready" ? t.allSet : t.readyToAnswer}</Progress>
               </ul>
             )}
 
@@ -204,7 +205,7 @@ export default function Onboarding() {
                   onClick={() => router.push("/dashboard?welcome=1")}
                   className="h-12 cursor-pointer rounded-lg border-0 bg-[var(--color-primary)] px-7 text-[0.9375rem] font-semibold text-[var(--color-on-primary)] transition-opacity hover:opacity-85"
                 >
-                  Go to dashboard
+                  {t.goToDashboard}
                 </button>
               ) : (
                 <button
@@ -213,7 +214,7 @@ export default function Onboarding() {
                   className="inline-flex h-12 cursor-pointer items-center gap-2 rounded-lg border-0 bg-[var(--color-primary)] px-7 text-[0.9375rem] font-semibold text-[var(--color-on-primary)] transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:bg-[var(--color-bubble)] disabled:text-[var(--color-muted)] disabled:opacity-100"
                 >
                   {(submitting || busy) && <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />}
-                  {busy ? "Setting up…" : phase === "failed" ? "Try again" : "Continue"}
+                  {busy ? t.settingUp : phase === "failed" ? t.tryAgain : t.continue}
                 </button>
               )}
               {phase !== "ready" && (
@@ -222,7 +223,7 @@ export default function Onboarding() {
                 onClick={() => router.push(phase === "reading" ? "/dashboard/knowledge" : "/dashboard")}
                 className="h-12 cursor-pointer rounded-lg border-0 bg-transparent px-5 text-[0.9375rem] font-semibold text-[var(--color-text)] transition-opacity hover:opacity-70"
               >
-                {phase === "reading" ? "Continue in the background" : phase === "failed" ? "Continue anyway" : "Skip for now"}
+                {phase === "reading" ? t.background : phase === "failed" ? t.anyway : t.skip}
               </button>
               )}
             </div>
@@ -236,9 +237,10 @@ export default function Onboarding() {
 }
 
 export function WidgetPreview() {
+  const t = useAppI18n().t.setup.onboarding.preview
   return (
     <aside
-      aria-label="Widget preview"
+      aria-label={t.label}
       className="relative hidden flex-col items-center justify-center gap-10 overflow-hidden rounded-2xl bg-[var(--color-secondary)] p-8 lg:flex"
     >
       {/* soft light blobs, same indigo family as the brand accent */}
@@ -252,7 +254,7 @@ export function WidgetPreview() {
       />
 
       <span className="relative rounded-full bg-[var(--color-primary)] px-5 py-2.5 text-[0.9375rem] text-[var(--color-on-primary)]">
-        Website widget preview
+        {t.badge}
       </span>
 
       <div className="relative flex w-full max-w-[24rem] flex-col rounded-[28px] bg-[var(--color-surface)] p-5 shadow-2xl">
@@ -261,24 +263,24 @@ export function WidgetPreview() {
             <Sparkles className="h-4 w-4" aria-hidden="true" />
             <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-[var(--color-raised)] bg-green-500" />
           </span>
-          <span className="text-sm font-semibold">Apex Assistant</span>
+          <span className="text-sm font-semibold">{t.assistant}</span>
         </div>
 
         <div className="mt-5 space-y-3">
           <p className="max-w-[85%] rounded-2xl rounded-bl-md bg-[var(--color-bubble)] px-4 py-3 text-sm leading-snug">
-            Yes. If the bag is unopened, you can return it free of charge within 14 days of delivery.
+            {t.answer}
           </p>
           <p className="ml-auto w-fit max-w-[85%] rounded-2xl rounded-br-md bg-[var(--color-primary)] px-4 py-3 text-sm leading-snug text-[var(--color-on-primary)]">
-            It looks great. Thanks!
+            {t.reply}
           </p>
-          <p className="text-right text-xs text-[var(--color-muted)]">Read</p>
+          <p className="text-right text-xs text-[var(--color-muted)]">{t.read}</p>
         </div>
 
         <div className="mt-10 flex items-center gap-3 rounded-full border border-[var(--color-line)] bg-[var(--color-raised)] p-1.5 pl-2">
           <span className="flex h-9 w-9 items-center justify-center text-[var(--color-muted)]">
             <Plus className="h-5 w-5" aria-hidden="true" />
           </span>
-          <span className="flex-1 text-sm text-[var(--color-muted)]">Write a message...</span>
+          <span className="flex-1 text-sm text-[var(--color-muted)]">{t.input}</span>
           <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--color-bubble)] text-[var(--color-muted)]">
             <ArrowUp className="h-4 w-4" aria-hidden="true" />
           </span>

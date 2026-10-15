@@ -4,9 +4,13 @@ import { WidgetStudio } from "@/components/widget-studio/studio"
 import { requireVerifiedUser } from "@/lib/auth"
 import { botJson } from "@/lib/bot"
 import { currentBot } from "@/lib/dashboard"
+import { getAppDictionary } from "@/lib/i18n/app"
+import { requestLocale } from "@/lib/i18n/server"
 import { apiUrl } from "@/lib/site"
 
-export const metadata: Metadata = { title: "Customize widget" }
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: getAppDictionary(await requestLocale()).studio.title }
+}
 
 export default async function WidgetPage({ searchParams }: { searchParams: Promise<{ section?: string; guide?: string }> }) {
   const { section, guide } = await searchParams

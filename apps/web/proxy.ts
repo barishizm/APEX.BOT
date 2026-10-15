@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
-import { APP_PATHS, DEFAULT_LOCALE, isLocale, LOCALE_COOKIE, localizePath, matchLocale, splitLocale } from "@/lib/i18n/config"
+import { APP_PATHS, DEFAULT_LOCALE, isLocale, LOCALE_COOKIE, localizePath, matchLocale, splitLocale, type Locale } from "@/lib/i18n/config"
 
 const SESSION_COOKIE = "apex_session"
 const SIGNED_IN_COOKIE = "apex_signed_in"
@@ -12,7 +12,15 @@ const PROTECTED_PATHS = ["/dashboard", "/onboarding", "/verify-email"]
 
 const under = (pathname: string, roots: string[]) => roots.some((root) => pathname === root || pathname.startsWith(`${root}/`))
 
-// An explicit choice (the language switcher's cookie) wins over the browser's languages
+// The app pages (no locale in their URLs) follow the language the visitor last browsed in
+function remember(request: NextRequest, response: NextResponse, locale: Locale) {
+  if (request.cookies.get(LOCALE_COOKIE)?.value !== locale) {
+    response.cookies.set(LOCALE_COOKIE, locale, { path: "/", maxAge: 60 * 60 * 24 * 365, sameSite: "lax" })
+  }
+  return response
+}
+
+// The remembered language (switcher choice or last visit) wins over the browser's languages
 function preferredLocale(request: NextRequest) {
   const chosen = request.cookies.get(LOCALE_COOKIE)?.value
   return isLocale(chosen) ? chosen : (matchLocale(request.headers.get("accept-language")) ?? DEFAULT_LOCALE)
@@ -38,7 +46,7 @@ function route(request: NextRequest, signedIn: boolean) {
 
   // /en/pricing duplicates /pricing: send it to the one canonical URL
   if (prefixed && locale === DEFAULT_LOCALE) return to(path + search, 308)
-  if (prefixed) return NextResponse.next()
+  if (prefixed) return remember(request, NextResponse.next(), locale)
 
   // An unprefixed URL is the default language, unless the visitor prefers another one we have.
   // Crawlers send no cookie and usually no Accept-Language, so they always get the canonical page.
@@ -47,7 +55,7 @@ function route(request: NextRequest, signedIn: boolean) {
 
   const url = request.nextUrl.clone()
   url.pathname = `/${DEFAULT_LOCALE}${pathname === "/" ? "" : pathname}`
-  return NextResponse.rewrite(url)
+  return remember(request, NextResponse.rewrite(url), DEFAULT_LOCALE)
 }
 
 export function proxy(request: NextRequest) {
