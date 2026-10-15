@@ -1,0 +1,27 @@
+# Render Blueprint for the chat API (apps/api). The web app is deployed on Vercel.
+# Secrets marked sync:false are entered in the Render dashboard, never committed.
+services:
+  - type: web
+    name: apex-api
+    runtime: node
+    plan: free
+    region: frankfurt
+    branch: main
+    buildCommand: npm ci && npm run build -w @apex/widget
+    startCommand: npm start -w @apex/api
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 24
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_SSL
+        value: require
+      - key: TRUST_PROXY
+        value: "1"
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: APEX_MODEL
+        value: claude-haiku-5-5
+      - key: RESEND_API_KEY
+        sync: false
