@@ -12,6 +12,7 @@ import {
   UserPlus,
   type LucideIcon,
 } from "lucide-react";
+import Image from "next/image";
 import { CopySnippet } from "@/components/copy-snippet";
 import { RegisterButton } from "@/components/ui/login-button";
 import { WidgetShowcase } from "@/components/landing/widget-showcase";
@@ -19,14 +20,17 @@ import { embedSnippet } from "@/lib/site";
 
 const STEPS = [
   {
+    image: "/marketing/step1.jpg",
     title: "Point it at your website",
     text: "Apex reads your pages and builds a private knowledge base. Add text for anything that isn't online yet, like internal FAQs.",
   },
   {
+    image: "/marketing/step2.jpg",
     title: "Make it yours",
     text: "Name, colors, launcher, greeting, tone, the AI model and topics to avoid. A live preview shows every change before you save.",
   },
   {
+    image: "/marketing/step3.jpg",
     title: "Paste one line",
     text: "Add the script tag before </body>. It works on WordPress, Shopify, Webflow or plain HTML, and only on the domains you allow.",
   },
@@ -128,6 +132,24 @@ function SectionHead({ eyebrow, title, text, center }: { eyebrow: string; title:
 export function LandingSections({ signedIn }: { signedIn: boolean }) {
   return (
     <>
+      <section className="night" aria-labelledby="night-title">
+        <figure className="night__frame">
+          <Image
+            src="/marketing/night.jpg"
+            alt="A closed shop at night, a laptop glowing on the counter by a rain-streaked window"
+            width={2048}
+            height={1152}
+            sizes="(max-width: 1200px) 100vw, 1200px"
+            className="night__img"
+          />
+          <figcaption className="night__caption">
+            <p className="eyebrow">After hours</p>
+            <h2 id="night-title">The shop is closed. The answers aren&apos;t.</h2>
+            <p>Visitors ask about shipping at 2 a.m. Apex replies from your own pages while you sleep.</p>
+          </figcaption>
+        </figure>
+      </section>
+
       <section id="how-it-works" className="section-block" aria-labelledby="how-title">
         <div className="section-head">
           <p className="eyebrow">How it works</p>
@@ -136,6 +158,7 @@ export function LandingSections({ signedIn }: { signedIn: boolean }) {
         <ol className="grid3 steps">
           {STEPS.map((step, i) => (
             <li key={step.title}>
+              <Image src={step.image} alt="" width={960} height={720} sizes="(max-width: 760px) 100vw, 380px" className="steps__img" />
               <span className="steps__n">0{i + 1}</span>
               <h3>{step.title}</h3>
               <p>{step.text}</p>
@@ -224,6 +247,7 @@ export function LandingSections({ signedIn }: { signedIn: boolean }) {
       </section>
 
       <section className="closing" aria-labelledby="closing-title">
+        <Image src="/marketing/closing.jpg" alt="" fill sizes="(max-width: 1200px) 100vw, 1200px" className="closing__bg" />
         <h2 id="closing-title">Give your visitors answers tonight.</h2>
         <p className="lede">Set up takes a few minutes. Free while Apex is in beta.</p>
         <div className="actions">
