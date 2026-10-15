@@ -292,7 +292,15 @@ export class Widget {
   mount(): void {
     this.host.id = "apex-bot";
     const shadow = this.host.attachShadow({ mode: "closed" });
-    shadow.append(h("style", {}, css), this.root);
+    // A constructed stylesheet is exempt from `style-src`, so strict-CSP hosts don't need 'unsafe-inline'.
+    try {
+      const sheet = new CSSStyleSheet();
+      sheet.replaceSync(css);
+      shadow.adoptedStyleSheets = [sheet];
+      shadow.append(this.root);
+    } catch {
+      shadow.append(h("style", {}, css), this.root);
+    }
     document.body.append(this.host);
 
     const b = this.ui?.behavior;
