@@ -4,18 +4,25 @@ import { redirect } from "next/navigation"
 import { isIP } from "node:net"
 import { AuthError, getSession, type NewSession, type RequestMeta } from "@apex/db"
 import { db, schemaMissing } from "@/lib/db"
+import { translateMessage } from "@/lib/i18n/messages"
+import { requestLocale } from "@/lib/i18n/server"
 
 export const SESSION_COOKIE = "apex_session"
+// Mirrors lib/signed-in.ts, which is client-only
+export const SIGNED_IN_COOKIE = "apex_signed_in"
 
 export async function setSessionCookie(session: NewSession) {
-  ;(await cookies()).set(SESSION_COOKIE, session.token, {
-    httpOnly: true,
+  const jar = await cookies()
+  const options = {
     secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    sameSite: "lax" as const,
     path: "/",
     // without "keep me signed in" it is a browser-session cookie
     ...(session.persistent ? { expires: session.expiresAt } : {}),
-  })
+  }
+  jar.set(SESSION_COOKIE, session.token, { ...options, httpOnly: true })
+  // readable hint for the static marketing pages; see lib/signed-in.ts
+  jar.set(SIGNED_IN_COOKIE, "1", options)
 }
 
 export async function sessionToken() {
@@ -56,7 +63,9 @@ export async function requireSession() {
 }
 
 export async function clearSessionCookie() {
-  ;(await cookies()).delete(SESSION_COOKIE)
+  const jar = await cookies()
+  jar.delete(SESSION_COOKIE)
+  jar.delete(SIGNED_IN_COOKIE)
 }
 
 export async function requestMeta(): Promise<RequestMeta> {
@@ -91,13 +100,20 @@ const STATUS: Record<AuthError["code"], number> = {
   already_verified: 409,
 }
 
-export function authErrorResponse(err: unknown) {
+// A JSON error in the requester's language; `error` stays a stable code for the client
+export async function errorJson(code: string, message: string, init: ResponseInit & { extra?: Record<string, unknown> } = {}) {
+  const { extra, ...rest } = init
+  return Response.json({ error: code, message: translateMessage(message, await requestLocale()), ...extra }, rest)
+}
+
+export async function authErrorResponse(err: unknown) {
   if (err instanceof AuthError) {
-    return Response.json(
-      { error: err.code, message: err.message },
+    return errorJson(
+      err.code,
+      err.message,
       { status: STATUS[err.code], headers: err.retryAfterSeconds ? { "retry-after": String(err.retryAfterSeconds) } : {} },
     )
   }
   console.error("[auth]", err)
-  return Response.json({ error: "server_error", message: "Something went wrong. Try again" }, { status: 500 })
+  return errorJson("server_error", "Something went wrong. Try again", { status: 500 })
 }

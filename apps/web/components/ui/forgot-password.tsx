@@ -5,14 +5,16 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { ArrowLeft, CircleAlert, CircleCheck, LoaderCircle } from "lucide-react"
+import { useAppI18n } from "@/components/i18n/app-provider"
+import { localizePath } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
-async function postJson(path: string, body: object) {
+async function postJson(path: string, body: object, networkError: string) {
   try {
     const res = await fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) })
     return { ok: res.ok, data: await res.json().catch(() => ({})) }
   } catch {
-    return { ok: false, data: { message: "Couldn't reach the server. Check your connection and try again" } }
+    return { ok: false, data: { message: networkError } }
   }
 }
 
@@ -22,6 +24,9 @@ const primary =
   "inline-flex h-12 cursor-pointer items-center gap-2 rounded-lg border-0 bg-[var(--color-primary)] px-7 text-[0.9375rem] font-semibold text-[var(--color-on-primary)] transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-50"
 
 export default function ForgotPassword() {
+  const { t: app, locale } = useAppI18n()
+  const a = app.account
+  const t = a.reset
   const router = useRouter()
   const [step, setStep] = useState<"email" | "code" | "done">("email")
   const [email, setEmail] = useState("")
@@ -32,24 +37,24 @@ export default function ForgotPassword() {
 
   const requestCode = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return setError("Enter a valid email address")
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return setError(a.invalidEmail)
     setBusy(true)
     setError(null)
-    const { ok, data } = await postJson("/api/auth/forgot-password", { email })
+    const { ok, data } = await postJson("/api/auth/forgot-password", { email }, a.network)
     setBusy(false)
-    if (!ok) return setError(data.message ?? "Something went wrong. Try again")
+    if (!ok) return setError(data.message ?? a.generic)
     setStep("code")
   }
 
   const reset = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!/^\d{6}$/.test(code.trim())) return setError("Enter the 6-digit code from the email")
-    if (password.length < 8) return setError("Choose a password with at least 8 characters")
+    if (!/^\d{6}$/.test(code.trim())) return setError(t.codeInvalid)
+    if (password.length < 8) return setError(t.passwordShort)
     setBusy(true)
     setError(null)
-    const { ok, data } = await postJson("/api/auth/reset-password", { email, code, password })
+    const { ok, data } = await postJson("/api/auth/reset-password", { email, code, password }, a.network)
     setBusy(false)
-    if (!ok) return setError(data.message ?? "Something went wrong. Try again")
+    if (!ok) return setError(data.message ?? a.generic)
     setStep("done")
     setTimeout(() => router.push("/dashboard"), 1500)
   }
@@ -57,7 +62,7 @@ export default function ForgotPassword() {
   return (
     <main id="main" className="flex min-h-screen items-center justify-center bg-[var(--color-surface)] p-3 text-[var(--color-text)]">
       <section className="flex w-full max-w-[34rem] flex-col rounded-2xl border border-[var(--color-line)] bg-[var(--color-raised)] px-6 py-8 sm:px-10">
-        <Link href="/" className="logo" aria-label="Apex Bot home">
+        <Link href={localizePath("/", locale)} className="logo" aria-label={a.home}>
           <span className="logo__mark" />
         </Link>
 
@@ -65,15 +70,15 @@ export default function ForgotPassword() {
           {step === "done" ? (
             <div role="status" className="flex flex-col items-start gap-4">
               <CircleCheck className="h-12 w-12 text-green-600" aria-hidden="true" />
-              <h1 className="text-3xl font-semibold tracking-tight">Password updated</h1>
-              <p className="text-lg text-[var(--color-muted)]">You're signed in. Other devices were signed out. Taking you to your dashboard…</p>
+              <h1 className="text-3xl font-semibold tracking-tight">{t.doneTitle}</h1>
+              <p className="text-lg text-[var(--color-muted)]">{t.doneText}</p>
             </div>
           ) : step === "email" ? (
             <form onSubmit={requestCode} noValidate>
-              <h1 className="text-3xl font-semibold tracking-tight">Reset your password</h1>
-              <p className="mt-3 text-lg text-[var(--color-muted)]">Enter the email you signed up with and we'll send you a 6-digit code.</p>
+              <h1 className="text-3xl font-semibold tracking-tight">{t.title}</h1>
+              <p className="mt-3 text-lg text-[var(--color-muted)]">{t.lede}</p>
               <label htmlFor="reset-email" className="mt-8 block text-sm font-medium">
-                Email
+                {t.email}
               </label>
               <input
                 id="reset-email"
@@ -85,7 +90,7 @@ export default function ForgotPassword() {
                   setEmail(e.target.value)
                   setError(null)
                 }}
-                placeholder="jane@company.com"
+                placeholder={t.emailPlaceholder}
                 aria-invalid={!!error}
                 className={cn(input, error ? "border-red-500" : "border-[var(--color-line)] focus:border-[var(--color-secondary)]")}
               />
@@ -98,23 +103,23 @@ export default function ForgotPassword() {
               <div className="mt-8 flex flex-wrap items-center gap-4">
                 <button type="submit" disabled={busy} className={primary}>
                   {busy && <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />}
-                  Send code
+                  {t.sendCode}
                 </button>
-                <Link href="/login" className="inline-flex items-center gap-1.5 text-sm font-semibold no-underline hover:opacity-70">
+                <Link href={localizePath("/login", locale)} className="inline-flex items-center gap-1.5 text-sm font-semibold no-underline hover:opacity-70">
                   <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-                  Back to log in
+                  {t.back}
                 </Link>
               </div>
             </form>
           ) : (
             <form onSubmit={reset} noValidate>
-              <h1 className="text-3xl font-semibold tracking-tight">Check your email</h1>
+              <h1 className="text-3xl font-semibold tracking-tight">{t.checkEmail}</h1>
               <p className="mt-3 text-lg text-[var(--color-muted)]">
-                If an account exists for <strong className="break-all text-[var(--color-text)]">{email.trim()}</strong>, we've sent it a code. It expires in 15
-                minutes.
+                {t.sentPre} <strong className="break-all text-[var(--color-text)]">{email.trim()}</strong>
+                {t.sentPost}
               </p>
               <label htmlFor="reset-code" className="mt-8 block text-sm font-medium">
-                6-digit code
+                {t.code}
               </label>
               <input
                 id="reset-code"
@@ -131,7 +136,7 @@ export default function ForgotPassword() {
                 className={cn(input, "font-mono tracking-[0.3em]", "border-[var(--color-line)] focus:border-[var(--color-secondary)]")}
               />
               <label htmlFor="reset-password" className="mt-5 block text-sm font-medium">
-                New password
+                {t.newPassword}
               </label>
               <input
                 id="reset-password"
@@ -143,7 +148,7 @@ export default function ForgotPassword() {
                   setPassword(e.target.value)
                   setError(null)
                 }}
-                placeholder="At least 8 characters"
+                placeholder={t.passwordPlaceholder}
                 className={cn(input, "border-[var(--color-line)] focus:border-[var(--color-secondary)]")}
               />
               {error && (
@@ -155,7 +160,7 @@ export default function ForgotPassword() {
               <div className="mt-8 flex flex-wrap items-center gap-4">
                 <button type="submit" disabled={busy} className={primary}>
                   {busy && <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />}
-                  Set new password
+                  {t.submit}
                 </button>
                 <button
                   type="button"
@@ -166,7 +171,7 @@ export default function ForgotPassword() {
                   }}
                   className="cursor-pointer border-0 bg-transparent text-sm font-semibold text-[var(--color-text)] hover:opacity-70"
                 >
-                  Use a different email
+                  {t.differentEmail}
                 </button>
               </div>
             </form>

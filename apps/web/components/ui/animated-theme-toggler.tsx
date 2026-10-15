@@ -7,6 +7,7 @@ import { Moon, Sun } from "lucide-react"
 
 import { motion, AnimatePresence } from "framer-motion"
 
+import { useI18n } from "@/components/i18n/provider"
 import { cn } from "@/lib/utils"
 
 type AnimatedThemeTogglerProps = {
@@ -23,6 +24,7 @@ const isDark = () => {
 }
 
 export const AnimatedThemeToggler = ({ className }: AnimatedThemeTogglerProps) => {
+  const { t } = useI18n()
   const buttonRef = useRef<HTMLButtonElement>(null)
   const [darkMode, setDarkMode] = useState(false)
 
@@ -87,7 +89,7 @@ export const AnimatedThemeToggler = ({ className }: AnimatedThemeTogglerProps) =
     <button
       ref={buttonRef}
       onClick={onToggle}
-      aria-label="Switch theme"
+      aria-label={t.common.switchTheme}
       className={cn(
         "flex items-center justify-center size-9 border border-[var(--color-line)] bg-transparent p-0 rounded-[var(--radius-md)] outline-none focus:outline-none active:outline-none focus:ring-0 cursor-pointer text-[var(--color-text)]",
         className

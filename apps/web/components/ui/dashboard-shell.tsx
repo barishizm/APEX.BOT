@@ -4,18 +4,19 @@ import { BookOpen, CircleHelp, LayoutDashboard, ListChecks, MessageSquareText, P
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useEffect, useState, type ReactNode } from "react"
+import { useAppI18n } from "@/components/i18n/app-provider"
 import { CommandPalette } from "./command-palette"
 import { PrismFluxLoader } from "./prism-flux-loader"
 import { ProfileMenu } from "./profile-menu"
 
 export type NavLabel = "Overview" | "Knowledge" | "Conversations" | "Widget" | "Setup" | "Settings"
 
-const NAV: { label: NavLabel; icon: LucideIcon; href: string }[] = [
-  { label: "Overview", icon: LayoutDashboard, href: "/dashboard" },
-  { label: "Knowledge", icon: BookOpen, href: "/dashboard/knowledge" },
-  { label: "Conversations", icon: MessageSquareText, href: "/dashboard/conversations" },
-  { label: "Widget", icon: Palette, href: "/dashboard/widget" },
-  { label: "Setup", icon: ListChecks, href: "/dashboard/onboarding/list" },
+const NAV: { id: NavLabel; key: "overview" | "knowledge" | "conversations" | "widget" | "setup"; icon: LucideIcon; href: string }[] = [
+  { id: "Overview", key: "overview", icon: LayoutDashboard, href: "/dashboard" },
+  { id: "Knowledge", key: "knowledge", icon: BookOpen, href: "/dashboard/knowledge" },
+  { id: "Conversations", key: "conversations", icon: MessageSquareText, href: "/dashboard/conversations" },
+  { id: "Widget", key: "widget", icon: Palette, href: "/dashboard/widget" },
+  { id: "Setup", key: "setup", icon: ListChecks, href: "/dashboard/onboarding/list" },
 ]
 
 const pill = "flex h-9 items-center gap-2 rounded-full border border-[var(--color-line)] bg-[var(--color-raised)] px-3 text-sm"
@@ -70,6 +71,8 @@ export function DashboardShell({
   /** Label of the rail item to highlight. */
   active?: NavLabel
 }) {
+  const { t: app, href } = useAppI18n()
+  const t = app.shell
   const router = useRouter()
   const [loading, setLoading] = useState(intro)
   const [paletteOpen, setPaletteOpen] = useState(false)
@@ -106,14 +109,14 @@ export function DashboardShell({
         </div>
       )}
       <header className="flex h-14 shrink-0 items-center gap-3 pr-3">
-        <Link href="/dashboard" aria-label="Apex Bot dashboard" className="-mr-3 flex h-14 w-16 shrink-0 items-center justify-center">
+        <Link href="/dashboard" aria-label={t.home} className="-mr-3 flex h-14 w-16 shrink-0 items-center justify-center">
           <img src="/brand/mini-logo.png" alt="" className="block h-11 w-11 rounded-xl" />
         </Link>
 
         {!complete && (
           <Link href="/dashboard/onboarding/list" className={`${pill} text-[var(--color-text)] no-underline max-sm:hidden`}>
             <ProgressRing done={setup.done} total={setup.total} />
-            <span>Complete setup</span>
+            <span>{t.completeSetup}</span>
             <span className="text-[var(--color-muted)]">
               ({setup.done}/{setup.total})
             </span>
@@ -126,28 +129,28 @@ export function DashboardShell({
           className="mx-auto flex h-9 w-full max-w-[28rem] cursor-pointer items-center gap-2 rounded-full border border-[var(--color-line)] bg-[var(--color-raised)] px-4 text-sm text-[var(--color-muted)] transition-colors hover:border-[var(--color-muted)]/60"
         >
           <Search className="h-4 w-4" aria-hidden />
-          <span className="truncate">Search or go to…</span>
+          <span className="truncate">{t.search}</span>
           <kbd className="ml-auto font-sans text-xs max-sm:hidden">⌘ K</kbd>
         </button>
 
-        <a href="/docs" target="_blank" rel="noopener noreferrer" className={`${pill} ml-auto text-[var(--color-text)] no-underline max-md:hidden`}>
-          Docs
+        <a href={href("/docs")} target="_blank" rel="noopener noreferrer" className={`${pill} ml-auto text-[var(--color-text)] no-underline max-md:hidden`}>
+          {t.docs}
         </a>
       </header>
 
       <div className="flex min-h-0 flex-1">
-        <nav aria-label="Main" className="flex w-16 shrink-0 flex-col items-center gap-2 py-2">
-          {NAV.map(({ label, icon: Icon, href }) => (
-            <RailLink key={label} label={label} href={href} active={label === active}>
+        <nav aria-label={t.mainNav} className="flex w-16 shrink-0 flex-col items-center gap-2 py-2">
+          {NAV.map(({ id, key, icon: Icon, href: to }) => (
+            <RailLink key={id} label={t.nav[key]} href={to} active={id === active}>
               <Icon className="h-5 w-5" aria-hidden />
             </RailLink>
           ))}
 
           <div className="mt-auto flex flex-col items-center gap-2">
-            <RailLink label="Account settings" href="/dashboard/settings" active={active === "Settings"}>
+            <RailLink label={t.nav.settings} href="/dashboard/settings" active={active === "Settings"}>
               <Settings className="h-5 w-5" aria-hidden />
             </RailLink>
-            <RailLink label="Help & docs" href="/docs" external>
+            <RailLink label={t.nav.help} href={href("/docs")} external>
               <CircleHelp className="h-5 w-5" aria-hidden />
             </RailLink>
             <ProfileMenu name={user.username} email={user.email} />

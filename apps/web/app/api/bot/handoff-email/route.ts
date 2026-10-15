@@ -1,3 +1,4 @@
+import { requestLocale } from "@/lib/i18n/server"
 import { startHandoffVerification } from "@apex/db"
 import { db } from "@/lib/db"
 import { readJson } from "@/lib/auth"
@@ -10,7 +11,7 @@ export async function POST(request: Request) {
     const user = await requireApiUser()
     const { email } = await readJson(request)
     const sent = await startHandoffVerification(db(), user.id, email)
-    await sendHandoffConfirmationCode(sent.email, sent.code)
+    await sendHandoffConfirmationCode(sent.email, sent.code, await requestLocale())
     return Response.json({ email: sent.email })
   } catch (err) {
     return botErrorResponse(err)

@@ -13,13 +13,16 @@ import {
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useRef, useState } from "react"
+import { useAppI18n } from "@/components/i18n/app-provider"
 import { Group, TextArea, TextInput } from "@/components/widget-studio/fields"
+import { format } from "@/lib/i18n"
+import { formatNumber, plural, timeAgo } from "@/lib/i18n/format"
 import type { SourceJson } from "@/lib/knowledge"
 import { cn } from "@/lib/utils"
 
 type Limits = { sources: number; websitePages: number; textChars: number; title: number }
 
-async function send(path: string, method: string, body?: object) {
+async function send(path: string, method: string, offline: string, body?: object) {
   try {
     const res = await fetch(path, {
       method,
@@ -29,30 +32,27 @@ async function send(path: string, method: string, body?: object) {
     const data = res.status === 204 ? {} : await res.json().catch(() => ({}))
     return { ok: res.ok, status: res.status, data }
   } catch {
-    return { ok: false, status: 0, data: { message: "You're offline. Check your connection and try again" } }
+    return { ok: false, status: 0, data: { message: offline } }
   }
 }
 
-function ago(iso: string | null) {
-  if (!iso) return ""
-  const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000)
-  if (s < 60) return "just now"
-  if (s < 3600) return `${Math.floor(s / 60)} min ago`
-  if (s < 86400) return `${Math.floor(s / 3600)} h ago`
-  return new Date(iso).toLocaleDateString("en", { dateStyle: "medium" })
+// `send` with the offline message in the current language
+function useSend() {
+  const offline = useAppI18n().t.knowledge.offline
+  return useCallback((path: string, method: string, body?: object) => send(path, method, offline, body), [offline])
 }
 
-const plural = (n: number, word: string) => `${n.toLocaleString("en")} ${word}${n === 1 ? "" : "s"}`
-
 function StatusLine({ source }: { source: SourceJson }) {
+  const { t: app, locale } = useAppI18n()
+  const t = app.knowledge.status
   if (source.status === "pending") {
-    return <span className="text-[var(--color-muted)]">Not read yet. Press Sync once the other websites have finished.</span>
+    return <span className="text-[var(--color-muted)]">{t.pending}</span>
   }
   if (source.status === "syncing") {
     return (
       <span className="flex items-center gap-1.5 text-[var(--color-muted)]">
         <LoaderCircle className="h-3.5 w-3.5 animate-spin" aria-hidden />
-        Reading the website… this usually takes under a minute
+        {t.reading}
       </span>
     )
   }
@@ -60,16 +60,17 @@ function StatusLine({ source }: { source: SourceJson }) {
     return (
       <span className="flex items-start gap-1.5 text-red-600 dark:text-red-400">
         <CircleAlert className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden />
-        {source.error ?? "Couldn't read this source"}
-        {source.chunks > 0 && <span className="text-[var(--color-muted)]"> · the previous version is still in use</span>}
+        {source.error ?? t.failed}
+        {source.chunks > 0 && <span className="text-[var(--color-muted)]">{t.previousInUse}</span>}
       </span>
     )
   }
   return (
     <span className="flex flex-wrap items-center gap-x-1.5 text-[var(--color-muted)]">
       <CircleCheck className="h-3.5 w-3.5 text-green-600" aria-hidden />
-      {source.kind === "website" ? `${plural(source.pages, "page")} · ` : ""}
-      {plural(source.chunks, "excerpt")} · updated {ago(source.syncedAt)}
+      {source.kind === "website" ? `${plural(source.pages, t.pages, locale)} · ` : ""}
+      {plural(source.chunks, t.excerpts, locale)}
+      {source.syncedAt && ` · ${format(t.updated, { when: timeAgo(source.syncedAt, locale) })}`}
       {source.error && <span className="text-amber-600 dark:text-amber-400">· {source.error}</span>}
     </span>
   )
@@ -88,6 +89,8 @@ function SourceRow({
   onRemove: (id: string) => void
   onError: (message: string) => void
 }) {
+  const t = useAppI18n().t.knowledge.row
+  const send = useSend()
   const [confirming, setConfirming] = useState(false)
   const [busy, setBusy] = useState(false)
   const syncing = source.status === "syncing"
@@ -98,14 +101,14 @@ function SourceRow({
     const { ok, data } = await send(`/api/knowledge/${source.id}/sync`, "POST")
     setBusy(false)
     if (ok) onChange(data.source)
-    else onError(data.message ?? "Couldn't start the sync")
+    else onError(data.message ?? t.syncFailed)
   }
   const remove = async () => {
     setBusy(true)
     const { ok, status, data } = await send(`/api/knowledge/${source.id}`, "DELETE")
     setBusy(false)
     if (ok || status === 404) onRemove(source.id)
-    else onError(data.message ?? "Couldn't remove this source")
+    else onError(data.message ?? t.removeFailed)
   }
 
   return (
@@ -130,21 +133,21 @@ function SourceRow({
         <div className="flex shrink-0 items-center gap-2 sm:pt-0.5">
           {confirming ? (
             <>
-              <span className="text-xs text-[var(--color-muted)]">Remove it?</span>
+              <span className="text-xs text-[var(--color-muted)]">{t.confirm}</span>
               <button
                 type="button"
                 onClick={remove}
                 disabled={busy}
                 className="h-8 cursor-pointer rounded-md border-0 bg-red-600 px-3 text-xs font-semibold text-white disabled:opacity-50"
               >
-                {busy ? "Removing…" : "Remove"}
+                {busy ? t.removing : t.remove}
               </button>
               <button
                 type="button"
                 onClick={() => setConfirming(false)}
                 className="h-8 cursor-pointer rounded-md border border-[var(--color-line)] bg-transparent px-3 text-xs font-semibold text-[var(--color-text)]"
               >
-                Cancel
+                {t.cancel}
               </button>
             </>
           ) : (
@@ -154,18 +157,18 @@ function SourceRow({
                   type="button"
                   onClick={resync}
                   disabled={busy || syncing}
-                  title="Read the website again"
+                  title={t.resyncTitle}
                   className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md border border-[var(--color-line)] bg-transparent px-2.5 text-xs font-semibold text-[var(--color-text)] hover:border-[var(--color-muted)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <RefreshCw className={cn("h-3.5 w-3.5", syncing && "animate-spin")} aria-hidden />
-                  {syncing ? "Syncing" : "Sync"}
+                  {syncing ? t.syncing : t.sync}
                 </button>
               )}
               <button
                 type="button"
                 onClick={() => setConfirming(true)}
-                aria-label={`Remove ${source.title}`}
-                title="Remove"
+                aria-label={format(t.removeLabel, { title: source.title })}
+                title={t.remove}
                 className="grid h-8 w-8 cursor-pointer place-items-center rounded-md border border-[var(--color-line)] bg-transparent text-[var(--color-muted)] hover:border-red-500/60 hover:text-red-600"
               >
                 <Trash2 className="h-3.5 w-3.5" aria-hidden />
@@ -181,6 +184,8 @@ function SourceRow({
 type SearchResult = { title: string; url: string; text: string; score: number; used: boolean }
 
 function TryQuestion({ disabled }: { disabled: boolean }) {
+  const t = useAppI18n().t.knowledge.try
+  const send = useSend()
   const [query, setQuery] = useState("")
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<{ answered: boolean; confidence: string; threshold: number; results: SearchResult[] } | null>(null)
@@ -194,20 +199,20 @@ function TryQuestion({ disabled }: { disabled: boolean }) {
     const { ok, data } = await send("/api/knowledge/search", "POST", { query })
     setLoading(false)
     if (ok) setResult(data)
-    else setError(data.message ?? "Couldn't search right now")
+    else setError(data.message ?? t.failed)
   }
 
   return (
-    <Group title="Try a question" description="See which excerpts the assistant would answer from. Nothing is sent to the AI model.">
+    <Group title={t.title} description={t.description}>
       <form onSubmit={run} className="flex gap-2">
         <label htmlFor="try-question" className="sr-only">
-          Question
+          {t.label}
         </label>
         <input
           id="try-question"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="e.g. How long does shipping take?"
+          placeholder={t.placeholder}
           disabled={disabled}
           className="h-10 min-w-0 flex-1 rounded-lg border border-[var(--color-line)] bg-[var(--color-raised)] px-3 text-sm text-[var(--color-text)] outline-none placeholder:text-[var(--color-muted)]/70 focus:border-[var(--color-secondary)] disabled:opacity-60"
         />
@@ -217,10 +222,10 @@ function TryQuestion({ disabled }: { disabled: boolean }) {
           className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-lg border-0 bg-[var(--color-primary)] px-4 text-sm font-semibold text-[var(--color-on-primary)] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {loading ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden /> : <Search className="h-4 w-4" aria-hidden />}
-          Search
+          {t.search}
         </button>
       </form>
-      {disabled && <p className="text-xs text-[var(--color-muted)]">Add a source first.</p>}
+      {disabled && <p className="text-xs text-[var(--color-muted)]">{t.needSource}</p>}
       {error && <p className="text-sm text-red-600">{error}</p>}
       {result && (
         <div className="flex flex-col gap-3" aria-live="polite">
@@ -231,22 +236,22 @@ function TryQuestion({ disabled }: { disabled: boolean }) {
             )}
           >
             {result.answered ? (
-              "The assistant would answer this from the highlighted excerpts."
+              t.answered
             ) : result.results.length === 0 ? (
-              "Nothing in your knowledge mentions this, so the assistant would say it doesn't know. Add a source that covers it."
+              t.nothing
             ) : (
               <>
-                The closest excerpt scored {result.results[0].score}, below the {result.threshold} needed, so the assistant would say it doesn&apos;t know.{" "}
+                {format(t.belowThreshold, { score: result.results[0].score, threshold: result.threshold })}{" "}
                 {result.confidence !== "lenient" ? (
                   <>
-                    With a small knowledge base, set{" "}
+                    {t.lenientPre}{" "}
                     <Link href="/dashboard/widget?section=persona" className="font-semibold underline underline-offset-2">
-                      Persona → Answer confidence
+                      {t.lenientLink}
                     </Link>{" "}
-                    to Lenient, or add a source that covers this question.
+                    {t.lenientPost}
                   </>
                 ) : (
-                  "Add a source that covers this question."
+                  t.addSource
                 )}
               </>
             )}
@@ -262,7 +267,8 @@ function TryQuestion({ disabled }: { disabled: boolean }) {
               <div className="flex items-center justify-between gap-3">
                 <span className="truncate font-medium">{r.title}</span>
                 <span className="shrink-0 font-mono text-[0.6875rem] text-[var(--color-muted)]">
-                  {r.used ? "used · " : ""}score {r.score}
+                  {r.used ? t.used : ""}
+                  {format(t.score, { score: r.score })}
                 </span>
               </div>
               <p className="line-clamp-3 text-xs leading-relaxed text-[var(--color-muted)]">{r.text}</p>
@@ -286,6 +292,9 @@ export function KnowledgeManager({
   /** From a conversation's "Add an answer": the question to answer. */
   prefillTitle?: string
 }) {
+  const { t: app, locale } = useAppI18n()
+  const t = app.knowledge
+  const send = useSend()
   const [sources, setSources] = useState(initial)
   const [url, setUrl] = useState("")
   const [urlError, setUrlError] = useState<string | undefined>()
@@ -303,7 +312,7 @@ export function KnowledgeManager({
   const refresh = useCallback(async () => {
     const { ok, data } = await send("/api/knowledge", "GET")
     if (ok) setSources(data.sources)
-  }, [])
+  }, [send])
 
   // While a website is being read, check back every few seconds
   useEffect(() => {
@@ -316,12 +325,12 @@ export function KnowledgeManager({
 
   const addSite = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!url.trim()) return setUrlError("Enter your website address")
+    if (!url.trim()) return setUrlError(t.website.missing)
     setAddingSite(true)
     setUrlError(undefined)
     const { ok, data } = await send("/api/knowledge", "POST", { kind: "website", url })
     setAddingSite(false)
-    if (!ok) return setUrlError(data.message ?? "Couldn't add this website")
+    if (!ok) return setUrlError(data.message ?? t.website.failed)
     upsert(data.source)
     setUrl("")
     if (data.notice) setNotice(data.notice)
@@ -333,7 +342,7 @@ export function KnowledgeManager({
     setTextError(undefined)
     const { ok, data } = await send("/api/knowledge", "POST", { kind: "text", title, content })
     setAddingText(false)
-    if (!ok) return setTextError(data.message ?? "Couldn't add this text")
+    if (!ok) return setTextError(data.message ?? t.text.failed)
     upsert(data.source)
     setTitle("")
     setContent("")
@@ -358,16 +367,14 @@ export function KnowledgeManager({
     <div className="flex min-h-full flex-col">
       <header className="sticky top-0 z-10 flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-[var(--color-line)] bg-[var(--color-raised)]/95 px-4 py-3 backdrop-blur sm:px-6">
         <div className="flex min-w-0 flex-1 flex-col">
-          <h1 className="text-lg font-semibold">Knowledge</h1>
-          <p className="truncate text-xs text-[var(--color-muted)]">
-            {canEdit ? "What your assistant answers from. Changes reach your live widget within a minute." : "View only. Ask a workspace owner or admin to make changes."}
-          </p>
+          <h1 className="text-lg font-semibold">{t.title}</h1>
+          <p className="truncate text-xs text-[var(--color-muted)]">{canEdit ? t.lede : t.viewOnly}</p>
         </div>
         <dl className="flex gap-5 text-xs">
           {[
-            ["Sources", `${sources.length}/${limits.sources}`],
-            ["Pages", pages.toLocaleString("en")],
-            ["Excerpts", chunks.toLocaleString("en")],
+            [t.stats.sources, `${sources.length}/${limits.sources}`],
+            [t.stats.pages, formatNumber(pages, locale)],
+            [t.stats.excerpts, formatNumber(chunks, locale)],
           ].map(([k, v]) => (
             <div key={k} className="flex flex-col">
               <dt className="text-[var(--color-muted)]">{k}</dt>
@@ -383,18 +390,18 @@ export function KnowledgeManager({
             <p role="alert" className="flex items-center justify-between gap-3 rounded-lg bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
               {notice}
               <button type="button" onClick={() => setNotice(null)} className="cursor-pointer border-0 bg-transparent text-xs font-semibold text-inherit underline">
-                Dismiss
+                {t.dismiss}
               </button>
             </p>
           )}
 
           <section className="overflow-hidden rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface)]">
             <div className="flex items-center justify-between gap-3 border-b border-[var(--color-line)] px-4 py-3 sm:px-5">
-              <h2 className="text-base font-semibold">Sources</h2>
+              <h2 className="text-base font-semibold">{t.sources}</h2>
               {syncing && (
                 <span className="flex items-center gap-1.5 text-xs text-[var(--color-muted)]">
                   <LoaderCircle className="h-3.5 w-3.5 animate-spin" aria-hidden />
-                  Syncing
+                  {t.syncing}
                 </span>
               )}
             </div>
@@ -403,10 +410,8 @@ export function KnowledgeManager({
                 <span className="grid h-11 w-11 place-items-center rounded-xl bg-[var(--color-bubble)]" aria-hidden>
                   <Globe className="h-5 w-5" />
                 </span>
-                <p className="font-medium">No knowledge yet</p>
-                <p className="max-w-sm text-sm text-[var(--color-muted)]">
-                  Until you add a source, your assistant can only say it doesn't know. Start with your website.
-                </p>
+                <p className="font-medium">{t.emptyTitle}</p>
+                <p className="max-w-sm text-sm text-[var(--color-muted)]">{t.emptyText}</p>
               </div>
             ) : (
               <ul className="divide-y divide-[var(--color-line)]">
@@ -429,17 +434,17 @@ export function KnowledgeManager({
 
         {canEdit && (
           <div className="flex min-w-0 flex-col gap-6">
-            <Group title="Add a website" description={`Apex reads up to ${limits.websitePages} pages: the address you enter, your sitemap and the pages they link to.`}>
+            <Group title={t.website.title} description={format(t.website.description, { n: limits.websitePages })}>
               <form onSubmit={addSite} className="flex flex-col gap-3" noValidate>
                 <TextInput
-                  label="Website address"
+                  label={t.website.label}
                   type="url"
                   value={url}
                   onChange={(v) => {
                     setUrl(v)
                     setUrlError(undefined)
                   }}
-                  placeholder="www.example.com"
+                  placeholder={t.website.placeholder}
                   error={urlError}
                   disabled={full}
                   mono
@@ -450,21 +455,21 @@ export function KnowledgeManager({
                   className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-lg border-0 bg-[var(--color-primary)] px-4 text-sm font-semibold text-[var(--color-on-primary)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {addingSite && <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />}
-                  {addingSite ? "Adding…" : "Add website"}
+                  {addingSite ? t.website.adding : t.website.add}
                 </button>
               </form>
             </Group>
 
-            <Group title="Add text" description="FAQs, policies or details that aren't on your website.">
+            <Group title={t.text.title} description={t.text.description}>
               <form onSubmit={addText} className="flex flex-col gap-3">
-                <TextInput label="Title" value={title} onChange={setTitle} max={limits.title} placeholder="Return policy" disabled={full} />
+                <TextInput label={t.text.titleLabel} value={title} onChange={setTitle} max={limits.title} placeholder={t.text.titlePlaceholder} disabled={full} />
                 <TextArea
-                  label="Content"
+                  label={t.text.content}
                   rows={7}
                   value={content}
                   onChange={setContent}
                   max={limits.textChars}
-                  placeholder={"Unopened bags can be returned within 14 days of delivery.\nGround coffee can't be returned."}
+                  placeholder={t.text.contentPlaceholder}
                   error={textError}
                   disabled={full}
                 />
@@ -474,11 +479,11 @@ export function KnowledgeManager({
                   className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-lg border border-[var(--color-line)] bg-transparent px-4 text-sm font-semibold text-[var(--color-text)] hover:border-[var(--color-muted)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {addingText && <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />}
-                  {addingText ? "Adding…" : "Add text"}
+                  {addingText ? t.text.adding : t.text.add}
                 </button>
               </form>
             </Group>
-            {full && <p className="text-xs text-[var(--color-muted)]">You've reached {limits.sources} sources. Remove one to add another.</p>}
+            {full && <p className="text-xs text-[var(--color-muted)]">{format(t.full, { n: limits.sources })}</p>}
           </div>
         )}
       </div>

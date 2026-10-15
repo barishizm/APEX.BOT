@@ -6,6 +6,7 @@ import {
   Code2,
   Cpu,
   CornerDownLeft,
+  Languages,
   LayoutDashboard,
   LifeBuoy,
   ListChecks,
@@ -22,6 +23,10 @@ import {
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useRef, useState } from "react"
+import { useAppI18n } from "@/components/i18n/app-provider"
+import { useSetLocale } from "@/components/i18n/use-set-locale"
+import { LOCALE_META, LOCALES, localizePath, type Locale } from "@/lib/i18n"
+import type { AppDictionary } from "@/lib/i18n/app"
 import { cn } from "@/lib/utils"
 
 type Command = { label: string; group: string; icon: LucideIcon; keywords?: string; run: (go: (href: string) => void) => void }
@@ -38,38 +43,56 @@ function toggleTheme() {
   } catch {}
 }
 
-const COMMANDS: Command[] = [
-  { group: "Go to", label: "Overview", icon: LayoutDashboard, keywords: "home dashboard", run: nav("/dashboard") },
-  { group: "Go to", label: "Knowledge", icon: BookOpen, keywords: "sources website text faq crawl", run: nav("/dashboard/knowledge") },
-  { group: "Go to", label: "Conversations", icon: MessageSquareText, keywords: "inbox chats messages leads", run: nav("/dashboard/conversations") },
-  { group: "Go to", label: "Setup checklist", icon: ListChecks, keywords: "onboarding progress", run: nav("/dashboard/onboarding/list") },
-  { group: "Go to", label: "Account settings", icon: Settings, keywords: "password username profile", run: nav("/dashboard/settings") },
-  { group: "Widget", label: "General", icon: Settings2, keywords: "name company language", run: nav("/dashboard/widget?section=general") },
-  { group: "Widget", label: "Appearance", icon: Palette, keywords: "color launcher theme font", run: nav("/dashboard/widget?section=appearance") },
-  { group: "Widget", label: "Messages", icon: MessageSquareText, keywords: "greeting suggestions disclaimer", run: nav("/dashboard/widget?section=messages") },
-  { group: "Widget", label: "Behavior", icon: MousePointerClick, keywords: "auto open teaser sources", run: nav("/dashboard/widget?section=behavior") },
-  { group: "Widget", label: "AI model", icon: Cpu, keywords: "claude openai gemini temperature", run: nav("/dashboard/widget?section=model") },
-  { group: "Widget", label: "Persona", icon: Sparkles, keywords: "tone instructions topics confidence", run: nav("/dashboard/widget?section=persona") },
-  { group: "Widget", label: "Hand-off & leads", icon: LifeBuoy, keywords: "human email lead capture", run: nav("/dashboard/widget?section=handoff") },
-  { group: "Widget", label: "Install & security", icon: Code2, keywords: "embed snippet allowed websites site key limits", run: nav("/dashboard/widget?section=install") },
-  { group: "Help", label: "Docs", icon: BookOpen, keywords: "help guide", run: () => window.open("/docs", "_blank", "noopener") },
-  { group: "Help", label: "System status", icon: Activity, run: () => window.open("/status", "_blank", "noopener") },
-  { group: "Actions", label: "Toggle dark mode", icon: SunMoon, keywords: "theme light", run: () => toggleTheme() },
-  {
-    group: "Actions",
-    label: "Log out",
-    icon: LogOut,
-    keywords: "sign out",
-    run: async () => {
-      await fetch("/api/auth/logout", { method: "POST" }).catch(() => {})
-      window.location.replace("/")
-    },
-  },
-]
+type Strings = AppDictionary["shell"]["palette"]
 
-const norm = (s: string) => s.toLocaleLowerCase("en").normalize("NFD").replace(/[̀-ͯ]/g, "")
+function buildCommands(t: Strings, locale: Locale, setLocale: (l: Locale) => void): Command[] {
+  const c = t.commands
+  const g = t.groups
+  return [
+    { group: g.goTo, label: c.overview, icon: LayoutDashboard, keywords: "home dashboard panel", run: nav("/dashboard") },
+    { group: g.goTo, label: c.knowledge, icon: BookOpen, keywords: "sources website text faq crawl kaynak site metin", run: nav("/dashboard/knowledge") },
+    { group: g.goTo, label: c.conversations, icon: MessageSquareText, keywords: "inbox chats messages leads sohbet mesaj", run: nav("/dashboard/conversations") },
+    { group: g.goTo, label: c.setup, icon: ListChecks, keywords: "onboarding progress kurulum", run: nav("/dashboard/onboarding/list") },
+    { group: g.goTo, label: c.settings, icon: Settings, keywords: "password username profile şifre kullanıcı", run: nav("/dashboard/settings") },
+    { group: g.widget, label: c.general, icon: Settings2, keywords: "name company language isim şirket dil", run: nav("/dashboard/widget?section=general") },
+    { group: g.widget, label: c.appearance, icon: Palette, keywords: "color launcher theme font renk tema", run: nav("/dashboard/widget?section=appearance") },
+    { group: g.widget, label: c.messages, icon: MessageSquareText, keywords: "greeting suggestions disclaimer karşılama öneri", run: nav("/dashboard/widget?section=messages") },
+    { group: g.widget, label: c.behavior, icon: MousePointerClick, keywords: "auto open teaser sources otomatik", run: nav("/dashboard/widget?section=behavior") },
+    { group: g.widget, label: c.model, icon: Cpu, keywords: "claude openai gemini temperature model", run: nav("/dashboard/widget?section=model") },
+    { group: g.widget, label: c.persona, icon: Sparkles, keywords: "tone instructions topics confidence üslup talimat", run: nav("/dashboard/widget?section=persona") },
+    { group: g.widget, label: c.handoff, icon: LifeBuoy, keywords: "human email lead capture insan e-posta", run: nav("/dashboard/widget?section=handoff") },
+    { group: g.widget, label: c.install, icon: Code2, keywords: "embed snippet allowed websites site key limits kod anahtar", run: nav("/dashboard/widget?section=install") },
+    { group: g.help, label: c.docs, icon: BookOpen, keywords: "help guide yardım rehber", run: () => window.open(localizePath("/docs", locale), "_blank", "noopener") },
+    { group: g.help, label: c.status, icon: Activity, run: () => window.open(localizePath("/status", locale), "_blank", "noopener") },
+    ...LOCALES.filter((l) => l !== locale).map((l) => ({
+      group: g.language,
+      label: LOCALE_META[l].name,
+      icon: Languages,
+      keywords: "language dil",
+      run: () => setLocale(l),
+    })),
+    { group: g.actions, label: c.theme, icon: SunMoon, keywords: "theme light dark tema", run: () => toggleTheme() },
+    {
+      group: g.actions,
+      label: c.logOut,
+      icon: LogOut,
+      keywords: "sign out çıkış",
+      run: async () => {
+        await fetch("/api/auth/logout", { method: "POST" }).catch(() => {})
+        window.location.replace(localizePath("/", locale))
+      },
+    },
+  ]
+}
+
+// Case- and accent-insensitive, so "turkce" finds "Türkçe" and "i" finds "İ"
+const norm = (s: string) => s.toLocaleLowerCase("tr").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/ı/g, "i")
 
 export function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { t: app, locale } = useAppI18n()
+  const t = app.shell.palette
+  const setLocale = useSetLocale()
+  const commands = useMemo(() => buildCommands(t, locale, setLocale), [t, locale, setLocale])
   const router = useRouter()
   const [query, setQuery] = useState("")
   const [index, setIndex] = useState(0)
@@ -79,9 +102,9 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
 
   const results = useMemo(() => {
     const q = norm(query.trim())
-    if (!q) return COMMANDS
-    return COMMANDS.filter((c) => norm(`${c.label} ${c.group} ${c.keywords ?? ""}`).includes(q))
-  }, [query])
+    if (!q) return commands
+    return commands.filter((c) => norm(`${c.label} ${c.group} ${c.keywords ?? ""}`).includes(q))
+  }, [query, commands])
 
   useEffect(() => {
     if (!open) return
@@ -131,7 +154,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Search or go to"
+        aria-label={t.dialog}
         onMouseDown={(e) => e.stopPropagation()}
         className="flex max-h-[70vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-[var(--color-line)] bg-[var(--color-raised)] text-[var(--color-text)] shadow-2xl"
       >
@@ -142,7 +165,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onKeyDown}
-            placeholder="Search pages, settings and actions…"
+            placeholder={t.placeholder}
             role="combobox"
             aria-expanded="true"
             aria-controls="command-results"
@@ -152,7 +175,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
           <kbd className="rounded border border-[var(--color-line)] px-1.5 font-sans text-[0.6875rem] text-[var(--color-muted)]">Esc</kbd>
         </div>
         <ul ref={listRef} id="command-results" role="listbox" className="overflow-y-auto p-2">
-          {results.length === 0 && <li className="px-3 py-8 text-center text-sm text-[var(--color-muted)]">No matches for “{query}”</li>}
+          {results.length === 0 && <li className="px-3 py-8 text-center text-sm text-[var(--color-muted)]">{t.noMatches.replace("{query}", query)}</li>}
           {results.map((c, i) => {
             const header = c.group !== lastGroup ? c.group : null
             lastGroup = c.group

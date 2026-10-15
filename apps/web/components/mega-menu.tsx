@@ -1,12 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { NAV as menu } from "@/components/site-nav";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useI18n } from "@/components/i18n/provider";
+import { buildNav } from "@/components/site-nav";
 
 const PANEL_W = 640;
 const CLOSE_DELAY = 160;
 
 export function MegaMenu() {
+  const { t, href } = useI18n();
+  const menu = useMemo(() => buildNav(t), [t]);
   const navRef = useRef<HTMLElement>(null);
   const linkRefs = useRef<(HTMLAnchorElement | null)[]>([]);
   const sheetRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -37,7 +40,7 @@ export function MegaMenu() {
       setIdx(i);
       setOpen(true);
     },
-    [open],
+    [open, menu],
   );
 
   const scheduleClose = () => {
@@ -51,7 +54,7 @@ export function MegaMenu() {
     <nav
       ref={navRef}
       className="bar__menu"
-      aria-label="Site menu"
+      aria-label={t.common.siteMenu}
       onMouseLeave={scheduleClose}
       onBlur={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget)) setOpen(false);
@@ -66,7 +69,7 @@ export function MegaMenu() {
           ref={(el) => {
             linkRefs.current[i] = el;
           }}
-          href={m.href}
+          href={href(m.href)}
           className={m.panel ? "bar__link bar__link--panel" : "bar__link"}
           aria-expanded={m.panel ? open && idx === i : undefined}
           data-active={open && idx === i ? "" : undefined}
@@ -106,7 +109,7 @@ export function MegaMenu() {
                       {col.items.map((it) => (
                         <a
                           key={it.title}
-                          href={it.href}
+                          href={href(it.href)}
                           onClick={() => setOpen(false)}
                           className={it.icon ? "mega__item mega__item--icon" : "mega__item"}
                         >
@@ -118,7 +121,7 @@ export function MegaMenu() {
                     </div>
                   ))}
                 </div>
-                <a href={m.panel.cta.href} className="mega__cta" onClick={() => setOpen(false)}>
+                <a href={href(m.panel.cta.href)} className="mega__cta" onClick={() => setOpen(false)}>
                   {m.panel.cta.label} <span aria-hidden="true">→</span>
                 </a>
               </div>

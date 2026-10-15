@@ -2,19 +2,18 @@ import { LandingSections } from "@/components/landing/sections";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import Hero from "@/components/ui/hero-button-expendable";
-import { isSignedIn } from "@/lib/auth";
+import type { Locale } from "@/lib/i18n";
 
 // The landing page; /login and /signup render it with the auth modal already open
-export async function Home({ initialAuth, initialError }: { initialAuth?: "login" | "register"; initialError?: string }) {
-  const signedIn = await isSignedIn();
+export function Home({ locale, initialAuth }: { locale: Locale; initialAuth?: "login" | "register" }) {
   return (
     <>
-      <SiteHeader />
+      <SiteHeader locale={locale} authModal={false} />
       <main id="main">
-        <Hero signedIn={signedIn} initialAuth={signedIn ? undefined : initialAuth} initialError={initialError} />
-        <LandingSections signedIn={signedIn} />
+        <Hero initialAuth={initialAuth} />
+        <LandingSections locale={locale} />
       </main>
-      <SiteFooter />
+      <SiteFooter locale={locale} />
     </>
   );
 }

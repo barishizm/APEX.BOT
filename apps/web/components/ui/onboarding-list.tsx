@@ -3,11 +3,15 @@
 import { BookOpen, Check, ChevronRight, Mail, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { useAppI18n } from "@/components/i18n/app-provider";
 import { CONTACT_EMAIL } from "@/components/site-nav";
+import { format } from "@/lib/i18n";
 import type { Step } from "@/lib/setup-steps";
 
 
 function ChatPreview() {
+  const t = useAppI18n().t.setup.list.preview;
+  const [hello, question, answer, thanks] = t.messages;
   const bubble = "max-w-[85%] rounded-xl px-3 py-2 text-[0.6875rem] leading-snug";
   return (
     <div
@@ -19,24 +23,26 @@ function ChatPreview() {
       }}
     >
       <span className="absolute left-6 top-20 flex items-center gap-2 rounded-full bg-[#e5f86b] px-3 py-1 text-sm font-medium text-[#0c0c09] shadow-lg">
-        Chatting
+        {t.chatting}
         <span className="h-5 w-5 rounded-full bg-[#312c85]" />
       </span>
       <div className="absolute bottom-0 right-6 top-10 flex w-[62%] flex-col gap-3 rounded-t-2xl bg-[#171713] p-4 text-[#f4f4f1] shadow-2xl">
         <span className="mx-auto flex items-center gap-1.5 rounded-full bg-[#26261f] px-3 py-1 text-[0.6875rem] font-medium">
           <Sparkles className="h-3 w-3" />
-          AI assistant
+          {t.assistant}
         </span>
-        <p className={bubble}>Hello! Welcome to Crest Cycles. How can I help you?</p>
-        <p className={`${bubble} ml-auto bg-[#26261f]`}>Is the Urban Pro e-bike back in stock in matte black?</p>
-        <p className={bubble}>It is! It came back this week. You can order it on the product page.</p>
-        <p className={`${bubble} ml-auto bg-[#26261f]`}>Great, thanks!</p>
+        <p className={bubble}>{hello}</p>
+        <p className={`${bubble} ml-auto bg-[#26261f]`}>{question}</p>
+        <p className={bubble}>{answer}</p>
+        <p className={`${bubble} ml-auto bg-[#26261f]`}>{thanks}</p>
       </div>
     </div>
   );
 }
 
 export function OnboardingList({ stages }: { stages: { label: string; steps: Step[] }[] }) {
+  const { t: app, href } = useAppI18n();
+  const t = app.setup.list;
   const [stage, setStage] = useState(0);
   const steps = stages[stage].steps;
   // null = open the first unfinished step
@@ -52,8 +58,8 @@ export function OnboardingList({ stages }: { stages: { label: string; steps: Ste
     <div className="flex min-h-full items-center justify-center">
       <div className="flex w-full max-w-[52rem] flex-col gap-5 px-4 py-6 sm:px-8">
         <div className="flex flex-col items-center gap-3 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight">Set up your assistant</h1>
-          <div role="tablist" aria-label="Setup stages" className="flex rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] p-1">
+          <h1 className="text-2xl font-semibold tracking-tight">{t.title}</h1>
+          <div role="tablist" aria-label={t.stagesLabel} className="flex rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] p-1">
             {stages.map((s, i) => {
               const finished = s.steps.every((x) => x.done);
               return (
@@ -70,14 +76,14 @@ export function OnboardingList({ stages }: { stages: { label: string; steps: Ste
                     stage === i ? "bg-[var(--color-bubble)] text-[var(--color-text)]" : "bg-transparent text-[var(--color-muted)] hover:text-[var(--color-text)]"
                   }`}
                 >
-                  {finished && <Check className="h-3.5 w-3.5 text-green-600" strokeWidth={3} aria-label="(done)" />}
+                  {finished && <Check className="h-3.5 w-3.5 text-green-600" strokeWidth={3} aria-label={t.done} />}
                   {s.label}
                 </button>
               );
             })}
           </div>
           <p className="text-sm text-[var(--color-muted)]">
-            {doneCount} of {steps.length} done
+            {format(t.progress, { done: doneCount, total: steps.length })}
           </p>
         </div>
 
@@ -109,7 +115,7 @@ export function OnboardingList({ stages }: { stages: { label: string; steps: Ste
                     >
                       <span className="flex-1">
                         {step.title}
-                        {step.done && <span className="sr-only"> (completed)</span>}
+                        {step.done && <span className="sr-only"> {t.completed}</span>}
                       </span>
                       {!expanded && <ChevronRight className="h-4 w-4 text-[var(--color-muted)]" aria-hidden />}
                     </button>
@@ -140,20 +146,20 @@ export function OnboardingList({ stages }: { stages: { label: string; steps: Ste
             <span className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--color-bubble)]">
               <BookOpen className="h-5 w-5" aria-hidden />
             </span>
-            <h2 className="text-base font-semibold">Read the setup guide</h2>
-            <p className="m-0 text-sm text-[var(--color-muted)]">Step-by-step instructions for WordPress, Shopify, Webflow and more.</p>
-            <a href="/docs#setup" target="_blank" rel="noopener noreferrer" className={`${ghostButton} mt-3`}>
-              Open docs
+            <h2 className="text-base font-semibold">{t.guideTitle}</h2>
+            <p className="m-0 text-sm text-[var(--color-muted)]">{t.guideText}</p>
+            <a href={href("/docs#setup")} target="_blank" rel="noopener noreferrer" className={`${ghostButton} mt-3`}>
+              {t.guideCta}
             </a>
           </section>
           <section className={`${card} flex flex-col items-start gap-1 p-5`}>
             <span className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--color-bubble)]">
               <Mail className="h-5 w-5" aria-hidden />
             </span>
-            <h2 className="text-base font-semibold">Stuck? Write to us</h2>
-            <p className="m-0 text-sm text-[var(--color-muted)]">We answer every beta customer personally, usually within a day.</p>
-            <a href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent("Apex Bot setup")}`} className={`${ghostButton} mt-3`}>
-              Email the team
+            <h2 className="text-base font-semibold">{t.helpTitle}</h2>
+            <p className="m-0 text-sm text-[var(--color-muted)]">{t.helpText}</p>
+            <a href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(t.helpSubject)}`} className={`${ghostButton} mt-3`}>
+              {t.helpCta}
             </a>
           </section>
         </div>
