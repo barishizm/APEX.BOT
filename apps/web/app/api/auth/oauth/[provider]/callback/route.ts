@@ -4,6 +4,7 @@ import { timingSafeEqual } from "node:crypto"
 import { AuthError, oauthLogin } from "@apex/db"
 import { db } from "@/lib/db"
 import { requestMeta, setSessionCookie } from "@/lib/auth"
+import { SIGNUPS_OPEN } from "@/lib/signups"
 import { OAUTH_COOKIE, credentials, fetchProfile, isProvider, siteOrigin } from "@/lib/oauth"
 
 const to = (path: string) => NextResponse.redirect(`${siteOrigin()}${path}`)
@@ -37,10 +38,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ prov
       db(),
       { ...profile, accountType: flow.type === "business" ? "business" : "personal" },
       await requestMeta(),
+      { allowSignup: SIGNUPS_OPEN },
     )
     await setSessionCookie(session)
     return to(isNew ? "/onboarding" : "/dashboard?welcome=1")
   } catch (err) {
+    if (err instanceof AuthError && err.code === "signups_closed") return fail("oauth_signups_closed")
     if (err instanceof AuthError && err.code === "invalid_input") return fail("oauth_email_unverified")
     console.error("[oauth]", provider, err instanceof Error ? err.message : err)
     return fail("oauth_failed")

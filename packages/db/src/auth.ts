@@ -38,6 +38,7 @@ export type AuthErrorCode =
   | "code_expired"
   | "already_verified"
   | "unauthorized"
+  | "signups_closed"
 
 export class AuthError extends Error {
   constructor(
@@ -461,6 +462,7 @@ export async function oauthLogin(
   db: Db,
   profile: OAuthProfile,
   meta: RequestMeta = {},
+  options: { allowSignup?: boolean } = {},
 ): Promise<{ user: User; session: NewSession; isNew: boolean }> {
   if (!profile.emailVerified) {
     throw new AuthError("invalid_input", "Your provider has no verified email for this account. Verify it there and try again")
@@ -508,6 +510,8 @@ export async function oauthLogin(
         await logEvent(tx, "login", meta, row.id, email)
         return { user: toUser(row), session, isNew: false }
       }
+
+      if (options.allowSignup === false) throw new AuthError("signups_closed", "Sign-ups are closed for now. Join the waitlist")
 
       // New account: find a free username (checked first, since a failed insert would abort the transaction)
       const base = suggestUsername(profile.username, email)

@@ -98,6 +98,7 @@ const STATUS: Record<AuthError["code"], number> = {
   invalid_code: 400,
   code_expired: 400,
   already_verified: 409,
+  signups_closed: 403,
 }
 
 // A JSON error in the requester's language; `error` stays a stable code for the client

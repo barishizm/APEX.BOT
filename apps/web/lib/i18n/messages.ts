@@ -40,6 +40,7 @@ const RULES: Record<Locale, Rule[]> = {
     ["This code has expired. Request a new one", "Bu kodun süresi doldu. Yeni bir kod isteyin"],
     ["Too many incorrect codes. Request a new one", "Çok fazla hatalı kod girildi. Yeni bir kod isteyin"],
     ["Too many incorrect codes. Try again later", "Çok fazla hatalı kod girildi. Daha sonra tekrar deneyin"],
+    ["Sign-ups are closed for now. Join the waitlist", "Kayıtlar şimdilik kapalı. Bekleme listesine katılın"],
     ["Too many requests. Try again later", "Çok fazla istek. Daha sonra tekrar deneyin"],
     ["Incorrect code. Check your email and try again", "Kod hatalı. E-postanızı kontrol edip tekrar deneyin"],
     ["Incorrect code. Check the inbox of that address and try again", "Kod hatalı. O adresin gelen kutusunu kontrol edip tekrar deneyin"],
