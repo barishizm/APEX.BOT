@@ -197,6 +197,7 @@ export default function Hero({
   const switchMode = (mode: "register" | "login") => {
     setFormStep("idle")
     setAuthError(null)
+    setTurnstileToken(null)
     setAuthMode(mode)
   }
 
@@ -214,7 +215,7 @@ export default function Hero({
     const field = (name: string) => form.get(name) ?? undefined
     const body =
       authMode === "login"
-        ? { email: field("email"), password: field("password"), remember: form.has("rememberMe") }
+        ? { email: field("email"), password: field("password"), remember: form.has("rememberMe"), turnstileToken }
         : {
             accountType,
             username: field("username"),
@@ -226,7 +227,7 @@ export default function Hero({
             allowTraining: form.has("allowTraining"),
             turnstileToken,
           }
-    if (authMode === "register" && TURNSTILE_SITE_KEY && !turnstileToken) {
+    if (TURNSTILE_SITE_KEY && !turnstileToken) {
       setAuthError("Please wait for the human check to finish, then try again")
       return
     }
@@ -254,7 +255,7 @@ export default function Hero({
       setFormStep("idle")
     } finally {
       // a Turnstile token works once
-      if (authMode === "register") setTurnstileReset((n) => n + 1)
+      setTurnstileReset((n) => n + 1)
     }
   }
 
@@ -641,6 +642,8 @@ export default function Hero({
                           <a href="/forgot-password" className="text-xs text-zinc-600 dark:text-zinc-300 underline underline-offset-2 hover:text-zinc-900 dark:hover:text-white">{t.auth.login.forgot}</a>
                           </div>
                         </div>
+
+                        <Turnstile onToken={setTurnstileToken} resetKey={turnstileReset} />
 
                         {authError && (
                           <p role="alert" className="text-sm text-red-600 dark:text-red-400">{authError}</p>

@@ -8,6 +8,7 @@ import { ArrowLeft, CircleAlert, CircleCheck, LoaderCircle } from "lucide-react"
 import { useAppI18n } from "@/components/i18n/app-provider"
 import { localizePath } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
+import { Turnstile, TURNSTILE_SITE_KEY } from "@/components/ui/turnstile"
 
 async function postJson(path: string, body: object, networkError: string) {
   try {
@@ -34,14 +35,18 @@ export default function ForgotPassword() {
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [humanToken, setHumanToken] = useState<string | null>(null)
+  const [humanReset, setHumanReset] = useState(0)
 
   const requestCode = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return setError(a.invalidEmail)
+    if (TURNSTILE_SITE_KEY && !humanToken) return setError(a.generic)
     setBusy(true)
     setError(null)
-    const { ok, data } = await postJson("/api/auth/forgot-password", { email }, a.network)
+    const { ok, data } = await postJson("/api/auth/forgot-password", { email, turnstileToken: humanToken }, a.network)
     setBusy(false)
+    setHumanReset((n) => n + 1)
     if (!ok) return setError(data.message ?? a.generic)
     setStep("code")
   }
@@ -100,6 +105,9 @@ export default function ForgotPassword() {
                   {error}
                 </p>
               )}
+              <div className="mt-6">
+                <Turnstile onToken={setHumanToken} resetKey={humanReset} />
+              </div>
               <div className="mt-8 flex flex-wrap items-center gap-4">
                 <button type="submit" disabled={busy} className={primary}>
                   {busy && <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />}
