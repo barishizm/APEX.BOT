@@ -4,10 +4,12 @@ import { AuthError, register } from "@apex/db"
 import { db } from "@/lib/db"
 import { authErrorResponse, readJson, requestMeta, setSessionCookie } from "@/lib/auth"
 import { requireHuman } from "@/lib/turnstile"
+import { SIGNUPS_OPEN } from "@/lib/signups"
 import { sendAccountExistsNotice, sendVerificationCode } from "@/lib/mail"
 
 export async function POST(request: Request) {
   try {
+    if (!SIGNUPS_OPEN) throw new AuthError("signups_closed", "Sign-ups are closed for now. Join the waitlist")
     const b = await readJson(request)
     const meta = await requestMeta()
     await requireHuman(b.turnstileToken, meta.ip)
