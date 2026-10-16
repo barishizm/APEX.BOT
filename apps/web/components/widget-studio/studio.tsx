@@ -16,10 +16,10 @@ import {
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { checkSettings, type BotSettings, type Lang, type SettingsIssue } from "@apex/db/bot-settings"
+import { checkSettings, LANGS, type BotSettings, type Lang, type SettingsIssue } from "@apex/db/bot-settings"
 import { useAppI18n } from "@/components/i18n/app-provider"
 import type { BotJson } from "@/lib/bot"
-import { format } from "@/lib/i18n"
+import { format, LOCALE_META } from "@/lib/i18n"
 import { formatDate, plural } from "@/lib/i18n/format"
 import { translateIssues } from "@/lib/i18n/messages"
 import { cn } from "@/lib/utils"
@@ -257,9 +257,19 @@ export function WidgetStudio({
           </p>
         </div>
         <div role="radiogroup" aria-label={t.editingLanguage} className="flex rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] p-0.5">
-          {(["tr", "en"] as const).map((l) => (
-            <button key={l} type="button" role="radio" aria-checked={lang === l} onClick={() => setLang(l)} className={pill(lang === l)}>
-              {l === "tr" ? "Türkçe" : "English"}
+          {LANGS.map((l) => (
+            <button
+              key={l}
+              type="button"
+              role="radio"
+              aria-checked={lang === l}
+              aria-label={LOCALE_META[l].name}
+              title={LOCALE_META[l].name}
+              lang={LOCALE_META[l].hreflang}
+              onClick={() => setLang(l)}
+              className={pill(lang === l)}
+            >
+              {l.toUpperCase()}
             </button>
           ))}
         </div>

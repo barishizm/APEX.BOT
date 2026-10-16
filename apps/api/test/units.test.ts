@@ -63,6 +63,22 @@ describe("text", () => {
     assert.equal(detectLang("How long is shipping?"), "en");
     assert.equal(detectLang("ok"), null);
   });
+
+  it("detects Lithuanian, Latvian and Estonian", () => {
+    assert.equal(detectLang("Kiek laiko trunka pristatymas?"), "lt");
+    assert.equal(detectLang("Kaip galiu grąžinti prekę?"), "lt");
+    assert.equal(detectLang("Cik ilgi notiek piegāde?"), "lv");
+    assert.equal(detectLang("cik maksa piegade"), "lv");
+    assert.equal(detectLang("Kui kaua tarne aega võtab?"), "et");
+    assert.equal(detectLang("kuidas ma saan tellimuse tagastada"), "et");
+    // ö and ü are shared by Turkish and Estonian, so they only tip the balance
+    assert.equal(detectLang("Ürün iade edilebilir mi?"), "tr");
+  });
+
+  it("folds Baltic letters for retrieval", () => {
+    assert.deepEqual(tokenize("Grąžinimo sąlygos"), ["grazi", "~graz", "salyg", "~saly"]);
+    assert.deepEqual(tokenize("Piegādes"), ["piega", "~pieg"]);
+  });
 });
 
 describe("maskPII", () => {
@@ -71,6 +87,11 @@ describe("maskPII", () => {
       "Mail ayse@example.com, tel +90 532 123 45 67, kart 4111 1111 1111 1111, IBAN TR33 0006 1005 1978 6457 8413 26",
     );
     assert.equal(out, "Mail [email], tel [phone], kart [card], IBAN [iban]");
+  });
+
+  it("masks Baltic phone numbers and IBANs", () => {
+    const out = maskPII("tel +370 612 34567, +372 5123 4567, IBAN LT12 1000 0111 0100 1000, LV80 BANK 0000 4351 9500 1, EE38 2200 2210 2014 5685");
+    assert.equal(out, "tel [phone], [phone], IBAN [iban], [iban], [iban]");
   });
 
   it("leaves ordinary numbers alone", () => {

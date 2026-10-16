@@ -5,9 +5,12 @@ import { notFound } from "next/navigation"
 import { siteUrl } from "@/lib/site"
 import { DEFAULT_LOCALE, isLocale, LOCALE_COOKIE, LOCALE_META, LOCALES, localizePath, matchLocale, type Locale } from "./config"
 import { en, type Dictionary } from "./dictionaries/en"
+import { et } from "./dictionaries/et"
+import { lt } from "./dictionaries/lt"
+import { lv } from "./dictionaries/lv"
 import { tr } from "./dictionaries/tr"
 
-const DICTIONARIES: Record<Locale, Dictionary> = { en, tr }
+const DICTIONARIES: Record<Locale, Dictionary> = { en, tr, lt, lv, et }
 
 export const getDictionary = (locale: Locale) => DICTIONARIES[locale]
 

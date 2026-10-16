@@ -41,8 +41,8 @@ function Body() {
           <a href="/grounded-answers">How grounded answers work</a>.
         </li>
         <li>
-          <strong>Turkish and English.</strong> Shoppers get replies in the language they write in, which helps stores
-          selling both in Turkey and abroad.
+          <strong>Five languages.</strong> Turkish, English, Lithuanian, Latvian and Estonian: shoppers get replies in the
+          language they write in, which helps stores selling across borders.
         </li>
         <li>
           <strong>Lead capture.</strong> Optionally ask for a name, email or phone number before the chat starts, so a
@@ -121,13 +121,13 @@ export const ecommerce: MarketingContent = {
   meta: {
     title: "AI chatbot for e-commerce stores",
     description:
-      "Answer shipping, returns, sizing and payment questions 24/7 with an AI chatbot that only uses your store's own pages. Turkish and English.",
+      "Answer shipping, returns, sizing and payment questions 24/7 with an AI chatbot that only uses your store's own pages. In five languages.",
     crumb: "E-commerce",
   },
   eyebrow: "For e-commerce",
   title: "An AI chatbot for online stores that never invents a return policy",
   intro:
-    "Answer shipping, returns, sizing and payment questions around the clock, from your own store pages, in Turkish and English.",
+    "Answer shipping, returns, sizing and payment questions around the clock, from your own store pages, in Turkish, English, Lithuanian, Latvian and Estonian.",
   toc: TOC,
   body: Body,
 };

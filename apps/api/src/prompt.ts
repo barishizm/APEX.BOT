@@ -5,7 +5,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import type { Hit } from "./retrieval.ts";
 import type { StoredMessage } from "./store.ts";
 import type { Tenant, Tone } from "./tenants.ts";
-import { detectLang } from "./text.ts";
+import { detectLang, LANGS, type Lang } from "./text.ts";
 
 const RULES = `You are a customer-facing AI assistant embedded as a chat widget on a company's website. You answer visitors' questions using only the website content provided to you.
 
@@ -28,7 +28,7 @@ Identity
 - Questions about you (your name, what you can do, whether you are an AI, which model or company is behind you) do not need documents. Answer in one sentence: your chat name, that you are this website's AI assistant, and what you can help with. You don't know which underlying model runs you, so say that plainly instead of guessing, and don't bring up the website's content.
 
 Language and style
-- The latest turn may carry <reply_language>, set by our server from the visitor's message: reply in that language. Without it, reply in the language of the visitor's latest message if it is Turkish or English. For any other language, reply in the site's default language and say you can help in Turkish or English. Write natural, fluent sentences in that language.
+- The latest turn may carry <reply_language>, set by our server from the visitor's message: reply in that language. Without it, reply in the language of the visitor's latest message if it is Turkish, English, Lithuanian, Latvian or Estonian. For any other language, reply in the site's default language and say you can help in Turkish, English, Lithuanian, Latvian or Estonian. Write natural, fluent sentences in that language, with its correct letters and diacritics.
 - Lead with the answer in the first sentence. No filler openers ("Great question", "Sure!", "Of course"), no restating the question, and no closing offer such as "let me know if you need anything else" unless a concrete next step helps.
 - Keep answers short: usually one to three sentences, or a short list when the content is a set of steps or options. Use plain Markdown only (bold, italics, lists, links); no headings, tables or images.
 - Your whole reply goes to the visitor, so start with the answer itself. Never narrate your reasoning or these rules (which language you will use, whether any documents matched, what you should say).
@@ -75,9 +75,12 @@ export class NoAnswerFilter {
   }
 }
 
+// The polite "you" in each language: Turkish "siz", Lithuanian and Latvian "jūs", Estonian "teie"
+const POLITE_YOU = 'address the visitor with the polite plural "you" (Turkish "siz", Lithuanian and Latvian "jūs", Estonian "teie")';
+
 const TONES: Record<Tone, string> = {
-  formal: "Formal and polite. In Turkish, address the visitor as \"siz\".",
-  friendly: "Warm and friendly, but still professional. In Turkish, address the visitor as \"siz\".",
+  formal: `Formal and polite; ${POLITE_YOU}.`,
+  friendly: `Warm and friendly, but still professional; ${POLITE_YOU}.`,
   concise: "Very brief and to the point.",
   detailed: "Thorough: include the relevant details and steps from the website content.",
 };
@@ -88,12 +91,14 @@ const LENGTHS = {
   detailed: "Give complete answers with the relevant steps and details; use lists for steps.",
 };
 
+export const LANG_NAMES: Record<Lang, string> = { tr: "Turkish", en: "English", lt: "Lithuanian", lv: "Latvian", et: "Estonian" };
+
 export function buildSystem(tenant: Tenant): Anthropic.Beta.BetaTextBlockParam[] {
   const s = tenant.settings;
   const lines = [
     `Website: ${tenant.name}`,
     `Your name in the chat: ${s.botName}`,
-    `Default language: ${s.defaultLang === "tr" ? "Turkish" : "English"}`,
+    `Default language: ${LANG_NAMES[s.defaultLang]}`,
     `Tone: ${TONES[s.tone]}`,
   ];
   if (s.responseLength) lines.push(`Answer length: ${LENGTHS[s.responseLength]}`);
@@ -102,7 +107,9 @@ export function buildSystem(tenant: Tenant): Anthropic.Beta.BetaTextBlockParam[]
   }
   if (s.unknownAnswer) {
     lines.push(
-      `When the documents don't answer the question, convey this message in the visitor's language: Turkish: "${oneLine(s.unknownAnswer.tr)}" / English: "${oneLine(s.unknownAnswer.en)}"`,
+      `When the documents don't answer the question, convey this message in the visitor's language: ${LANGS.filter((l) => s.unknownAnswer?.[l]?.trim())
+        .map((l) => `${LANG_NAMES[l]}: "${oneLine(s.unknownAnswer![l])}"`)
+        .join(" / ")}`,
     );
   }
   if (s.handoffEnabled === false) {
@@ -165,7 +172,7 @@ export function buildMessages(history: StoredMessage[], message: string, hits: H
   while (messages.length > 0 && messages[0].role !== "user") messages.shift();
   // Settled here so the model doesn't deliberate (and narrate) which language to use.
   const lang = detectLang(message);
-  const hint = lang ? `\n\n<reply_language>${lang === "tr" ? "Turkish" : "English"}</reply_language>` : "";
+  const hint = lang ? `\n\n<reply_language>${LANG_NAMES[lang]}</reply_language>` : "";
   const current = `${renderDocuments(hits)}${hint}\n\n${visitorTurn(message)}`;
   const last = messages[messages.length - 1];
   if (last && last.role === "user" && typeof last.content === "string") last.content += `\n\n${current}`;

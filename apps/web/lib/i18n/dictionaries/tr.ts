@@ -6,8 +6,8 @@ export const tr: Dictionary = {
     titleTemplate: "%s — Apex Bot",
     defaultTitle: "Apex Bot — Web siteniz için yapay zekâ destek chatbotu",
     description:
-      "Apex Bot, ziyaretçilerinize yalnızca web sitenizdeki bilgilerle Türkçe ve İngilizce yanıt veren yapay zekâ destek chatbotudur. Tek satır kodla kurulur.",
-    keywords: ["yapay zekâ chatbot", "web sitesi chatbot", "müşteri destek botu", "AI asistan", "Türkçe chatbot", "canlı destek botu"],
+      "Apex Bot, ziyaretçilerinize yalnızca web sitenizdeki bilgilerle Türkçe, İngilizce, Litvanca, Letonca ve Estonca yanıt veren yapay zekâ destek chatbotudur. Tek satır kodla kurulur.",
+    keywords: ["yapay zekâ chatbot", "web sitesi chatbot", "müşteri destek botu", "AI asistan", "Türkçe chatbot", "canlı destek botu", "çok dilli chatbot"],
     pricing: {
       title: "Fiyatlandırma",
       description: "Apex Bot beta süresince ücretsiz. Lansmanda sunacağımız Starter, Pro ve Enterprise planlarını inceleyin.",
@@ -62,7 +62,7 @@ export const tr: Dictionary = {
     chatWidgetText: "Markanıza uyarlayın, istediğiniz yere yerleştirin",
     whyApex: "Neden Apex",
     groundedAnswers: "Kaynağa dayalı yanıtlar",
-    turkishEnglish: "Türkçe ve İngilizce",
+    turkishEnglish: "Beş dil",
     humanHandoff: "İnsana devir",
     securityPrivacy: "Güvenlik ve gizlilik",
     seePricing: "Fiyatları görün",
@@ -90,12 +90,12 @@ export const tr: Dictionary = {
   },
 
   footer: {
-    tagline: "Kendi web sitenizdeki bilgilerle Türkçe ve İngilizce yanıt veren yapay zekâ asistanı.",
+    tagline: "Kendi web sitenizdeki bilgilerle Türkçe, İngilizce, Litvanca, Letonca ve Estonca yanıt veren yapay zekâ asistanı.",
     rights: "© {year} Apex Bot. Tüm hakları saklıdır.",
   },
 
   hero: {
-    badge: "Kapalı beta aşamasında · Türkçe ve İngilizce",
+    badge: "Kapalı beta aşamasında · Beş dil",
     titleStart: "Hiç uyumayan",
     titleAccent: "müşteri desteği.",
     lede1: "Apex, ziyaretçilerinizi kendi web sitenizdeki bilgilerle günün her saati yanıtlayan bir yapay zekâ destek chatbotudur.",
@@ -130,7 +130,7 @@ export const tr: Dictionary = {
         { title: "7/24 Kesintisiz", text: "Ekibinizi büyütmeden müşteri sorularını günün her saatinde anında yanıtlayın." },
         {
           title: "Müşterinizin Dilini Konuşur",
-          text: "Ziyaretçi hangi dilde yazarsa Türkçe ya da İngilizce olarak, yalnızca sizin içeriğinizle yanıt verir.",
+          text: "Ziyaretçi Türkçe, İngilizce, Litvanca, Letonca ya da Estonca, hangi dilde yazarsa o dilde ve yalnızca sizin içeriğinizle yanıt verir.",
         },
         { title: "Ekibinize Devreder", text: "Yanıt veremediğinde ziyaretçiler, tüm konuşmayla birlikte size e-postayla ulaşır." },
       ],
@@ -236,7 +236,10 @@ export const tr: Dictionary = {
           title: "İçeriğinize dayalı",
           text: "Yanıtlar yalnızca kendi sayfalarınızdan gelir ve altında kaynak bağlantısı bulunur. İçeriğiniz bir konuyu kapsamıyorsa Apex tahmin yürütmek yerine bunu söyler.",
         },
-        { title: "Türkçe ve İngilizce", text: "Ziyaretçiler yazdıkları dilde yanıt alır; widget'ın her kelimesi çevrilmiştir." },
+        {
+          title: "Beş dil",
+          text: "Türkçe, İngilizce, Litvanca, Letonca ve Estonca. Ziyaretçiler yazdıkları dilde yanıt alır; widget'ın her kelimesi çevrilmiştir.",
+        },
         {
           title: "İnsana devir",
           text: "“Bir insanla konuş” seçeneği, ziyaretçinin sorusunu ve tüm konuşmayı ekibinize e-postayla iletir. Yanıtladığınızda doğrudan onunla yazışırsınız.",
@@ -249,7 +252,7 @@ export const tr: Dictionary = {
     widget: {
       eyebrow: "Sohbet widget'ı",
       title: "Bizim değil, sizin markanız gibi görünür",
-      text: "Her ayrıntı, canlı önizlemesiyle panelinizde bir ayardır. Burada iki dilde de deneyin.",
+      text: "Her ayrıntı, canlı önizlemesiyle panelinizde bir ayardır. Burada tüm dillerde deneyin.",
       checks: [
         "Marka rengi, açılış simgesi veya kendi görseliniz, konum ve boyut",
         "Karşılama mesajı, önerilen sorular ve “bilmiyorum” yanıtı",
@@ -307,7 +310,7 @@ export const tr: Dictionary = {
         },
         {
           q: "Hangi dilleri konuşuyor?",
-          a: "Türkçe ve İngilizce. Asistan ziyaretçinin dilinde yanıt verir; widget arayüzü ise ziyaretçinin tarayıcı diline ya da seçtiğiniz varsayılan dile uyar.",
+          a: "Türkçe, İngilizce, Litvanca, Letonca ve Estonca. Asistan ziyaretçinin dilinde yanıt verir; widget arayüzü ise ziyaretçinin tarayıcı diline ya da seçtiğiniz varsayılan dile uyar.",
         },
         {
           q: "Verilerim yapay zekâ modellerini eğitmek için kullanılıyor mu?",
@@ -361,7 +364,7 @@ export const tr: Dictionary = {
         features: [
           "1 web sitesinde 1 asistan",
           "50 sayfaya kadar bilgi",
-          "Türkçe ve İngilizce",
+          "Beş dilin tamamı",
           "E-postayla insana devir ve potansiyel müşteri toplama",
           "Widget'ta “Powered by Apex Bot” ibaresi",
         ],

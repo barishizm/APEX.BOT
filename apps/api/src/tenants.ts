@@ -1,6 +1,6 @@
 // Tenant registry. Each customer site is a tenant; its public site_key is only usable
 // from the origins on its allowlist.
-import type { BotSettings, PublicWidgetSettings } from "@apex/db/bot-settings";
+import { DEFAULT_SETTINGS, LANGS, type BotSettings, type PublicWidgetSettings } from "@apex/db/bot-settings";
 import type { ModelChoice } from "./model.ts";
 import type { Lang } from "./text.ts";
 
@@ -192,8 +192,10 @@ function validateTenant(t: Tenant): void {
   if (!(t.retentionDays > 0)) fail("retentionDays must be > 0");
   const s = t.settings;
   if (!s?.botName) fail("settings.botName is required");
-  if (s.defaultLang !== "tr" && s.defaultLang !== "en") fail("settings.defaultLang must be tr or en");
-  if (!s.greeting?.tr || !s.greeting?.en) fail("settings.greeting needs tr and en");
-  s.suggestions ??= { tr: [], en: [] };
+  if (!LANGS.includes(s.defaultLang)) fail(`settings.defaultLang must be one of ${LANGS.join(", ")}`);
+  if (!s.greeting?.[s.defaultLang]) fail(`settings.greeting needs ${s.defaultLang} (the default language)`);
+  // A language the file leaves out gets the dashboard's default greeting and no suggestions
+  s.greeting = { ...DEFAULT_SETTINGS.messages.greeting, ...s.greeting };
+  s.suggestions = { ...DEFAULT_SETTINGS.messages.suggestions, ...s.suggestions };
   s.blockedTopics ??= [];
 }

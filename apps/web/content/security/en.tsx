@@ -142,7 +142,7 @@ function Body() {
         </li>
         <li>
           <strong>Personal data stays out of logs.</strong> Email addresses, phone numbers, card numbers (checked with the
-          Luhn algorithm) and Turkish IBANs are masked before anything is written to our application logs.
+          Luhn algorithm) and Turkish, Lithuanian, Latvian and Estonian IBANs are masked before anything is written to our application logs.
         </li>
         <li>
           <strong>Retention you control.</strong> Conversations are deleted automatically after the period you choose (1 to
