@@ -10,7 +10,7 @@ import { formatNumber, formatPercent, plural } from "@/lib/i18n/format"
 import { LOCALE_META } from "@/lib/i18n/config"
 import { TZ_COOKIE } from "@/lib/time-zone"
 import { cn } from "@/lib/utils"
-import { ActivityChart, CardHeader, HoursChart, QualityChart, card } from "./charts"
+import { ActivityChart, BetaBadge, CardHeader, HoursChart, QualityChart, card } from "./charts"
 import { UnansweredQuestions, type AnswerLimits } from "./unanswered"
 
 const RANGES = [7, 30, 90] as const
@@ -68,7 +68,7 @@ function TopicsCard({ data }: { data: AnalyticsJson }) {
 
   return (
     <section className={card} aria-labelledby="topics-title">
-      <CardHeader id="topics-title" title={t.title} description={t.description}>
+      <CardHeader id="topics-title" title={t.title} description={t.description} beta>
         <div role="tablist" aria-label={t.title} className="flex rounded-lg bg-[var(--color-bubble)] p-0.5 text-sm">
           {(["topics", "sources"] as const).map((key) => (
             <button
@@ -188,7 +188,7 @@ function LanguagesCard({ languages }: { languages: AnalyticsJson["languages"] })
 
   return (
     <section className={card} aria-labelledby="languages-title">
-      <CardHeader id="languages-title" title={t.title} description={t.description} />
+      <CardHeader id="languages-title" title={t.title} description={t.description} beta />
       {total === 0 ? (
         <p className="text-sm text-[var(--color-muted)]">{app.analytics.noData}</p>
       ) : (
@@ -340,6 +340,7 @@ export function AnalyticsDashboard({ initial, canEdit, limits }: { initial: Anal
           <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
             <ChartColumn className="h-6 w-6 text-[var(--color-muted)]" aria-hidden />
             {t.title}
+            <BetaBadge className="text-xs" />
           </h1>
           <p className="max-w-2xl text-[var(--color-muted)]">{t.lede}</p>
         </div>
