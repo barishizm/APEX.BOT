@@ -318,7 +318,7 @@ export class EchoChatModel implements ChatModel {
     const doc = /<document [^>]*title="([^"]*)"[^>]*>\n([\s\S]*?)\n<\/document>/.exec(content);
     const text = doc
       ? `**${doc[1]}**\n\n${doc[2]}`
-      : "Bu konuda sitede bir bilgi bulamadım. İsterseniz **Bir insanla konuş** seçeneğiyle ekibe ulaşabilirsiniz.";
+      : "Bu konuda sitede bir bilgi bulamadım. İsterseniz **Bir insanla konuş** seçeneğiyle ekibe ulaşabilirsiniz. [[no-answer]]";
     for (const word of text.split(/(?<= )/)) {
       if (signal?.aborted) return;
       await new Promise((r) => setTimeout(r, 25));

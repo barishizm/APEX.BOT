@@ -89,6 +89,21 @@ describe("POST /v1/chat", () => {
     assert.match(model.requests[0].messages.at(-1)!.content as string, /No website content matched/);
   });
 
+  it("takes the handoff path when the model finds the retrieved content doesn't answer", async () => {
+    const { app, model, store } = setup();
+    // "iade" matches a chunk, but the model judges it doesn't answer the question
+    model.reply = ["Bu bilgiye sahip değilim.", " [[no-", "answer]]"];
+    const events = await readSSE(await chat(app, { message: "İade kargosunu kim öder?" }));
+    const text = events.filter((e) => e.event === "delta").map((e) => e.data.text).join("");
+    assert.equal(text.includes("[["), false, "the marker never reaches the visitor");
+    const done = events.at(-1)!.data;
+    assert.equal(done.handoff, true);
+    assert.deepEqual(done.sources, [], "no unrelated sources under an \"I don't know\"");
+    const saved = store.get("tn_a", events[0].data.conversationId)!.messages.at(-1)!;
+    assert.equal(saved.unanswered, true);
+    assert.equal(saved.content, "Bu bilgiye sahip değilim.");
+  });
+
   it("continues a conversation and keeps history alternating", async () => {
     const { app, model } = setup();
     const first = await readSSE(await chat(app, { message: "iade süresi?" }));

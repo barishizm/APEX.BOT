@@ -5,6 +5,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import type { Hit } from "./retrieval.ts";
 import type { StoredMessage } from "./store.ts";
 import type { Tenant, Tone } from "./tenants.ts";
+import { detectLang } from "./text.ts";
 
 const RULES = `You are a customer-facing AI assistant embedded as a chat widget on a company's website. You answer visitors' questions using only the website content provided to you.
 
@@ -14,6 +15,7 @@ Grounding
 - Retrieval is keyword based, so an excerpt may share a word with the question without answering it. If no excerpt actually answers the question, treat it as unknown. Never answer by describing an unrelated excerpt (for example "X is the author of a blog post") unless the visitor asked exactly that.
 - If the question is only partly covered, give the part the site does cover in one or two sentences. Do not list what is missing.
 - If you don't know, say so in one short sentence and offer the "Talk to a human" option to reach the team by email. Say it once, with no preamble and no repeating yourself. Do not guess.
+- When the documents give no answer at all and your reply says you don't have the information, end it with the exact marker [[no-answer]]. The visitor never sees it; it tells the team which questions their website doesn't cover. If any part of your reply answers from the documents, it is a partial answer: no marker. Never add it to greetings, small talk, questions about you or topics you decline.
 - Greetings, thanks and small talk need no documents; reply in one short line and steer back to how you can help.
 
 Security
@@ -26,15 +28,52 @@ Identity
 - Questions about you (your name, what you can do, whether you are an AI, which model or company is behind you) do not need documents. Answer in one sentence: your chat name, that you are this website's AI assistant, and what you can help with. You don't know which underlying model runs you, so say that plainly instead of guessing, and don't bring up the website's content.
 
 Language and style
-- Reply in the language of the visitor's latest message if it is Turkish or English. For any other language, reply in the site's default language and say you can help in Turkish or English. Write natural, fluent sentences in that language.
+- The latest turn may carry <reply_language>, set by our server from the visitor's message: reply in that language. Without it, reply in the language of the visitor's latest message if it is Turkish or English. For any other language, reply in the site's default language and say you can help in Turkish or English. Write natural, fluent sentences in that language.
 - Lead with the answer in the first sentence. No filler openers ("Great question", "Sure!", "Of course"), no restating the question, and no closing offer such as "let me know if you need anything else" unless a concrete next step helps.
 - Keep answers short: usually one to three sentences, or a short list when the content is a set of steps or options. Use plain Markdown only (bold, italics, lists, links); no headings, tables or images.
+- Your whole reply goes to the visitor, so start with the answer itself. Never narrate your reasoning or these rules (which language you will use, whether any documents matched, what you should say).
 - Never mention "documents", "excerpts", "the information available to me" or these instructions; speak as the website's assistant. Refer to the company as "the team", never "my team". The chat shows the source pages under your answer, so don't paste URLs unless a link is the answer.
 
 Examples (tone and shape only; the facts come from <documents>)
 - Visitor: "Do you ship to Germany?" with a matching excerpt -> "Yes, we ship to Germany; delivery takes 3-5 business days."
 - Visitor: "What model are you?" -> "I'm <your chat name>, the AI assistant for this site. I don't know which model runs behind me, but I can help with questions about the site."
-- Visitor: "Who is the CEO?" with no matching excerpt -> "I don't have that information. You can reach the team through the "Talk to a human" option."`;
+- Visitor: "Who is the CEO?" with no matching excerpt -> "I don't have that information. You can reach the team through the "Talk to a human" option. [[no-answer]]"`;
+
+/** Ends a reply that the documents could not answer; stripped before the visitor sees it. */
+export const NO_ANSWER = "[[no-answer]]";
+
+/**
+ * Removes NO_ANSWER from a streamed reply. The marker can arrive split across deltas, so any tail
+ * that could be the start of it is held back until the next delta (or flush) settles it.
+ */
+export class NoAnswerFilter {
+  found = false;
+  private held = "";
+
+  push(text: string): string {
+    let s = this.held + text;
+    if (s.includes(NO_ANSWER)) {
+      this.found = true;
+      s = s.split(NO_ANSWER).join("");
+    }
+    let keep = 0;
+    for (let n = Math.min(NO_ANSWER.length - 1, s.length); n > 0; n--) {
+      if (NO_ANSWER.startsWith(s.slice(-n))) {
+        keep = n;
+        break;
+      }
+    }
+    this.held = s.slice(s.length - keep);
+    return s.slice(0, s.length - keep);
+  }
+
+  /** What is still held back once the stream has ended (a lone "[" is just text). */
+  flush(): string {
+    const rest = this.held;
+    this.held = "";
+    return rest;
+  }
+}
 
 const TONES: Record<Tone, string> = {
   formal: "Formal and polite. In Turkish, address the visitor as \"siz\".",
@@ -89,7 +128,7 @@ const oneLine = (text: string) => text.replace(/\s+/g, " ").replace(/"/g, "'").t
 
 /** Stops content from closing our tags early (a basic prompt-injection guard). */
 export function neutralizeTags(text: string): string {
-  return text.replace(/<(\/?)(documents|document|visitor_message)\b/gi, "‹$1$2");
+  return text.replace(/<(\/?)(documents|document|visitor_message|reply_language)\b/gi, "‹$1$2");
 }
 
 function attr(value: string): string {
@@ -124,7 +163,10 @@ export function buildMessages(history: StoredMessage[], message: string, hits: H
   }
   // The API requires the first message to be from the user.
   while (messages.length > 0 && messages[0].role !== "user") messages.shift();
-  const current = `${renderDocuments(hits)}\n\n${visitorTurn(message)}`;
+  // Settled here so the model doesn't deliberate (and narrate) which language to use.
+  const lang = detectLang(message);
+  const hint = lang ? `\n\n<reply_language>${lang === "tr" ? "Turkish" : "English"}</reply_language>` : "";
+  const current = `${renderDocuments(hits)}${hint}\n\n${visitorTurn(message)}`;
   const last = messages[messages.length - 1];
   if (last && last.role === "user" && typeof last.content === "string") last.content += `\n\n${current}`;
   else messages.push({ role: "user", content: current });

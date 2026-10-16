@@ -1,0 +1,22 @@
+{
+  "name": "@apex/evals",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "eval": "tsx src/cli.ts",
+    "eval:update": "tsx src/cli.ts --update-baseline",
+    "test": "tsx --test test/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "eval:live": "tsx --env-file-if-exists=../../apps/api/.env src/live.ts",
+    "experiment:embeddings": "tsx --env-file-if-exists=../../apps/api/.env src/experiments/embeddings.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "@apex/api": "*",
+    "@apex/knowledge": "*"
+  }
+}

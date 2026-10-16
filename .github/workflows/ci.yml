@@ -1,0 +1,35 @@
+# Type checks, tests and the retrieval quality gate on every pull request and push to main.
+# Needs no secrets: database tests run on embedded PostgreSQL and the retrieval evals are offline.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Test
+        run: npm test
+      - name: Retrieval evals (fails on regression against packages/evals/baseline.json)
+        run: npm run eval -w @apex/evals -- --verbose
+      - name: Build widget
+        run: npm run build:widget

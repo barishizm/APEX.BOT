@@ -8,7 +8,7 @@ import { RateLimiter, TokenBudget, type TokenUsageStore } from "./limits.ts";
 import { log } from "./log.ts";
 import type { Mailer } from "./mailer.ts";
 import type { ChatModel } from "./model.ts";
-import { buildMessages, buildSystem } from "./prompt.ts";
+import { NoAnswerFilter, buildMessages, buildSystem } from "./prompt.ts";
 import { relevantHits, type Hit, type KnowledgeBase } from "./retrieval.ts";
 import type { Conversation, ConversationStore, Source } from "./store.ts";
 import { normalizeOrigin, publicSettings, type Tenant, type TenantRegistry } from "./tenants.ts";
@@ -167,11 +167,16 @@ export function createApp(deps: AppDeps) {
       await stream.writeSSE({ event: "meta", data: JSON.stringify({ conversationId: conv.id, messageId: userMessage.id }) });
 
       let answer = "";
+      const noAnswer = new NoAnswerFilter();
+      const emit = async (text: string) => {
+        if (!text) return;
+        answer += text;
+        await stream.writeSSE({ event: "delta", data: JSON.stringify({ text }) });
+      };
       try {
         for await (const event of model.stream({ ...request, signal: abort.signal })) {
           if (event.type === "text") {
-            answer += event.text;
-            await stream.writeSSE({ event: "delta", data: JSON.stringify({ text: event.text }) });
+            await emit(noAnswer.push(event.text));
             continue;
           }
           budget.record(tenant.id, event.inputTokens + event.outputTokens);
@@ -189,9 +194,12 @@ export function createApp(deps: AppDeps) {
         return;
       }
 
-      const unanswered = hits.length === 0;
-      const sources = uniqueSources(hits);
-      const reply = store.append(conv, { role: "assistant", content: answer, sources, unanswered });
+      await emit(noAnswer.flush());
+      // Retrieval can pass content that shares words with the question without answering it;
+      // the model's marker catches those, so the gap is reported and no unrelated sources show.
+      const unanswered = hits.length === 0 || noAnswer.found;
+      const sources = noAnswer.found ? [] : uniqueSources(hits);
+      const reply = store.append(conv, { role: "assistant", content: answer.trimEnd(), sources, unanswered });
       if (unanswered) log("info", "unanswered question", { tenant: tenant.id, question: message });
       const offerHandoff = unanswered && tenant.settings.handoffEnabled !== false && tenant.settings.offerHandoffWhenUnsure !== false;
       await stream.writeSSE({
