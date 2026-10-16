@@ -1,5 +1,5 @@
 import type { Db, Queryable } from "./db.ts"
-import { canEditBot, getBotForUser } from "./bots.ts"
+import { BotError, canEditBot, getBotForUser } from "./bots.ts"
 
 // ---------- Written by the chat API (scoped by bot id, which it resolved from the site key) ----------
 
@@ -276,6 +276,37 @@ export async function conversationStats(db: Db, userId: string, days = 7): Promi
     [bot.id, days],
   )
   return rows[0]
+}
+
+// ---------- Unanswered questions, closed out from the analytics page ----------
+
+/** Most replies one request may resolve; the analytics page groups repeats of a question. */
+export const MAX_RESOLVE = 200
+
+/** Valid, distinct reply ids, or an error for anything else. */
+export function replyIdList(raw: unknown): string[] {
+  if (!Array.isArray(raw) || !raw.length || raw.length > MAX_RESOLVE || !raw.every((id) => typeof id === "string" && UUID.test(id))) {
+    throw new BotError("not_found", "Those questions are no longer open")
+  }
+  return [...new Set(raw as string[])]
+}
+
+/** Marks this bot's open unanswered replies resolved; ids of other bots are ignored. */
+export async function resolveReplies(db: Queryable, botId: string, ids: string[]): Promise<number> {
+  const { rows } = await db.query(
+    `update app.messages set resolved_at = now()
+      where bot_id = $1 and id = any($2::uuid[]) and role = 'assistant' and unanswered and resolved_at is null
+      returning id`,
+    [botId, ids],
+  )
+  return rows.length
+}
+
+/** "Dismiss": the question needs no answer in the knowledge base. */
+export async function dismissUnansweredForUser(db: Db, userId: string, rawIds: unknown): Promise<number> {
+  const bot = await getBotForUser(db, userId)
+  if (!canEditBot(bot.role)) throw new BotError("forbidden", "Only workspace owners and admins can change the knowledge base")
+  return resolveReplies(db, bot.id, replyIdList(rawIds))
 }
 
 // ---------- Daily token usage (chat API) ----------
