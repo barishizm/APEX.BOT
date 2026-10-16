@@ -1,5 +1,6 @@
 import type { Locale } from "../config"
 import { account } from "./account"
+import { analytics } from "./analytics"
 import { inbox } from "./inbox"
 import { knowledge } from "./knowledge"
 import { overview } from "./overview"
@@ -9,7 +10,7 @@ import { shell } from "./shell"
 import { studio } from "./studio"
 
 // The signed-in app's strings, one namespace per area. Register new namespaces here.
-const NAMESPACES = { shell, setup, overview, account, settings, inbox, knowledge, studio }
+const NAMESPACES = { shell, setup, overview, analytics, account, settings, inbox, knowledge, studio }
 
 type Namespaces = typeof NAMESPACES
 export type AppDictionary = { [K in keyof Namespaces]: Namespaces[K]["en"] }

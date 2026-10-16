@@ -13,6 +13,7 @@ export const MIGRATION_NAMES = [
   "0008_handoff_verification.sql",
   "0009_token_usage.sql",
   "0010_waitlist.sql",
+  "0011_analytics.sql",
 ] as const
 
 /** Migrations this code expects that the database hasn't applied (run `npm run db:migrate`). */
