@@ -11,5 +11,5 @@ export async function generateMetadata({ params }: PageProps<"/[lang]/privacy">)
 
 export default async function Page({ params }: PageProps<"/[lang]/privacy">) {
   const locale = await resolveLocale(params);
-  return <ProsePage locale={locale} content={PROSE.privacy[locale]} />;
+  return <ProsePage locale={locale} content={PROSE.privacy[locale]} path="/privacy" crumb={getDictionary(locale).meta.privacy.title} />;
 }
