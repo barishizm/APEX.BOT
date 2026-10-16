@@ -106,7 +106,7 @@ export function buildFooter(t: Dictionary): { heading: string; links: { label: s
     {
       heading: t.nav.company,
       links: [
-        { label: t.nav.securityPrivacy, href: "/#security" },
+        { label: t.nav.securityPrivacy, href: "/security" },
         { label: t.nav.terms, href: "/terms" },
         { label: t.nav.privacy, href: "/privacy" },
         { label: t.nav.contact, href: `mailto:${CONTACT_EMAIL}` },
