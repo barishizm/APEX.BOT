@@ -259,7 +259,7 @@ npm run dev:api                                # sohbet API'si, http://localhost
 npm run dev:web                                # site + yönetim paneli, http://localhost:3000
 ```
 
-Kontroller: `npm run typecheck` ve `npm test` (veritabanı testleri gömülü PostgreSQL ile, ağ gerektirmez).
+Kontroller: `npm run typecheck`, `npm test` (veritabanı testleri gömülü PostgreSQL ile, ağ gerektirmez) ve `npm run eval` (retrieval kalite kapısı; `baseline.json`a göre geriye gidişte başarısız olur). Hepsi her PR'da CI'da çalışır.
 
 Uygulamalar:
 
@@ -270,6 +270,7 @@ Uygulamalar:
 | `apps/widget` | Shadow DOM'lu gömülebilir widget (`widget.js`) |
 | `packages/db` | Şema, migration'lar ve tüm veritabanı erişimi (tenant izolasyonu burada) |
 | `packages/knowledge` | SSRF korumalı site tarayıcı, içerik çıkarma, parçalama ve BM25 retrieval |
+| `packages/evals` | Altın soru setleri, retrieval kalite kapısı (CI), canlı ve kırmızı takım değerlendirmeleri ([README](packages/evals/README.md)) |
 
 Ortam değişkenleri:
 
@@ -312,16 +313,16 @@ Sitenin tamamı İngilizce ve Türkçedir: herkese açık sayfalar, giriş/kayı
 **Faz 0 – Temel (1–2 hafta)**
 - [ ] Teknoloji kararlarının kesinleşmesi (ADR'ler)
 - [x] Monorepo iskeleti ve test altyapısı
-- [ ] CI ve lint
+- [x] CI (typecheck, test, retrieval eval kapısı); lint henüz yok
 - [x] Tek bir örnek site için elle hazırlanmış bilgi tabanı
 
 **Faz 1 – MVP (3–5 hafta)**
 - [x] `/v1/chat` akışlı yanıt, sistem istemi, geçmiş yönetimi
 - [x] URL tarama → parçalama → retrieval (BM25)
-- [ ] Embedding ile anlamsal arama
+- [ ] Embedding ile anlamsal arama (ölçüldü, şimdilik ertelendi: [ADR 0001](docs/adr/0001-retrieval-embeddings.md))
 - [x] Temel widget (aç/kapa, akış, kaynak linkleri)
 - [x] Site anahtarı + domain izin listesi + rate limit
-- [ ] İlk değerlendirme seti
+- [x] İlk değerlendirme seti (`packages/evals`: retrieval kapısı, canlı ve kırmızı takım paketleri)
 
 **Faz 2 – Ürünleşme**
 - [x] Yönetim paneli (kaynaklar, ayarlar, konuşmalar)
