@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { parseInline, parseMarkdown } from "../src/markdown.ts";
 import { createSSEParser } from "../src/sse.ts";
+import { LANGS, pickLang, strings } from "../src/i18n.ts";
 
 describe("SSE parser", () => {
   it("handles events split across chunks and CRLF", () => {
@@ -52,5 +53,25 @@ describe("markdown", () => {
 
   it("keeps raw HTML as text", () => {
     assert.deepEqual(parseInline('<img src=x onerror="alert(1)">'), [{ t: "text", v: '<img src=x onerror="alert(1)">' }]);
+  });
+});
+
+describe("languages", () => {
+  it("picks a supported language from a preference, else the fallback", () => {
+    assert.equal(pickLang("lt-LT", "en"), "lt");
+    assert.equal(pickLang("lv", "en"), "lv");
+    assert.equal(pickLang("ET", "en"), "et");
+    assert.equal(pickLang("de-DE", "lv"), "lv");
+  });
+
+  it("has every string in every language", () => {
+    const keys = (o: object): string[] => Object.entries(o).flatMap(([k, v]) => (typeof v === "object" ? keys(v).map((s) => `${k}.${s}`) : [k]));
+    for (const lang of LANGS) {
+      assert.deepEqual(keys(strings[lang]), keys(strings.en), lang);
+      for (const key of keys(strings[lang])) {
+        const value = key.split(".").reduce<unknown>((o, k) => (o as Record<string, unknown>)[k], strings[lang]);
+        assert.ok(typeof value === "string" && value.trim(), `${lang}.${key} is empty`);
+      }
+    }
   });
 });

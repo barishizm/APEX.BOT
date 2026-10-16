@@ -1,4 +1,5 @@
-export type Lang = "tr" | "en";
+export type Lang = "tr" | "en" | "lt" | "lv" | "et";
+export const LANGS: readonly Lang[] = ["tr", "en", "lt", "lv", "et"];
 
 const tr = {
   open: "Sohbeti aç",
@@ -102,13 +103,165 @@ const en: Strings = {
   },
 };
 
-export const strings: Record<Lang, Strings> = { tr, en };
+const lt: Strings = {
+  open: "Atidaryti pokalbį",
+  close: "Uždaryti pokalbį",
+  ai: "DI asistentas",
+  placeholder: "Užduokite klausimą…",
+  send: "Siųsti",
+  newChat: "Naujas pokalbis",
+  sources: "Šaltiniai",
+  helpful: "Naudinga",
+  notHelpful: "Nenaudinga",
+  thanks: "Ačiū!",
+  disclaimer: "Atsakymus generuoja dirbtinis intelektas, todėl jie gali būti netikslūs.",
+  privacy: "Privatumas",
+  human: "Kalbėti su žmogumi",
+  humanOffer: "Jei norite, galiu perduoti jūsų klausimą mūsų komandai.",
+  handoffTitle: "Susisiekite su komanda",
+  handoffIntro: "Palikite savo duomenis ir komanda jums atsakys el. paštu. Kartu bus išsiųsta ir šio pokalbio kopija.",
+  name: "Jūsų vardas (neprivaloma)",
+  email: "Jūsų el. pašto adresas",
+  note: "Jūsų žinutė (neprivaloma)",
+  submit: "Siųsti",
+  cancel: "Atšaukti",
+  back: "Grįžti į pokalbį",
+  sending: "Siunčiama…",
+  handoffSent: "Jūsų žinutė išsiųsta. Komanda netrukus atsakys el. paštu.",
+  invalidEmail: "Įveskite tinkamą el. pašto adresą.",
+  typing: "Rašomas atsakymas",
+  retry: "Bandyti dar kartą",
+  leadTitle: "Prieš pradedant",
+  leadIntro: "Palikite savo kontaktinius duomenis, kad galėtume jums geriau padėti.",
+  nameReq: "Jūsų vardas",
+  phone: "Jūsų telefono numeris (neprivaloma)",
+  phoneReq: "Jūsų telefono numeris",
+  invalidPhone: "Įveskite tinkamą telefono numerį.",
+  required: "Šis laukas privalomas.",
+  start: "Pradėti pokalbį",
+  skip: "Praleisti",
+  dismiss: "Uždaryti",
+  powered: "Veikia su Apex Bot",
+  errors: {
+    rate_limited: "Siunčiate žinutes per greitai. Palaukite akimirką ir bandykite dar kartą.",
+    budget_exhausted: "Asistentas šiuo metu negali atsakyti. Savo klausimą galite išsiųsti mūsų komandai.",
+    message_too_long: "Jūsų žinutė per ilga. Sutrumpinkite ją.",
+    conversation_full: "Šis pokalbis tapo per ilgas. Pradėkite naują pokalbį.",
+    refused: "Šiuo klausimu negaliu padėti.",
+    network: "Nepavyko prisijungti. Bandykite dar kartą.",
+    generic: "Kažkas nepavyko. Bandykite dar kartą.",
+  },
+};
+
+const lv: Strings = {
+  open: "Atvērt tērzēšanu",
+  close: "Aizvērt tērzēšanu",
+  ai: "MI asistents",
+  placeholder: "Uzdodiet jautājumu…",
+  send: "Sūtīt",
+  newChat: "Jauna saruna",
+  sources: "Avoti",
+  helpful: "Noderīgi",
+  notHelpful: "Nav noderīgi",
+  thanks: "Paldies!",
+  disclaimer: "Atbildes ģenerē mākslīgais intelekts, un tās var būt neprecīzas.",
+  privacy: "Privātums",
+  human: "Runāt ar cilvēku",
+  humanOffer: "Ja vēlaties, varu nodot jūsu jautājumu mūsu komandai.",
+  handoffTitle: "Sazinieties ar komandu",
+  handoffIntro: "Atstājiet savu kontaktinformāciju, un komanda jums atbildēs pa e-pastu. Tiks nosūtīta arī šīs sarunas kopija.",
+  name: "Jūsu vārds (nav obligāti)",
+  email: "Jūsu e-pasta adrese",
+  note: "Jūsu ziņa (nav obligāti)",
+  submit: "Sūtīt",
+  cancel: "Atcelt",
+  back: "Atpakaļ uz sarunu",
+  sending: "Notiek sūtīšana…",
+  handoffSent: "Jūsu ziņa ir nosūtīta. Komanda drīzumā atbildēs pa e-pastu.",
+  invalidEmail: "Ievadiet derīgu e-pasta adresi.",
+  typing: "Tiek rakstīta atbilde",
+  retry: "Mēģināt vēlreiz",
+  leadTitle: "Pirms sākam",
+  leadIntro: "Atstājiet savu kontaktinformāciju, lai mēs varētu jums labāk palīdzēt.",
+  nameReq: "Jūsu vārds",
+  phone: "Jūsu tālruņa numurs (nav obligāti)",
+  phoneReq: "Jūsu tālruņa numurs",
+  invalidPhone: "Ievadiet derīgu tālruņa numuru.",
+  required: "Šis lauks ir obligāts.",
+  start: "Sākt sarunu",
+  skip: "Izlaist",
+  dismiss: "Aizvērt",
+  powered: "Darbina Apex Bot",
+  errors: {
+    rate_limited: "Jūs sūtāt ziņas pārāk ātri. Brīdi uzgaidiet un mēģiniet vēlreiz.",
+    budget_exhausted: "Asistents pašlaik nevar atbildēt. Savu jautājumu varat nosūtīt mūsu komandai.",
+    message_too_long: "Jūsu ziņa ir pārāk gara. Lūdzu, saīsiniet to.",
+    conversation_full: "Šī saruna ir kļuvusi pārāk gara. Sāciet jaunu sarunu.",
+    refused: "Šajā jautājumā nevaru palīdzēt.",
+    network: "Neizdevās izveidot savienojumu. Lūdzu, mēģiniet vēlreiz.",
+    generic: "Radās kļūda. Lūdzu, mēģiniet vēlreiz.",
+  },
+};
+
+const et: Strings = {
+  open: "Ava vestlus",
+  close: "Sulge vestlus",
+  ai: "TI assistent",
+  placeholder: "Esitage küsimus…",
+  send: "Saada",
+  newChat: "Uus vestlus",
+  sources: "Allikad",
+  helpful: "Kasulik",
+  notHelpful: "Pole kasulik",
+  thanks: "Aitäh!",
+  disclaimer: "Vastused loob tehisintellekt ja need võivad olla ebatäpsed.",
+  privacy: "Privaatsus",
+  human: "Räägi inimesega",
+  humanOffer: "Soovi korral saan teie küsimuse meie meeskonnale edastada.",
+  handoffTitle: "Võtke meeskonnaga ühendust",
+  handoffIntro: "Jätke oma andmed ja meeskond vastab teile e-posti teel. Lisatakse ka selle vestluse koopia.",
+  name: "Teie nimi (valikuline)",
+  email: "Teie e-posti aadress",
+  note: "Teie sõnum (valikuline)",
+  submit: "Saada",
+  cancel: "Tühista",
+  back: "Tagasi vestlusse",
+  sending: "Saatmine…",
+  handoffSent: "Teie sõnum on saadetud. Meeskond vastab teile peagi e-posti teel.",
+  invalidEmail: "Sisestage kehtiv e-posti aadress.",
+  typing: "Vastust koostatakse",
+  retry: "Proovi uuesti",
+  leadTitle: "Enne alustamist",
+  leadIntro: "Jätke oma kontaktandmed, et saaksime teid paremini aidata.",
+  nameReq: "Teie nimi",
+  phone: "Teie telefoninumber (valikuline)",
+  phoneReq: "Teie telefoninumber",
+  invalidPhone: "Sisestage kehtiv telefoninumber.",
+  required: "See väli on kohustuslik.",
+  start: "Alusta vestlust",
+  skip: "Jäta vahele",
+  dismiss: "Sulge",
+  powered: "Apex Boti toel",
+  errors: {
+    rate_limited: "Saadate sõnumeid liiga kiiresti. Oodake hetk ja proovige uuesti.",
+    budget_exhausted: "Assistent ei saa praegu vastata. Võite oma küsimuse saata meie meeskonnale.",
+    message_too_long: "Teie sõnum on liiga pikk. Palun lühendage seda.",
+    conversation_full: "See vestlus on liiga pikaks veninud. Alustage uut vestlust.",
+    refused: "Selle teemaga ma aidata ei saa.",
+    network: "Ühendust ei õnnestunud luua. Palun proovige uuesti.",
+    generic: "Midagi läks valesti. Palun proovige uuesti.",
+  },
+};
+
+export const strings: Record<Lang, Strings> = { tr, en, lt, lv, et };
+
+const isLang = (value: string): value is Lang => (LANGS as readonly string[]).includes(value);
 
 export function pickLang(preference: string | undefined, fallback: Lang): Lang {
   const candidates = preference && preference !== "auto" ? [preference] : [document.documentElement.lang, ...navigator.languages];
   for (const c of candidates) {
     const base = c?.slice(0, 2).toLowerCase();
-    if (base === "tr" || base === "en") return base;
+    if (base && isLang(base)) return base;
   }
   return fallback;
 }

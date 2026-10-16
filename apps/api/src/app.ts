@@ -328,30 +328,99 @@ function uniqueSources(hits: Hit[]): Source[] {
 const HANDOFF_SUBJECT: Record<Lang, (site: string) => string> = {
   tr: (site) => `[Apex Bot] ${site}: ziyaretçi bir insanla görüşmek istiyor`,
   en: (site) => `[Apex Bot] ${site}: a visitor asked to talk to a human`,
+  lt: (site) => `[Apex Bot] ${site}: lankytojas nori pasikalbėti su žmogumi`,
+  lv: (site) => `[Apex Bot] ${site}: apmeklētājs vēlas runāt ar cilvēku`,
+  et: (site) => `[Apex Bot] ${site}: külastaja soovib rääkida inimesega`,
 };
 
 const LEAD_SUBJECT: Record<Lang, (site: string) => string> = {
   tr: (site) => `[Apex Bot] ${site}: yeni potansiyel müşteri`,
   en: (site) => `[Apex Bot] ${site}: new lead from the chat`,
+  lt: (site) => `[Apex Bot] ${site}: naujas kontaktas iš pokalbio`,
+  lv: (site) => `[Apex Bot] ${site}: jauns kontakts no tērzēšanas`,
+  et: (site) => `[Apex Bot] ${site}: uus kontakt vestlusest`,
+};
+
+// Labels for the hand-off and lead emails, in the site's default language
+const MAIL: Record<Lang, Record<"leadIntro" | "handoffIntro" | "name" | "email" | "phone" | "note" | "transcript" | "visitor" | "bot" | "none" | "reply", string>> = {
+  tr: {
+    leadIntro: "Bir ziyaretçi sohbete başlamadan önce iletişim bilgilerini bıraktı.",
+    handoffIntro: "Sohbet widget'ından bir ziyaretçi iletişim talebi gönderdi.",
+    name: "Ad",
+    email: "E-posta",
+    phone: "Telefon",
+    note: "Mesaj",
+    transcript: "Konuşma",
+    visitor: "Ziyaretçi",
+    bot: "Asistan",
+    none: "(Konuşma kaydı yok)",
+    reply: "Bu e-postayı yanıtladığınızda ziyaretçiye ulaşır.",
+  },
+  en: {
+    leadIntro: "A visitor left their contact details before starting a chat.",
+    handoffIntro: "A visitor sent a contact request from the chat widget.",
+    name: "Name",
+    email: "Email",
+    phone: "Phone",
+    note: "Message",
+    transcript: "Conversation",
+    visitor: "Visitor",
+    bot: "Assistant",
+    none: "(No conversation)",
+    reply: "Replying to this email reaches the visitor.",
+  },
+  lt: {
+    leadIntro: "Lankytojas prieš pradėdamas pokalbį paliko savo kontaktinius duomenis.",
+    handoffIntro: "Lankytojas per pokalbių valdiklį išsiuntė prašymą susisiekti.",
+    name: "Vardas",
+    email: "El. paštas",
+    phone: "Telefonas",
+    note: "Žinutė",
+    transcript: "Pokalbis",
+    visitor: "Lankytojas",
+    bot: "Asistentas",
+    none: "(Pokalbio nėra)",
+    reply: "Atsakę į šį laišką, susisieksite tiesiogiai su lankytoju.",
+  },
+  lv: {
+    leadIntro: "Apmeklētājs pirms sarunas sākuma atstāja savu kontaktinformāciju.",
+    handoffIntro: "Apmeklētājs tērzēšanas logrīkā nosūtīja saziņas pieprasījumu.",
+    name: "Vārds",
+    email: "E-pasts",
+    phone: "Tālrunis",
+    note: "Ziņa",
+    transcript: "Saruna",
+    visitor: "Apmeklētājs",
+    bot: "Asistents",
+    none: "(Sarunas nav)",
+    reply: "Atbildot uz šo e-pastu, jūs sazināsieties tieši ar apmeklētāju.",
+  },
+  et: {
+    leadIntro: "Külastaja jättis enne vestluse alustamist oma kontaktandmed.",
+    handoffIntro: "Külastaja saatis vestlusvidina kaudu ühendusevõtmise soovi.",
+    name: "Nimi",
+    email: "E-post",
+    phone: "Telefon",
+    note: "Sõnum",
+    transcript: "Vestlus",
+    visitor: "Külastaja",
+    bot: "Assistent",
+    none: "(Vestlust pole)",
+    reply: "Sellele e-kirjale vastates jõuate otse külastajani.",
+  },
 };
 
 function leadBody(lang: Lang, { email, name, phone }: { email: string; name: string; phone: string }): string {
-  const t =
-    lang === "tr"
-      ? { intro: "Bir ziyaretçi sohbete başlamadan önce iletişim bilgilerini bıraktı.", name: "Ad", email: "E-posta", phone: "Telefon", reply: "Bu e-postayı yanıtladığınızda ziyaretçiye ulaşır." }
-      : { intro: "A visitor left their contact details before starting a chat.", name: "Name", email: "Email", phone: "Phone", reply: "Replying to this email reaches the visitor." };
-  return [t.intro, "", `${t.name}: ${name || "-"}`, `${t.email}: ${email}`, `${t.phone}: ${phone || "-"}`, "", t.reply].join("\n");
+  const t = MAIL[lang];
+  return [t.leadIntro, "", `${t.name}: ${name || "-"}`, `${t.email}: ${email}`, `${t.phone}: ${phone || "-"}`, "", t.reply].join("\n");
 }
 
 function handoffBody(
   lang: Lang,
   { email, name, note, phone, conversation }: { email: string; name: string; note: string; phone: string; conversation?: Conversation },
 ): string {
-  const t =
-    lang === "tr"
-      ? { intro: "Sohbet widget'ından bir ziyaretçi iletişim talebi gönderdi.", name: "Ad", email: "E-posta", phone: "Telefon", note: "Mesaj", transcript: "Konuşma", visitor: "Ziyaretçi", bot: "Asistan", none: "(Konuşma kaydı yok)", reply: "Bu e-postayı yanıtladığınızda ziyaretçiye ulaşır." }
-      : { intro: "A visitor sent a contact request from the chat widget.", name: "Name", email: "Email", phone: "Phone", note: "Message", transcript: "Conversation", visitor: "Visitor", bot: "Assistant", none: "(No conversation)", reply: "Replying to this email reaches the visitor." };
-  const lines = [t.intro, "", `${t.name}: ${name || "-"}`, `${t.email}: ${email}`];
+  const t = MAIL[lang];
+  const lines = [t.handoffIntro, "", `${t.name}: ${name || "-"}`, `${t.email}: ${email}`];
   if (phone) lines.push(`${t.phone}: ${phone}`);
   lines.push(`${t.note}: ${note || "-"}`, "", `${t.transcript}:`);
   const messages = conversation?.messages.slice(-30) ?? [];
@@ -360,4 +429,3 @@ function handoffBody(
   lines.push("", t.reply);
   return lines.join("\n");
 }
-

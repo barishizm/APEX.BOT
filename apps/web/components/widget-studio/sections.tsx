@@ -4,6 +4,7 @@ import { AlignLeft, AlignRight, Check, Copy, ImageIcon, KeyRound, TriangleAlert 
 import { useState, type ReactNode } from "react"
 import {
   FONT_STACKS,
+  LANGS,
   LIMITS,
   MAX_TEMPERATURE,
   MODELS,
@@ -48,7 +49,14 @@ export interface SectionProps {
   listErr: (path: string) => Record<string, string> | undefined
 }
 
-const other = (lang: Lang): Lang => (lang === "tr" ? "en" : "tr")
+// Sample text in each widget language, shown as input placeholders
+const EXAMPLES: Record<Lang, { subtitle: string; buttonLabel: string; suggestion: string; teaser: string }> = {
+  tr: { subtitle: "Genelde birkaç saniyede yanıtlar", buttonLabel: "Bize sorun", suggestion: "Kargo ne kadar sürer?", teaser: "Sorunuz mu var? Hemen yanıtlayalım 👋" },
+  en: { subtitle: "Usually replies in seconds", buttonLabel: "Ask us", suggestion: "How long does shipping take?", teaser: "Questions? We answer in seconds 👋" },
+  lt: { subtitle: "Paprastai atsako per kelias sekundes", buttonLabel: "Klauskite mūsų", suggestion: "Kiek laiko trunka pristatymas?", teaser: "Turite klausimų? Atsakysime per kelias sekundes 👋" },
+  lv: { subtitle: "Parasti atbild dažu sekunžu laikā", buttonLabel: "Jautājiet mums", suggestion: "Cik ilgi notiek piegāde?", teaser: "Ir jautājumi? Atbildēsim dažu sekunžu laikā 👋" },
+  et: { subtitle: "Vastab tavaliselt mõne sekundiga", buttonLabel: "Küsige meilt", suggestion: "Kui kaua tarne aega võtab?", teaser: "Küsimusi? Vastame mõne sekundiga 👋" },
+}
 
 function LangTag({ lang }: { lang: Lang }) {
   return (
@@ -58,12 +66,12 @@ function LangTag({ lang }: { lang: Lang }) {
   )
 }
 
-/** Hint under a translated field when the other language still needs text. */
+/** Hint under a translated field when other languages still need text. */
 function useMissingHint() {
   const t = useAppI18n().t.studio
   return (value: Localized, lang: Lang, hint?: ReactNode): ReactNode => {
-    const o = other(lang)
-    if (value[lang].trim() && !value[o].trim()) return format(t.missingOther, { lang: t.langNames[o] })
+    const missing = LANGS.filter((l) => l !== lang && !value[l]?.trim())
+    if (value[lang].trim() && missing.length > 0) return format(t.missingOther, { lang: missing.map((l) => t.langNames[l]).join(", ") })
     return hint
   }
 }
@@ -136,7 +144,7 @@ export function GeneralSection({ s, set, lang, err }: SectionProps) {
           onChange={(subtitle) => set("general", { subtitle })}
           max={LIMITS.subtitle}
           error={err(`general.subtitle.${lang}`)}
-          placeholder={lang === "tr" ? "Genelde birkaç saniyede yanıtlar" : "Usually replies in seconds"}
+          placeholder={EXAMPLES[lang].subtitle}
           hint={t.subtitleHint}
         />
       </Group>
@@ -145,10 +153,7 @@ export function GeneralSection({ s, set, lang, err }: SectionProps) {
           label={t.defaultLang}
           value={g.defaultLang}
           onChange={(defaultLang) => set("general", { defaultLang })}
-          options={[
-            { value: "tr", label: "Türkçe" },
-            { value: "en", label: "English" },
-          ]}
+          options={LANGS.map((l) => ({ value: l, label: LOCALE_META[l].name }))}
           hint={t.defaultLangHint}
         />
         <ChoiceCards
@@ -224,7 +229,7 @@ export function AppearanceSection({ s, set, lang, err }: SectionProps) {
             onChange={(launcherLabel) => set("appearance", { launcherLabel })}
             max={LIMITS.launcherLabel}
             error={err(`appearance.launcherLabel.${lang}`)}
-            placeholder={lang === "tr" ? "Bize sorun" : "Ask us"}
+            placeholder={EXAMPLES[lang].buttonLabel}
             hint={t.buttonLabelHint}
           />
           <Segmented
@@ -340,7 +345,7 @@ export function MessagesSection({ s, set, lang, err, listErr }: SectionProps) {
           onChange={(list) => set("messages", { suggestions: { ...m.suggestions, [lang]: list } })}
           max={LIMITS.suggestions}
           maxLength={LIMITS.suggestion}
-          placeholder={lang === "tr" ? "Kargo ne kadar sürer?" : "How long does shipping take?"}
+          placeholder={EXAMPLES[lang].suggestion}
           hint={t.suggestionsHint}
           errors={listErr(`messages.suggestions.${lang}`)}
         />
@@ -409,7 +414,7 @@ export function BehaviorSection({ s, set, lang, err, listErr }: SectionProps) {
           onChange={(teaser) => set("behavior", { teaser })}
           max={LIMITS.teaser}
           error={err(`behavior.teaser.${lang}`)}
-          placeholder={lang === "tr" ? "Sorunuz mu var? Hemen yanıtlayalım 👋" : "Questions? We answer in seconds 👋"}
+          placeholder={EXAMPLES[lang].teaser}
           hint={t.teaserHint}
         />
       </Group>

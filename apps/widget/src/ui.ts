@@ -432,7 +432,8 @@ export class Widget {
   // ----- internals -----
 
   private async hydrate(): Promise<void> {
-    this.addBot(this.opts.greeting ?? this.cfg.greeting[this.lang]);
+    // Tenants configured in the API's JSON file may only have some languages
+    this.addBot(this.opts.greeting ?? (this.cfg.greeting[this.lang] || this.cfg.greeting[this.cfg.defaultLang] || this.cfg.greeting.en));
     let history: StoredMessage[] = [];
     if (this.conversationId) {
       try {

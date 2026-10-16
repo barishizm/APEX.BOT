@@ -147,7 +147,7 @@ function Body() {
         </li>
         <li>
           <strong>Kişisel veriler kayıtlara girmez.</strong> E-posta adresleri, telefon numaraları, kart numaraları (Luhn
-          algoritmasıyla kontrol edilir) ve Türkiye IBAN'ları, uygulama kayıtlarımıza yazılmadan önce maskelenir.
+          algoritmasıyla kontrol edilir) ile Türkiye, Litvanya, Letonya ve Estonya IBAN'ları, uygulama kayıtlarımıza yazılmadan önce maskelenir.
         </li>
         <li>
           <strong>Saklama süresi sizde.</strong> Konuşmalar, belirlediğiniz sürenin (1 ile 365 gün, varsayılan 30) sonunda otomatik

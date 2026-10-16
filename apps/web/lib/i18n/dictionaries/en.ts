@@ -6,8 +6,8 @@ export const en = {
     titleTemplate: "%s — Apex Bot",
     defaultTitle: "Apex Bot — AI support chatbot for your website",
     description:
-      "Apex Bot is an AI support chatbot that answers visitors using only your website's content, in Turkish and English. Installs with one line of code.",
-    keywords: ["AI chatbot", "website chatbot", "customer support bot", "AI assistant", "RAG chatbot", "Turkish chatbot"],
+      "Apex Bot is an AI support chatbot that answers visitors using only your website's content, in Turkish, English, Lithuanian, Latvian and Estonian. Installs with one line of code.",
+    keywords: ["AI chatbot", "website chatbot", "customer support bot", "AI assistant", "RAG chatbot", "Turkish chatbot", "Lithuanian chatbot", "Latvian chatbot", "Estonian chatbot"],
     pricing: {
       title: "Pricing",
       description: "Apex Bot is free during the beta. See the Starter, Pro and Enterprise plans we'll offer at launch.",
@@ -62,7 +62,7 @@ export const en = {
     chatWidgetText: "Match your brand, place it anywhere",
     whyApex: "Why Apex",
     groundedAnswers: "Grounded answers",
-    turkishEnglish: "Turkish & English",
+    turkishEnglish: "Five languages",
     humanHandoff: "Human hand-off",
     securityPrivacy: "Security & privacy",
     seePricing: "See pricing",
@@ -90,12 +90,12 @@ export const en = {
   },
 
   footer: {
-    tagline: "The AI assistant that answers from your own website, in Turkish and English.",
+    tagline: "The AI assistant that answers from your own website, in Turkish, English, Lithuanian, Latvian and Estonian.",
     rights: "© {year} Apex Bot. All rights reserved.",
   },
 
   hero: {
-    badge: "Now in closed beta · Turkish & English",
+    badge: "Now in closed beta · Five languages",
     titleStart: "Support that",
     titleAccent: "never sleeps.",
     lede1: "Apex is an AI support chatbot that answers your visitors from your own website, around the clock.",
@@ -130,7 +130,7 @@ export const en = {
         { title: "Always On, 24/7", text: "Answer customer questions instantly, any time of day, without growing your team." },
         {
           title: "Speaks Your Customers' Language",
-          text: "Replies in Turkish or English, whichever your visitor writes in, using only your own content.",
+          text: "Replies in Turkish, English, Lithuanian, Latvian or Estonian, whichever your visitor writes in, using only your own content.",
         },
         { title: "Hands Off to Your Team", text: "When it can't answer, visitors reach you by email with the whole conversation attached." },
       ],
@@ -236,7 +236,10 @@ export const en = {
           title: "Grounded in your content",
           text: "Answers come only from your own pages, with the source linked underneath. If your content doesn't cover it, Apex says so instead of guessing.",
         },
-        { title: "Turkish and English", text: "Visitors get replies in the language they write in, and every word of the widget is translated." },
+        {
+          title: "Five languages",
+          text: "Turkish, English, Lithuanian, Latvian and Estonian. Visitors get replies in the language they write in, and every word of the widget is translated.",
+        },
         {
           title: "Human hand-off",
           text: "“Talk to a human” emails your team the visitor's question and the whole conversation. Reply and you're talking to them.",
@@ -249,7 +252,7 @@ export const en = {
     widget: {
       eyebrow: "Chat widget",
       title: "Looks like your brand, not like ours",
-      text: "Every detail is a setting in your dashboard, with a live preview. Try it here in both languages.",
+      text: "Every detail is a setting in your dashboard, with a live preview. Try it here in every language.",
       checks: [
         "Brand color, launcher icon or your own image, position and size",
         "Greeting, suggested questions and the “I don't know” reply",
@@ -307,7 +310,7 @@ export const en = {
         },
         {
           q: "Which languages does it speak?",
-          a: "Turkish and English. The assistant replies in the visitor's language, and the widget interface follows the visitor's browser or a default you pick.",
+          a: "Turkish, English, Lithuanian, Latvian and Estonian. The assistant replies in the visitor's language, and the widget interface follows the visitor's browser or a default you pick.",
         },
         {
           q: "Is my data used to train AI models?",
@@ -361,7 +364,7 @@ export const en = {
         features: [
           "1 assistant on 1 website",
           "Up to 50 pages of knowledge",
-          "Turkish and English",
+          "All five languages",
           "Email hand-off and lead capture",
           "“Powered by Apex Bot” in the widget",
         ],

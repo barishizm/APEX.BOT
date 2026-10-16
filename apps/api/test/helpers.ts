@@ -23,8 +23,8 @@ export function tenant(id: string, siteKey: string, origin: string): Tenant {
       defaultLang: "tr",
       primaryColor: "#000000",
       position: "bottom-right",
-      greeting: { tr: "Merhaba", en: "Hi" },
-      suggestions: { tr: [], en: [] },
+      greeting: { tr: "Merhaba", en: "Hi", lt: "Sveiki", lv: "Sveiki", et: "Tere" },
+      suggestions: { tr: [], en: [], lt: [], lv: [], et: [] },
       blockedTopics: [],
     },
   };
