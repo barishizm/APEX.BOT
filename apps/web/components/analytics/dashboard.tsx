@@ -10,7 +10,7 @@ import { formatNumber, formatPercent, plural } from "@/lib/i18n/format"
 import { LOCALE_META } from "@/lib/i18n/config"
 import { TZ_COOKIE } from "@/lib/time-zone"
 import { cn } from "@/lib/utils"
-import { ActivityChart, BetaBadge, CardHeader, HoursChart, QualityChart, card } from "./charts"
+import { ActivityChart, BetaBadge, CardHeader, ChartEmptyOverlay, HoursChart, QualityChart, card } from "./charts"
 import { UnansweredQuestions, type AnswerLimits } from "./unanswered"
 
 const RANGES = [7, 30, 90] as const
@@ -58,6 +58,27 @@ function Meter({ value, color = "var(--chart-1)" }: { value: number; color?: str
   )
 }
 
+/** Ten faded rows in the shape of a ranked list, so an empty card keeps its size. */
+function PlaceholderRows({ message }: { message: string }) {
+  return (
+    <ChartEmptyOverlay show message={message}>
+      <ol className="m-0 flex list-none flex-col gap-1 p-0">
+        {Array.from({ length: 10 }, (_, i) => (
+          <li key={i} className="grid grid-cols-[1.75rem_1fr_auto] items-center gap-x-3 gap-y-1.5 rounded-xl bg-[var(--color-raised)] px-3 py-2.5">
+            <span className="text-sm font-semibold text-[var(--color-muted)] tabular-nums">{i + 1}</span>
+            <span className="block h-3 rounded bg-[var(--color-bubble)]" style={{ width: `${60 - i * 4}%` }} />
+            <span className="block h-3 w-10 rounded bg-[var(--color-bubble)]" />
+            <span />
+            <span className="col-span-2">
+              <Meter value={(10 - i) / 10} color="var(--color-line)" />
+            </span>
+          </li>
+        ))}
+      </ol>
+    </ChartEmptyOverlay>
+  )
+}
+
 function TopicsCard({ data }: { data: AnalyticsJson }) {
   const { t: app, locale } = useAppI18n()
   const t = app.analytics.topics
@@ -92,7 +113,7 @@ function TopicsCard({ data }: { data: AnalyticsJson }) {
       {tab === "topics" ? (
         <div id="topics-panel-topics" role="tabpanel" className="flex flex-col gap-2">
           {data.topics.length === 0 ? (
-            <p className="rounded-xl bg-[var(--color-raised)] px-4 py-6 text-center text-sm text-[var(--color-muted)]">{t.empty}</p>
+            <PlaceholderRows message={t.empty} />
           ) : (
             <ol className="m-0 flex list-none flex-col gap-1 p-0">
               {data.topics.map((topic, i) => {
@@ -146,7 +167,7 @@ function TopicsCard({ data }: { data: AnalyticsJson }) {
       ) : (
         <div id="topics-panel-sources" role="tabpanel">
           {data.topSources.length === 0 ? (
-            <p className="rounded-xl bg-[var(--color-raised)] px-4 py-6 text-center text-sm text-[var(--color-muted)]">{t.sourcesEmpty}</p>
+            <PlaceholderRows message={t.sourcesEmpty} />
           ) : (
             <ol className="m-0 flex list-none flex-col gap-1 p-0">
               {data.topSources.map((s, i) => (
@@ -187,10 +208,20 @@ function LanguagesCard({ languages }: { languages: AnalyticsJson["languages"] })
   const OTHER = "color-mix(in srgb, var(--color-muted) 40%, transparent)"
 
   return (
-    <section className={card} aria-labelledby="languages-title">
+    <section className={cn(card, "flex-1")} aria-labelledby="languages-title">
       <CardHeader id="languages-title" title={t.title} description={t.description} beta />
       {total === 0 ? (
-        <p className="text-sm text-[var(--color-muted)]">{app.analytics.noData}</p>
+        <ChartEmptyOverlay show message={app.analytics.chartEmpty} className="flex-1">
+          <div className="flex h-full flex-col justify-center gap-3 py-2">
+            <div className="h-2.5 w-full rounded-full bg-[var(--color-line)]" aria-hidden />
+            {[70, 55, 40].map((w) => (
+              <div key={w} className="flex items-center gap-2">
+                <span className="h-2.5 w-2.5 shrink-0 rounded-[3px] bg-[var(--color-line)]" aria-hidden />
+                <span className="h-3 rounded bg-[var(--color-bubble)]" style={{ width: `${w}%` }} />
+              </div>
+            ))}
+          </div>
+        </ChartEmptyOverlay>
       ) : (
         <>
           <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-[var(--color-bubble)]" aria-hidden>
@@ -403,32 +434,27 @@ export function AnalyticsDashboard({ initial, canEdit, limits }: { initial: Anal
       )}
 
       <div aria-busy={loading} className={cn("flex flex-col gap-6 transition-opacity", loading && "pointer-events-none opacity-60")}>
-        {empty ? (
-          <Empty />
-        ) : (
-          <>
-            <section aria-label={t.title} className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-              {kpis.map(({ key, ...k }) => (
-                <Kpi key={key} {...k} vs={vs} />
-              ))}
-            </section>
+        {empty && <Empty />}
+        <section aria-label={t.title} className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+          {kpis.map(({ key, ...k }) => (
+            <Kpi key={key} {...k} vs={vs} />
+          ))}
+        </section>
 
-            <ActivityChart daily={data.daily} />
+        <ActivityChart daily={data.daily} />
 
-            <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-              <TopicsCard data={data} />
-              <div className="flex min-w-0 flex-col gap-6">
-                <QualityChart daily={data.daily} />
-                <LanguagesCard languages={data.languages} />
-              </div>
-            </div>
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+          <TopicsCard data={data} />
+          <div className="flex min-w-0 flex-col gap-6">
+            <QualityChart daily={data.daily} />
+            <LanguagesCard languages={data.languages} />
+          </div>
+        </div>
 
-            <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-              <UnansweredQuestions groups={data.unanswered} open={data.unansweredOpen} canEdit={canEdit} limits={limits} />
-              <HoursChart hours={data.hours} />
-            </div>
-          </>
-        )}
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+          <UnansweredQuestions groups={data.unanswered} open={data.unansweredOpen} canEdit={canEdit} limits={limits} />
+          <HoursChart hours={data.hours} />
+        </div>
       </div>
     </div>
   )
@@ -438,7 +464,7 @@ function Empty(): ReactNode {
   const { t: app } = useAppI18n()
   const t = app.analytics.empty
   return (
-    <section className={cn(card, "items-center py-14 text-center")}>
+    <section className={cn(card, "items-center py-8 text-center")}>
       <ChartColumn className="h-8 w-8 text-[var(--color-muted)]" aria-hidden />
       <h2 className="text-lg font-semibold">{t.title}</h2>
       <p className="max-w-md text-sm text-[var(--color-muted)]">{t.text}</p>
