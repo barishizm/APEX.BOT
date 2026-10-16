@@ -77,9 +77,14 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                 {t.last7Days}
               </h2>
             </div>
-            <Link href="/dashboard/conversations" className="text-sm font-semibold">
-              {t.allConversations}
-            </Link>
+            <div className="flex items-center gap-4">
+              <Link href="/dashboard/analytics" className="text-sm font-semibold">
+                {app.shell.nav.analytics}
+              </Link>
+              <Link href="/dashboard/conversations" className="text-sm font-semibold">
+                {t.allConversations}
+              </Link>
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
             {(

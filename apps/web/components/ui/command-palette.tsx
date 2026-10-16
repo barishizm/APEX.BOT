@@ -3,6 +3,7 @@
 import {
   Activity,
   BookOpen,
+  ChartColumn,
   Code2,
   Cpu,
   CornerDownLeft,
@@ -52,6 +53,7 @@ function buildCommands(t: Strings, locale: Locale, setLocale: (l: Locale) => voi
     { group: g.goTo, label: c.overview, icon: LayoutDashboard, keywords: "home dashboard panel", run: nav("/dashboard") },
     { group: g.goTo, label: c.knowledge, icon: BookOpen, keywords: "sources website text faq crawl kaynak site metin", run: nav("/dashboard/knowledge") },
     { group: g.goTo, label: c.conversations, icon: MessageSquareText, keywords: "inbox chats messages leads sohbet mesaj", run: nav("/dashboard/conversations") },
+    { group: g.goTo, label: c.analytics, icon: ChartColumn, keywords: "analytics stats reports charts topics unanswered analitik istatistik rapor konu yanıtsız", run: nav("/dashboard/analytics") },
     { group: g.goTo, label: c.setup, icon: ListChecks, keywords: "onboarding progress kurulum", run: nav("/dashboard/onboarding/list") },
     { group: g.goTo, label: c.settings, icon: Settings, keywords: "password username profile şifre kullanıcı", run: nav("/dashboard/settings") },
     { group: g.widget, label: c.general, icon: Settings2, keywords: "name company language isim şirket dil", run: nav("/dashboard/widget?section=general") },
