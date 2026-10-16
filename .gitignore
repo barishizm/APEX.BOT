@@ -36,3 +36,6 @@ skills-lock.json
 .vercel
 .env*
 /apexbot.eu-audit
+# Eval output (live runs vary; only baseline.json is committed)
+packages/evals/results/
+packages/evals/data/embeddings/
