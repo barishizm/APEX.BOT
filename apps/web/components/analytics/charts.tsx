@@ -44,6 +44,25 @@ export function CardHeader({ id, title, description, beta, children }: { id?: st
   )
 }
 
+/** Keeps an empty chart's axes in place and explains, in its middle, why nothing is drawn yet. */
+export function ChartEmptyOverlay({ show, message, className, children }: { show: boolean; message?: string; className?: string; children: React.ReactNode }) {
+  const { t: app } = useAppI18n()
+  return (
+    <div className={cn("relative", className)}>
+      <div className={cn("h-full", show && "pointer-events-none opacity-40")} aria-hidden={show || undefined}>
+        {children}
+      </div>
+      {show && (
+        <div className="absolute inset-0 flex items-center justify-center p-4">
+          <p className="max-w-xs rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2 text-center text-sm text-[var(--color-muted)] shadow-sm">
+            {message ?? app.analytics.chartEmpty}
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 /** "2026-10-16" -> "16 Oct" in the reader's language; the date is already local to the bot's chosen zone. */
 function useDayLabel() {
   const { locale } = useAppI18n()
@@ -104,20 +123,22 @@ export function ActivityChart({ daily }: { daily: Daily }) {
           ))}
         </div>
       </div>
-      <div className="px-2 pt-4 pb-3 sm:px-5">
-        <ChartContainer config={config} className="aspect-auto h-[240px] w-full">
-          <LineChart accessibilityLayer data={daily} margin={{ left: 4, right: 12, top: 4 }}>
-            <CartesianGrid vertical={false} />
-            <XAxis dataKey="day" tickLine={false} axisLine={false} tickMargin={8} minTickGap={28} tickFormatter={label.short} />
-            <YAxis tickLine={false} axisLine={false} width={36} allowDecimals={false} tickFormatter={(v: number) => formatNumber(v, locale)} />
-            <ChartTooltip
-              cursor={false}
-              content={<ChartTooltipContent className="w-[11rem]" nameKey={active} labelFormatter={(_, payload) => label.long(payload?.[0]?.payload?.day)} valueFormatter={(v) => formatNumber(v, locale)} />}
-            />
-            <Line dataKey={active} type="monotone" stroke={`var(--color-${active})`} strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
-          </LineChart>
-        </ChartContainer>
-      </div>
+      <ChartEmptyOverlay show={total[active] === 0}>
+        <div className="px-2 pt-4 pb-3 sm:px-5">
+          <ChartContainer config={config} className="aspect-auto h-[240px] w-full">
+            <LineChart accessibilityLayer data={daily} margin={{ left: 4, right: 12, top: 4 }}>
+              <CartesianGrid vertical={false} />
+              <XAxis dataKey="day" tickLine={false} axisLine={false} tickMargin={8} minTickGap={28} tickFormatter={label.short} />
+              <YAxis tickLine={false} axisLine={false} width={36} allowDecimals={false} tickFormatter={(v: number) => formatNumber(v, locale)} />
+              <ChartTooltip
+                cursor={false}
+                content={<ChartTooltipContent className="w-[11rem]" nameKey={active} labelFormatter={(_, payload) => label.long(payload?.[0]?.payload?.day)} valueFormatter={(v) => formatNumber(v, locale)} />}
+              />
+              <Line dataKey={active} type="monotone" stroke={`var(--color-${active})`} strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+            </LineChart>
+          </ChartContainer>
+        </div>
+      </ChartEmptyOverlay>
     </section>
   )
 }
@@ -147,17 +168,19 @@ export function QualityChart({ daily }: { daily: Daily }) {
         </h2>
         <p className="text-sm text-[var(--color-muted)]">{t.quality.description}</p>
       </div>
-      <ChartContainer config={config} className="aspect-auto h-[220px] w-full">
-        <LineChart accessibilityLayer data={rates} margin={{ left: 4, right: 12, top: 4 }}>
-          <CartesianGrid vertical={false} />
-          <XAxis dataKey="day" tickLine={false} axisLine={false} tickMargin={8} minTickGap={28} tickFormatter={label.short} />
-          <YAxis tickLine={false} axisLine={false} width={44} domain={[0, 1]} ticks={[0, 0.25, 0.5, 0.75, 1]} tickFormatter={pct} />
-          <ChartTooltip cursor={false} content={<ChartTooltipContent labelFormatter={(_, payload) => label.long(payload?.[0]?.payload?.day)} valueFormatter={pct} />} />
-          <ChartLegend content={<ChartLegendContent />} />
-          <Line dataKey="sourced" type="monotone" stroke="var(--color-sourced)" strokeWidth={2} dot={false} activeDot={{ r: 4 }} connectNulls={false} />
-          <Line dataKey="unanswered" type="monotone" stroke="var(--color-unanswered)" strokeWidth={2} strokeDasharray="5 4" dot={false} activeDot={{ r: 4 }} connectNulls={false} />
-        </LineChart>
-      </ChartContainer>
+      <ChartEmptyOverlay show={!daily.some((d) => d.answers > 0)}>
+        <ChartContainer config={config} className="aspect-auto h-[220px] w-full">
+          <LineChart accessibilityLayer data={rates} margin={{ left: 4, right: 12, top: 4 }}>
+            <CartesianGrid vertical={false} />
+            <XAxis dataKey="day" tickLine={false} axisLine={false} tickMargin={8} minTickGap={28} tickFormatter={label.short} />
+            <YAxis tickLine={false} axisLine={false} width={44} domain={[0, 1]} ticks={[0, 0.25, 0.5, 0.75, 1]} tickFormatter={pct} />
+            <ChartTooltip cursor={false} content={<ChartTooltipContent labelFormatter={(_, payload) => label.long(payload?.[0]?.payload?.day)} valueFormatter={pct} />} />
+            <ChartLegend content={<ChartLegendContent />} />
+            <Line dataKey="sourced" type="monotone" stroke="var(--color-sourced)" strokeWidth={2} dot={false} activeDot={{ r: 4 }} connectNulls={false} />
+            <Line dataKey="unanswered" type="monotone" stroke="var(--color-unanswered)" strokeWidth={2} strokeDasharray="5 4" dot={false} activeDot={{ r: 4 }} connectNulls={false} />
+          </LineChart>
+        </ChartContainer>
+      </ChartEmptyOverlay>
     </section>
   )
 }
@@ -176,26 +199,28 @@ export function HoursChart({ hours }: { hours: number[] }) {
   return (
     <section className={card} aria-labelledby="hours-chart-title">
       <CardHeader id="hours-chart-title" title={t.hours.title} description={t.hours.description} />
-      <ChartContainer config={config} className="aspect-auto h-[180px] w-full">
-        <BarChart accessibilityLayer data={data} margin={{ left: 0, right: 4, top: 4 }}>
-          <CartesianGrid vertical={false} />
-          <XAxis dataKey="hour" tickLine={false} axisLine={false} tickMargin={6} interval={2} tickFormatter={(h: number) => hh(h)} />
-          <YAxis hide domain={[0, Math.max(1, peak)]} />
-          <ChartTooltip
-            cursor
-            content={
-              <ChartTooltipContent
-                labelFormatter={(_, payload) => {
-                  const h = Number(payload?.[0]?.payload?.hour ?? 0)
-                  return format(t.hours.label, { from: `${hh(h)}:00`, to: `${hh(h)}:59` })
-                }}
-                valueFormatter={(v) => formatNumber(v, locale)}
-              />
-            }
-          />
-          <Bar dataKey="questions" fill="var(--color-questions)" radius={[3, 3, 0, 0]} />
-        </BarChart>
-      </ChartContainer>
+      <ChartEmptyOverlay show={peak === 0} className="min-h-[180px] flex-1">
+        <ChartContainer config={config} className="aspect-auto h-full min-h-[180px] w-full">
+          <BarChart accessibilityLayer data={data} margin={{ left: 0, right: 4, top: 4 }}>
+            <CartesianGrid vertical={false} />
+            <XAxis dataKey="hour" tickLine={false} axisLine={false} tickMargin={6} interval={2} tickFormatter={(h: number) => hh(h)} />
+            <YAxis hide domain={[0, Math.max(1, peak)]} />
+            <ChartTooltip
+              cursor
+              content={
+                <ChartTooltipContent
+                  labelFormatter={(_, payload) => {
+                    const h = Number(payload?.[0]?.payload?.hour ?? 0)
+                    return format(t.hours.label, { from: `${hh(h)}:00`, to: `${hh(h)}:59` })
+                  }}
+                  valueFormatter={(v) => formatNumber(v, locale)}
+                />
+              }
+            />
+            <Bar dataKey="questions" fill="var(--color-questions)" radius={[3, 3, 0, 0]} />
+          </BarChart>
+        </ChartContainer>
+      </ChartEmptyOverlay>
     </section>
   )
 }
