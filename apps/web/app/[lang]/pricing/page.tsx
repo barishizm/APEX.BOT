@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { Component as PricingSection } from "@/components/ui/pricing-section";
-import { getDictionary, pageMetadata, resolveLocale } from "@/lib/i18n/server";
+import { LOCALE_META } from "@/lib/i18n";
+import { absoluteUrl, breadcrumbs, getDictionary, jsonLd, pageMetadata, resolveLocale } from "@/lib/i18n/server";
+import { organization, organizationId } from "@/lib/structured-data";
 
 export async function generateMetadata({ params }: PageProps<"/[lang]/pricing">): Promise<Metadata> {
   const locale = await resolveLocale(params);
@@ -12,8 +14,27 @@ export async function generateMetadata({ params }: PageProps<"/[lang]/pricing">)
 
 export default async function PricingPage({ params }: PageProps<"/[lang]/pricing">) {
   const locale = await resolveLocale(params);
+  const { title, description } = getDictionary(locale).meta.pricing;
+  const url = absoluteUrl("/pricing", locale);
+  const schema = {
+    "@context": "https://schema.org",
+    "@graph": [
+      breadcrumbs(locale, [{ name: title, path: "/pricing" }]),
+      organization(locale),
+      {
+        "@type": "WebPage",
+        "@id": `${url}#page`,
+        url,
+        name: title,
+        description,
+        inLanguage: LOCALE_META[locale].hreflang,
+        publisher: { "@id": organizationId() },
+      },
+    ],
+  };
   return (
     <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(schema) }} />
       <SiteHeader locale={locale} />
       <main id="main">
         <PricingSection />

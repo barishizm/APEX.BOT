@@ -11,5 +11,5 @@ export async function generateMetadata({ params }: PageProps<"/[lang]/security">
 
 export default async function Page({ params }: PageProps<"/[lang]/security">) {
   const locale = await resolveLocale(params);
-  return <ProsePage locale={locale} content={PROSE.security[locale]} />;
+  return <ProsePage locale={locale} content={PROSE.security[locale]} path="/security" crumb={getDictionary(locale).meta.security.title} />;
 }

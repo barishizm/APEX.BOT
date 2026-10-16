@@ -4,9 +4,9 @@ export const tr: Dictionary = {
   meta: {
     siteName: "Apex Bot",
     titleTemplate: "%s — Apex Bot",
-    defaultTitle: "Apex Bot — Sitenizi tanıyan yapay zekâ asistanı",
+    defaultTitle: "Apex Bot — Web siteniz için yapay zekâ destek chatbotu",
     description:
-      "Apex Bot, ziyaretçilerinizin sorularını yalnızca sitenizdeki bilgilerle yanıtlar. Tek satır kodla kurulur.",
+      "Apex Bot, ziyaretçilerinize yalnızca web sitenizdeki bilgilerle Türkçe ve İngilizce yanıt veren yapay zekâ destek chatbotudur. Tek satır kodla kurulur.",
     keywords: ["yapay zekâ chatbot", "web sitesi chatbot", "müşteri destek botu", "AI asistan", "Türkçe chatbot", "canlı destek botu"],
     pricing: {
       title: "Fiyatlandırma",
@@ -20,8 +20,8 @@ export const tr: Dictionary = {
     privacy: { title: "Gizlilik Politikası", description: "Apex Bot'un kişisel verileri nasıl topladığı, kullandığı ve koruduğu." },
     security: { title: "Güvenlik", description: "Apex Bot hesapları, konuşmaları ve web sitenizi nasıl korur: erişim denetimi, yapay zekâ güvenliği, şifreleme ve kötüye kullanım koruması." },
     terms: { title: "Kullanım Koşulları", description: "Apex Bot'u kullanırken geçerli olan koşullar." },
-    login: { title: "Giriş yap" },
-    signup: { title: "Kayıt ol" },
+    login: { title: "Giriş yap", description: "Web sitenizin yapay zekâ destek asistanını yönetmek için Apex Bot paneline giriş yapın." },
+    signup: { title: "Kayıt ol", description: "Apex Bot kapalı beta aşamasında. Bekleme listesine katılın, kayıtlar açıldığı gün size e-posta gönderelim." },
     notFound: { title: "Sayfa bulunamadı" },
   },
 
@@ -80,6 +80,13 @@ export const tr: Dictionary = {
     terms: "Kullanım Koşulları",
     privacy: "Gizlilik Politikası",
     contact: "İletişim",
+    about: "Hakkımızda",
+    solutions: "Çözümler",
+    ecommerce: "E-ticaret için",
+    saas: "SaaS için",
+    wordpress: "WordPress chatbot",
+    shopify: "Shopify chatbot",
+    webflow: "Webflow chatbot",
   },
 
   footer: {
@@ -91,7 +98,7 @@ export const tr: Dictionary = {
     badge: "Kapalı beta aşamasında · Türkçe ve İngilizce",
     titleStart: "Hiç uyumayan",
     titleAccent: "müşteri desteği.",
-    lede1: "Apex, ziyaretçilerinizi kendi web sitenizdeki bilgilerle günün her saati yanıtlar.",
+    lede1: "Apex, ziyaretçilerinizi kendi web sitenizdeki bilgilerle günün her saati yanıtlayan bir yapay zekâ destek chatbotudur.",
     lede2: "Dakikalar içinde kurun, markanıza uyarlayın ve tek satır kodla sitenize ekleyin.",
     cta: "Bekleme listesine katılın",
     ctaSignedIn: "Panelinize gidin",
@@ -206,14 +213,17 @@ export const tr: Dictionary = {
         {
           title: "Web sitenizi gösterin",
           text: "Apex sayfalarınızı okur ve size özel bir bilgi tabanı oluşturur. Şirket içi SSS gibi henüz internette olmayan bilgileri metin olarak ekleyin.",
+          alt: "Bir web sitesi açık dizüstü bilgisayar, yanında basılı sayfa destesi ve açık bir defter",
         },
         {
           title: "Size özel hale getirin",
           text: "İsim, renkler, açılış düğmesi, karşılama mesajı, üslup, yapay zekâ modeli ve kaçınılacak konular. Canlı önizleme her değişikliği kaydetmeden önce gösterir.",
+          alt: "Bir kalemin yanında yelpaze gibi açılmış mavi ve gri tonlarında renk kartelaları",
         },
         {
           title: "Tek satır yapıştırın",
           text: "Script etiketini </body> öncesine ekleyin. WordPress, Shopify, Webflow veya düz HTML'de çalışır; yalnızca izin verdiğiniz alan adlarında.",
+          alt: "Klavyede ışıl ışıl parlayan tek bir tuşa basan parmak",
         },
       ],
     },

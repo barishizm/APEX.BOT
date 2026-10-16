@@ -40,7 +40,7 @@ export function buildNav(t: Dictionary): NavEntry[] {
           {
             heading: t.nav.whyApex,
             items: [
-              { title: t.nav.groundedAnswers, href: "/#features", icon: Sparkles },
+              { title: t.nav.groundedAnswers, href: "/grounded-answers", icon: Sparkles },
               { title: t.nav.turkishEnglish, href: "/#features", icon: Languages },
               { title: t.nav.humanHandoff, href: "/#features", icon: LifeBuoy },
               { title: t.nav.securityPrivacy, href: "/#security", icon: ShieldCheck },
@@ -90,8 +90,18 @@ export function buildFooter(t: Dictionary): { heading: string; links: { label: s
       links: [
         { label: t.nav.howItWorks, href: "/#how-it-works" },
         { label: t.nav.features, href: "/#features" },
-        { label: t.nav.chatWidget, href: "/#widget" },
+        { label: t.nav.groundedAnswers, href: "/grounded-answers" },
         { label: t.nav.pricing, href: "/pricing" },
+      ],
+    },
+    {
+      heading: t.nav.solutions,
+      links: [
+        { label: t.nav.ecommerce, href: "/use-cases/e-commerce" },
+        { label: t.nav.saas, href: "/use-cases/saas" },
+        { label: t.nav.wordpress, href: "/integrations/wordpress" },
+        { label: t.nav.shopify, href: "/integrations/shopify" },
+        { label: t.nav.webflow, href: "/integrations/webflow" },
       ],
     },
     {
@@ -106,6 +116,7 @@ export function buildFooter(t: Dictionary): { heading: string; links: { label: s
     {
       heading: t.nav.company,
       links: [
+        { label: t.nav.about, href: "/about" },
         { label: t.nav.securityPrivacy, href: "/security" },
         { label: t.nav.terms, href: "/terms" },
         { label: t.nav.privacy, href: "/privacy" },

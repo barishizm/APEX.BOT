@@ -7,6 +7,5 @@ export default function robots(): MetadataRoute.Robots {
     // /login and /signup stay crawlable so search engines can see their noindex
     rules: { userAgent: "*", allow: "/", disallow: ["/api/", ...APP_PATHS] },
     sitemap: `${siteUrl()}/sitemap.xml`,
-    host: siteUrl(),
   }
 }
