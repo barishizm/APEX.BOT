@@ -11,5 +11,5 @@ export async function generateMetadata({ params }: PageProps<"/[lang]/terms">): 
 
 export default async function Page({ params }: PageProps<"/[lang]/terms">) {
   const locale = await resolveLocale(params);
-  return <ProsePage locale={locale} content={PROSE.terms[locale]} />;
+  return <ProsePage locale={locale} content={PROSE.terms[locale]} path="/terms" crumb={getDictionary(locale).meta.terms.title} />;
 }

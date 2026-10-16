@@ -4,9 +4,9 @@ export const en = {
   meta: {
     siteName: "Apex Bot",
     titleTemplate: "%s — Apex Bot",
-    defaultTitle: "Apex Bot — The assistant that knows your site",
+    defaultTitle: "Apex Bot — AI support chatbot for your website",
     description:
-      "Apex Bot answers your visitors' questions using only the information on your site. Installs with a single line of code.",
+      "Apex Bot is an AI support chatbot that answers visitors using only your website's content, in Turkish and English. Installs with one line of code.",
     keywords: ["AI chatbot", "website chatbot", "customer support bot", "AI assistant", "RAG chatbot", "Turkish chatbot"],
     pricing: {
       title: "Pricing",
@@ -20,8 +20,8 @@ export const en = {
     privacy: { title: "Privacy Policy", description: "How Apex Bot collects, uses and protects personal data." },
     security: { title: "Security", description: "How Apex Bot protects accounts, conversations and your website: access control, AI safety, encryption and abuse protection." },
     terms: { title: "Terms of Service", description: "The terms that apply when you use Apex Bot." },
-    login: { title: "Log in" },
-    signup: { title: "Sign up" },
+    login: { title: "Log in", description: "Log in to your Apex Bot dashboard to manage your website's AI support assistant." },
+    signup: { title: "Sign up", description: "Apex Bot is in closed beta. Join the waitlist and we'll email you the day sign-ups open." },
     notFound: { title: "Page not found" },
   },
 
@@ -80,6 +80,13 @@ export const en = {
     terms: "Terms of Service",
     privacy: "Privacy Policy",
     contact: "Contact",
+    about: "About",
+    solutions: "Solutions",
+    ecommerce: "For e-commerce",
+    saas: "For SaaS",
+    wordpress: "WordPress chatbot",
+    shopify: "Shopify chatbot",
+    webflow: "Webflow chatbot",
   },
 
   footer: {
@@ -91,7 +98,7 @@ export const en = {
     badge: "Now in closed beta · Turkish & English",
     titleStart: "Support that",
     titleAccent: "never sleeps.",
-    lede1: "Apex answers your visitors from your own website, around the clock.",
+    lede1: "Apex is an AI support chatbot that answers your visitors from your own website, around the clock.",
     lede2: "Set it up in minutes, match it to your brand and install it with one line of code.",
     cta: "Join the waitlist",
     ctaSignedIn: "Go to your dashboard",
@@ -206,14 +213,17 @@ export const en = {
         {
           title: "Point it at your website",
           text: "Apex reads your pages and builds a private knowledge base. Add text for anything that isn't online yet, like internal FAQs.",
+          alt: "A laptop showing a website next to a stack of printed pages and an open notebook",
         },
         {
           title: "Make it yours",
           text: "Name, colors, launcher, greeting, tone, the AI model and topics to avoid. A live preview shows every change before you save.",
+          alt: "Paint swatches in shades of blue and grey fanned out next to a pencil",
         },
         {
           title: "Paste one line",
           text: "Add the script tag before </body>. It works on WordPress, Shopify, Webflow or plain HTML, and only on the domains you allow.",
+          alt: "A finger pressing a single glowing key on a keyboard",
         },
       ],
     },
