@@ -1,10 +1,12 @@
 import { after, before, beforeEach, describe, test } from "node:test"
 import assert from "node:assert/strict"
+import { randomUUID } from "node:crypto"
 import { PGlite } from "@electric-sql/pglite"
 import type { Db } from "../src/db.ts"
 import { migrate } from "../src/migrate.ts"
 import { register } from "../src/auth.ts"
 import { addAllowedOrigin, getBotForUser, listBotsChangedSince, recordWidgetSeen } from "../src/bots.ts"
+import { insertConversation, insertMessage } from "../src/conversations.ts"
 import {
   KNOWLEDGE_LIMITS,
   KnowledgeError,
@@ -13,9 +15,12 @@ import {
   deleteSource,
   failSync,
   finishSync,
+  getSourceDetail,
   listKnowledgeChunks,
   listSources,
+  sourceUsage,
   startSync,
+  updateSource,
   type ChunkRecord,
 } from "../src/knowledge.ts"
 
@@ -194,5 +199,118 @@ describe("knowledge sources", () => {
     assert.equal(seen.widgetSeenOrigin, "https://www.kahve.example")
     assert.equal(seen.widgetSeenAt?.toISOString(), "2026-10-01T11:00:00.000Z")
     assert.equal(seen.updatedAt.getTime(), bot.updatedAt.getTime())
+  })
+})
+
+describe("source detail and editing", () => {
+  test("shows a text source's content and excerpts, and a website's pages", async () => {
+    const user = await newUser()
+    const text = await addTextSource(db, user.id, { title: "Returns", content: "Unopened bags: 14 days.\n\nGround coffee can't be returned." }, chunker)
+    const detail = await getSourceDetail(db, user.id, text.id)
+    assert.equal(detail.content, "Unopened bags: 14 days.\n\nGround coffee can't be returned.")
+    assert.deepEqual(detail.chunks.map((c) => c.position), [0, 1])
+    assert.deepEqual(detail.pages, [])
+
+    const site = await addWebsiteSource(db, user.id, "https://kahve.example/")
+    await startSync(db, user.id, site.id)
+    await finishSync(db, site.id, {
+      pages: 2,
+      chunks: [
+        { url: "https://kahve.example/", title: "Home", text: "Welcome to the shop." },
+        { url: "https://kahve.example/kargo", title: "Shipping", text: "Shipping takes 2 days." },
+        { url: "https://kahve.example/kargo", title: "Shipping", text: "Free over 500 TL." },
+      ],
+    })
+    const web = await getSourceDetail(db, user.id, site.id)
+    assert.equal(web.content, null)
+    assert.deepEqual(web.pages, [
+      { url: "https://kahve.example/", title: "Home", chunks: 1 },
+      { url: "https://kahve.example/kargo", title: "Shipping", chunks: 2 },
+    ])
+    await assert.rejects(getSourceDetail(db, user.id, randomUUID()), code("not_found"))
+    await assert.rejects(getSourceDetail(db, user.id, "nope"), code("not_found"))
+  })
+
+  test("editing a text source re-chunks it and bumps the knowledge version", async () => {
+    const user = await newUser()
+    const bot = await getBotForUser(db, user.id)
+    const text = await addTextSource(db, user.id, { title: "Returns", content: "Unopened bags: 14 days." }, chunker)
+    const [before] = await listBotsChangedSince(db, null)
+    const edited = await updateSource(db, user.id, text.id, { title: "Return policy", content: "Unopened bags: 30 days.\n\nOpened bags can't be returned." }, chunker)
+    assert.equal(edited.title, "Return policy")
+    assert.equal(edited.chunks, 2)
+    assert.deepEqual(await listKnowledgeChunks(db, bot.id), [
+      { url: "", title: "Return policy", text: "Unopened bags: 30 days." },
+      { url: "", title: "Return policy", text: "Opened bags can't be returned." },
+    ])
+    const [after] = await listBotsChangedSince(db, null)
+    assert.ok(after.knowledgeVersion > before.knowledgeVersion)
+
+    // a rename alone keeps the content and re-titles the excerpts
+    await updateSource(db, user.id, text.id, { title: "Returns" }, chunker)
+    assert.deepEqual((await listKnowledgeChunks(db, bot.id)).map((c) => c.title), ["Returns", "Returns"])
+
+    await assert.rejects(updateSource(db, user.id, text.id, { content: "short" }, chunker), code("invalid_input"))
+    await assert.rejects(updateSource(db, user.id, text.id, { title: " " }, chunker), code("invalid_input"))
+    await assert.rejects(updateSource(db, user.id, text.id, {}, chunker), code("invalid_input"))
+    await assert.rejects(updateSource(db, user.id, randomUUID(), { title: "x" }, chunker), code("not_found"))
+  })
+
+  test("websites can be renamed but not rewritten", async () => {
+    const user = await newUser()
+    const site = await addWebsiteSource(db, user.id, "https://kahve.example/")
+    const renamed = await updateSource(db, user.id, site.id, { title: "Our shop" }, chunker)
+    assert.equal(renamed.title, "Our shop")
+    assert.equal(renamed.url, "https://kahve.example/")
+    await assert.rejects(updateSource(db, user.id, site.id, { content: "Some new content for the site." }, chunker), code("invalid_input"))
+  })
+
+  test("members can look but not edit", async () => {
+    const owner = await newUser()
+    const bot = await getBotForUser(db, owner.id)
+    const text = await addTextSource(db, owner.id, { title: "Returns", content: "Unopened bags: 14 days." }, chunker)
+    const member = await newUser("member@example.com", "member")
+    await db.query("delete from app.organization_members where user_id = $1", [member.id])
+    await db.query("insert into app.organization_members (organization_id, user_id, role) values ($1, $2, 'member')", [bot.organizationId, member.id])
+    assert.equal((await getSourceDetail(db, member.id, text.id)).chunks.length, 1)
+    await assert.rejects(updateSource(db, member.id, text.id, { title: "Mine" }, chunker), code("forbidden"))
+    // another workspace's source doesn't exist for them
+    const stranger = await newUser("other@example.com", "other")
+    await assert.rejects(getSourceDetail(db, stranger.id, text.id), code("not_found"))
+    await assert.rejects(updateSource(db, stranger.id, text.id, { title: "Mine" }, chunker), code("not_found"))
+  })
+
+  test("an edit that would overflow the knowledge base is refused and changes nothing", async () => {
+    const user = await newUser()
+    const text = await addTextSource(db, user.id, { title: "Small", content: "Just a sentence or two here." }, chunker)
+    const site = await addWebsiteSource(db, user.id, "https://big.example/")
+    await startSync(db, user.id, site.id)
+    const many = Array.from({ length: KNOWLEDGE_LIMITS.chunksPerBot - 2 }, (_, i) => ({ url: "https://big.example/", title: "T", text: `chunk ${i}` }))
+    await finishSync(db, site.id, { pages: 1, chunks: many })
+    const huge = Array.from({ length: 5 }, (_, i) => `Paragraph number ${i} of the text.`).join("\n\n")
+    await assert.rejects(updateSource(db, user.id, text.id, { content: huge }, chunker), code("limit"))
+    assert.equal((await getSourceDetail(db, user.id, text.id)).content, "Just a sentence or two here.")
+  })
+
+  test("counts recent replies that cited each source", async () => {
+    const user = await newUser()
+    const bot = await getBotForUser(db, user.id)
+    const text = await addTextSource(db, user.id, { title: "Returns", content: "Unopened bags: 14 days." }, chunker)
+    const site = await addWebsiteSource(db, user.id, "https://kahve.example/")
+    await startSync(db, user.id, site.id)
+    await finishSync(db, site.id, { pages: 1, chunks: [{ url: "https://kahve.example/kargo", title: "Shipping", text: "Shipping takes 2 days." }] })
+
+    const reply = async (sources: { url: string; title: string }[], at = new Date()) => {
+      const id = randomUUID()
+      await insertConversation(db, { id, botId: bot.id, origin: "https://kahve.example", createdAt: at })
+      await insertMessage(db, { id: randomUUID(), conversationId: id, botId: bot.id, role: "assistant", content: "Yanıt", sources, createdAt: at })
+    }
+    await reply([{ url: "https://kahve.example/kargo", title: "Shipping" }, { url: "", title: "Returns" }])
+    await reply([{ url: "https://kahve.example/kargo", title: "Shipping" }])
+    await reply([{ url: "", title: "Somebody else's" }])
+    await reply([{ url: "", title: "Returns" }], new Date(Date.now() - 40 * 86_400_000))
+
+    assert.deepEqual(await sourceUsage(db, user.id), { [site.id]: 2, [text.id]: 1 })
+    assert.deepEqual(await sourceUsage(db, user.id, 60), { [site.id]: 2, [text.id]: 2 })
   })
 })

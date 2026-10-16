@@ -333,6 +333,111 @@ export async function deleteSource(db: Db, userId: string, sourceId: string): Pr
   })
 }
 
+export interface SourceDetail {
+  source: KnowledgeSource
+  /** Text sources only: the full content, for editing. */
+  content: string | null
+  /** Website sources only: each page that was read, with its excerpt count, in crawl order. */
+  pages: { url: string; title: string; chunks: number }[]
+  chunks: (ChunkRecord & { position: number })[]
+}
+
+/** One source with what it was turned into; every workspace member can look. */
+export async function getSourceDetail(db: Db, userId: string, sourceId: string): Promise<SourceDetail> {
+  const bot = await getBotForUser(db, userId)
+  if (!UUID.test(sourceId)) throw new KnowledgeError("not_found", "That source doesn't exist")
+  const found = await db.query<SourceRow & { content: string | null }>(
+    `select ${COLUMNS}, content from app.knowledge_sources where id = $1 and bot_id = $2`,
+    [sourceId, bot.id],
+  )
+  const row = found.rows[0]
+  if (!row) throw new KnowledgeError("not_found", "That source doesn't exist")
+  const { rows: chunks } = await db.query<ChunkRecord & { position: number }>(
+    "select url, title, text, position from app.knowledge_chunks where source_id = $1 order by position",
+    [sourceId],
+  )
+  const pages = new Map<string, { url: string; title: string; chunks: number }>()
+  if (row.kind === "website") {
+    for (const c of chunks) {
+      const page = pages.get(c.url) ?? pages.set(c.url, { url: c.url, title: c.title, chunks: 0 }).get(c.url)!
+      page.chunks++
+    }
+  }
+  return { source: toSource(row), content: row.kind === "text" ? row.content : null, pages: [...pages.values()], chunks }
+}
+
+/**
+ * Renames a source, and for text sources replaces the content too (re-chunked in the same
+ * transaction, so search never sees half of it). A website's content comes from the site.
+ */
+export async function updateSource(
+  db: Db,
+  userId: string,
+  sourceId: string,
+  input: { title?: unknown; content?: unknown },
+  chunk: (title: string, content: string) => ChunkRecord[],
+): Promise<KnowledgeSource> {
+  const bot = await editableBot(db, userId)
+  if (!UUID.test(sourceId)) throw new KnowledgeError("not_found", "That source doesn't exist")
+  if (input.title === undefined && input.content === undefined) throw new KnowledgeError("invalid_input", "Nothing to update")
+  return db.transaction(async (tx) => {
+    const found = await tx.query<SourceRow & { content: string | null }>(
+      `select ${COLUMNS}, content from app.knowledge_sources where id = $1 and bot_id = $2 for update`,
+      [sourceId, bot.id],
+    )
+    const existing = found.rows[0]
+    if (!existing) throw new KnowledgeError("not_found", "That source doesn't exist")
+    const title = input.title === undefined ? existing.title : cleanTitle(input.title)
+
+    if (existing.kind === "website") {
+      if (input.content !== undefined) throw new KnowledgeError("invalid_input", "A website's content comes from the site. Sync it to update")
+      const { rows } = await tx.query<SourceRow>(`update app.knowledge_sources set title = $2 where id = $1 returning ${COLUMNS}`, [sourceId, title])
+      return toSource(rows[0])
+    }
+
+    const content = input.content === undefined ? (existing.content ?? "") : typeof input.content === "string" ? input.content.trim() : ""
+    if (content.length < 20) throw new KnowledgeError("invalid_input", "Add at least a sentence or two of text")
+    if (content.length > KNOWLEDGE_LIMITS.textChars) {
+      throw new KnowledgeError("invalid_input", `Keep each text under ${KNOWLEDGE_LIMITS.textChars.toLocaleString("en")} characters, or split it in two`)
+    }
+    const chunks = chunk(title, content)
+    if (chunks.length > (await chunkRoom(tx, bot.id, sourceId))) throw new KnowledgeError("limit", "Your knowledge base is full. Remove a source to add more")
+    await tx.query("delete from app.knowledge_chunks where source_id = $1", [sourceId])
+    const { rows } = await tx.query<SourceRow>(
+      `update app.knowledge_sources set title = $2, content = $3, chunks = $4, status = 'ready', error = null, synced_at = now()
+        where id = $1 returning ${COLUMNS}`,
+      [sourceId, title, content, chunks.length],
+    )
+    await insertChunks(tx, bot.id, sourceId, chunks)
+    await bumpKnowledge(tx, bot.id)
+    return toSource(rows[0])
+  })
+}
+
+/**
+ * Replies in the last `days` that cited each source, by source id. Replies store the cited
+ * excerpt's url and title, not its source: a website page matches by url, pasted text (no url)
+ * by title. Sources nobody cited are left out.
+ */
+export async function sourceUsage(db: Db, userId: string, days = 30): Promise<Record<string, number>> {
+  const bot = await getBotForUser(db, userId)
+  const { rows } = await db.query<{ source_id: string; replies: number }>(
+    `with cited as (
+       select distinct m.id, coalesce(s ->> 'url', '') as url, coalesce(s ->> 'title', '') as title
+         from app.messages m cross join lateral jsonb_array_elements(case when jsonb_typeof(m.sources) = 'array' then m.sources else '[]'::jsonb end) s
+        where m.bot_id = $1 and m.role = 'assistant' and m.created_at >= now() - make_interval(days => $2)
+     ), pages as (
+       select distinct source_id, url, title from app.knowledge_chunks where bot_id = $1
+     )
+     select p.source_id, count(distinct c.id)::int as replies
+       from cited c
+       join pages p on case when c.url <> '' then p.url = c.url else p.url = '' and p.title = c.title end
+      group by 1`,
+    [bot.id, days],
+  )
+  return Object.fromEntries(rows.map((r) => [r.source_id, r.replies]))
+}
+
 /** Every chunk of one bot, for the chat API's index. */
 export async function listKnowledgeChunks(db: Queryable, botId: string): Promise<ChunkRecord[]> {
   if (!UUID.test(botId)) return []
