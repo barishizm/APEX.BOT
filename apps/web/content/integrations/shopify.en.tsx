@@ -95,7 +95,7 @@ export const shopify: MarketingContent = {
   eyebrow: "Shopify",
   title: "How to add an AI chatbot to your Shopify store",
   intro:
-    "Paste one line of code into your theme and Apex Bot answers your shoppers' questions from your own store pages, in Turkish and English.",
+    "Paste one line of code into your theme and Apex Bot answers your shoppers' questions from your own store pages, in Turkish, English, Lithuanian, Latvian and Estonian.",
   toc: TOC,
   body: Body,
 };

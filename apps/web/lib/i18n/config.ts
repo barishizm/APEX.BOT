@@ -1,7 +1,7 @@
 // Every supported language lives here. Adding one means: add its code below, give it an
 // entry in LOCALE_META, and add a dictionary in ./dictionaries (and the long-form pages in
 // content/). TypeScript flags every place that is still missing a translation.
-export const LOCALES = ["en", "tr"] as const
+export const LOCALES = ["en", "tr", "lt", "lv", "et"] as const
 export type Locale = (typeof LOCALES)[number]
 
 // Served without a URL prefix (/pricing); every other locale is prefixed (/tr/pricing)
@@ -10,6 +10,9 @@ export const DEFAULT_LOCALE: Locale = "en"
 export const LOCALE_META: Record<Locale, { name: string; hreflang: string; ogLocale: string; intl: string; dir: "ltr" | "rtl" }> = {
   en: { name: "English", hreflang: "en", ogLocale: "en_US", intl: "en-GB", dir: "ltr" },
   tr: { name: "Türkçe", hreflang: "tr", ogLocale: "tr_TR", intl: "tr-TR", dir: "ltr" },
+  lt: { name: "Lietuvių", hreflang: "lt", ogLocale: "lt_LT", intl: "lt-LT", dir: "ltr" },
+  lv: { name: "Latviešu", hreflang: "lv", ogLocale: "lv_LV", intl: "lv-LV", dir: "ltr" },
+  et: { name: "Eesti", hreflang: "et", ogLocale: "et_EE", intl: "et-EE", dir: "ltr" },
 }
 
 // Set when a visitor picks a language, so we stop guessing from Accept-Language

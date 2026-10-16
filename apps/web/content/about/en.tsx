@@ -7,7 +7,7 @@ function Body() {
       <h2 id="what">What Apex Bot is</h2>
       <p>
         Apex Bot is an AI support assistant for websites. It reads your pages, builds a private knowledge base from them and
-        answers your visitors' questions in a chat widget, in Turkish and English, at any hour. It answers only from what
+        answers your visitors' questions in a chat widget, in Turkish, English, Lithuanian, Latvian and Estonian, at any hour. It answers only from what
         you gave it, links the page each answer came from, and says so when it doesn't know.
       </p>
       <p>
@@ -52,8 +52,8 @@ function Body() {
           <a href="/privacy">privacy policy</a> is written to meet Turkey's KVKK and the EU's GDPR.
         </li>
         <li>
-          <strong>Turkish as a first language.</strong> Turkish and English are both fully supported, in the answers and in
-          every word of the widget.
+          <strong>Local languages, not just English.</strong> Turkish, English, Lithuanian, Latvian and Estonian are all fully
+          supported, in the answers and in every word of the widget.
         </li>
         <li>
           <strong>It answers, it doesn't act.</strong> Apex can't place orders, change accounts or make promises. When a

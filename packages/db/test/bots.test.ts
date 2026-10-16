@@ -118,6 +118,25 @@ describe("settings validation", () => {
     assert.deepEqual(s.security.allowedOrigins, ["https://shop.example"])
   })
 
+  test("settings saved before Lithuanian, Latvian and Estonian existed load with their defaults", () => {
+    const s = parseSettings({
+      handoff: { enabled: false },
+      general: { defaultLang: "lv" },
+      messages: { greeting: { tr: "Selam", en: "Hello" }, suggestions: { tr: ["Kargo"], en: [] } },
+    })
+    assert.equal(s.general.defaultLang, "lv")
+    assert.equal(s.messages.greeting.tr, "Selam")
+    assert.equal(s.messages.greeting.lt, DEFAULT_SETTINGS.messages.greeting.lt)
+    assert.equal(s.messages.greeting.et, DEFAULT_SETTINGS.messages.greeting.et)
+    assert.deepEqual(s.messages.suggestions.lv, [])
+    assert.equal(s.general.subtitle.lt, "")
+  })
+
+  test("a blank required text in any language is reported by path", () => {
+    const issues = issuesOf({ handoff: { enabled: false }, messages: { greeting: { lt: "  " } } })
+    assert.deepEqual(issues, ["messages.greeting.lt"])
+  })
+
   test("parseSettings throws every issue at once", () => {
     assert.throws(
       () => parseSettings({ general: { botName: "" }, model: { maxOutputTokens: 1 } }),

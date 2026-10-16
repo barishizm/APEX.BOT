@@ -96,7 +96,7 @@ export const shopify: MarketingContent = {
   eyebrow: "Shopify",
   title: "Shopify mağazanıza yapay zekâ chatbot nasıl eklenir?",
   intro:
-    "Temanıza tek satır kod yapıştırın; Apex Bot alışverişçilerinizin sorularını kendi mağaza sayfalarınızdan Türkçe ve İngilizce yanıtlasın.",
+    "Temanıza tek satır kod yapıştırın; Apex Bot alışverişçilerinizin sorularını kendi mağaza sayfalarınızdan Türkçe, İngilizce, Litvanca, Letonca ve Estonca yanıtlasın.",
   toc: TOC,
   body: Body,
 };

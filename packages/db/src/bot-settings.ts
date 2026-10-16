@@ -2,9 +2,13 @@
 // Pure TypeScript with no Node or pg imports, so the dashboard (browser), the web
 // server and the chat API all share one definition (import "@apex/db/bot-settings").
 
-export type Lang = "tr" | "en"
-export const LANGS: readonly Lang[] = ["tr", "en"]
+export type Lang = "tr" | "en" | "lt" | "lv" | "et"
+export const LANGS: readonly Lang[] = ["tr", "en", "lt", "lv", "et"]
 export type Localized = Record<Lang, string>
+
+/** One value per language, e.g. an empty string for every language. */
+export const perLang = <T>(make: (lang: Lang) => T): Record<Lang, T> =>
+  Object.fromEntries(LANGS.map((lang) => [lang, make(lang)])) as Record<Lang, T>
 
 // ---------- Models ----------
 
@@ -212,7 +216,7 @@ export const DEFAULT_SETTINGS: BotSettings = {
     companyName: "",
     defaultLang: "en",
     languageMode: "auto",
-    subtitle: { tr: "", en: "" },
+    subtitle: perLang(() => ""),
   },
   appearance: {
     theme: "auto",
@@ -222,7 +226,7 @@ export const DEFAULT_SETTINGS: BotSettings = {
     offsetY: 20,
     launcherIcon: "chat",
     launcherImage: "",
-    launcherLabel: { tr: "", en: "" },
+    launcherLabel: perLang(() => ""),
     launcherSize: "medium",
     avatar: "initial",
     avatarUrl: "",
@@ -235,17 +239,26 @@ export const DEFAULT_SETTINGS: BotSettings = {
     greeting: {
       tr: "Merhaba! Size nasıl yardımcı olabilirim?",
       en: "Hi there! How can I help you today?",
+      lt: "Sveiki! Kuo galiu jums padėti?",
+      lv: "Sveiki! Kā varu jums palīdzēt?",
+      et: "Tere! Kuidas saan teid aidata?",
     },
-    suggestions: { tr: [], en: [] },
-    placeholder: { tr: "Bir soru yazın…", en: "Ask a question…" },
+    suggestions: perLang(() => []),
+    placeholder: { tr: "Bir soru yazın…", en: "Ask a question…", lt: "Užduokite klausimą…", lv: "Uzdodiet jautājumu…", et: "Esitage küsimus…" },
     unknownAnswer: {
       tr: "Bu konuda bir bilgim yok. İsterseniz sizi ekibimize yönlendirebilirim.",
       en: "I don't have information on that yet. I can connect you with our team if you like.",
+      lt: "Šiuo klausimu kol kas neturiu informacijos. Jei norite, galiu jus nukreipti į mūsų komandą.",
+      lv: "Par šo man pagaidām nav informācijas. Ja vēlaties, varu jūs savienot ar mūsu komandu.",
+      et: "Mul pole selle kohta veel teavet. Soovi korral saan teid meie meeskonnaga ühendada.",
     },
     showDisclaimer: true,
     disclaimer: {
       tr: "Yanıtlar yapay zekâ ile üretilir ve hatalı olabilir.",
       en: "Answers are AI-generated and may be inaccurate.",
+      lt: "Atsakymus generuoja dirbtinis intelektas, todėl jie gali būti netikslūs.",
+      lv: "Atbildes ģenerē mākslīgais intelekts, un tās var būt neprecīzas.",
+      et: "Vastused loob tehisintellekt ja need võivad olla ebatäpsed.",
     },
     privacyUrl: "",
   },
@@ -253,7 +266,7 @@ export const DEFAULT_SETTINGS: BotSettings = {
     autoOpen: "never",
     autoOpenDelay: 10,
     autoOpenOnMobile: false,
-    teaser: { tr: "", en: "" },
+    teaser: perLang(() => ""),
     showSources: true,
     showFeedback: true,
     soundOnReply: false,
@@ -371,8 +384,8 @@ export function parseSettings(raw: unknown): BotSettings {
       const v = o[key]
       const at = `${path}.${key}`
       if (v === undefined) return { ...fallback }
-      if (!isObj(v)) return fail(at, "Must have a Turkish and an English version", { ...fallback })
-      return { tr: r.str(v, at, "tr", fallback.tr, max, opts), en: r.str(v, at, "en", fallback.en, max, opts) }
+      if (!isObj(v)) return fail(at, "Must have a version for every language", { ...fallback })
+      return perLang((lang) => r.str(v, at, lang, fallback[lang], max, opts))
     },
     list(o: Obj, path: string, key: string, fallback: string[], maxItems: number, maxLen: number, check?: (s: string) => string | null): string[] {
       const v = o[key]
@@ -448,13 +461,12 @@ export function parseSettings(raw: unknown): BotSettings {
 
   const m = section("messages")
   const suggestionsRaw = isObj(m.suggestions) ? m.suggestions : {}
-  if (m.suggestions !== undefined && !isObj(m.suggestions)) issues.push({ path: "messages.suggestions", message: "Must have a Turkish and an English list" })
+  if (m.suggestions !== undefined && !isObj(m.suggestions)) issues.push({ path: "messages.suggestions", message: "Must have a list for every language" })
   const messages: BotSettings["messages"] = {
     greeting: r.localized(m, "messages", "greeting", D.messages.greeting, LIMITS.greeting, { required: true }),
-    suggestions: {
-      tr: r.list(suggestionsRaw, "messages.suggestions", "tr", D.messages.suggestions.tr, LIMITS.suggestions, LIMITS.suggestion),
-      en: r.list(suggestionsRaw, "messages.suggestions", "en", D.messages.suggestions.en, LIMITS.suggestions, LIMITS.suggestion),
-    },
+    suggestions: perLang((lang) =>
+      r.list(suggestionsRaw, "messages.suggestions", lang, D.messages.suggestions[lang], LIMITS.suggestions, LIMITS.suggestion),
+    ),
     placeholder: r.localized(m, "messages", "placeholder", D.messages.placeholder, LIMITS.placeholder, { required: true }),
     unknownAnswer: r.localized(m, "messages", "unknownAnswer", D.messages.unknownAnswer, LIMITS.unknownAnswer, { required: true }),
     showDisclaimer: r.bool(m, "messages", "showDisclaimer", D.messages.showDisclaimer),
