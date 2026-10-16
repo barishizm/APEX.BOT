@@ -4,6 +4,7 @@ import type { Messages } from "./types"
 const en = {
   title: "Analytics",
   lede: "How visitors use your assistant, what they ask about, and what it couldn't answer yet.",
+  beta: "Still in development: numbers and groupings may change.",
   range: "Period",
   ranges: { d7: "7 days", d30: "30 days", d90: "90 days" },
   timeZone: "Days and hours in {tz}",
@@ -99,6 +100,7 @@ export const analytics: Messages<typeof en> = {
   tr: {
     title: "Analitik",
     lede: "Ziyaretçilerin asistanınızı nasıl kullandığı, en çok neleri sorduğu ve henüz neleri yanıtlayamadığı.",
+    beta: "Geliştirme aşamasında: sayılar ve gruplamalar değişebilir.",
     range: "Dönem",
     ranges: { d7: "7 gün", d30: "30 gün", d90: "90 gün" },
     timeZone: "Gün ve saatler {tz} saat dilimine göre",
@@ -190,6 +192,7 @@ export const analytics: Messages<typeof en> = {
   lt: {
     title: "Analitika",
     lede: "Kaip lankytojai naudojasi jūsų asistentu, ko dažniausiai klausia ir į ką jis dar negali atsakyti.",
+    beta: "Dar kuriama: skaičiai ir grupavimas gali keistis.",
     range: "Laikotarpis",
     ranges: { d7: "7 dienos", d30: "30 dienų", d90: "90 dienų" },
     timeZone: "Dienos ir valandos pagal {tz}",
@@ -281,6 +284,7 @@ export const analytics: Messages<typeof en> = {
   lv: {
     title: "Analītika",
     lede: "Kā apmeklētāji izmanto jūsu asistentu, par ko viņi jautā un uz ko tas vēl nespēj atbildēt.",
+    beta: "Vēl tiek izstrādāts: skaitļi un grupējumi var mainīties.",
     range: "Periods",
     ranges: { d7: "7 dienas", d30: "30 dienas", d90: "90 dienas" },
     timeZone: "Dienas un stundas pēc {tz}",
@@ -372,6 +376,7 @@ export const analytics: Messages<typeof en> = {
   et: {
     title: "Analüütika",
     lede: "Kuidas külastajad teie assistenti kasutavad, mille kohta nad küsivad ja millele see veel vastata ei oska.",
+    beta: "Alles arendamisel: arvud ja rühmitused võivad muutuda.",
     range: "Periood",
     ranges: { d7: "7 päeva", d30: "30 päeva", d90: "90 päeva" },
     timeZone: "Päevad ja tunnid ajavööndis {tz}",

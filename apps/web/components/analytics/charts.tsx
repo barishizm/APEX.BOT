@@ -16,12 +16,26 @@ type Daily = AnalyticsJson["daily"]
 
 export const card = "flex min-w-0 flex-col gap-4 rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface)] p-5"
 
-export function CardHeader({ id, title, description, children }: { id?: string; title: string; description?: string; children?: React.ReactNode }) {
+/** Marks a part of the analytics page that is still being developed. */
+export function BetaBadge({ className }: { className?: string }) {
+  const { t: app } = useAppI18n()
+  return (
+    <span
+      title={app.analytics.beta}
+      className={cn("rounded-full border border-[var(--color-line)] bg-[var(--color-bubble)] px-2 py-px text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--color-muted)]", className)}
+    >
+      Beta
+    </span>
+  )
+}
+
+export function CardHeader({ id, title, description, beta, children }: { id?: string; title: string; description?: string; beta?: boolean; children?: React.ReactNode }) {
   return (
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div className="flex min-w-0 flex-col gap-0.5">
-        <h2 id={id} className="font-semibold">
+        <h2 id={id} className="flex items-center gap-2 font-semibold">
           {title}
+          {beta && <BetaBadge />}
         </h2>
         {description && <p className="text-sm text-[var(--color-muted)]">{description}</p>}
       </div>

@@ -8,7 +8,7 @@ import type { UnansweredGroup } from "@/lib/analytics"
 import { format } from "@/lib/i18n"
 import { formatNumber, plural, timeAgo } from "@/lib/i18n/format"
 import { cn } from "@/lib/utils"
-import { card } from "./charts"
+import { BetaBadge, card } from "./charts"
 
 export interface AnswerLimits {
   question: number
@@ -187,6 +187,7 @@ export function UnansweredQuestions({
           <h2 id="unanswered-title" className="flex items-center gap-2 font-semibold">
             <CircleHelp className="h-4 w-4 text-[var(--color-muted)]" aria-hidden />
             {t.title}
+            <BetaBadge />
             {open > 0 && (
               <span className="rounded-full bg-amber-500/15 px-2 py-px text-xs font-semibold text-amber-700 dark:text-amber-300">{plural(open, t.open, locale)}</span>
             )}
