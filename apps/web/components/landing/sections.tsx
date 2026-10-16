@@ -66,7 +66,7 @@ export function LandingSections({ locale }: { locale: Locale }) {
         <ol className="grid3 steps">
           {t.how.steps.map((step, i) => (
             <li key={step.title}>
-              <Image src={STEP_IMAGES[i]} alt="" width={960} height={720} sizes="(max-width: 760px) 100vw, 380px" className="steps__img" />
+              <Image src={STEP_IMAGES[i]} alt={step.alt} width={960} height={720} sizes="(max-width: 760px) 100vw, 380px" className="steps__img" />
               <span className="steps__n">0{i + 1}</span>
               <h3>{step.title}</h3>
               <p>{step.text}</p>

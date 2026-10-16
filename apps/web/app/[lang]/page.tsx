@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import { Home } from "@/components/landing/home";
-import { CONTACT_EMAIL } from "@/components/site-nav";
-import { LOCALE_META, localizePath } from "@/lib/i18n";
-import { getDictionary, jsonLd, pageMetadata, resolveLocale } from "@/lib/i18n/server";
-import { siteUrl } from "@/lib/site";
+import { LOCALE_META } from "@/lib/i18n";
+import { absoluteUrl, getDictionary, jsonLd, pageMetadata, resolveLocale } from "@/lib/i18n/server";
+import { organization, organizationId } from "@/lib/structured-data";
 
 export async function generateMetadata({ params }: PageProps<"/[lang]">): Promise<Metadata> {
   return pageMetadata({ locale: await resolveLocale(params), path: "/" });
@@ -12,42 +11,44 @@ export async function generateMetadata({ params }: PageProps<"/[lang]">): Promis
 // Structured data for rich results: who we are, the site, the product and the FAQ
 function structuredData(locale: Awaited<ReturnType<typeof resolveLocale>>) {
   const t = getDictionary(locale);
-  const base = siteUrl();
-  const url = base + localizePath("/", locale);
+  const url = absoluteUrl("/", locale);
   const language = LOCALE_META[locale].hreflang;
   return {
     "@context": "https://schema.org",
     "@graph": [
-      {
-        "@type": "Organization",
-        "@id": `${base}/#organization`,
-        name: t.meta.siteName,
-        url: base,
-        logo: `${base}/icon.png`,
-        email: CONTACT_EMAIL,
-      },
+      organization(locale),
       {
         "@type": "WebSite",
-        "@id": `${url}#website`,
+        "@id": `${url}/#website`,
         name: t.meta.siteName,
         url,
         inLanguage: language,
-        publisher: { "@id": `${base}/#organization` },
+        publisher: { "@id": organizationId() },
       },
       {
         "@type": "SoftwareApplication",
+        "@id": `${url}/#software`,
         name: t.meta.siteName,
         url,
         description: t.meta.description,
         applicationCategory: "BusinessApplication",
         operatingSystem: "Web",
         inLanguage: language,
-        offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
-        publisher: { "@id": `${base}/#organization` },
+        featureList: t.landing.features.items.map((item) => item.title),
+        // Free for everyone admitted to the closed beta; the paid plans on /pricing start at launch
+        offers: {
+          "@type": "Offer",
+          name: t.hero.note.split(" · ")[0],
+          price: "0",
+          priceCurrency: "USD",
+          availability: "https://schema.org/LimitedAvailability",
+          url: absoluteUrl("/pricing", locale),
+        },
+        publisher: { "@id": organizationId() },
       },
       {
         "@type": "FAQPage",
-        "@id": `${url}#faq`,
+        "@id": `${url}/#faq`,
         inLanguage: language,
         mainEntity: t.landing.faq.items.map(({ q, a }) => ({
           "@type": "Question",

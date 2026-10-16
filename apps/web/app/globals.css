@@ -1006,7 +1006,7 @@ button:not(:focus-visible) {
 
 .site-foot {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 2fr) repeat(4, minmax(0, 1fr));
   gap: var(--space-6);
   /* content width, so the top rule lines up with the text */
   width: min(calc(1200px - 2 * var(--gutter)), calc(100% - 2 * var(--gutter)));
@@ -1179,6 +1179,15 @@ button:not(:focus-visible) {
 .prose th {
   font-weight: 600;
 }
+.prose blockquote {
+  display: grid;
+  gap: var(--space-2);
+  padding-left: var(--space-4);
+  border-left: 3px solid var(--color-secondary);
+}
+.prose blockquote p:last-child {
+  color: var(--color-muted);
+}
 .prose .callout {
   padding: var(--space-4);
   border: 1px solid var(--color-line);
@@ -1206,7 +1215,7 @@ button:not(:focus-visible) {
     grid-template-columns: minmax(0, 1fr);
   }
   .site-foot {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
   .site-foot__brand {
     grid-column: 1 / -1;

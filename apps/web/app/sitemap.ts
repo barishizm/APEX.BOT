@@ -1,17 +1,15 @@
 import type { MetadataRoute } from "next"
-import { LOCALES, localizePath } from "@/lib/i18n"
-import { languageAlternates } from "@/lib/i18n/server"
-import { siteUrl } from "@/lib/site"
+import { PUBLIC_PAGES } from "@/content"
+import { LOCALES } from "@/lib/i18n"
+import { absoluteUrl, languageAlternates } from "@/lib/i18n/server"
 
-const PATHS = ["/", "/pricing", "/docs", "/status", "/privacy", "/security", "/terms"]
-
-// Every page in every language, each listing its translations (hreflang) for search engines
+// Every indexable page in every language, each listing its translations (hreflang) and when it last changed.
+// /status is left out on purpose: it is a live check with nothing for search engines to rank.
 export default function sitemap(): MetadataRoute.Sitemap {
-  return PATHS.flatMap((path) =>
+  return Object.entries(PUBLIC_PAGES).flatMap(([path, updated]) =>
     LOCALES.map((locale) => ({
-      url: siteUrl() + localizePath(path, locale),
-      changeFrequency: path === "/status" ? ("hourly" as const) : ("monthly" as const),
-      priority: path === "/" ? 1 : 0.6,
+      url: absoluteUrl(path, locale),
+      lastModified: updated,
       alternates: { languages: languageAlternates(path) },
     })),
   )

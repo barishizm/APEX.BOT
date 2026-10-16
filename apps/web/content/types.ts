@@ -9,3 +9,9 @@ export type ProseContent = {
   toc?: { id: string; label: string }[]
   body: () => ReactNode
 }
+
+// A marketing page (about, use cases, integrations) carries its own search metadata.
+// `crumb` is its short name in breadcrumbs.
+export type MarketingContent = ProseContent & {
+  meta: { title: string; description: string; crumb: string }
+}

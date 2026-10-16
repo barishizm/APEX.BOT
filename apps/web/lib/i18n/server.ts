@@ -31,12 +31,27 @@ export const generateLocaleParams = () => LOCALES.map((lang) => ({ lang }))
 // app/opengraph-image.png sits above both root layouts, so pages reference it explicitly
 const OG_IMAGE = { url: "/opengraph-image.png", width: 1200, height: 630, alt: "Apex Bot" }
 
+// Absolute URL of `path` in `locale`, written the way Next prints canonicals (the home page has no trailing slash)
+export function absoluteUrl(path: string, locale: Locale) {
+  const localized = localizePath(path, locale)
+  return localized === "/" ? siteUrl() : siteUrl() + localized
+}
+
 // Absolute URL of `path` in every language, plus x-default for visitors we can't match
 export function languageAlternates(path: string) {
   const languages: Record<string, string> = {}
-  for (const locale of LOCALES) languages[LOCALE_META[locale].hreflang] = siteUrl() + localizePath(path, locale)
-  languages["x-default"] = siteUrl() + localizePath(path, DEFAULT_LOCALE)
+  for (const locale of LOCALES) languages[LOCALE_META[locale].hreflang] = absoluteUrl(path, locale)
+  languages["x-default"] = absoluteUrl(path, DEFAULT_LOCALE)
   return languages
+}
+
+// BreadcrumbList from the home page down to the current page; `trail` excludes the home page
+export function breadcrumbs(locale: Locale, trail: { name: string; path: string }[]) {
+  const items = [{ name: getDictionary(locale).meta.siteName, path: "/" }, ...trail]
+  return {
+    "@type": "BreadcrumbList",
+    itemListElement: items.map((item, i) => ({ "@type": "ListItem", position: i + 1, name: item.name, item: absoluteUrl(item.path, locale) })),
+  }
 }
 
 // Title, description, canonical, hreflang, Open Graph and Twitter tags for one localized page.
@@ -61,7 +76,8 @@ export function pageMetadata({
   return {
     ...(title ? { title } : { title: { absolute: t.meta.defaultTitle } }),
     description: desc,
-    alternates: index ? { canonical: url, languages: languageAlternates(path) } : { canonical: localizePath("/", locale) },
+    // A noindex page points at itself: a canonical to another URL would contradict the noindex
+    alternates: index ? { canonical: url, languages: languageAlternates(path) } : { canonical: url },
     robots: index ? undefined : { index: false, follow: true },
     openGraph: {
       type: "website",
