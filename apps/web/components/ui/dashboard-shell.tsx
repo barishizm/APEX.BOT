@@ -1,6 +1,6 @@
 "use client"
 
-import { BookOpen, CircleHelp, LayoutDashboard, ListChecks, MessageSquareText, Palette, Search, Settings, type LucideIcon } from "lucide-react"
+import { ChartColumn, BookOpen, CircleHelp, LayoutDashboard, ListChecks, MessageSquareText, Palette, Search, Settings, type LucideIcon } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useEffect, useState, type ReactNode } from "react"
@@ -9,10 +9,11 @@ import { CommandPalette } from "./command-palette"
 import { PrismFluxLoader } from "./prism-flux-loader"
 import { ProfileMenu } from "./profile-menu"
 
-export type NavLabel = "Overview" | "Knowledge" | "Conversations" | "Widget" | "Setup" | "Settings"
+export type NavLabel = "Overview" | "Analytics" | "Knowledge" | "Conversations" | "Widget" | "Setup" | "Settings"
 
-const NAV: { id: NavLabel; key: "overview" | "knowledge" | "conversations" | "widget" | "setup"; icon: LucideIcon; href: string }[] = [
+const NAV: { id: NavLabel; key: "overview" | "analytics" | "knowledge" | "conversations" | "widget" | "setup"; icon: LucideIcon; href: string }[] = [
   { id: "Overview", key: "overview", icon: LayoutDashboard, href: "/dashboard" },
+  { id: "Analytics", key: "analytics", icon: ChartColumn, href: "/dashboard/analytics" },
   { id: "Knowledge", key: "knowledge", icon: BookOpen, href: "/dashboard/knowledge" },
   { id: "Conversations", key: "conversations", icon: MessageSquareText, href: "/dashboard/conversations" },
   { id: "Widget", key: "widget", icon: Palette, href: "/dashboard/widget" },

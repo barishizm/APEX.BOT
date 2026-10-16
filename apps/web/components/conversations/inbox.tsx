@@ -236,11 +236,14 @@ export function ConversationInbox({
   hasMore: initialHasMore,
   filter,
   canEdit,
+  open,
 }: {
   initial: SummaryJson[]
   hasMore: boolean
   filter: ConversationFilter
   canEdit: boolean
+  /** Conversation to show first (linked from the analytics page), even if it isn't on the first page. */
+  open?: string | null
 }) {
   const { t: app, locale } = useAppI18n()
   const t = app.inbox
@@ -248,14 +251,14 @@ export function ConversationInbox({
   const [items, setItems] = useState(initial)
   const [hasMore, setHasMore] = useState(initialHasMore)
   const [loadingMore, setLoadingMore] = useState(false)
-  const [selected, setSelected] = useState<string | null>(null)
+  const [selected, setSelected] = useState<string | null>(open ?? null)
 
   // a new filter arrives as new server props
   useEffect(() => {
     setItems(initial)
     setHasMore(initialHasMore)
-    setSelected(null)
-  }, [initial, initialHasMore])
+    setSelected(open ?? null)
+  }, [initial, initialHasMore, open])
 
   const loadMore = async () => {
     const last = items.at(-1)

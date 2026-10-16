@@ -18,6 +18,13 @@
   --color-secondary: #312c85;
   --color-bubble: #ecece7;
 
+  /* Data series (analytics charts): distinct in hue and lightness, AA against both grounds */
+  --chart-1: #4338ca;
+  --chart-2: #0f766e;
+  --chart-3: #b45309;
+  --chart-4: #be123c;
+  --chart-5: #64748b;
+
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -53,6 +60,11 @@
     --color-on-primary: #0c0c09;
     --color-secondary: #a9a4f2;
     --color-bubble: #21211b;
+    --chart-1: #a5b4fc;
+    --chart-2: #5eead4;
+    --chart-3: #fcd34d;
+    --chart-4: #fda4af;
+    --chart-5: #94a3b8;
     color-scheme: dark;
   }
 }
@@ -67,6 +79,11 @@
   --color-on-primary: #0c0c09;
   --color-secondary: #a9a4f2;
   --color-bubble: #21211b;
+  --chart-1: #a5b4fc;
+  --chart-2: #5eead4;
+  --chart-3: #fcd34d;
+  --chart-4: #fda4af;
+  --chart-5: #94a3b8;
   color-scheme: dark;
 }
 

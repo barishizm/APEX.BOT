@@ -1,5 +1,6 @@
 import type { Db, Queryable } from "./db.ts"
 import { canEditBot, getBotForUser } from "./bots.ts"
+import { replyIdList, resolveReplies } from "./conversations.ts"
 
 export const KNOWLEDGE_LIMITS = {
   sources: 20,
@@ -25,6 +26,8 @@ export interface KnowledgeSource {
   url: string | null
   /** Text sources only: the beginning of the content. */
   preview: string | null
+  /** The text source answers from the analytics page are appended to. */
+  managed: boolean
   status: SourceStatus
   error: string | null
   pages: number
@@ -57,6 +60,7 @@ interface SourceRow {
   title: string
   url: string | null
   preview: string | null
+  managed: boolean
   status: SourceStatus
   error: string | null
   pages: number
@@ -66,7 +70,7 @@ interface SourceRow {
   updated_at: Date
 }
 
-const COLUMNS = `id, kind, title, url, left(content, 240) as preview, status, error, pages, chunks, synced_at, created_at, updated_at`
+const COLUMNS = `id, kind, title, url, left(content, 240) as preview, managed, status, error, pages, chunks, synced_at, created_at, updated_at`
 
 const toSource = (r: SourceRow): KnowledgeSource => ({
   id: r.id,
@@ -74,6 +78,7 @@ const toSource = (r: SourceRow): KnowledgeSource => ({
   title: r.title,
   url: r.url,
   preview: r.preview,
+  managed: r.managed,
   // a crawl that died with its server process shows as failed, so it can be retried
   status: r.status === "syncing" && Date.now() - new Date(r.updated_at).getTime() > STALE_SYNC_MS ? "failed" : r.status,
   error: r.status === "syncing" && Date.now() - new Date(r.updated_at).getTime() > STALE_SYNC_MS ? "The sync was interrupted. Try again" : r.error,
@@ -186,6 +191,73 @@ export async function addTextSource(
     await insertChunks(tx, bot.id, rows[0].id, chunks)
     await bumpKnowledge(tx, bot.id)
     return toSource(rows[0])
+  })
+}
+
+export const ANSWER_LIMITS = { question: 300, answerMin: 10, answer: 4000 } as const
+
+/**
+ * "Add to knowledge base" for an unanswered question: appends the question and its answer to
+ * the bot's managed text source (created on first use, titled `title`), re-chunks it and
+ * resolves the given replies, in one transaction. Entries are separated by a blank line and
+ * never contain one, so `chunk` can keep each question with its answer.
+ */
+export async function addAnswerToKnowledge(
+  db: Db,
+  userId: string,
+  input: { question: unknown; answer: unknown; replyIds: unknown; title: string },
+  chunk: (title: string, content: string) => ChunkRecord[],
+): Promise<{ source: KnowledgeSource; resolved: number }> {
+  const bot = await editableBot(db, userId)
+  const question = typeof input.question === "string" ? input.question.replace(/\s+/g, " ").trim() : ""
+  const answer = typeof input.answer === "string" ? input.answer.replace(/\r\n?/g, "\n").replace(/[ \t]+\n/g, "\n").replace(/\n{2,}/g, "\n").trim() : ""
+  if (!question) throw new KnowledgeError("invalid_input", "Write the question")
+  if (question.length > ANSWER_LIMITS.question) throw new KnowledgeError("invalid_input", `Keep the question under ${ANSWER_LIMITS.question} characters`)
+  if (answer.length < ANSWER_LIMITS.answerMin) throw new KnowledgeError("invalid_input", "Write an answer of at least a few words")
+  if (answer.length > ANSWER_LIMITS.answer) {
+    throw new KnowledgeError("invalid_input", `Keep the answer under ${ANSWER_LIMITS.answer.toLocaleString("en")} characters`)
+  }
+  const ids = replyIdList(input.replyIds)
+  const entry = `${question}\n${answer}`
+
+  return db.transaction(async (tx) => {
+    await tx.query("select id from app.bots where id = $1 for update", [bot.id])
+    const found = await tx.query<SourceRow & { content: string }>(
+      `select ${COLUMNS}, content from app.knowledge_sources where bot_id = $1 and managed for update`,
+      [bot.id],
+    )
+    const existing = found.rows[0]
+    const content = existing ? `${existing.content}\n\n${entry}` : entry
+    if (content.length > KNOWLEDGE_LIMITS.textChars) {
+      throw new KnowledgeError("limit", "Your answered questions are full. Remove that source from your knowledge base to start a new one")
+    }
+    if (!existing) await checkRoom(tx, bot.id)
+    const title = existing?.title ?? cleanTitle(input.title)
+    const chunks = chunk(title, content)
+    if (chunks.length > (await chunkRoom(tx, bot.id, existing?.id ?? null))) {
+      throw new KnowledgeError("limit", "Your knowledge base is full. Remove a source to add more")
+    }
+
+    let row: SourceRow
+    if (existing) {
+      await tx.query("delete from app.knowledge_chunks where source_id = $1", [existing.id])
+      const { rows } = await tx.query<SourceRow>(
+        `update app.knowledge_sources set content = $2, chunks = $3, status = 'ready', error = null, synced_at = now()
+          where id = $1 returning ${COLUMNS}`,
+        [existing.id, content, chunks.length],
+      )
+      row = rows[0]
+    } else {
+      const { rows } = await tx.query<SourceRow>(
+        `insert into app.knowledge_sources (bot_id, kind, title, content, status, chunks, synced_at, created_by, managed)
+         values ($1, 'text', $2, $3, 'ready', $4, now(), $5, true) returning ${COLUMNS}`,
+        [bot.id, title, content, chunks.length, userId],
+      )
+      row = rows[0]
+    }
+    await insertChunks(tx, bot.id, row.id, chunks)
+    await bumpKnowledge(tx, bot.id)
+    return { source: toSource(row), resolved: await resolveReplies(tx, bot.id, ids) }
   })
 }
 
