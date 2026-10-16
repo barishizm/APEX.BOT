@@ -1,0 +1,142 @@
+[
+  {
+    "url": "https://help.taskline.example/pricing",
+    "title": "Plans and pricing",
+    "text": "Taskline has three plans. Free is for small teams: up to 5 members, 3 projects and 1 GB of storage. Pro costs €8 per user per month billed annually, or €10 billed monthly, and adds unlimited projects, timelines and guest access. Business costs €16 per user per month and adds SAML single sign-on, the audit log and a 99.9% uptime SLA. Every new workspace starts with a 14-day Pro trial; no credit card is needed."
+  },
+  {
+    "url": "https://help.taskline.example/billing/invoices",
+    "title": "Invoices and receipts",
+    "text": "An invoice is emailed to the billing contact after every charge. Owners and billing admins can download past invoices as PDF from Settings > Billing > Invoices. To show your company name, address or VAT ID on future invoices, edit the billing details on the same page; invoices that were already issued can't be changed. To send invoices to a different address, change the billing email."
+  },
+  {
+    "url": "https://help.taskline.example/billing/payment-methods",
+    "title": "Payment methods",
+    "text": "We accept Visa, Mastercard and American Express. Annual Business plans can also pay by SEPA direct debit. Workspaces with more than 50 seats can ask for payment by bank transfer against an invoice. We don't accept PayPal or cryptocurrency. To replace your card, go to Settings > Billing > Payment method."
+  },
+  {
+    "url": "https://help.taskline.example/billing/cancel",
+    "title": "Cancelling your subscription",
+    "text": "You can cancel at any time from Settings > Billing > Cancel plan. Your workspace keeps its paid features until the end of the current billing period and then moves to the Free plan; nothing is deleted. Annual plans cancelled within the first 30 days get a pro-rata refund to the original payment method within 5-10 business days. Monthly plans are not refunded."
+  },
+  {
+    "url": "https://help.taskline.example/billing/discounts",
+    "title": "Discounts for nonprofits and education",
+    "text": "Registered nonprofits, schools and universities get 50% off Pro and Business. Apply with the discount form and proof of status; approval takes about 3 business days. Students get Pro for free for personal use while they have a valid university email address."
+  },
+  {
+    "url": "https://help.taskline.example/security/sso",
+    "title": "SAML single sign-on (SSO)",
+    "text": "Business workspaces can sign in with SAML 2.0 single sign-on. We support Okta, Microsoft Entra ID (Azure AD), Google Workspace and any SAML 2.0 identity provider. SCIM provisioning creates and removes members automatically. Once SSO works, owners can enforce it so members can no longer sign in with a password."
+  },
+  {
+    "url": "https://help.taskline.example/security/2fa",
+    "title": "Two-factor authentication",
+    "text": "Turn on two-factor authentication under Profile > Security. You can use an authenticator app or a hardware security key (WebAuthn / passkey). Save the ten recovery codes somewhere safe: they are the only way back in if you lose your phone. Admins can require two-factor authentication for every member of the workspace."
+  },
+  {
+    "url": "https://help.taskline.example/security/data-location",
+    "title": "Where your data is stored",
+    "text": "All workspace data is stored in the European Union, in Frankfurt (AWS eu-central-1), with encrypted backups in Ireland. Data is encrypted at rest with AES-256 and in transit with TLS 1.3. We sign a GDPR data processing agreement (DPA) with every paid customer on request, and our subprocessor list is public."
+  },
+  {
+    "url": "https://help.taskline.example/security/uptime",
+    "title": "Uptime, SLA and status",
+    "text": "Business plans include a 99.9% monthly uptime SLA with service credits if we miss it. Live status and incident history are at status.taskline.example, where you can subscribe to updates. Planned maintenance happens on Sundays between 02:00 and 04:00 CET and is announced 72 hours ahead."
+  },
+  {
+    "url": "https://help.taskline.example/account/password",
+    "title": "Resetting your password",
+    "text": "Click \"Forgot password\" on the sign-in page and enter your email; the reset link is valid for 30 minutes. If you don't get the email, check spam or ask an admin to confirm the address on your account. If your workspace uses single sign-on, reset your password with your identity provider instead."
+  },
+  {
+    "url": "https://help.taskline.example/account/delete-workspace",
+    "title": "Deleting a workspace",
+    "text": "Only the workspace owner can delete it, from Settings > Workspace > Delete workspace. Deletion cancels any paid plan immediately. The workspace can be restored for 30 days; after that all projects, tasks and files are permanently erased. Export your data first if you want to keep a copy."
+  },
+  {
+    "url": "https://help.taskline.example/workspace/roles",
+    "title": "Roles and permissions",
+    "text": "Every member has one role. Owners manage billing and can delete the workspace. Admins manage members, integrations and settings. Members create and edit projects they belong to. Guests can only see the projects shared with them and can't create projects. Change a role from Settings > Members."
+  },
+  {
+    "url": "https://help.taskline.example/workspace/guests",
+    "title": "Inviting clients and guests",
+    "text": "On Pro and Business you can invite clients and freelancers as guests at no extra cost. Open a project, click Share and enter their email. Guests only see that project, can comment and complete tasks assigned to them, and never count as paid seats."
+  },
+  {
+    "url": "https://help.taskline.example/projects/import",
+    "title": "Importing from Trello, Asana and Jira",
+    "text": "Go to Settings > Import to bring in boards from Trello, projects from Asana or issues from Jira. Assignees, due dates, comments and attachments are copied; attachments larger than 100 MB are skipped. You can also import tasks from a CSV file with one task per row."
+  },
+  {
+    "url": "https://help.taskline.example/projects/storage",
+    "title": "Storage and file size limits",
+    "text": "Storage is shared by the whole workspace: 1 GB on Free, 100 GB on Pro and unlimited on Business. A single uploaded file can be up to 250 MB. When the workspace is full, existing files stay available but new uploads are blocked until you free up space or upgrade."
+  },
+  {
+    "url": "https://help.taskline.example/projects/export",
+    "title": "Exporting your data",
+    "text": "Admins can export the whole workspace from Settings > Export as JSON or CSV, including tasks, comments and file links. A single project can be exported to CSV from its menu. The export link is emailed to you and stays valid for 7 days."
+  },
+  {
+    "url": "https://help.taskline.example/integrations/slack",
+    "title": "Slack integration",
+    "text": "Connect Slack from Settings > Integrations to post task updates to a channel per project. Use the /taskline command or the message shortcut to turn any Slack message into a task. Each member can choose which notifications they get as Slack direct messages."
+  },
+  {
+    "url": "https://help.taskline.example/integrations/github",
+    "title": "GitHub integration",
+    "text": "Link pull requests and commits to tasks by putting the task ID (for example TL-123) in the branch name, commit message or pull request title. The task shows the pull request status, and it moves to Done automatically when the pull request is merged."
+  },
+  {
+    "url": "https://help.taskline.example/developers/api",
+    "title": "REST API",
+    "text": "The REST API lives at https://api.taskline.example/v2. Authenticate with a personal access token from Profile > API tokens, sent as a Bearer token. Each token can make 100 requests per minute; above that the API answers 429 with a Retry-After header. Responses are paginated with a cursor."
+  },
+  {
+    "url": "https://help.taskline.example/developers/webhooks",
+    "title": "Webhooks",
+    "text": "Webhooks send an HTTPS POST to your endpoint when tasks are created, updated, completed or deleted. Each request is signed with HMAC-SHA256 in the X-Taskline-Signature header; verify it with your webhook secret. Failed deliveries are retried 5 times with exponential backoff over 24 hours."
+  },
+  {
+    "url": "https://help.taskline.example/apps/mobile",
+    "title": "Mobile apps",
+    "text": "Taskline has native apps for iOS 16 or later and Android 10 or later. You can create and update tasks offline; changes sync when you are back online. Push notifications follow your notification settings, and you can mute them outside working hours."
+  },
+  {
+    "url": "https://help.taskline.example/apps/shortcuts",
+    "title": "Keyboard shortcuts",
+    "text": "Press C to create a task, / to search, G then P to go to projects and G then I to open your inbox. Press ? anywhere to see the full list of keyboard shortcuts."
+  },
+  {
+    "url": "https://help.taskline.example/tr/fiyatlandirma",
+    "title": "Planlar ve fiyatlar",
+    "text": "Taskline'ın üç planı vardır. Ücretsiz plan küçük ekipler içindir: en fazla 5 üye, 3 proje ve 1 GB depolama. Pro, yıllık faturalandırmada kullanıcı başına aylık 8 €, aylık faturalandırmada 10 €'dur; sınırsız proje, zaman çizelgesi ve misafir erişimi ekler. Business kullanıcı başına aylık 16 €'dur; SAML tek oturum açma, denetim kaydı ve %99,9 erişilebilirlik taahhüdü içerir. Her yeni çalışma alanı 14 günlük ücretsiz Pro denemesiyle başlar; kredi kartı gerekmez."
+  },
+  {
+    "url": "https://help.taskline.example/tr/faturalar",
+    "title": "Faturalar ve makbuzlar",
+    "text": "Her ödemeden sonra fatura, faturalandırma iletişim adresine e-postayla gönderilir. Sahipler ve faturalandırma yöneticileri geçmiş faturaları Ayarlar > Faturalandırma > Faturalar sayfasından PDF olarak indirebilir. Şirket unvanınızın, adresinizin veya vergi numaranızın sonraki faturalarda görünmesi için aynı sayfadan fatura bilgilerini düzenleyin; kesilmiş faturalar değiştirilemez."
+  },
+  {
+    "url": "https://help.taskline.example/tr/iptal",
+    "title": "Aboneliği iptal etme",
+    "text": "Aboneliğinizi Ayarlar > Faturalandırma > Planı iptal et adımından istediğiniz zaman iptal edebilirsiniz. Çalışma alanınız mevcut fatura döneminin sonuna kadar ücretli özellikleri korur, ardından Ücretsiz plana geçer; hiçbir şey silinmez. İlk 30 gün içinde iptal edilen yıllık planlarda kalan süre için kısmi geri ödeme, 5-10 iş günü içinde ödeme yaptığınız yönteme yapılır. Aylık planlarda geri ödeme yapılmaz."
+  },
+  {
+    "url": "https://help.taskline.example/tr/iki-adimli-dogrulama",
+    "title": "İki adımlı doğrulama",
+    "text": "İki adımlı doğrulamayı Profil > Güvenlik sayfasından açın. Bir doğrulayıcı uygulama ya da donanım güvenlik anahtarı (WebAuthn / geçiş anahtarı) kullanabilirsiniz. On kurtarma kodunu güvenli bir yere kaydedin: telefonunuzu kaybederseniz hesabınıza dönmenin tek yolu bunlardır. Yöneticiler, çalışma alanındaki herkes için iki adımlı doğrulamayı zorunlu kılabilir."
+  },
+  {
+    "url": "https://help.taskline.example/tr/veri-konumu",
+    "title": "Verileriniz nerede saklanıyor",
+    "text": "Tüm çalışma alanı verileri Avrupa Birliği'nde, Frankfurt'ta (AWS eu-central-1) saklanır; şifreli yedekler İrlanda'dadır. Veriler depolamada AES-256, aktarımda TLS 1.3 ile şifrelenir. Talep eden her ücretli müşteriyle KVKK ve GDPR kapsamında veri işleme sözleşmesi imzalıyoruz."
+  },
+  {
+    "url": "https://help.taskline.example/tr/sifre-sifirlama",
+    "title": "Şifrenizi sıfırlama",
+    "text": "Giriş sayfasında \"Şifremi unuttum\" bağlantısına tıklayıp e-posta adresinizi girin; sıfırlama bağlantısı 30 dakika geçerlidir. E-posta gelmezse istenmeyen klasörüne bakın. Çalışma alanınız tek oturum açma kullanıyorsa şifrenizi kimlik sağlayıcınızdan sıfırlayın."
+  }
+]
