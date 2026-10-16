@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { Turnstile, TURNSTILE_SITE_KEY } from "@/components/ui/turnstile"
 import { useRouter } from "next/navigation"
 import { X, Check, ArrowRight, Clock, Languages, LifeBuoy, Eye, EyeOff } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
@@ -121,6 +122,8 @@ export default function Hero({
   const isBusiness = accountType === "business"
   const [formStep, setFormStep] = useState<"idle" | "submitting" | "success">("idle")
   const [authError, setAuthError] = useState<string | null>(null)
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
+  const [turnstileReset, setTurnstileReset] = useState(0)
   const [nextPath, setNextPath] = useState("/verify-email")
   const needsVerify = nextPath === "/verify-email"
   // Card height follows its content, animated, so switching forms grows/shrinks smoothly
@@ -221,7 +224,12 @@ export default function Hero({
             password: field("password"),
             acceptTerms: form.has("acceptTerms"),
             allowTraining: form.has("allowTraining"),
+            turnstileToken,
           }
+    if (authMode === "register" && TURNSTILE_SITE_KEY && !turnstileToken) {
+      setAuthError("Please wait for the human check to finish, then try again")
+      return
+    }
     setAuthError(null)
     setFormStep("submitting")
     try {
@@ -244,6 +252,9 @@ export default function Hero({
     } catch {
       setAuthError(t.auth.errors.network)
       setFormStep("idle")
+    } finally {
+      // a Turnstile token works once
+      if (authMode === "register") setTurnstileReset((n) => n + 1)
     }
   }
 
@@ -795,6 +806,8 @@ export default function Hero({
                             <span id="allow-training-label">{t.auth.register.allowTraining}</span>
                           </div>
                         </div>
+
+                        <Turnstile onToken={setTurnstileToken} resetKey={turnstileReset} />
 
                         {authError && (
                           <p role="alert" className="text-sm text-red-600 dark:text-red-400">{authError}</p>

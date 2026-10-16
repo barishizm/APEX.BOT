@@ -3,11 +3,14 @@ import { randomBytes } from "node:crypto"
 import { AuthError, register } from "@apex/db"
 import { db } from "@/lib/db"
 import { authErrorResponse, readJson, requestMeta, setSessionCookie } from "@/lib/auth"
+import { requireHuman } from "@/lib/turnstile"
 import { sendAccountExistsNotice, sendVerificationCode } from "@/lib/mail"
 
 export async function POST(request: Request) {
   try {
     const b = await readJson(request)
+    const meta = await requestMeta()
+    await requireHuman(b.turnstileToken, meta.ip)
     const input = {
       email: b.email,
       username: b.username,
@@ -19,7 +22,7 @@ export async function POST(request: Request) {
       allowTraining: b.allowTraining,
     }
     try {
-      const { user, session, code } = await register(db(), input, await requestMeta())
+      const { user, session, code } = await register(db(), input, meta)
       await setSessionCookie(session)
       await sendVerificationCode(user.email, code, await requestLocale())
       return Response.json({ user }, { status: 201 })
