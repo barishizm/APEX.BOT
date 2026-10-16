@@ -18,6 +18,7 @@ export const en = {
     },
     status: { title: "System status", description: "Live status of the Apex Bot dashboard, chat API and widget." },
     privacy: { title: "Privacy Policy", description: "How Apex Bot collects, uses and protects personal data." },
+    security: { title: "Security", description: "How Apex Bot protects accounts, conversations and your website: access control, AI safety, encryption and abuse protection." },
     terms: { title: "Terms of Service", description: "The terms that apply when you use Apex Bot." },
     login: { title: "Log in" },
     signup: { title: "Sign up" },

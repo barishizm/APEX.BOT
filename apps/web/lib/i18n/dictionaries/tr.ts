@@ -18,6 +18,7 @@ export const tr: Dictionary = {
     },
     status: { title: "Sistem durumu", description: "Apex Bot paneli, sohbet API'si ve widget'ının canlı durumu." },
     privacy: { title: "Gizlilik Politikası", description: "Apex Bot'un kişisel verileri nasıl topladığı, kullandığı ve koruduğu." },
+    security: { title: "Güvenlik", description: "Apex Bot hesapları, konuşmaları ve web sitenizi nasıl korur: erişim denetimi, yapay zekâ güvenliği, şifreleme ve kötüye kullanım koruması." },
     terms: { title: "Kullanım Koşulları", description: "Apex Bot'u kullanırken geçerli olan koşullar." },
     login: { title: "Giriş yap" },
     signup: { title: "Kayıt ol" },

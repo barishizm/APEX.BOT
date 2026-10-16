@@ -3,7 +3,7 @@ import { LOCALES, localizePath } from "@/lib/i18n"
 import { languageAlternates } from "@/lib/i18n/server"
 import { siteUrl } from "@/lib/site"
 
-const PATHS = ["/", "/pricing", "/docs", "/status", "/privacy", "/terms"]
+const PATHS = ["/", "/pricing", "/docs", "/status", "/privacy", "/security", "/terms"]
 
 // Every page in every language, each listing its translations (hreflang) for search engines
 export default function sitemap(): MetadataRoute.Sitemap {
