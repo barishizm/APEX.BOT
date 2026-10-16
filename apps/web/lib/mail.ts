@@ -78,6 +78,63 @@ const EMAILS: Messages<{
       text: `Bu e-posta adresiyle Apex Bot'a kaydolmaya çalışıldı, ancak bu adrese ait bir hesap zaten var.\n\nBu sizseniz giriş yapmanız yeterli. Şifrenizi unuttuysanız giriş sayfasındaki "Şifrenizi mi unuttunuz?" bağlantısını kullanın. Hesabınızda hiçbir değişiklik yapılmadı.`,
     },
   },
+  lt: {
+    footer: "\n\nJei to neprašėte, šį laišką galite ignoruoti.\n\nApex Bot",
+    verification: (code) => ({
+      subject: `Jūsų Apex Bot patvirtinimo kodas: ${code}`,
+      text: `Jūsų patvirtinimo kodas: ${code}\n\nĮveskite jį patvirtinimo puslapyje, kad patvirtintumėte savo el. pašto adresą. Kodas galioja 15 minučių.`,
+    }),
+    passwordReset: (code) => ({
+      subject: `Jūsų Apex Bot slaptažodžio atkūrimo kodas: ${code}`,
+      text: `Gautas prašymas atkurti jūsų Apex Bot paskyros slaptažodį.\n\nJūsų kodas: ${code}\n\nĮveskite jį atkūrimo puslapyje ir pasirinkite naują slaptažodį. Kodas galioja 15 minučių.`,
+    }),
+    handoffConfirmation: (code) => ({
+      subject: `Jūsų Apex Bot perdavimo patvirtinimo kodas: ${code}`,
+      text: `Gautas prašymas siųsti pokalbių roboto perdavimo laiškus šiuo adresu.\n\nJūsų patvirtinimo kodas: ${code}\n\nNorėdami patvirtinti, įveskite jį Apex Bot valdymo skydelyje. Kodas galioja 15 minučių. Jei šio prašymo neatpažįstate, ignoruokite šį laišką – perdavimo laiškai šiuo adresu nebus siunčiami.`,
+    }),
+    accountExists: {
+      subject: "Jūs jau turite Apex Bot paskyrą",
+      text: `Kažkas bandė užsiregistruoti Apex Bot naudodamas šį el. pašto adresą, tačiau paskyra su juo jau yra.\n\nJei tai buvote jūs, tiesiog prisijunkite. Jei pamiršote slaptažodį, prisijungimo puslapyje spustelėkite „Pamiršote slaptažodį?“. Jūsų paskyroje niekas nepakeista.`,
+    },
+  },
+  lv: {
+    footer: "\n\nJa jūs to nepieprasījāt, varat šo e-pastu ignorēt.\n\nApex Bot",
+    verification: (code) => ({
+      subject: `Jūsu Apex Bot apstiprinājuma kods: ${code}`,
+      text: `Jūsu apstiprinājuma kods: ${code}\n\nIevadiet to apstiprināšanas lapā, lai apstiprinātu savu e-pasta adresi. Kods ir derīgs 15 minūtes.`,
+    }),
+    passwordReset: (code) => ({
+      subject: `Jūsu Apex Bot paroles atiestatīšanas kods: ${code}`,
+      text: `Saņemts pieprasījums atiestatīt jūsu Apex Bot konta paroli.\n\nJūsu kods: ${code}\n\nIevadiet to atiestatīšanas lapā, lai izvēlētos jaunu paroli. Kods ir derīgs 15 minūtes.`,
+    }),
+    handoffConfirmation: (code) => ({
+      subject: `Jūsu Apex Bot nodošanas apstiprinājuma kods: ${code}`,
+      text: `Saņemts pieprasījums sūtīt tērzēšanas robota nodošanas e-pastus uz šo adresi.\n\nJūsu apstiprinājuma kods: ${code}\n\nLai apstiprinātu, ievadiet to Apex Bot vadības panelī. Kods ir derīgs 15 minūtes. Ja jūs šo pieprasījumu neatpazīstat, ignorējiet šo e-pastu – nodošanas e-pasti uz šo adresi netiks sūtīti.`,
+    }),
+    accountExists: {
+      subject: "Jums jau ir Apex Bot konts",
+      text: `Kāds mēģināja reģistrēties Apex Bot ar šo e-pasta adresi, taču konts ar to jau pastāv.\n\nJa tas bijāt jūs, vienkārši piesakieties. Ja aizmirsāt paroli, pieteikšanās lapā izmantojiet saiti “Aizmirsāt paroli?”. Jūsu kontā nekas netika mainīts.`,
+    },
+  },
+  et: {
+    footer: "\n\nKui te seda ei taotlenud, võite selle e-kirja tähelepanuta jätta.\n\nApex Bot",
+    verification: (code) => ({
+      subject: `Teie Apex Boti kinnituskood: ${code}`,
+      text: `Teie kinnituskood: ${code}\n\nSisestage see kinnituslehel, et oma e-posti aadress kinnitada. Kood kehtib 15 minutit.`,
+    }),
+    passwordReset: (code) => ({
+      subject: `Teie Apex Boti parooli lähtestamise kood: ${code}`,
+      text: `Saime taotluse teie Apex Boti konto parooli lähtestamiseks.\n\nTeie kood: ${code}\n\nSisestage see lähtestamise lehel ja valige uus parool. Kood kehtib 15 minutit.`,
+    }),
+    handoffConfirmation: (code) => ({
+      subject: `Teie Apex Boti üleandmise kinnituskood: ${code}`,
+      text: `Saime taotluse saata sellele aadressile vestlusroboti üleandmiskirju.\n\nTeie kinnituskood: ${code}\n\nKinnitamiseks sisestage see Apex Boti töölaual. Kood kehtib 15 minutit. Kui te seda taotlust ei tunne, jätke see e-kiri tähelepanuta – sellele aadressile üleandmiskirju ei saadeta.`,
+    }),
+    accountExists: {
+      subject: "Teil on juba Apex Boti konto",
+      text: `Keegi proovis selle e-posti aadressiga Apex Botis registreeruda, kuid sellega seotud konto on juba olemas.\n\nKui see olite teie, logige lihtsalt sisse. Kui olete parooli unustanud, kasutage sisselogimislehel linki „Unustasite parooli?“. Teie kontol ei muudetud midagi.`,
+    },
+  },
 }
 
 function compose(to: string, locale: Locale, mail: { subject: string; text: string }) {

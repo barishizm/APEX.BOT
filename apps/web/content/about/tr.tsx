@@ -7,7 +7,7 @@ function Body() {
       <h2 id="what">Apex Bot nedir?</h2>
       <p>
         Apex Bot, web siteleri için bir yapay zekâ destek asistanıdır. Sayfalarınızı okur, bunlardan size özel bir bilgi
-        tabanı oluşturur ve ziyaretçilerinizin sorularını sohbet widget'ında Türkçe ve İngilizce olarak, günün her saati
+        tabanı oluşturur ve ziyaretçilerinizin sorularını sohbet widget'ında Türkçe, İngilizce, Litvanca, Letonca ve Estonca olarak, günün her saati
         yanıtlar. Yalnızca sizin verdiğiniz bilgilerle yanıt verir, her yanıtın geldiği sayfayı gösterir ve bilmediğinde
         bunu açıkça söyler.
       </p>
@@ -54,8 +54,8 @@ function Body() {
           <a href="/tr/privacy">Gizlilik politikamız</a> KVKK ve GDPR'a uygun olarak yazılmıştır.
         </li>
         <li>
-          <strong>Türkçe birinci sınıf dil.</strong> Türkçe ve İngilizce hem yanıtlarda hem de widget'ın her kelimesinde tam
-          olarak desteklenir.
+          <strong>Yalnızca İngilizce değil, yerel diller.</strong> Türkçe, İngilizce, Litvanca, Letonca ve Estonca hem
+          yanıtlarda hem de widget'ın her kelimesinde tam olarak desteklenir.
         </li>
         <li>
           <strong>Yanıtlar, işlem yapmaz.</strong> Apex sipariş veremez, hesap değiştiremez, söz veremez. Ziyaretçinin bir

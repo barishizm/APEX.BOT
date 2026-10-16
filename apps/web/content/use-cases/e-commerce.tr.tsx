@@ -41,8 +41,8 @@ function Body() {
           <a href="/tr/grounded-answers">Kaynağa dayalı yanıtlar nasıl çalışır?</a>
         </li>
         <li>
-          <strong>Türkçe ve İngilizce.</strong> Alışverişçiler hangi dilde yazarsa o dilde yanıt alır; hem Türkiye'ye hem
-          yurt dışına satış yapan mağazalar için idealdir.
+          <strong>Beş dil.</strong> Türkçe, İngilizce, Litvanca, Letonca ve Estonca: alışverişçiler hangi dilde yazarsa o
+          dilde yanıt alır; sınır ötesine satış yapan mağazalar için idealdir.
         </li>
         <li>
           <strong>Potansiyel müşteri toplama.</strong> İsterseniz sohbet başlamadan önce isim, e-posta veya telefon
@@ -121,13 +121,13 @@ export const ecommerce: MarketingContent = {
   meta: {
     title: "E-ticaret siteleri için yapay zekâ chatbot",
     description:
-      "Kargo, iade, beden ve ödeme sorularını yalnızca mağaza sayfalarınızı kullanan bir yapay zekâ chatbot ile 7/24 yanıtlayın. Türkçe ve İngilizce.",
+      "Kargo, iade, beden ve ödeme sorularını yalnızca mağaza sayfalarınızı kullanan bir yapay zekâ chatbot ile 7/24 yanıtlayın. Beş dilde.",
     crumb: "E-ticaret",
   },
   eyebrow: "E-ticaret için",
   title: "Asla iade politikası uydurmayan, online mağazalar için yapay zekâ chatbot",
   intro:
-    "Kargo, iade, beden ve ödeme sorularını kendi mağaza sayfalarınızdan, günün her saati Türkçe ve İngilizce yanıtlayın.",
+    "Kargo, iade, beden ve ödeme sorularını kendi mağaza sayfalarınızdan, günün her saati Türkçe, İngilizce, Litvanca, Letonca ve Estonca yanıtlayın.",
   toc: TOC,
   body: Body,
 };

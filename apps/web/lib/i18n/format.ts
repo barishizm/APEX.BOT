@@ -19,9 +19,14 @@ export function timeAgo(date: Date | string, locale: Locale, now = Date.now()) {
   return formatDate(date, locale)
 }
 
+// Plural forms by CLDR category. English and Turkish need only one/other; Lithuanian also
+// uses `few` (2-9, 22-29: "2 puslapiai" vs "10 puslapių"). A missing category falls back to other.
+export type PluralForms = { one: string; other: string; few?: string; many?: string }
+
 // Pick the plural form: { one: "{n} source", other: "{n} sources" }
-export function plural(n: number, forms: { one: string; other: string }, locale: Locale) {
-  const form = new Intl.PluralRules(LOCALE_META[locale].intl).select(n) === "one" ? forms.one : forms.other
+export function plural(n: number, forms: PluralForms, locale: Locale) {
+  const category = new Intl.PluralRules(LOCALE_META[locale].intl).select(n)
+  const form = (category === "one" || category === "few" || category === "many" ? forms[category] : undefined) ?? forms.other
   return form.replace(/\{n\}/g, formatNumber(n, locale))
 }
 

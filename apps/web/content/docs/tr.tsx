@@ -16,7 +16,7 @@ const TOC: ProseContent["toc"] = [
 const API_EXAMPLE = `<script>
   // İsteğe bağlı ayarlar; widget yüklenirken okunur
   window.Apex = {
-    lang: "auto",                 // "auto", "tr" veya "en"
+    lang: "auto",                 // "auto", "tr", "en", "lt", "lv" veya "et"
     greeting: "Merhaba! Mağazamızla ilgili her şeyi sorabilirsiniz.",
     suggestions: ["Kargo süreleri", "İade koşulları"],
     theme: { primary: "#312c85", position: "bottom-right" },

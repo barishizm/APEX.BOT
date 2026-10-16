@@ -1,8 +1,9 @@
 "use client"
 
 import { useState } from "react"
-import { DEFAULT_SETTINGS, type BotSettings, type Lang } from "@apex/db/bot-settings"
+import { DEFAULT_SETTINGS, LANGS, type BotSettings, type Lang } from "@apex/db/bot-settings"
 import { useI18n } from "@/components/i18n/provider"
+import { LOCALE_META } from "@/lib/i18n"
 import { WidgetPreview, type PreviewView } from "@/components/widget-studio/preview"
 import { useDark } from "@/lib/use-dark"
 
@@ -16,6 +17,9 @@ const SAMPLE: BotSettings = {
     suggestions: {
       tr: ["Kargo ne kadar sürer?", "İade koşulları neler?"],
       en: ["How long does shipping take?", "What is your return policy?"],
+      lt: ["Kiek laiko trunka pristatymas?", "Kokios grąžinimo sąlygos?"],
+      lv: ["Cik ilgi notiek piegāde?", "Kādi ir atgriešanas noteikumi?"],
+      et: ["Kui kaua tarne aega võtab?", "Millised on tagastustingimused?"],
     },
   },
   handoff: { ...DEFAULT_SETTINGS.handoff, email: "support@example.com" },
@@ -27,8 +31,8 @@ const VIEWS = ["conversation", "welcome"] as const satisfies readonly PreviewVie
 export function WidgetShowcase() {
   const { locale, t } = useI18n()
   const dark = useDark()
-  // the widget speaks Turkish and English; other site languages preview in English
-  const [lang, setLang] = useState<Lang>(locale === "tr" ? "tr" : "en")
+  // the widget speaks every site language, so the preview starts in the page's own
+  const [lang, setLang] = useState<Lang>(locale)
   const [view, setView] = useState<PreviewView>("conversation")
   const [open, setOpen] = useState(true)
 
@@ -38,9 +42,19 @@ export function WidgetShowcase() {
     <div className="showcase__stage">
       <div className="showcase__controls">
         <div role="radiogroup" aria-label={t.showcase.previewLanguage} className="showcase__pills">
-          {(["en", "tr"] as const).map((l) => (
-            <button key={l} type="button" role="radio" aria-checked={lang === l} className={pill(lang === l)} onClick={() => setLang(l)}>
-              {l === "en" ? "English" : "Türkçe"}
+          {[locale, ...LANGS.filter((l) => l !== locale)].map((l) => (
+            <button
+              key={l}
+              type="button"
+              role="radio"
+              aria-checked={lang === l}
+              aria-label={LOCALE_META[l].name}
+              title={LOCALE_META[l].name}
+              lang={LOCALE_META[l].hreflang}
+              className={pill(lang === l)}
+              onClick={() => setLang(l)}
+            >
+              {l.toUpperCase()}
             </button>
           ))}
         </div>

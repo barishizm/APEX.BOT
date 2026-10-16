@@ -6,7 +6,7 @@ import { siteUrl } from "@/lib/site"
 import { viewport as sharedViewport } from "@/lib/viewport"
 import "../globals.css"
 
-// Every public page, once per language: /pricing (English) and /tr/pricing (Turkish).
+// Every public page, once per language: /pricing (English), /tr/pricing (Turkish), /lt/pricing and so on.
 // The proxy maps unprefixed URLs onto the default language.
 export const generateStaticParams = generateLocaleParams
 
