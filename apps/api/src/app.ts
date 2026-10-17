@@ -16,6 +16,7 @@ import { DEFAULT_RETRIEVAL, retrieve, semanticQueryTexts, type Hit, type Knowled
 import type { Conversation, ConversationStore, Source } from "./store.ts";
 import { normalizeOrigin, publicSettings, type Tenant, type TenantRegistry } from "./tenants.ts";
 import type { Lang } from "./text.ts";
+import { visitorContext } from "./visitor-context.ts";
 
 export interface AppDeps {
   tenants: TenantRegistry;
@@ -201,7 +202,7 @@ export function createApp(deps: AppDeps) {
 
     const conversationId = idOf(body.conversationId);
     let conversation = conversationId ? await store.getOrLoad(tenant.id, conversationId) : undefined;
-    conversation ??= store.create(tenant.id, c.get("origin"));
+    conversation ??= store.create(tenant.id, c.get("origin"), visitorContext(body.context, c.req.header("user-agent")));
     if (conversation.messages.length >= limits.maxConversationMessages) return fail(c, "conversation_full", 409);
 
     const historyCount = tenant.limits?.historyMessages ?? limits.historyMessages;
@@ -335,7 +336,7 @@ export function createApp(deps: AppDeps) {
 
     const conversationId = idOf(body.conversationId);
     let conversation = conversationId ? await store.getOrLoad(tenant.id, conversationId) : undefined;
-    conversation ??= store.create(tenant.id, c.get("origin"));
+    conversation ??= store.create(tenant.id, c.get("origin"), visitorContext(body.context, c.req.header("user-agent")));
     store.setVisitor(conversation, { email: address, ...(name ? { name } : {}), ...(phone ? { phone } : {}) });
 
     // The lead is kept in the inbox either way; over the cap only the notification email is skipped

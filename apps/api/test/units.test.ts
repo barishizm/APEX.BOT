@@ -8,6 +8,7 @@ import { ConversationStore } from "../src/store.ts";
 import { detectLang, tokenize } from "../src/text.ts";
 import { RateLimiter } from "../src/limits.ts";
 import { OutboxMailer, ResendMailer, mailerFromEnv } from "../src/mailer.ts";
+import { parseUserAgent, visitorContext } from "../src/visitor-context.ts";
 import { tenant } from "./helpers.ts";
 
 describe("retrieval", () => {
@@ -271,5 +272,30 @@ describe("image turns for other providers", () => {
   });
   it("Gemini gets inline data parts", () => {
     assert.deepEqual(geminiContent(turn), { role: "user", parts: [{ inlineData: { mimeType: "image/png", data: "AAAA" } }, { text: "Bu ne?" }] });
+  });
+});
+
+describe("visitor context", () => {
+  it("tells the kind of device, system and browser", () => {
+    const win = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
+    assert.deepEqual(parseUserAgent(win), { device: "desktop", os: "Windows", browser: "Chrome" });
+    assert.deepEqual(parseUserAgent(`${win} Edg/130.0.0.0`), { device: "desktop", os: "Windows", browser: "Edge" });
+    const tab = "Mozilla/5.0 (Linux; Android 14; SM-X710) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
+    assert.deepEqual(parseUserAgent(tab), { device: "tablet", os: "Android", browser: "Chrome" });
+    const phone = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36";
+    assert.equal(parseUserAgent(phone).device, "mobile");
+    assert.deepEqual(parseUserAgent(undefined), {});
+  });
+
+  it("keeps only the page path and drops what doesn't check out", () => {
+    assert.deepEqual(visitorContext({ page: "/sepet?token=abc", title: "Sepet\u0000", locale: "en-GB", timeZone: "Asia/Calcutta" }, undefined), {
+      page: "/sepet",
+      pageTitle: "Sepet",
+      locale: "en-GB",
+      country: "IN",
+    });
+    assert.deepEqual(visitorContext({ page: 42, locale: "<script>", timeZone: "UTC" }, undefined), {});
+    assert.deepEqual(visitorContext("nonsense", undefined), {});
+    assert.equal(visitorContext({ title: "x".repeat(500) }, undefined).pageTitle!.length, 200);
   });
 });

@@ -128,6 +128,19 @@ describe("POST /v1/chat", () => {
     assert.equal(saved.content, "Bu bilgiye sahip değilim.");
   });
 
+  it("keeps where a conversation started, from the widget's context and the User-Agent", async () => {
+    const { app, store } = setup();
+    const iphone = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
+    const context = { page: "https://a.example/kargo?email=ada@example.com#x", title: "Kargo | Kahve", locale: "tr-TR", timeZone: "Europe/Istanbul" };
+    const first = await readSSE(await chat(app, { message: "iade süresi?", context }, A, { "user-agent": iphone }));
+    const conversationId = first[0].data.conversationId;
+    const expected = { page: "/kargo", pageTitle: "Kargo | Kahve", locale: "tr-TR", country: "TR", device: "mobile", os: "iOS", browser: "Safari" };
+    assert.deepEqual(store.get("tn_a", conversationId)!.context, expected);
+    // later messages don't move it
+    await readSSE(await chat(app, { message: "ya kargo?", conversationId, context: { page: "/other" } }));
+    assert.deepEqual(store.get("tn_a", conversationId)!.context, expected);
+  });
+
   it("continues a conversation and keeps history alternating", async () => {
     const { app, model } = setup();
     const first = await readSSE(await chat(app, { message: "iade süresi?" }));

@@ -10,10 +10,12 @@ import {
   type Db,
 } from "@apex/db";
 import type { Conversation, ConversationPersistence } from "./store.ts";
+import type { VisitorContext } from "./visitor-context.ts";
 
-export function postgresPersistence(db: Db): ConversationPersistence {
+export function postgresPersistence(db: Db, options: { context?: boolean } = {}): ConversationPersistence {
+  const withContext = options.context ?? true;
   return {
-    created: (c) => insertConversation(db, { id: c.id, botId: c.tenantId, origin: c.origin ?? null, createdAt: new Date(c.createdAt) }),
+    created: (c) => insertConversation(db, { id: c.id, botId: c.tenantId, origin: c.origin ?? null, context: withContext ? (c.context ?? {}) : undefined, createdAt: new Date(c.createdAt) }),
     appended: (c, m) =>
       insertMessage(db, {
         id: m.id,
@@ -38,6 +40,8 @@ export function postgresPersistence(db: Db): ConversationPersistence {
         createdAt: stored.createdAt.getTime(),
         updatedAt: stored.updatedAt.getTime(),
         ...(stored.origin ? { origin: stored.origin } : {}),
+        // written by visitorContext(), so its fields have that shape
+        ...(Object.keys(stored.context).length ? { context: stored.context as VisitorContext } : {}),
         ...(stored.handoffAt ? { handoffSent: true } : {}),
         ...(stored.visitor
           ? { visitor: { email: stored.visitor.email, ...(stored.visitor.name ? { name: stored.visitor.name } : {}), ...(stored.visitor.phone ? { phone: stored.visitor.phone } : {}) } }

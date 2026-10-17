@@ -4,6 +4,7 @@
 // durable copy. Writes go out in order per conversation and never block a reply; a
 // conversation missing from memory (after a restart) is loaded back on demand.
 import { randomUUID } from "node:crypto";
+import type { VisitorContext } from "./visitor-context.ts";
 
 export interface Source {
   url: string;
@@ -29,6 +30,8 @@ export interface Conversation {
   messages: StoredMessage[];
   /** Page origin the widget ran on. */
   origin?: string;
+  /** Page, language, country and device the conversation started from. */
+  context?: VisitorContext;
   handoffSent?: boolean;
   /** Contact details from the widget's lead form. */
   visitor?: { email: string; name?: string; phone?: string };
@@ -94,9 +97,17 @@ export class ConversationStore {
     while (this.chains.size) await Promise.all([...this.chains.values()]);
   }
 
-  create(tenantId: string, origin?: string): Conversation {
+  create(tenantId: string, origin?: string, context?: VisitorContext): Conversation {
     const at = this.now();
-    const conversation: Conversation = { id: randomUUID(), tenantId, createdAt: at, updatedAt: at, messages: [], ...(origin ? { origin } : {}) };
+    const conversation: Conversation = {
+      id: randomUUID(),
+      tenantId,
+      createdAt: at,
+      updatedAt: at,
+      messages: [],
+      ...(origin ? { origin } : {}),
+      ...(context && Object.keys(context).length ? { context } : {}),
+    };
     this.items.set(this.key(tenantId, conversation.id), conversation);
     this.write(conversation, (p) => p.created(conversation));
     return conversation;
