@@ -55,7 +55,7 @@ describe("password reset", () => {
     assert.equal(after.id, user.id)
     assert.equal(after.emailVerified, true)
     assert.equal(await getSession(db, old.token), null)
-    assert.ok(await getSession(db, session.token))
+    assert.ok(await getSession(db, session!.token))
     await assert.rejects(login(db, { email: "jane@example.com", password: PASSWORD }), code("invalid_credentials"))
     assert.ok(await login(db, { email: "jane@example.com", password: "new password" }))
     // single use
@@ -100,14 +100,14 @@ describe("account settings", () => {
     await assert.rejects(changePassword(db, user.id, { current: "wrong", next: "brand new pw" }, me.sessionId), code("invalid_credentials"))
     await assert.rejects(changePassword(db, user.id, { current: PASSWORD, next: PASSWORD }, me.sessionId), code("invalid_input"))
     assert.deepEqual(await changePassword(db, user.id, { current: PASSWORD, next: "brand new pw" }, me.sessionId), { signedOut: 1 })
-    assert.equal(await getSession(db, other.session.token), null)
+    assert.equal(await getSession(db, other.session!.token), null)
     assert.ok(await getSession(db, session.token))
     assert.ok(await login(db, { email: "jane@example.com", password: "brand new pw" }))
   })
 
   test("Google/GitHub-only accounts can set a password without a current one", async () => {
     const { user, session } = await oauthLogin(db, { provider: "github", providerAccountId: "42", email: "oauth@example.com", emailVerified: true, username: "octo" })
-    const me = (await getSession(db, session.token))!
+    const me = (await getSession(db, session!.token))!
     const account = await getAccount(db, user.id, me.sessionId)
     assert.equal(account.hasPassword, false)
     assert.deepEqual(account.providers, ["github"])
@@ -136,8 +136,8 @@ describe("account settings", () => {
     const a = await login(db, { email: "jane@example.com", password: PASSWORD })
     const b = await login(db, { email: "jane@example.com", password: PASSWORD })
     assert.equal(await revokeOtherSessions(db, user.id, me.sessionId), 2)
-    assert.equal(await getSession(db, a.session.token), null)
-    assert.equal(await getSession(db, b.session.token), null)
+    assert.equal(await getSession(db, a.session!.token), null)
+    assert.equal(await getSession(db, b.session!.token), null)
     assert.ok(await getSession(db, session.token))
   })
 

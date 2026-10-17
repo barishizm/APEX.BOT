@@ -28,6 +28,8 @@ export default async function SettingsPage() {
           providers: account.providers,
           otherSessions: account.otherSessions,
           allowTraining: account.allowTraining,
+          twoFactor: account.user.twoFactor,
+          recoveryCodesLeft: account.recoveryCodesLeft,
         }}
       />
     </DashboardFrame>

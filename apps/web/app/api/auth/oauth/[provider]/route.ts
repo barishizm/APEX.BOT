@@ -1,5 +1,6 @@
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
+import { safeNext } from "@/lib/auth"
 import { OAUTH_COOKIE, authorizeUrl, credentials, isProvider, newState, siteOrigin } from "@/lib/oauth"
 
 const back = (error: string) => NextResponse.redirect(`${siteOrigin()}/login?error=${error}`)
@@ -12,8 +13,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ prov
   if (!creds) return back("oauth_not_configured")
 
   const { state, verifier } = newState()
-  const type = new URL(request.url).searchParams.get("type") === "business" ? "business" : "personal"
-  ;(await cookies()).set(OAUTH_COOKIE, JSON.stringify({ provider, state, verifier, type }), {
+  const query = new URL(request.url).searchParams
+  const type = query.get("type") === "business" ? "business" : "personal"
+  const next = safeNext(query.get("next"))
+  ;(await cookies()).set(OAUTH_COOKIE, JSON.stringify({ provider, state, verifier, type, next }), {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",

@@ -60,6 +60,8 @@ export default function ForgotPassword() {
     const { ok, data } = await postJson("/api/auth/reset-password", { email, code, password }, a.network)
     setBusy(false)
     if (!ok) return setError(data.message ?? a.generic)
+    // the new password is set; two-step sign-in still asks for the authenticator code
+    if (data.twoFactor) return router.push("/two-factor")
     setStep("done")
     setTimeout(() => router.push("/dashboard"), 1500)
   }

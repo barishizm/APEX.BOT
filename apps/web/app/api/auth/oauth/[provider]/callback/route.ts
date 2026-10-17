@@ -1,9 +1,9 @@
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import { timingSafeEqual } from "node:crypto"
-import { AuthError, oauthLogin } from "@apex/db"
+import { AuthError, invitationAllowsSignup, oauthLogin } from "@apex/db"
 import { db } from "@/lib/db"
-import { requestMeta, setSessionCookie } from "@/lib/auth"
+import { inviteTokenFrom, requestMeta, safeNext, setChallengeCookie, setSessionCookie } from "@/lib/auth"
 import { SIGNUPS_OPEN } from "@/lib/signups"
 import { OAUTH_COOKIE, credentials, fetchProfile, isProvider, siteOrigin } from "@/lib/oauth"
 
@@ -23,7 +23,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ prov
   if (url.searchParams.get("error")) return fail("oauth_denied")
   const code = url.searchParams.get("code")
   const state = url.searchParams.get("state")
-  let flow: { provider: string; state: string; verifier: string; type: string } | null = null
+  let flow: { provider: string; state: string; verifier: string; type: string; next?: string | null } | null = null
   try {
     flow = saved ? JSON.parse(saved) : null
   } catch {}
@@ -34,14 +34,21 @@ export async function GET(request: Request, { params }: { params: Promise<{ prov
 
   try {
     const profile = await fetchProfile(provider, code, flow.verifier, creds)
-    const { session, isNew } = await oauthLogin(
+    const next = safeNext(flow.next)
+    // while sign-ups are closed, an invitation to this address still lets it sign up
+    const allowSignup = SIGNUPS_OPEN || (await invitationAllowsSignup(db(), inviteTokenFrom(next), profile.email))
+    const result = await oauthLogin(
       db(),
       { ...profile, accountType: flow.type === "business" ? "business" : "personal" },
       await requestMeta(),
-      { allowSignup: SIGNUPS_OPEN },
+      { allowSignup },
     )
-    await setSessionCookie(session)
-    return to(isNew ? "/onboarding" : "/dashboard?welcome=1")
+    if (result.challenge) {
+      await setChallengeCookie(result.challenge)
+      return to(`/two-factor${next ? `?next=${encodeURIComponent(next)}` : ""}`)
+    }
+    await setSessionCookie(result.session)
+    return to(next ?? (result.isNew ? "/onboarding" : "/dashboard?welcome=1"))
   } catch (err) {
     if (err instanceof AuthError && err.code === "signups_closed") return fail("oauth_signups_closed")
     if (err instanceof AuthError && err.code === "invalid_input") return fail("oauth_email_unverified")

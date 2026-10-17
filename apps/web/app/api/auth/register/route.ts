@@ -1,6 +1,6 @@
 import { requestLocale } from "@/lib/i18n/server"
 import { randomBytes } from "node:crypto"
-import { AuthError, register } from "@apex/db"
+import { AuthError, invitationAllowsSignup, register } from "@apex/db"
 import { db } from "@/lib/db"
 import { authErrorResponse, readJson, requestMeta, setSessionCookie } from "@/lib/auth"
 import { requireHuman } from "@/lib/turnstile"
@@ -9,8 +9,11 @@ import { sendAccountExistsNotice, sendVerificationCode } from "@/lib/mail"
 
 export async function POST(request: Request) {
   try {
-    if (!SIGNUPS_OPEN) throw new AuthError("signups_closed", "Sign-ups are closed for now. Join the waitlist")
     const b = await readJson(request)
+    // while sign-ups are closed, an invitation to a workspace still lets the invited address in
+    if (!SIGNUPS_OPEN && !(await invitationAllowsSignup(db(), b.inviteToken, b.email))) {
+      throw new AuthError("signups_closed", "Sign-ups are closed for now. Join the waitlist")
+    }
     const meta = await requestMeta()
     await requireHuman(b.turnstileToken, meta.ip)
     const input = {

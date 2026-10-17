@@ -30,7 +30,7 @@ function GitHubLogo() {
   )
 }
 
-function SocialButtons({ verb, accountType }: { verb: string; accountType?: "business" | "personal" }) {
+function SocialButtons({ verb, accountType, next }: { verb: string; accountType?: "business" | "personal"; next?: string | null }) {
   const { t, href } = useI18n()
   return (
     <>
@@ -47,7 +47,7 @@ function SocialButtons({ verb, accountType }: { verb: string; accountType?: "bus
         ].map(({ name, slug, logo }) => (
           <a
             key={name}
-            href={`/api/auth/oauth/${slug}${accountType ? `?type=${accountType}` : ""}`}
+            href={`/api/auth/oauth/${slug}?${new URLSearchParams({ ...(accountType && { type: accountType }), ...(next && { next }) })}`}
             className="w-full flex items-center justify-center gap-3 px-8 py-2.5 rounded-lg border border-zinc-300 dark:border-white/20 bg-white dark:bg-zinc-950 text-sm font-medium text-zinc-900 dark:text-white hover:bg-zinc-50 dark:hover:bg-zinc-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 transition-colors cursor-pointer"
           >
             {logo}
@@ -126,7 +126,13 @@ export default function Hero({
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
   const [turnstileReset, setTurnstileReset] = useState(0)
   const [nextPath, setNextPath] = useState("/verify-email")
-  const needsVerify = nextPath === "/verify-email"
+  const needsVerify = nextPath.startsWith("/verify-email")
+  // An invitation link sends people here with ?next=/invite/<token>: they return there after
+  // signing in, and may sign up with the invited address even while sign-ups are closed
+  const [afterAuth, setAfterAuth] = useState<string | null>(null)
+  const inviteToken = afterAuth?.slice("/invite/".length) ?? null
+  const signupsOpen = SIGNUPS_OPEN || !!inviteToken
+  const nextQuery = afterAuth ? `?next=${encodeURIComponent(afterAuth)}` : ""
   // Card height follows its content, animated, so switching forms grows/shrinks smoothly
   const [contentEl, setContentEl] = useState<HTMLDivElement | null>(null)
   const [cardHeight, setCardHeight] = useState<number | "auto">("auto")
@@ -189,7 +195,10 @@ export default function Hero({
       oauth_failed: t.auth.errors.oauth_failed,
       oauth_signups_closed: t.auth.errors.oauth_signups_closed,
     }
-    const error = new URLSearchParams(window.location.search).get("error")
+    const query = new URLSearchParams(window.location.search)
+    const error = query.get("error")
+    const next = query.get("next")
+    setAfterAuth(next && /^\/invite\/[A-Za-z0-9_-]{20,100}$/.test(next) ? next : null)
     setAuthError(initialAuth === "login" && error ? (oauthErrors[error] ?? null) : null)
     // drop ?error= so a refresh doesn't replay it
     window.history.replaceState(null, "", window.location.pathname)
@@ -262,6 +271,7 @@ export default function Hero({
             password: field("password"),
             acceptTerms: form.has("acceptTerms"),
             allowTraining: form.has("allowTraining"),
+            inviteToken,
             turnstileToken,
           }
     if (TURNSTILE_SITE_KEY && !turnstileToken) {
@@ -282,7 +292,9 @@ export default function Hero({
         setFormStep("idle")
         return
       }
-      const next = data.user.emailVerified ? "/dashboard?welcome=1" : "/verify-email"
+      // two-step sign-in: the code page finishes it
+      if (data.twoFactor) return router.push(`/two-factor${nextQuery}`)
+      const next = data.user.emailVerified ? (afterAuth ?? "/dashboard?welcome=1") : `/verify-email${nextQuery}`
       setNextPath(next)
       setFormStep("success")
       // the success screen is a beat of feedback, not a stop; Continue stays as a fallback
@@ -699,7 +711,7 @@ export default function Hero({
                           ) : t.auth.login.submit}
                         </button>
 
-                        <SocialButtons verb={t.auth.login.verb} />
+                        <SocialButtons verb={t.auth.login.verb} next={afterAuth} />
 
                         <p className="text-center text-sm text-zinc-600 dark:text-zinc-300">
                           {t.auth.login.noAccount}{" "}
@@ -712,7 +724,7 @@ export default function Hero({
                           </button>
                         </p>
                       </form>
-                    ) : !SIGNUPS_OPEN ? (
+                    ) : !signupsOpen ? (
                       waitlistDone ? (
                         <div className="flex flex-col items-center space-y-5 py-6 text-center text-zinc-900 dark:text-white">
                           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-500 shadow-lg shadow-green-500/30">
@@ -938,7 +950,7 @@ export default function Hero({
                           ) : t.auth.register.submit}
                         </button>
 
-                        <SocialButtons verb={t.auth.register.verb} accountType={accountType} />
+                        <SocialButtons verb={t.auth.register.verb} accountType={accountType} next={afterAuth} />
 
                         <p className="text-center text-sm text-zinc-600 dark:text-zinc-300">
                           {t.auth.register.haveAccount}{" "}

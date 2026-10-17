@@ -39,6 +39,8 @@ const EMAILS: Messages<{
   passwordReset: (code: string) => { subject: string; text: string }
   handoffConfirmation: (code: string) => { subject: string; text: string }
   accountExists: { subject: string; text: string }
+  emailChanged: (next: string) => { subject: string; text: string }
+  invitation: (i: { workspace: string; inviter: string; link: string }) => { subject: string; text: string }
 }> = {
   en: {
     footer: "\n\nIf you didn't ask for this, you can ignore this email.\n\nApex Bot",
@@ -53,6 +55,14 @@ const EMAILS: Messages<{
     handoffConfirmation: (code) => ({
       subject: `${code} is your Apex Bot hand-off confirmation code`,
       text: `Someone asked to send chatbot hand-off emails to this address.\n\nYour confirmation code is ${code}\n\nEnter it in the Apex Bot dashboard to confirm. It expires in 15 minutes. If you don't recognise this, ignore this email and no hand-offs will be sent here.`,
+    }),
+    emailChanged: (next) => ({
+      subject: "Your Apex Bot email address was changed",
+      text: `The email address of your Apex Bot account was changed to ${next}. From now on, sign in and receive our emails there.\n\nIf you didn't do this, reset your password right away from the login page and write to us by replying to this email.`,
+    }),
+    invitation: ({ workspace, inviter, link }) => ({
+      subject: `${inviter} invited you to ${workspace} on Apex Bot`,
+      text: `${inviter} invited you to join the ${workspace} workspace on Apex Bot, to work on its website assistant together.\n\nAccept the invitation here:\n${link}\n\nThe link works for 7 days. Log in or sign up with this email address to accept it.`,
     }),
     accountExists: {
       subject: "You already have an Apex Bot account",
@@ -73,6 +83,14 @@ const EMAILS: Messages<{
       subject: `Apex Bot insana devir onay kodunuz: ${code}`,
       text: `Chatbot devir e-postalarının bu adrese gönderilmesi istendi.\n\nOnay kodunuz: ${code}\n\nOnaylamak için bu kodu Apex Bot paneline girin. Kodun geçerlilik süresi 15 dakikadır. Bu isteği tanımıyorsanız e-postayı yok sayın; bu adrese devir e-postası gönderilmez.`,
     }),
+    emailChanged: (next) => ({
+      subject: "Apex Bot e-posta adresiniz değiştirildi",
+      text: `Apex Bot hesabınızın e-posta adresi ${next} olarak değiştirildi. Bundan sonra bu adresle giriş yapacak ve e-postalarımızı orada alacaksınız.\n\nBu değişikliği siz yapmadıysanız giriş sayfasından hemen şifrenizi sıfırlayın ve bu e-postayı yanıtlayarak bize yazın.`,
+    }),
+    invitation: ({ workspace, inviter, link }) => ({
+      subject: `${inviter} sizi Apex Bot'ta ${workspace} çalışma alanına davet etti`,
+      text: `${inviter}, web sitesi asistanı üzerinde birlikte çalışmak için sizi Apex Bot'taki ${workspace} çalışma alanına davet etti.\n\nDaveti buradan kabul edin:\n${link}\n\nBağlantı 7 gün geçerlidir. Kabul etmek için bu e-posta adresiyle giriş yapın veya kaydolun.`,
+    }),
     accountExists: {
       subject: "Zaten bir Apex Bot hesabınız var",
       text: `Bu e-posta adresiyle Apex Bot'a kaydolmaya çalışıldı, ancak bu adrese ait bir hesap zaten var.\n\nBu sizseniz giriş yapmanız yeterli. Şifrenizi unuttuysanız giriş sayfasındaki "Şifrenizi mi unuttunuz?" bağlantısını kullanın. Hesabınızda hiçbir değişiklik yapılmadı.`,
@@ -91,6 +109,14 @@ const EMAILS: Messages<{
     handoffConfirmation: (code) => ({
       subject: `Jūsų Apex Bot perdavimo patvirtinimo kodas: ${code}`,
       text: `Gautas prašymas siųsti pokalbių roboto perdavimo laiškus šiuo adresu.\n\nJūsų patvirtinimo kodas: ${code}\n\nNorėdami patvirtinti, įveskite jį Apex Bot valdymo skydelyje. Kodas galioja 15 minučių. Jei šio prašymo neatpažįstate, ignoruokite šį laišką – perdavimo laiškai šiuo adresu nebus siunčiami.`,
+    }),
+    emailChanged: (next) => ({
+      subject: "Jūsų Apex Bot el. pašto adresas pakeistas",
+      text: `Jūsų Apex Bot paskyros el. pašto adresas pakeistas į ${next}. Nuo šiol prisijunkite ir mūsų laiškus gaukite šiuo adresu.\n\nJei to nedarėte, nedelsdami atkurkite slaptažodį prisijungimo puslapyje ir parašykite mums atsakydami į šį laišką.`,
+    }),
+    invitation: ({ workspace, inviter, link }) => ({
+      subject: `${inviter} pakvietė jus į ${workspace} darbo sritį Apex Bot`,
+      text: `${inviter} pakvietė jus prisijungti prie ${workspace} darbo srities Apex Bot ir kartu dirbti su svetainės asistentu.\n\nPriimkite kvietimą čia:\n${link}\n\nNuoroda galioja 7 dienas. Norėdami priimti kvietimą, prisijunkite arba užsiregistruokite šiuo el. pašto adresu.`,
     }),
     accountExists: {
       subject: "Jūs jau turite Apex Bot paskyrą",
@@ -111,6 +137,14 @@ const EMAILS: Messages<{
       subject: `Jūsu Apex Bot nodošanas apstiprinājuma kods: ${code}`,
       text: `Saņemts pieprasījums sūtīt tērzēšanas robota nodošanas e-pastus uz šo adresi.\n\nJūsu apstiprinājuma kods: ${code}\n\nLai apstiprinātu, ievadiet to Apex Bot vadības panelī. Kods ir derīgs 15 minūtes. Ja jūs šo pieprasījumu neatpazīstat, ignorējiet šo e-pastu – nodošanas e-pasti uz šo adresi netiks sūtīti.`,
     }),
+    emailChanged: (next) => ({
+      subject: "Jūsu Apex Bot e-pasta adrese ir mainīta",
+      text: `Jūsu Apex Bot konta e-pasta adrese ir nomainīta uz ${next}. Turpmāk piesakieties un saņemiet mūsu e-pastus šajā adresē.\n\nJa to neesat izdarījis jūs, nekavējoties atiestatiet paroli pieteikšanās lapā un rakstiet mums, atbildot uz šo e-pastu.`,
+    }),
+    invitation: ({ workspace, inviter, link }) => ({
+      subject: `${inviter} uzaicināja jūs uz darbvietu ${workspace} Apex Bot`,
+      text: `${inviter} uzaicināja jūs pievienoties darbvietai ${workspace} Apex Bot, lai kopā strādātu pie vietnes asistenta.\n\nPieņemiet uzaicinājumu šeit:\n${link}\n\nSaite ir derīga 7 dienas. Lai to pieņemtu, piesakieties vai reģistrējieties ar šo e-pasta adresi.`,
+    }),
     accountExists: {
       subject: "Jums jau ir Apex Bot konts",
       text: `Kāds mēģināja reģistrēties Apex Bot ar šo e-pasta adresi, taču konts ar to jau pastāv.\n\nJa tas bijāt jūs, vienkārši piesakieties. Ja aizmirsāt paroli, pieteikšanās lapā izmantojiet saiti “Aizmirsāt paroli?”. Jūsu kontā nekas netika mainīts.`,
@@ -129,6 +163,14 @@ const EMAILS: Messages<{
     handoffConfirmation: (code) => ({
       subject: `Teie Apex Boti üleandmise kinnituskood: ${code}`,
       text: `Saime taotluse saata sellele aadressile vestlusroboti üleandmiskirju.\n\nTeie kinnituskood: ${code}\n\nKinnitamiseks sisestage see Apex Boti töölaual. Kood kehtib 15 minutit. Kui te seda taotlust ei tunne, jätke see e-kiri tähelepanuta – sellele aadressile üleandmiskirju ei saadeta.`,
+    }),
+    emailChanged: (next) => ({
+      subject: "Teie Apex Boti e-posti aadress on muudetud",
+      text: `Teie Apex Boti konto e-posti aadress muudeti: ${next}. Edaspidi logige sisse ja saage meie e-kirju sellel aadressil.\n\nKui te seda ei teinud, lähtestage kohe sisselogimislehel oma parool ja kirjutage meile, vastates sellele e-kirjale.`,
+    }),
+    invitation: ({ workspace, inviter, link }) => ({
+      subject: `${inviter} kutsus teid Apex Botis tööruumi ${workspace}`,
+      text: `${inviter} kutsus teid liituma Apex Boti tööruumiga ${workspace}, et koos veebisaidi assistendi kallal töötada.\n\nVõtke kutse vastu siin:\n${link}\n\nLink kehtib 7 päeva. Kutse vastuvõtmiseks logige sisse või registreeruge selle e-posti aadressiga.`,
     }),
     accountExists: {
       subject: "Teil on juba Apex Boti konto",
@@ -155,4 +197,13 @@ export function sendHandoffConfirmationCode(email: string, code: string, locale:
 
 export function sendAccountExistsNotice(email: string, locale: Locale) {
   return compose(email, locale, EMAILS[locale].accountExists)
+}
+
+/** To the old address after the account email changed. */
+export function sendEmailChangedNotice(previous: string, next: string, locale: Locale) {
+  return send({ to: previous, ...EMAILS[locale].emailChanged(next) })
+}
+
+export function sendInvitation(email: string, i: { workspace: string; inviter: string; link: string; locale: Locale }) {
+  return compose(email, i.locale, EMAILS[i.locale].invitation(i))
 }
