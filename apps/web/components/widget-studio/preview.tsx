@@ -12,6 +12,9 @@ import {
   ThumbsUp,
   X,
   ArrowUp,
+  AudioLines,
+  Mic,
+  Paperclip,
   type LucideIcon,
 } from "lucide-react"
 import type { CSSProperties } from "react"
@@ -45,7 +48,7 @@ const COPY = {
   tr: {
     ai: "Yapay zekâ asistanı",
     human: "Bir insanla konuş",
-    privacy: "Gizlilik",
+    privacy: ["Sohbet ederek ", "gizlilik politikasını", " kabul edersiniz."],
     sources: "Kaynaklar",
     question: "Kargo ne kadar sürer?",
     answer: "Siparişler **1–3 iş günü** içinde kargoya verilir. 750 TL üzeri siparişlerde kargo ücretsizdir.",
@@ -63,7 +66,7 @@ const COPY = {
   en: {
     ai: "AI assistant",
     human: "Talk to a human",
-    privacy: "Privacy",
+    privacy: ["By chatting, you agree to our ", "privacy policy", "."],
     sources: "Sources",
     question: "How long does shipping take?",
     answer: "Orders ship within **1–3 business days**. Shipping is free on orders over $50.",
@@ -81,7 +84,7 @@ const COPY = {
   lt: {
     ai: "DI asistentas",
     human: "Kalbėti su žmogumi",
-    privacy: "Privatumas",
+    privacy: ["Rašydami sutinkate su ", "privatumo politika", "."],
     sources: "Šaltiniai",
     question: "Kiek laiko trunka pristatymas?",
     answer: "Užsakymai išsiunčiami per **1–3 darbo dienas**. Užsakymams nuo 50 € pristatymas nemokamas.",
@@ -99,7 +102,7 @@ const COPY = {
   lv: {
     ai: "MI asistents",
     human: "Runāt ar cilvēku",
-    privacy: "Privātums",
+    privacy: ["Tērzējot jūs piekrītat ", "privātuma politikai", "."],
     sources: "Avoti",
     question: "Cik ilgi notiek piegāde?",
     answer: "Pasūtījumi tiek nosūtīti **1–3 darba dienu** laikā. Pasūtījumiem virs 50 € piegāde ir bez maksas.",
@@ -117,7 +120,7 @@ const COPY = {
   et: {
     ai: "TI assistent",
     human: "Räägi inimesega",
-    privacy: "Privaatsus",
+    privacy: ["Vesteldes nõustute ", "privaatsuspoliitikaga", "."],
     sources: "Allikad",
     question: "Kui kaua tarne aega võtab?",
     answer: "Tellimused saadetakse teele **1–3 tööpäeva** jooksul. Üle 50 € tellimuste tarne on tasuta.",
@@ -132,7 +135,7 @@ const COPY = {
     skip: "Jäta vahele",
     powered: "Apex Boti toel",
   },
-} satisfies Record<Lang, Record<string, string>>
+} satisfies Record<Lang, Record<string, string | [string, string, string]>>
 
 function Bold({ text }: { text: string }) {
   return (
@@ -192,7 +195,8 @@ export function WidgetPreview({
       })()
     )
   const subtitle = general.subtitle[lang] || [t.ai, general.companyName].filter(Boolean).join(" · ")
-  const handoffOn = handoff.enabled && !!handoff.email
+  // the widget shows the privacy sentence in a one-line card above the composer
+  const notice = !!m.privacyUrl
   const radius = Math.min(a.radius, 28)
   // the mobile frame is narrower than the real panel widths
   const edgeX = mobile ? Math.min(a.offsetX, 16) : a.offsetX
@@ -303,28 +307,34 @@ export function WidgetPreview({
             ))}
           </div>
         )}
-        <div className="flex items-end gap-2" style={{ padding: "8px 10px", borderTop: `1px solid ${c.line}` }}>
-          <span
-            className="flex-1 truncate"
-            style={{ border: `1px solid ${c.line}`, borderRadius: 12, background: c.surface, padding: "9px 11px", color: c.muted }}
-          >
-            {m.placeholder[lang]}
-          </span>
-          <span className="grid shrink-0 place-items-center" style={{ width: 40, height: 40, borderRadius: 12, background: a.primaryColor, color: onP, opacity: 0.35 }}>
-            <ArrowUp className="h-4 w-4" />
-          </span>
-        </div>
-        <div className="text-center" style={{ padding: "0 12px 8px", fontSize: 10.5, color: c.muted, lineHeight: 1.5 }}>
-          {[m.showDisclaimer && m.disclaimer[lang], m.privacyUrl && t.privacy, handoffOn && t.human]
-            .filter(Boolean)
-            .map((part, i) => (
-              <span key={i}>
-                {i > 0 && " · "}
-                {i === 0 && m.showDisclaimer ? part : <u>{part}</u>}
+        {/* same composer as the widget: notice card around a pill with paperclip, mic and a round button */}
+        <div style={{ margin: "0 10px 8px", borderRadius: 20, background: notice ? c.bubble : "transparent" }}>
+          {notice && (
+            <div className="flex items-center gap-1.5" style={{ padding: "6px 6px 6px 13px", fontSize: 11, color: c.text }}>
+              <span className="flex-1 truncate" style={{ opacity: 0.85 }}>
+                {t.privacy[0]}
+                <u style={{ fontWeight: 600 }}>{t.privacy[1]}</u>
+                {t.privacy[2]}
               </span>
-            ))}
-          {a.showBranding && <div style={{ opacity: 0.8 }}>{t.powered}</div>}
+              <X className="h-3.5 w-3.5 shrink-0" style={{ color: c.muted }} />
+            </div>
+          )}
+          <div className="flex items-center gap-0.5" style={{ padding: 3, border: `1.5px solid ${c.text}`, borderRadius: 20, background: c.bg }}>
+            {b.attachments && <Paperclip className="mx-2 h-4 w-4 shrink-0" style={{ color: c.muted }} />}
+            <span className="flex-1 truncate" style={{ padding: "7px 4px", color: c.muted, paddingLeft: b.attachments ? 0 : 10 }}>
+              {m.placeholder[lang]}
+            </span>
+            {b.voiceInput && <Mic className="mx-2 h-4 w-4 shrink-0" style={{ color: c.muted }} />}
+            <span className="grid shrink-0 place-items-center" style={{ width: 34, height: 34, borderRadius: 999, background: a.primaryColor, color: onP, opacity: b.voiceInput ? 1 : 0.35 }}>
+              {b.voiceInput ? <AudioLines className="h-4 w-4" /> : <ArrowUp className="h-4 w-4" />}
+            </span>
+          </div>
         </div>
+        {(m.showDisclaimer || a.showBranding) && (
+          <div className="text-center" style={{ padding: "0 12px 8px", fontSize: 10.5, color: c.muted }}>
+            {[m.showDisclaimer && m.disclaimer[lang], a.showBranding && t.powered].filter(Boolean).join(" · ")}
+          </div>
+        )}
       </>
     )
 

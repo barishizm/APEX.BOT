@@ -134,6 +134,10 @@ export interface BotSettings {
     showSources: boolean
     showFeedback: boolean
     soundOnReply: boolean
+    /** Paperclip in the composer: images and text files go to the model with the message. */
+    attachments: boolean
+    /** Microphone in the composer: dictation and a hands-free voice mode (browser speech APIs). */
+    voiceInput: boolean
     /** Where the conversation survives: this tab, this browser, or nowhere. */
     persistence: "tab" | "browser" | "none"
     mobileFullscreen: boolean
@@ -270,6 +274,8 @@ export const DEFAULT_SETTINGS: BotSettings = {
     showSources: true,
     showFeedback: true,
     soundOnReply: false,
+    attachments: true,
+    voiceInput: true,
     persistence: "tab",
     mobileFullscreen: true,
     hiddenPaths: [],
@@ -487,6 +493,8 @@ export function parseSettings(raw: unknown): BotSettings {
     showSources: r.bool(b, "behavior", "showSources", D.behavior.showSources),
     showFeedback: r.bool(b, "behavior", "showFeedback", D.behavior.showFeedback),
     soundOnReply: r.bool(b, "behavior", "soundOnReply", D.behavior.soundOnReply),
+    attachments: r.bool(b, "behavior", "attachments", D.behavior.attachments),
+    voiceInput: r.bool(b, "behavior", "voiceInput", D.behavior.voiceInput),
     persistence: r.oneOf(b, "behavior", "persistence", D.behavior.persistence, ["tab", "browser", "none"] as const),
     mobileFullscreen: r.bool(b, "behavior", "mobileFullscreen", D.behavior.mobileFullscreen),
     hiddenPaths: r.list(b, "behavior", "hiddenPaths", D.behavior.hiddenPaths, LIMITS.hiddenPaths, 200, (s) =>

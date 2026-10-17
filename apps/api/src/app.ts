@@ -4,6 +4,7 @@ import { randomInt } from "node:crypto";
 import { Hono, type Context } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { streamSSE } from "hono/streaming";
+import { CHAT_BODY_LIMIT, attachmentNote, parseAttachments } from "./attachments.ts";
 import type { Limits } from "./config.ts";
 import { RateLimiter, TokenBudget, type TokenUsageStore } from "./limits.ts";
 import { log } from "./log.ts";
@@ -45,7 +46,9 @@ type ErrorCode =
   | "conversation_full"
   | "not_found"
   | "upstream"
-  | "refused";
+  | "refused"
+  | "attachment_too_large"
+  | "unsupported_file";
 
 // No whitespace or RFC 5322 "specials" (<>()[]\,;:"), so an address can't smuggle in a display
 // name, a second recipient or a header when a mail provider parses it.
@@ -129,7 +132,10 @@ export function createApp(deps: AppDeps) {
     });
   });
 
-  app.use("/v1/*", bodyLimit({ maxSize: 16 * 1024, onError: (c) => c.json({ error: "bad_request" }, 413) }));
+  // Chat messages may carry images; every other body is a few fields
+  const smallBody = bodyLimit({ maxSize: 16 * 1024, onError: (c) => c.json({ error: "bad_request" }, 413) });
+  const chatBody = bodyLimit({ maxSize: CHAT_BODY_LIMIT, onError: (c) => c.json({ error: "attachment_too_large" }, 413) });
+  app.use("/v1/*", (c, next) => (c.req.path === "/v1/chat" ? chatBody(c, next) : smallBody(c, next)));
 
   app.use("/v1/*", async (c, next) => {
     const tenant = tenants.findBySiteKey(c.req.header("x-apex-site-key") ?? c.req.query("site_key"));
@@ -169,7 +175,11 @@ export function createApp(deps: AppDeps) {
     const tenant = c.get("tenant");
     const body = await readJson(c);
     const message = typeof body.message === "string" ? body.message.replace(CONTROL, "").trim() : "";
-    if (!message) return fail(c, "bad_request", 400);
+    const attachments = parseAttachments(body.attachments);
+    if ("error" in attachments) return fail(c, attachments.error, attachments.error === "attachment_too_large" ? 413 : 400);
+    // the dashboard's "Visitors can send files" switch is enforced here, not just in the widget
+    if (attachments.length && tenant.settings.ui?.behavior.attachments === false) return fail(c, "unsupported_file", 400);
+    if (!message && !attachments.length) return fail(c, "bad_request", 400);
     if (message.length > (tenant.limits?.maxMessageChars ?? limits.maxMessageChars)) return fail(c, "message_too_long", 413);
 
     const ip = deps.clientIp(c);
@@ -194,13 +204,14 @@ export function createApp(deps: AppDeps) {
     const historyCount = tenant.limits?.historyMessages ?? limits.historyMessages;
     const history = historyCount > 0 ? conversation.messages.slice(-historyCount) : [];
     const previousQuestion = [...conversation.messages].reverse().find((m) => m.role === "user")?.content;
-    const query = [{ text: message, weight: 1 }];
+    const query = [{ text: message || attachments.map((a) => a.name).join(" "), weight: 1 }];
     if (previousQuestion) query.push({ text: previousQuestion, weight: 0.5 });
     const ranked = knowledge.search(tenant.id, query, limits.retrievalTopK);
     const hits = relevantHits(ranked, limits.minRetrievalScore, tenant.settings.confidence);
 
-    const request = { system: buildSystem(tenant), messages: buildMessages(history, message, hits), model: tenant.settings.model };
-    const userMessage = store.append(conversation, { role: "user", content: message });
+    const request = { system: buildSystem(tenant), messages: buildMessages(history, message, hits, attachments), model: tenant.settings.model };
+    // the transcript keeps which files were sent, not the files
+    const userMessage = store.append(conversation, { role: "user", content: [message, attachmentNote(attachments)].filter(Boolean).join("\n\n") });
     const conv = conversation;
 
     return streamSSE(c, async (stream) => {
