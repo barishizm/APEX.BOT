@@ -63,12 +63,12 @@ describe("summarize", () => {
 });
 
 describe("golden suites", () => {
-  it("load, validate and run deterministically", () => {
+  it("load, validate and run deterministically", async () => {
     const suites = loadSuites();
     assert.ok(suites.length >= 2);
     for (const suite of suites) {
       assert.ok(suite.cases.some((c) => c.expect === null), `${suite.name} needs unanswerable cases`);
-      assert.deepEqual(runSuite(suite), runSuite(suite));
+      assert.deepEqual(await runSuite(suite), await runSuite(suite));
     }
   });
 });

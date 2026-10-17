@@ -48,11 +48,14 @@ describe("conversation persistence", () => {
 
     const boot = () => {
       const store = new ConversationStore({ persistence: postgresPersistence(db), persists: (id) => tenants.findById(id)?.managed === true });
+      const model = new FakeModel();
+      // nothing in the knowledge base answers these, and the model says so
+      model.reply = ["Bu bilgiye sahip değilim. [[no-answer]]"];
       const app = createApp({
         tenants,
         knowledge: new KnowledgeBase(),
         store,
-        model: new FakeModel(),
+        model,
         mailer: new OutboxMailer(),
         limits: defaultLimits,
         clientIp: () => "1.1.1.1",

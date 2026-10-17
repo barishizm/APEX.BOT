@@ -6,7 +6,7 @@
 // over its threshold and reported at its best combined pass rate. That tunes on the test set, so
 // treat the numbers as an upper bound: a gate that can't beat BM25 even here won't in production.
 import { KnowledgeBase, relevantHits, type Hit } from "@apex/knowledge/retrieval";
-import { createEmbedder, dot, embeddingText } from "../embed.ts";
+import { createEmbedder, dot, embeddingText } from "@apex/knowledge/embed";
 import { EmbeddingCache } from "../embeddings.ts";
 import { scoreCase, summarize, type Summary } from "../metrics.ts";
 import { PRODUCTION_SETTINGS, loadSuites, runSuite } from "../suite.ts";
@@ -35,7 +35,8 @@ type Gate = (s: Signals) => boolean;
 const line = (summaries: Summary[]) =>
   summaries.map((s, i) => `${suites[i].name}: pass ${s.passRate.toFixed(3)} ctx ${s.contextRecall.toFixed(3)} abstain ${s.abstainAccuracy.toFixed(3)} hit@1 ${s.hitAt1.toFixed(3)}`).join("  |  ");
 
-console.log(`${"bm25 (production)".padEnd(48)}${line(suites.map((s) => runSuite(s).summary))}`);
+const bm25 = await Promise.all(suites.map((s) => runSuite(s, { ...PRODUCTION_SETTINGS, embedder: null })));
+console.log(`${"bm25 (lexical-only production)".padEnd(48)}${line(bm25.map((r) => r.summary))}`);
 
 for (const spec of specs) {
   const cache = new EmbeddingCache(spec, createEmbedder(spec, { openai: process.env.OPENAI_API_KEY, gemini: process.env.GEMINI_API_KEY }, { retries: 6, batchSize: 20 }));

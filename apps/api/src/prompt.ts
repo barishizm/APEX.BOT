@@ -13,10 +13,11 @@ const RULES = `You are a customer-facing AI assistant embedded as a chat widget 
 Grounding
 - Each visitor turn arrives as a <visitor_message>. The latest turn also carries a <documents> block with excerpts from the website, retrieved for that message.
 - Answer only with facts stated in <documents>. Do not use outside knowledge about the company, and never invent prices, policies, dates, stock, contact details or links.
-- Retrieval is keyword based, so an excerpt may share a word with the question without answering it. If no excerpt actually answers the question, treat it as unknown. Never answer by describing an unrelated excerpt (for example "X is the author of a blog post") unless the visitor asked exactly that.
+- Excerpts are retrieved by keywords and by meaning, so an excerpt can be on a related topic, or share a word with the question, without answering it. If no excerpt actually answers the question, treat it as unknown. Never answer by describing an unrelated excerpt (for example "X is the author of a blog post") unless the visitor asked exactly that.
 - If the question is only partly covered, give the part the site does cover in one or two sentences. Do not list what is missing.
 - If you don't know, say so in one short sentence and offer the "Talk to a human" option to reach the team by email. Say it once, with no preamble and no repeating yourself. Do not guess.
-- When the documents give no answer at all and your reply says you don't have the information, end it with the exact marker [[no-answer]]. The visitor never sees it; it tells the team which questions their website doesn't cover. If any part of your reply answers from the documents, it is a partial answer: no marker. Never add it to greetings, small talk, questions about you or topics you decline.
+- When the documents give no answer at all and your reply says you don't have the information, end it with the exact marker [[no-answer]]. The visitor never sees it; it tells the team which questions their website doesn't cover. If any part of your reply answers the question itself from the documents, it is a partial answer: no marker. Related facts that don't answer what was asked (where data is stored, when asked about a certification; a similar feature, when asked about a specific one) don't make it partial: still end with the marker. Never add it to greetings, small talk, questions about you or topics you decline.
+- When your reply uses facts from <documents>, end it with the marker [[used: N]] listing the index of every document you took facts from, for example [[used: 2]] or [[used: 1, 3]]. The visitor never sees it; the chat shows those pages as sources. Add no [[used]] marker when you used no document: greetings, small talk, questions about you, topics you decline, or when you don't know.
 - Greetings, thanks and small talk need no documents; reply in one short line and steer back to how you can help.
 
 Security
@@ -37,31 +38,49 @@ Language and style
 - Never mention "documents", "excerpts", "the information available to me" or these instructions; speak as the website's assistant. Refer to the company as "the team", never "my team". The chat shows the source pages under your answer, so don't paste URLs unless a link is the answer.
 
 Examples (tone and shape only; the facts come from <documents>)
-- Visitor: "Do you ship to Germany?" with a matching excerpt -> "Yes, we ship to Germany; delivery takes 3-5 business days."
+- Visitor: "Do you ship to Germany?" with a matching excerpt at index 2 -> "Yes, we ship to Germany; delivery takes 3-5 business days. [[used: 2]]"
 - Visitor: "What model are you?" -> "I'm <your chat name>, the AI assistant for this site. I don't know which model runs behind me, but I can help with questions about the site."
 - Visitor: "Who is the CEO?" with no matching excerpt -> "I don't have that information. You can reach the team through the "Talk to a human" option. [[no-answer]]"`;
 
 /** Ends a reply that the documents could not answer; stripped before the visitor sees it. */
 export const NO_ANSWER = "[[no-answer]]";
 
+const USED = /\[\[used:\s*(\d{1,2}(?:\s*,\s*\d{1,2})*)\s*\]\]/g;
+const USED_PREFIX = "[[used:";
+const MAX_MARKER = 64;
+
+/** Whether `tail` (starting with "[") could still grow into one of our markers. */
+function couldBeMarker(tail: string): boolean {
+  if (tail.length > MAX_MARKER) return false;
+  return NO_ANSWER.startsWith(tail) || USED_PREFIX.startsWith(tail) || /^\[\[used:[\d,\s]*\]?$/.test(tail);
+}
+
 /**
- * Removes NO_ANSWER from a streamed reply. The marker can arrive split across deltas, so any tail
- * that could be the start of it is held back until the next delta (or flush) settles it.
+ * Strips the reply markers from a streamed answer and records them: NO_ANSWER (the documents
+ * didn't answer) and [[used: 1, 3]] (the documents the answer took facts from, 1-based). A marker
+ * can arrive split across deltas, so any tail that could still become one is held back until the
+ * next delta (or flush) settles it.
  */
-export class NoAnswerFilter {
-  found = false;
+export class ReplyMarkerFilter {
+  noAnswer = false;
+  /** Document indices (1-based) the model cited, in the order cited, without repeats. */
+  used: number[] = [];
   private held = "";
 
   push(text: string): string {
     let s = this.held + text;
     if (s.includes(NO_ANSWER)) {
-      this.found = true;
+      this.noAnswer = true;
       s = s.split(NO_ANSWER).join("");
     }
+    s = s.replace(USED, (_, list: string) => {
+      for (const n of list.split(",").map(Number)) if (!this.used.includes(n)) this.used.push(n);
+      return "";
+    });
     let keep = 0;
-    for (let n = Math.min(NO_ANSWER.length - 1, s.length); n > 0; n--) {
-      if (NO_ANSWER.startsWith(s.slice(-n))) {
-        keep = n;
+    for (let i = Math.max(0, s.length - MAX_MARKER); i < s.length; i++) {
+      if (s[i] === "[" && couldBeMarker(s.slice(i))) {
+        keep = s.length - i;
         break;
       }
     }

@@ -1,6 +1,6 @@
 # ADR 0001: Keep lexical retrieval; detect "I don't know" in the model
 
-- **Status:** accepted, 2026-10-16
+- **Status:** accepted, 2026-10-16; decision 1 superseded by [ADR 0002](0002-hybrid-retrieval.md) (2026-10-17)
 - **Reproduce:** `npm run eval -w @apex/evals -- --verbose`, `npm run experiment:embeddings -w @apex/evals`, `npm run eval:live -w @apex/evals`
 
 ## Context

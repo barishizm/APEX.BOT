@@ -1,6 +1,6 @@
-// Text embeddings over plain fetch (no SDKs), used by the embeddings experiment. Not in
-// production retrieval: see docs/adr/0001-retrieval-embeddings.md. Vectors come back
-// L2-normalised, so cosine similarity is a dot product.
+// Text embeddings over plain fetch (no SDKs), for hybrid retrieval (docs/adr/0002-hybrid-retrieval.md)
+// and the evals. Vectors come back L2-normalised, so cosine similarity is a dot product.
+import { createHash } from "node:crypto";
 
 export type EmbedKind = "query" | "document";
 
@@ -132,6 +132,25 @@ export function dot(a: Float32Array, b: Float32Array): number {
 /** The text a chunk is embedded as: its title carries the topic when the body doesn't repeat it. */
 export const embeddingText = (chunk: { title: string; text: string }) => `${chunk.title}\n${chunk.text}`;
 
+/** What a chunk's stored vector is keyed by: sha256 of its embedding text, so equal text shares a vector. */
+export const chunkHash = (chunk: { title: string; text: string }): Uint8Array => new Uint8Array(createHash("sha256").update(embeddingText(chunk)).digest());
+
+/** Dimensions from an embedder id ("gemini:gemini-embedding-2@768" -> 768); null if malformed. */
+export function embedderDims(id: string): number | null {
+  const match = /@(\d+)$/.exec(id);
+  return match ? Number(match[1]) : null;
+}
+
+/** Storage bytes of a vector: float32, little-endian (the byte order of every platform Node runs on here). */
+export const vectorToBytes = (v: Float32Array): Uint8Array => new Uint8Array(v.buffer.slice(v.byteOffset, v.byteOffset + v.byteLength));
+
+/** A stored vector back, or null when its length doesn't fit `dims` (a row from a different model). */
+export function vectorFromBytes(bytes: Uint8Array, dims: number): Float32Array | null {
+  if (bytes.byteLength !== dims * 4) return null;
+  // copied out: a driver's Buffer can sit at an unaligned offset of a shared pool
+  return new Float32Array(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
+}
+
 /** Compact storage form (base64 of the float32 bytes): ~4/3 bytes per byte, versus ~10 for JSON numbers. */
 export const encodeVector = (v: Float32Array): string => Buffer.from(v.buffer, v.byteOffset, v.byteLength).toString("base64");
 
@@ -139,3 +158,10 @@ export function decodeVector(s: string): Float32Array {
   const bytes = Buffer.from(s, "base64");
   return new Float32Array(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
 }
+
+/**
+ * The embedder hybrid retrieval was calibrated with (docs/adr/0002-hybrid-retrieval.md): best
+ * ranking of the models measured, Turkish included, and 768 dimensions keep a full bot (5000
+ * chunks) at about 15 MB in memory.
+ */
+export const DEFAULT_EMBEDDER = "gemini:gemini-embedding-2@768";

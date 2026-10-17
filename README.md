@@ -4,7 +4,7 @@ Apex Bot, web sitelerine eklenen bir AI asistanıdır. Ziyaretçilerin soruları
 
 Apex Bot **kapalı kaynaklı, ticari bir SaaS** ürünüdür: birçok müşteri sitesine abonelikle sunulur, tamamı bizim tarafımızda barındırılır. Yapay zekâ modelleri kendi altyapımızda değil, **bulut API'leri üzerinden** çalışır.
 
-> **Durum:** Kapalı beta / MVP çalışıyor: kayıt ve giriş, site tarama ile bilgi tabanı, widget stüdyosu, konuşma kaydı, insana devir ve lead e-postaları. Embedding/hibrit arama, faturalama ve eval seti henüz yok (aşağıdaki yol haritası). Bu doküman hedefleri ve mimariyi de tanımlar.
+> **Durum:** Kapalı beta / MVP çalışıyor: kayıt ve giriş, site tarama ile bilgi tabanı, widget stüdyosu, konuşma kaydı, insana devir ve lead e-postaları. Hibrit arama (BM25 + embedding) ve eval seti var; faturalama henüz yok (aşağıdaki yol haritası). Bu doküman hedefleri ve mimariyi de tanımlar.
 
 ## Verilen kararlar
 
@@ -129,15 +129,15 @@ Her site bir **tenant**'tır. Vektör verisi, ayarlar ve konuşmalar `tenant_id`
 |---|---|---|
 | LLM | Claude API (Sonnet sınıfı model; basit sorular için Haiku) | Akış, prompt caching, tool use |
 | Backend | TypeScript + Node.js (Hono veya Fastify) | Widget ile tek dil |
-| Veritabanı | PostgreSQL + `pgvector` | Tek veritabanı: ilişkisel veri + vektörler. Ölçek büyürse ayrı vektör DB |
+| Veritabanı | PostgreSQL | Tek veritabanı: ilişkisel veri + vektörler (`bytea`; arama API belleğinde). Ölçek büyürse `pgvector` |
 | Kuyruk | BullMQ + Redis (veya Postgres tabanlı kuyruk) | Tarama ve embedding işleri |
-| Embedding | Çok dilli bir embedding modeli | Türkçe kalitesi test edilerek seçilecek |
+| Embedding | `gemini-embedding-2` (768 boyut) | Türkçe dahil ölçülerek seçildi: [ADR 0002](docs/adr/0002-hybrid-retrieval.md) |
 | Widget | Vanilla TS veya Preact, Shadow DOM, ~30 KB altı | Müşteri sitesinin CSS'iyle çakışmaz |
 | Yönetim paneli | Next.js | |
 | Barındırma | Container tabanlı (Fly.io / Railway / AWS) | |
 | Gözlemlenebilirlik | OpenTelemetry + log/trace paneli | Prompt ve yanıt izleme |
 
-Neden `pgvector`? İlk sürümde operasyonel yükü en düşük seçenek; tenant filtresi ve ilişkisel veriyle aynı sorguda çalışır.
+Neden şimdilik `pgvector` değil? BM25 indeksi zaten her tenant için API belleğinde (bot başına en fazla 5000 parça); 768 boyutlu vektörlerle tam kosinüs araması birkaç milisaniye sürer, mesaj başına veritabanı turu eklemez ve şema eklentisiz düz PostgreSQL kalır. Gerekçe ve geçiş koşulu: [ADR 0002](docs/adr/0002-hybrid-retrieval.md).
 
 ## Bilgi tabanı (RAG)
 
@@ -146,14 +146,14 @@ Neden `pgvector`? İlk sürümde operasyonel yükü en düşük seçenek; tenant
 1. **Toplama:** URL/sitemap tarama (robots.txt'e saygılı), dosya yükleme, manuel SSS.
 2. **Temizleme:** Menü, footer, çerez bannerı gibi gürültüyü at; ana içeriği çıkar (Readability benzeri).
 3. **Parçalama:** Başlık yapısını koruyan, ~300–500 token'lık parçalar, küçük örtüşmeyle. Her parçada sayfa başlığı ve URL meta olarak tutulur.
-4. **Embedding ve indeksleme:** Parçalar vektör olarak saklanır; ayrıca anahtar kelime araması için tam metin indeksi.
+4. **Embedding ve indeksleme:** Sohbet API'si bir botun bilgisini yüklediğinde parçaları arka planda embed eder; vektörler metnin hash'iyle `app.knowledge_embeddings`'te saklanır, böylece yeniden taramada yalnızca değişen sayfalar yeniden embed edilir.
 5. **Yenileme:** Zamanlanmış yeniden tarama + içerik hash'i ile sadece değişen sayfaları güncelle.
 
 **Retrieval**
 
-- Hibrit arama: vektör + tam metin (BM25), sonuçlar birleştirilir.
+- Hibrit arama: BM25 ve kosinüs adayları reciprocal rank fusion ile birleştirilir; ilk 4 parça modele gider. Embedding sağlayıcısı yanıt vermezse arama sessizce BM25'e düşer.
+- "Bilmiyorum" kararını model verir (`[[no-answer]]`), kullandığı sayfaları `[[used: n]]` ile belirtir; ziyaretçi yalnızca bu sayfaları kaynak olarak görür ([ADR 0001](docs/adr/0001-retrieval-embeddings.md), [ADR 0002](docs/adr/0002-hybrid-retrieval.md)).
 - Gerekirse yeniden sıralama (reranker).
-- Eşik altı skor → "bilmiyorum" yolu: asistan uydurmaz, insana yönlendirir.
 
 ## Widget entegrasyonu
 
@@ -282,7 +282,8 @@ Ortam değişkenleri:
 | `RESEND_API_KEY`, `MAIL_FROM` | web, api | E-posta (doğrulama/şifre sıfırlama kodları, devir ve lead bildirimleri). Yoksa geliştirmede loga yazılır |
 | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY` | api | Botların seçtiği model sağlayıcıları |
 | `APEX_MODEL` | api | Varsayılan model; `echo` anahtarsız yerel geliştirme içindir |
-| `APEX_MIN_RETRIEVAL_SCORE` | api, web | "Bilmiyorum" eşiği; panelin "soru dene" aracı da aynı değeri kullanmalı |
+| `APEX_MIN_RETRIEVAL_SCORE` | api, web | BM25 eşiği; panelin "soru dene" aracı da aynı değeri kullanmalı |
+| `APEX_EMBEDDINGS` | api, web | Hibrit arama: `gemini:gemini-embedding-2@768` (boş ya da `off` = yalnızca BM25). Site içeriği ve ziyaretçi mesajları sağlayıcıya gider; üretimde ücretli bir anahtar kullanın. Web'de "soru dene" önizlemesi için aynı değer + `GEMINI_API_KEY` |
 | `APEX_CRAWL_ALLOW_PRIVATE` | web | Sadece yerel geliştirme: tarayıcının yerel ağdaki siteleri okumasına izin verir |
 | `GOOGLE_*`, `GITHUB_*` | web | Google / GitHub ile giriş |
 | `NEXT_PUBLIC_CONTACT_EMAIL` | web | Sitede ve yasal sayfalarda gösterilen iletişim adresi |
@@ -319,7 +320,7 @@ Sitenin tamamı İngilizce ve Türkçedir: herkese açık sayfalar, giriş/kayı
 **Faz 1 – MVP (3–5 hafta)**
 - [x] `/v1/chat` akışlı yanıt, sistem istemi, geçmiş yönetimi
 - [x] URL tarama → parçalama → retrieval (BM25)
-- [ ] Embedding ile anlamsal arama (ölçüldü, şimdilik ertelendi: [ADR 0001](docs/adr/0001-retrieval-embeddings.md))
+- [x] Embedding ile anlamsal arama ([ADR 0002](docs/adr/0002-hybrid-retrieval.md))
 - [x] Temel widget (aç/kapa, akış, kaynak linkleri)
 - [x] Site anahtarı + domain izin listesi + rate limit
 - [x] İlk değerlendirme seti (`packages/evals`: retrieval kapısı, canlı ve kırmızı takım paketleri)
@@ -327,7 +328,8 @@ Sitenin tamamı İngilizce ve Türkçedir: herkese açık sayfalar, giriş/kayı
 **Faz 2 – Ürünleşme**
 - [x] Yönetim paneli (kaynaklar, ayarlar, konuşmalar)
 - [x] Tema ve kişilik özelleştirme
-- [ ] Hibrit arama + reranker
+- [x] Hibrit arama (BM25 + embedding, RRF)
+- [ ] Reranker
 - [x] Geri bildirim ve yanıtlanamayan soru filtresi, 7 günlük özet
 - [ ] Ayrıntılı analitik
 - [x] İnsana devretme (e-posta formu), lead toplama

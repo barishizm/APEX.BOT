@@ -3,7 +3,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { decodeVector, encodeVector, type EmbedKind, type Embedder } from "./embed.ts";
+import { decodeVector, encodeVector, type EmbedKind, type Embedder } from "@apex/knowledge/embed";
 import { DATA_DIR } from "./suite.ts";
 
 export const cachePath = (embedderId: string) => resolve(DATA_DIR, "embeddings", `${embedderId.replace(/[^\w.@-]+/g, "_")}.json`);

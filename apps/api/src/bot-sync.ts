@@ -7,6 +7,7 @@ import type { Db } from "@apex/db";
 import { listBotsChangedSince, listKnowledgeChunks } from "@apex/db";
 import { publicWidgetSettings } from "@apex/db/bot-settings";
 import { log } from "./log.ts";
+import type { ChunkIndexer } from "./embeddings.ts";
 import type { KnowledgeBase } from "./retrieval.ts";
 import { tenantFromBot, type TenantRegistry } from "./tenants.ts";
 
@@ -20,7 +21,8 @@ export interface BotSync {
 
 const OVERLAP_MS = 10_000;
 
-export function startBotSync(db: Db, tenants: TenantRegistry, knowledge: KnowledgeBase, intervalMs = 30_000): BotSync {
+/** `indexer` embeds each loaded bot's chunks in the background (hybrid search); omit it for lexical only. */
+export function startBotSync(db: Db, tenants: TenantRegistry, knowledge: KnowledgeBase, intervalMs = 30_000, indexer?: ChunkIndexer): BotSync {
   let since: Date | null = null;
   let inFlight: Promise<number> | null = null;
   let state: "starting" | "ok" | "failing" = "starting";
@@ -45,9 +47,11 @@ export function startBotSync(db: Db, tenants: TenantRegistry, knowledge: Knowled
           tenants.upsert(tenantFromBot(bot, publicWidgetSettings(bot.settings)));
           if (loaded.get(bot.id) !== bot.knowledgeVersion) {
             const chunks = await listKnowledgeChunks(db, bot.id);
-            knowledge.load(bot.id, chunks);
+            const generation = knowledge.load(bot.id, chunks);
             loaded.set(bot.id, bot.knowledgeVersion);
             log("info", "knowledge loaded", { tenant: bot.id, chunks: chunks.length });
+            // lexical search serves right away; vectors attach when the background job is done
+            void indexer?.index(bot.id, generation, chunks);
           }
           applied.set(bot.id, bot.updatedAt.getTime());
         } catch (error) {

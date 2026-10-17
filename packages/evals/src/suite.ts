@@ -1,10 +1,13 @@
-// Loads golden suites and runs them through retrieval exactly the way /v1/chat does:
-// the same top-k, score floor, confidence cut and follow-up weighting.
+// Loads golden suites and runs them through retrieval exactly the way /v1/chat does: the same
+// retrieve() call, top-k, floors, confidence cut and follow-up handling. Embeddings come from the
+// committed cache in data/embeddings, so this runs offline (and in CI) without an API key.
 import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defaultLimits } from "@apex/api/src/config.ts";
-import { KnowledgeBase, relevantHits, type ChunkInput, type Confidence } from "@apex/knowledge/retrieval";
+import { DEFAULT_EMBEDDER, createEmbedder, embeddingText } from "@apex/knowledge/embed";
+import { DEFAULT_RETRIEVAL, KnowledgeBase, retrieve, semanticQueryTexts, type ChunkInput, type RetrievalSettings, type SemanticQuery } from "@apex/knowledge/retrieval";
+import { EmbeddingCache } from "./embeddings.ts";
 import { scoreCase, summarize, type CaseResult, type GoldenCase, type Summary } from "./metrics.ts";
 
 export const DATA_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "../data");
@@ -16,21 +19,38 @@ export interface Suite {
   cases: GoldenCase[];
 }
 
-export interface RetrievalSettings {
-  topK: number;
-  minScore: number;
-  confidence: Confidence;
-  /** Weight of the previous visitor message in a follow-up query. */
-  previousWeight: number;
+export interface EvalSettings extends RetrievalSettings {
+  /** Embedder spec, or null for lexical-only retrieval (production without APEX_EMBEDDINGS). */
+  embedder: string | null;
 }
 
 /** Mirrors apps/api/src/app.ts (POST /v1/chat) with a tenant on default settings. */
-export const PRODUCTION_SETTINGS: RetrievalSettings = {
+export const PRODUCTION_SETTINGS: EvalSettings = {
+  ...DEFAULT_RETRIEVAL,
   topK: defaultLimits.retrievalTopK,
   minScore: defaultLimits.minRetrievalScore,
   confidence: "balanced",
-  previousWeight: 0.5,
+  embedder: DEFAULT_EMBEDDER,
 };
+
+/**
+ * Embeddings for a suite's corpus and questions. Reads the committed cache; with the provider's API
+ * key in the environment, fills what's missing (a new case) and saves it, to be committed.
+ */
+export async function suiteEmbeddings(suite: Suite, embedder: string) {
+  const keys = { openai: process.env.OPENAI_API_KEY, gemini: process.env.GEMINI_API_KEY };
+  const live = keys.openai || keys.gemini ? createEmbedder(embedder, keys, { retries: 6, batchSize: 20 }) : undefined;
+  const cache = new EmbeddingCache(embedder, live);
+  const docs = await cache.get(suite.corpus.map(embeddingText), "document");
+  const texts = [...new Set(suite.cases.flatMap((c) => semanticQueryTexts(c.q, c.prev)))];
+  const vectors = await cache.get(texts, "query");
+  cache.save();
+  const byText = new Map(texts.map((t, i) => [t, vectors[i]]));
+  return {
+    docs,
+    query: (q: string, prev?: string): SemanticQuery => ({ embedder, vectors: semanticQueryTexts(q, prev).map((t) => byText.get(t)!) }),
+  };
+}
 
 export interface SuiteResult {
   name: string;
@@ -63,15 +83,15 @@ function validate(name: string, cases: GoldenCase[], corpus: ChunkInput[]): void
   }
 }
 
-export function runSuite(suite: Suite, settings: RetrievalSettings = PRODUCTION_SETTINGS): SuiteResult {
+export async function runSuite(suite: Suite, settings: EvalSettings = PRODUCTION_SETTINGS): Promise<SuiteResult> {
   const kb = new KnowledgeBase();
   const tenant = `eval_${suite.name}`;
-  kb.load(tenant, suite.corpus);
+  const generation = kb.load(tenant, suite.corpus);
+  const embeddings = settings.embedder ? await suiteEmbeddings(suite, settings.embedder) : null;
+  if (embeddings) kb.attachVectors(tenant, generation, settings.embedder!, embeddings.docs);
   const cases = suite.cases.map((c) => {
-    const query = [{ text: c.q, weight: 1 }];
-    if (c.prev) query.push({ text: c.prev, weight: settings.previousWeight });
-    const ranked = kb.search(tenant, query, settings.topK);
-    return scoreCase(c, ranked, relevantHits(ranked, settings.minScore, settings.confidence));
+    const { ranked, hits } = retrieve(kb, tenant, { message: c.q, previous: c.prev, semantic: embeddings?.query(c.q, c.prev) }, settings);
+    return scoreCase(c, ranked, hits);
   });
   return { name: suite.name, summary: summarize(cases), cases };
 }

@@ -50,6 +50,7 @@ describe("bot sync", () => {
 
     // the widget gets answers grounded in both sources; pasted text isn't shown as a link
     const model = new FakeModel();
+    model.reply = ["Yanıt. [[used: 1]]"];
     const app = createApp({
       tenants,
       knowledge,
