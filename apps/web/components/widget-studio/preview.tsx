@@ -6,7 +6,7 @@ import {
   CircleHelp,
   Headset,
   MessageCircle,
-  RotateCcw,
+  Ellipsis,
   Sparkles,
   ThumbsDown,
   ThumbsUp,
@@ -359,7 +359,7 @@ export function WidgetPreview({
             {subtitle}
           </span>
         </span>
-        <RotateCcw className="h-4 w-4" style={{ color: c.muted }} />
+        <Ellipsis className="h-4 w-4" style={{ color: c.muted }} />
         <button type="button" onClick={onToggle} aria-label={site.showcase.closePanel} className="grid h-7 w-7 cursor-pointer place-items-center rounded-md border-0 bg-transparent" style={{ color: c.muted }}>
           <X className="h-4 w-4" />
         </button>

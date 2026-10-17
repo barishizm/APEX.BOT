@@ -15,11 +15,15 @@ npm test                                  # api + widget
 | `GET` | `/v1/widget/config?site_key=` | Public tenant settings (name, colors, greeting, suggestions) |
 | `POST` | `/v1/chat` | `{ message, conversationId? }` → SSE `meta`, `delta`*, `done` \| `error` |
 | `POST` | `/v1/feedback` | `{ conversationId, messageId, rating: "up" \| "down" }` |
-| `POST` | `/v1/handoff` | `{ conversationId?, email, name?, message? }` → emails the transcript to the tenant (404 when hand-off is off) |
+| `POST` | `/v1/handoff` | `{ conversationId?, email, name?, message? }` → emails the transcript to the tenant and returns `{ ticket: { id, createdAt } }`; the same `#XXXX-XXXX` reference is in the email subject (404 when hand-off is off) |
 | `POST` | `/v1/lead` | `{ conversationId?, email, name?, phone? }` → attaches the lead form to a conversation and emails the team |
 | `GET` / `DELETE` | `/v1/conversations/:id` | Visitor's own history / KVKK erasure |
 
 Every `/v1` request needs the site key (`x-apex-site-key` header or `site_key` query) and an `Origin` on that tenant's allowlist.
+Conversation and message ids must be server-made UUIDs: anything else starts a new conversation (chat) or is a 400/404 without touching storage.
+Conversation reads, erasures and ratings are rate limited per IP (`lookupsPerMinute`). `test/security.test.ts` (here) and
+`packages/db/test/injection.test.ts` hold the hostile-input suites: SQL/NoSQL payloads, tenant isolation, prototype
+pollution, mail header injection, control characters, and a static check that every query stays parameterized.
 Error codes the widget localizes: `unknown_site`, `origin_not_allowed`, `rate_limited`, `budget_exhausted`, `message_too_long`, `conversation_full`, `not_found`, `upstream`, `refused`.
 
 The demo tenant lives in `data/tenants.json` (only loaded when `NODE_ENV` is not `production`, or `APEX_DEMO_TENANT=1`) and its content in `data/knowledge/<tenant id>.json`.

@@ -41,6 +41,8 @@ export interface Limits {
   ipMessagesPerMinute: number;
   tenantMessagesPerMinute: number;
   handoffsPerHour: number;
+  /** Conversation reads, erasures and ratings per IP: ids are unguessable, this keeps probing slow too. */
+  lookupsPerMinute: number;
   /** Hand-off and lead emails one tenant may trigger, whoever the visitors are. */
   mailsPerTenantPerHour: number;
   mailsPerTenantPerDay: number;
@@ -59,6 +61,7 @@ export const defaultLimits: Limits = {
   ipMessagesPerMinute: 15,
   tenantMessagesPerMinute: 300,
   handoffsPerHour: 5,
+  lookupsPerMinute: 60,
   mailsPerTenantPerHour: 30,
   mailsPerTenantPerDay: 100,
   mailsPerRecipientPerHour: 40,

@@ -1,5 +1,6 @@
 // HTTP surface used by the widget. Every /v1 route resolves the tenant from the public
 // site key and rejects requests whose Origin is not on that tenant's allowlist.
+import { randomInt } from "node:crypto";
 import { Hono, type Context } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { streamSSE } from "hono/streaming";
@@ -46,8 +47,42 @@ type ErrorCode =
   | "upstream"
   | "refused";
 
-const EMAIL = /^[^\s@]{1,64}@[^\s@]+\.[^\s@]{2,}$/;
+// No whitespace or RFC 5322 "specials" (<>()[]\,;:"), so an address can't smuggle in a display
+// name, a second recipient or a header when a mail provider parses it.
+const EMAIL = /^[^\s@<>()[\]\\,;:"]{1,64}@[^\s@<>()[\]\\,;:"]+\.[^\s@<>()[\]\\,;:"]{2,}$/;
 const PHONE = /^\+?[\d\s().-]{7,40}$/;
+// Conversation and message ids are server-made v4 UUIDs; anything else is rejected before any lookup.
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// C0 controls (except tab and newline), DEL and C1 controls (NEL is a line break to some mail
+// software): Postgres rejects NUL in text, and none belong in a message or a mail.
+const CONTROL = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g;
+// Ticket references skip look-alike characters (0/O, 1/I) so they can be read out loud.
+const REF_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+/** A client-supplied string field: trimmed, capped, free of control characters. */
+function text(value: unknown, max: number): string {
+  return typeof value === "string" ? value.replace(CONTROL, "").trim().slice(0, max) : "";
+}
+
+/** A conversation or message id from a body or path, or undefined when it can't be one of ours. */
+export function idOf(value: unknown): string | undefined {
+  return typeof value === "string" && UUID.test(value) ? value : undefined;
+}
+
+/** A short reference for a hand-off request, e.g. "K7Q2-M9XA". */
+export function ticketRef(): string {
+  let ref = "";
+  for (let i = 0; i < 8; i++) ref += (i === 4 ? "-" : "") + REF_ALPHABET[randomInt(REF_ALPHABET.length)];
+  return ref;
+}
+
+/** An email address a visitor typed: plain characters only, so it can never break a mail header. */
+function email(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const address = value.trim();
+  CONTROL.lastIndex = 0;
+  return address.length <= 254 && EMAIL.test(address) && !CONTROL.test(address) ? address : null;
+}
 
 export function createApp(deps: AppDeps) {
   const { tenants, knowledge, store, model, mailer, limits } = deps;
@@ -55,6 +90,7 @@ export function createApp(deps: AppDeps) {
   const ipLimiter = new RateLimiter(limits.ipMessagesPerMinute, 60_000, now);
   const tenantLimiter = new RateLimiter(limits.tenantMessagesPerMinute, 60_000, now);
   const handoffLimiter = new RateLimiter(limits.handoffsPerHour, 3_600_000, now);
+  const lookupLimiter = new RateLimiter(limits.lookupsPerMinute, 60_000, now);
   const tenantMailHourly = new RateLimiter(limits.mailsPerTenantPerHour, 3_600_000, now);
   const tenantMailDaily = new RateLimiter(limits.mailsPerTenantPerDay, 86_400_000, now);
   const recipientMail = new RateLimiter(limits.mailsPerRecipientPerHour, 3_600_000, now);
@@ -118,6 +154,12 @@ export function createApp(deps: AppDeps) {
     return c.json({ error: code }, status);
   };
 
+  /** Rate limit for routes addressed by a conversation id. */
+  const lookup = (c: Context<Env>) => {
+    const check = lookupLimiter.hit(`lookup:${deps.clientIp(c)}`);
+    return check.ok ? null : fail(c, "rate_limited", 429, check.retryAfter);
+  };
+
   app.get("/v1/widget/config", (c) => {
     deps.onWidgetSeen?.(c.get("tenant"), c.get("origin"));
     return c.json(publicSettings(c.get("tenant")));
@@ -126,7 +168,7 @@ export function createApp(deps: AppDeps) {
   app.post("/v1/chat", async (c) => {
     const tenant = c.get("tenant");
     const body = await readJson(c);
-    const message = typeof body?.message === "string" ? body.message.trim() : "";
+    const message = typeof body.message === "string" ? body.message.replace(CONTROL, "").trim() : "";
     if (!message) return fail(c, "bad_request", 400);
     if (message.length > (tenant.limits?.maxMessageChars ?? limits.maxMessageChars)) return fail(c, "message_too_long", 413);
 
@@ -144,8 +186,8 @@ export function createApp(deps: AppDeps) {
       return fail(c, "budget_exhausted", 429);
     }
 
-    let conversation: Conversation | undefined;
-    if (typeof body.conversationId === "string") conversation = await store.getOrLoad(tenant.id, body.conversationId);
+    const conversationId = idOf(body.conversationId);
+    let conversation = conversationId ? await store.getOrLoad(tenant.id, conversationId) : undefined;
     conversation ??= store.create(tenant.id, c.get("origin"));
     if (conversation.messages.length >= limits.maxConversationMessages) return fail(c, "conversation_full", 409);
 
@@ -211,10 +253,12 @@ export function createApp(deps: AppDeps) {
 
   app.post("/v1/feedback", async (c) => {
     const body = await readJson(c);
-    const { conversationId, messageId, rating } = body ?? {};
-    if (typeof conversationId !== "string" || typeof messageId !== "string" || (rating !== "up" && rating !== "down")) {
-      return fail(c, "bad_request", 400);
-    }
+    const { rating } = body;
+    const conversationId = idOf(body.conversationId);
+    const messageId = idOf(body.messageId);
+    if (!conversationId || !messageId || (rating !== "up" && rating !== "down")) return fail(c, "bad_request", 400);
+    const limited = lookup(c);
+    if (limited) return limited;
     const conversation = await store.getOrLoad(c.get("tenant").id, conversationId);
     if (!conversation || !store.setFeedback(conversation, messageId, rating)) return fail(c, "not_found", 404);
     return c.json({ ok: true });
@@ -224,10 +268,10 @@ export function createApp(deps: AppDeps) {
     const tenant = c.get("tenant");
     if (tenant.settings.handoffEnabled === false || !tenant.handoffEmail) return fail(c, "not_found", 404);
     const body = await readJson(c);
-    const email = typeof body?.email === "string" ? body.email.trim() : "";
-    const name = typeof body?.name === "string" ? body.name.trim().slice(0, 100) : "";
-    const note = typeof body?.message === "string" ? body.message.trim().slice(0, 2000) : "";
-    if (email.length > 254 || !EMAIL.test(email)) return fail(c, "bad_request", 400);
+    const address = email(body.email);
+    const name = text(body.name, 100);
+    const note = text(body.message, 2000);
+    if (!address) return fail(c, "bad_request", 400);
 
     const limit = handoffLimiter.hit(`handoff:${deps.clientIp(c)}`);
     if (!limit.ok) return fail(c, "rate_limited", 429, limit.retryAfter);
@@ -237,16 +281,19 @@ export function createApp(deps: AppDeps) {
       return fail(c, "rate_limited", 429, mailLimit.retryAfter);
     }
 
-    const conversation = typeof body.conversationId === "string" ? await store.getOrLoad(tenant.id, body.conversationId) : undefined;
+    const conversationId = idOf(body.conversationId);
+    const conversation = conversationId ? await store.getOrLoad(tenant.id, conversationId) : undefined;
     const lang = tenant.settings.defaultLang;
+    // The visitor sees the same reference in the widget, so either side can quote it
+    const ref = ticketRef();
     await mailer.send({
       to: tenant.handoffEmail,
-      replyTo: email,
-      subject: HANDOFF_SUBJECT[lang](tenant.name),
-      text: handoffBody(lang, { email, name, note, phone: conversation?.visitor?.phone ?? "", conversation }),
+      replyTo: address,
+      subject: `${HANDOFF_SUBJECT[lang](tenant.name)} [#${ref}]`,
+      text: handoffBody(lang, { ref, email: address, name, note, phone: conversation?.visitor?.phone ?? "", conversation }),
     });
     if (conversation) store.markHandoff(conversation);
-    return c.json({ ok: true });
+    return c.json({ ok: true, ticket: { id: ref, createdAt: new Date(now()).toISOString() } });
   });
 
   // Lead form shown before the chat. Attaches the contact to a (new) conversation and
@@ -254,19 +301,19 @@ export function createApp(deps: AppDeps) {
   app.post("/v1/lead", async (c) => {
     const tenant = c.get("tenant");
     const body = await readJson(c);
-    const email = typeof body?.email === "string" ? body.email.trim() : "";
-    const name = typeof body?.name === "string" ? body.name.trim().slice(0, 100) : "";
-    const phone = typeof body?.phone === "string" ? body.phone.trim().slice(0, 40) : "";
-    if (email.length > 254 || !EMAIL.test(email)) return fail(c, "bad_request", 400);
+    const address = email(body.email);
+    const name = text(body.name, 100);
+    const phone = typeof body.phone === "string" ? body.phone.trim() : "";
+    if (!address) return fail(c, "bad_request", 400);
     if (phone && !PHONE.test(phone)) return fail(c, "bad_request", 400);
 
     const limit = handoffLimiter.hit(`lead:${deps.clientIp(c)}`);
     if (!limit.ok) return fail(c, "rate_limited", 429, limit.retryAfter);
 
-    let conversation: Conversation | undefined;
-    if (typeof body.conversationId === "string") conversation = await store.getOrLoad(tenant.id, body.conversationId);
+    const conversationId = idOf(body.conversationId);
+    let conversation = conversationId ? await store.getOrLoad(tenant.id, conversationId) : undefined;
     conversation ??= store.create(tenant.id, c.get("origin"));
-    store.setVisitor(conversation, { email, ...(name ? { name } : {}), ...(phone ? { phone } : {}) });
+    store.setVisitor(conversation, { email: address, ...(name ? { name } : {}), ...(phone ? { phone } : {}) });
 
     // The lead is kept in the inbox either way; over the cap only the notification email is skipped
     const mailLimit = tenant.handoffEmail ? mailAllowed(tenant) : { ok: false as const, retryAfter: 0 };
@@ -275,16 +322,19 @@ export function createApp(deps: AppDeps) {
       const lang = tenant.settings.defaultLang;
       await mailer.send({
         to: tenant.handoffEmail,
-        replyTo: email,
+        replyTo: address,
         subject: LEAD_SUBJECT[lang](tenant.name),
-        text: leadBody(lang, { email, name, phone }),
+        text: leadBody(lang, { email: address, name, phone }),
       });
     }
     return c.json({ conversationId: conversation.id });
   });
 
   app.get("/v1/conversations/:id", async (c) => {
-    const conversation = await store.getOrLoad(c.get("tenant").id, c.req.param("id"));
+    const limited = lookup(c);
+    if (limited) return limited;
+    const id = idOf(c.req.param("id"));
+    const conversation = id && (await store.getOrLoad(c.get("tenant").id, id));
     if (!conversation) return fail(c, "not_found", 404);
     return c.json({
       id: conversation.id,
@@ -294,7 +344,10 @@ export function createApp(deps: AppDeps) {
 
   // KVKK/GDPR: visitors can erase their conversation.
   app.delete("/v1/conversations/:id", async (c) => {
-    if (!(await store.delete(c.get("tenant").id, c.req.param("id")))) return fail(c, "not_found", 404);
+    const limited = lookup(c);
+    if (limited) return limited;
+    const id = idOf(c.req.param("id"));
+    if (!id || !(await store.delete(c.get("tenant").id, id))) return fail(c, "not_found", 404);
     return c.body(null, 204);
   });
 
@@ -312,7 +365,8 @@ function requestOrigin(c: Context): string | null {
 async function readJson(c: Context): Promise<Record<string, unknown>> {
   try {
     const body = await c.req.json();
-    return body && typeof body === "object" ? body : {};
+    // arrays and primitives are not a request body; fields are read as own data only
+    return body && typeof body === "object" && !Array.isArray(body) ? body : {};
   } catch {
     return {};
   }
@@ -342,10 +396,11 @@ const LEAD_SUBJECT: Record<Lang, (site: string) => string> = {
 };
 
 // Labels for the hand-off and lead emails, in the site's default language
-const MAIL: Record<Lang, Record<"leadIntro" | "handoffIntro" | "name" | "email" | "phone" | "note" | "transcript" | "visitor" | "bot" | "none" | "reply", string>> = {
+const MAIL: Record<Lang, Record<"leadIntro" | "handoffIntro" | "ticket" | "name" | "email" | "phone" | "note" | "transcript" | "visitor" | "bot" | "none" | "reply", string>> = {
   tr: {
     leadIntro: "Bir ziyaretçi sohbete başlamadan önce iletişim bilgilerini bıraktı.",
     handoffIntro: "Sohbet widget'ından bir ziyaretçi iletişim talebi gönderdi.",
+    ticket: "Talep no",
     name: "Ad",
     email: "E-posta",
     phone: "Telefon",
@@ -359,6 +414,7 @@ const MAIL: Record<Lang, Record<"leadIntro" | "handoffIntro" | "name" | "email" 
   en: {
     leadIntro: "A visitor left their contact details before starting a chat.",
     handoffIntro: "A visitor sent a contact request from the chat widget.",
+    ticket: "Ticket",
     name: "Name",
     email: "Email",
     phone: "Phone",
@@ -372,6 +428,7 @@ const MAIL: Record<Lang, Record<"leadIntro" | "handoffIntro" | "name" | "email" 
   lt: {
     leadIntro: "Lankytojas prieš pradėdamas pokalbį paliko savo kontaktinius duomenis.",
     handoffIntro: "Lankytojas per pokalbių valdiklį išsiuntė prašymą susisiekti.",
+    ticket: "Užklausos nr.",
     name: "Vardas",
     email: "El. paštas",
     phone: "Telefonas",
@@ -385,6 +442,7 @@ const MAIL: Record<Lang, Record<"leadIntro" | "handoffIntro" | "name" | "email" 
   lv: {
     leadIntro: "Apmeklētājs pirms sarunas sākuma atstāja savu kontaktinformāciju.",
     handoffIntro: "Apmeklētājs tērzēšanas logrīkā nosūtīja saziņas pieprasījumu.",
+    ticket: "Pieteikuma nr.",
     name: "Vārds",
     email: "E-pasts",
     phone: "Tālrunis",
@@ -398,6 +456,7 @@ const MAIL: Record<Lang, Record<"leadIntro" | "handoffIntro" | "name" | "email" 
   et: {
     leadIntro: "Külastaja jättis enne vestluse alustamist oma kontaktandmed.",
     handoffIntro: "Külastaja saatis vestlusvidina kaudu ühendusevõtmise soovi.",
+    ticket: "Pöördumise nr",
     name: "Nimi",
     email: "E-post",
     phone: "Telefon",
@@ -417,10 +476,10 @@ function leadBody(lang: Lang, { email, name, phone }: { email: string; name: str
 
 function handoffBody(
   lang: Lang,
-  { email, name, note, phone, conversation }: { email: string; name: string; note: string; phone: string; conversation?: Conversation },
+  { ref, email, name, note, phone, conversation }: { ref: string; email: string; name: string; note: string; phone: string; conversation?: Conversation },
 ): string {
   const t = MAIL[lang];
-  const lines = [t.handoffIntro, "", `${t.name}: ${name || "-"}`, `${t.email}: ${email}`];
+  const lines = [t.handoffIntro, "", `${t.ticket}: #${ref}`, `${t.name}: ${name || "-"}`, `${t.email}: ${email}`];
   if (phone) lines.push(`${t.phone}: ${phone}`);
   lines.push(`${t.note}: ${note || "-"}`, "", `${t.transcript}:`);
   const messages = conversation?.messages.slice(-30) ?? [];
