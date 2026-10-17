@@ -27,6 +27,8 @@ export interface TenantSettings {
   confidence?: BotSettings["persona"]["confidence"];
   handoffEnabled?: boolean;
   offerHandoffWhenUnsure?: boolean;
+  /** Email or link the assistant points visitors to when hand-off isn't available. */
+  contact?: string;
   /** Full widget look and behavior from the dashboard; JSON-file tenants use the widget's defaults. */
   ui?: PublicWidgetSettings;
 }
@@ -61,6 +63,7 @@ export function publicSettings(tenant: Tenant) {
 /** Maps a dashboard-managed bot to a tenant. */
 export function tenantFromBot(bot: { id: string; organizationName: string; siteKey: string; settings: BotSettings; handoffVerified: boolean }, ui: PublicWidgetSettings): Tenant {
   const s = bot.settings;
+  const handoffEnabled = s.handoff.enabled && bot.handoffVerified && !!s.handoff.email;
   return {
     id: bot.id,
     managed: true,
@@ -99,9 +102,11 @@ export function tenantFromBot(bot: { id: string; organizationName: string; siteK
       instructions: s.persona.instructions,
       unknownAnswer: s.messages.unknownAnswer,
       confidence: s.persona.confidence,
-      handoffEnabled: s.handoff.enabled && bot.handoffVerified && !!s.handoff.email,
+      handoffEnabled,
       offerHandoffWhenUnsure: s.handoff.offerWhenUnsure,
-      ui,
+      contact: s.handoff.contact,
+      // the widget shows "Talk to a human" only when /v1/handoff will actually accept it
+      ui: { ...ui, handoff: { ...ui.handoff, enabled: handoffEnabled } },
     },
   };
 }
