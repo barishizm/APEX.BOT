@@ -153,6 +153,11 @@ function Body() {
             <td>Lankytojo žinutė, naujausios pokalbio žinutės ir aktualios kliento turinio dalys</td>
           </tr>
           <tr>
+            <td>Google (Gemini API)</td>
+            <td>Paieška: kliento turinio ir lankytojų klausimų pavertimas vektoriais, kad asistentas rastų tinkamus puslapius</td>
+            <td>Kliento puslapių ir pridėto turinio tekstas bei lankytojo žinutė (tolesniems klausimams kartu su ankstesne). Gautus vektorius saugome savo duomenų bazėje. Kol naudojame nemokamą Google planą, Google sąlygos leidžia jam naudoti šiuos duomenis savo produktams tobulinti</td>
+          </tr>
+          <tr>
             <td>Supabase (valdoma PostgreSQL)</td>
             <td>Duomenų bazė</td>
             <td>Viskas, ką saugome: paskyros, nustatymai, žinios, pokalbiai</td>
