@@ -17,9 +17,12 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function NotFound() {
   const locale = await currentLocale();
-  const t = getDictionary(locale).notFound;
+  const dict = getDictionary(locale);
+  const t = dict.notFound;
   return (
     <>
+      {/* generateMetadata alone is lost after hydration in a nested not-found, so the page sets its own title */}
+      <title>{dict.meta.titleTemplate.replace("%s", dict.meta.notFound.title)}</title>
       <SiteHeader locale={locale} />
       <main id="main" className="closing" style={{ minHeight: "80vh", justifyContent: "center", paddingTop: 140 }}>
         <p className="eyebrow">404</p>
