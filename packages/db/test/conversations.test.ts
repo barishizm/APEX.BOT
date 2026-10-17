@@ -114,6 +114,17 @@ describe("conversations", () => {
     assert.equal(stats.leads, 1)
   })
 
+  test("days narrows the list to the window the stats count over", async () => {
+    const { user, bot } = await owner()
+    const old = await chat(bot.id, "Eski?", "Bilmiyorum", { unanswered: true, at: new Date(Date.now() - 10 * 86_400_000) })
+    const recent = await chat(bot.id, "Yeni?", "Bilmiyorum", { unanswered: true, at: new Date(Date.now() - 60_000) })
+
+    assert.deepEqual((await listConversations(db, user.id, { filter: "unanswered", days: 7 })).conversations.map((c) => c.id), [recent.id])
+    assert.deepEqual((await listConversations(db, user.id, { filter: "unanswered", days: 30 })).conversations.map((c) => c.id), [recent.id, old.id])
+    assert.equal((await listConversations(db, user.id, { filter: "unanswered" })).conversations.length, 2)
+    assert.equal((await conversationStats(db, user.id, 7)).unanswered, 1)
+  })
+
   test("tenants can't read, write or delete each other's conversations", async () => {
     const a = await owner()
     const b = await owner("b@example.com", "bob")

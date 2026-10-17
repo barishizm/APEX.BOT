@@ -147,7 +147,7 @@ export function AccountSettings({ initial }: { initial: Account }) {
         </p>
       </header>
 
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 p-4 sm:p-6">
+      <div className="flex w-full max-w-2xl flex-col gap-6 p-4 sm:p-6">
         <Group title={t.profile}>
           <form onSubmit={saveProfile} className="flex flex-col gap-4">
             <TextInput label={t.displayName} value={displayName} onChange={setDisplayName} hint={t.displayNameHint} />
