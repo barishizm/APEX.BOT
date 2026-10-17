@@ -23,6 +23,7 @@ export const MIGRATION_NAMES = [
   "0018_totp_secret_sealed.sql",
   "0019_knowledge_files_refresh.sql",
   "0020_workspace_plan.sql",
+  "0021_platform_admin.sql",
 ] as const
 
 /** Migrations this code expects that the database hasn't applied (run `npm run db:migrate`). */
