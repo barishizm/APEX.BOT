@@ -17,6 +17,7 @@ import {
   listConversations,
   loadConversation,
   markConversationHandoff,
+  searchTerms,
   setConversationVisitor,
   setMessageFeedback,
   sweepConversations,
@@ -112,6 +113,43 @@ describe("conversations", () => {
     assert.equal(stats.messages, 6)
     assert.equal(stats.unanswered, 1)
     assert.equal(stats.leads, 1)
+  })
+
+  test("keeps where a conversation started, for the list and the transcript", async () => {
+    const { user, bot } = await owner()
+    const id = randomUUID()
+    const context = { page: "/kargo", pageTitle: "Kargo", locale: "tr-TR", country: "TR", device: "mobile", os: "iOS", browser: "Safari" }
+    // unknown keys are dropped on the way in
+    await insertConversation(db, { id, botId: bot.id, context: { ...context, ip: "1.2.3.4" } as never, createdAt: new Date() })
+    await insertMessage(db, { id: randomUUID(), conversationId: id, botId: bot.id, role: "user", content: "Kargo?", createdAt: new Date() })
+    assert.deepEqual((await listConversations(db, user.id)).conversations[0].context, context)
+    assert.deepEqual((await getConversationForUser(db, user.id, id))!.context, context)
+    // a conversation from before migration 0016 reads as no context
+    const { id: old } = await chat(bot.id, "Eski?", "Evet")
+    assert.deepEqual((await loadConversation(db, bot.id, old))!.context, {})
+  })
+
+  test("search matches every word across visitor details, the start page and messages", async () => {
+    const { user, bot } = await owner()
+    const base = Date.now() - 60_000
+    const kargo = await chat(bot.id, "Kargo ücreti ne kadar?", "750 TL üzeri ücretsiz", { at: new Date(base) })
+    const iade = await chat(bot.id, "İade nasıl yapılır?", "14 gün içinde", { at: new Date(base + 1000) })
+    await setConversationVisitor(db, bot.id, iade.id, { email: "ada@example.com", name: "Ada" })
+    const page = randomUUID()
+    await insertConversation(db, { id: page, botId: bot.id, context: { page: "/fiyatlar_2026" }, createdAt: new Date(base + 2000) })
+    await insertMessage(db, { id: randomUUID(), conversationId: page, botId: bot.id, role: "user", content: "100% indirim?", createdAt: new Date(base + 2000) })
+
+    const ids = async (search: string) => (await listConversations(db, user.id, { search })).conversations.map((c) => c.id)
+    assert.deepEqual(await ids("ücretsiz"), [kargo.id], "the assistant's answers count too")
+    assert.deepEqual(await ids("KARGO"), [kargo.id], "case doesn't matter")
+    assert.deepEqual(await ids("ada@example"), [iade.id])
+    assert.deepEqual(await ids("ada 14"), [iade.id])
+    assert.deepEqual(await ids("ada@example kargo"), [], "every word must match")
+    assert.deepEqual(await ids("fiyatlar_"), [page])
+    assert.deepEqual(await ids("100%"), [page])
+    assert.deepEqual(await ids("_"), [page], "% and _ are literal")
+    assert.equal((await ids("   ")).length, 3)
+    assert.deepEqual(searchTerms("a\\b %x"), ["%a\\\\b%", "%\\%x%"])
   })
 
   test("days narrows the list to the window the stats count over", async () => {

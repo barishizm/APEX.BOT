@@ -12,11 +12,15 @@ export const parseDays = (raw: string | null | undefined): number | null => {
   return raw && Number.isInteger(n) && n >= 1 && n <= 365 ? n : null
 }
 
-/** Inbox link that keeps a filter and period; parts left out are dropped from the address. */
-export function conversationsHref(filter: ConversationFilter, days?: number | null) {
+// ?q= from the inbox search box
+export const parseSearch = (raw: string | null | undefined): string | null => raw?.trim().slice(0, 200) || null
+
+/** Inbox link that keeps a filter, period and search; parts left out are dropped from the address. */
+export function conversationsHref(filter: ConversationFilter, days?: number | null, search?: string | null) {
   const params = new URLSearchParams()
   if (filter !== "all") params.set("filter", filter)
   if (days) params.set("days", String(days))
+  if (search) params.set("q", search)
   const query = params.toString()
   return query ? `/dashboard/conversations?${query}` : "/dashboard/conversations"
 }
@@ -30,6 +34,7 @@ export function conversationJson(c: StoredConversation) {
   return {
     id: c.id,
     origin: c.origin,
+    context: c.context,
     visitor: c.visitor,
     handoffAt: c.handoffAt?.toISOString() ?? null,
     createdAt: c.createdAt.toISOString(),

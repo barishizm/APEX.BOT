@@ -90,7 +90,8 @@ if (process.env.DATABASE_URL) {
   log("info", "syncing dashboard bots from the database");
 
   store = new ConversationStore({
-    persistence: postgresPersistence(db),
+    // before migration 0016 the conversations table has no context column
+    persistence: postgresPersistence(db, { context: !missing.includes("0016_conversation_context.sql") }),
     persists: (tenantId) => tenants.findById(tenantId)?.managed === true,
     onError: (error, conversation) => log("error", "couldn't save conversation", { conversation, error }),
   });

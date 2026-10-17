@@ -18,10 +18,36 @@ export interface ConversationMessage {
   createdAt: Date
 }
 
+/** Where a conversation started (set by the chat API; see apps/api/src/visitor-context.ts). */
+export interface ConversationContext {
+  page?: string
+  pageTitle?: string
+  locale?: string
+  country?: string
+  device?: string
+  os?: string
+  browser?: string
+}
+
+const CONTEXT_KEYS = ["page", "pageTitle", "locale", "country", "device", "os", "browser"] as const
+
+/** Only the known string fields, whatever the stored JSON holds. */
+function toContext(raw: unknown): ConversationContext {
+  const value = typeof raw === "string" ? JSON.parse(raw) : raw
+  if (!value || typeof value !== "object") return {}
+  const out: ConversationContext = {}
+  for (const key of CONTEXT_KEYS) {
+    const v = (value as Record<string, unknown>)[key]
+    if (typeof v === "string" && v) out[key] = v.slice(0, 300)
+  }
+  return out
+}
+
 export interface StoredConversation {
   id: string
   botId: string
   origin: string | null
+  context: ConversationContext
   createdAt: Date
   updatedAt: Date
   visitor: { email: string; name: string | null; phone: string | null } | null
@@ -31,13 +57,20 @@ export interface StoredConversation {
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-export async function insertConversation(db: Queryable, c: { id: string; botId: string; origin?: string | null; createdAt: Date }): Promise<void> {
-  await db.query("insert into app.conversations (id, bot_id, origin, created_at, updated_at) values ($1, $2, $3, $4, $4) on conflict (id) do nothing", [
-    c.id,
-    c.botId,
-    c.origin?.slice(0, 300) ?? null,
-    c.createdAt,
-  ])
+/** `context` undefined leaves the column out, for a database still without migration 0016. */
+export async function insertConversation(
+  db: Queryable,
+  c: { id: string; botId: string; origin?: string | null; context?: ConversationContext; createdAt: Date },
+): Promise<void> {
+  const params = [c.id, c.botId, c.origin?.slice(0, 300) ?? null, c.createdAt]
+  if (!c.context) {
+    await db.query("insert into app.conversations (id, bot_id, origin, created_at, updated_at) values ($1, $2, $3, $4, $4) on conflict (id) do nothing", params)
+    return
+  }
+  await db.query(
+    "insert into app.conversations (id, bot_id, origin, context, created_at, updated_at) values ($1, $2, $3, $5::jsonb, $4, $4) on conflict (id) do nothing",
+    [...params, JSON.stringify(toContext(c.context))],
+  )
 }
 
 export async function insertMessage(
@@ -102,6 +135,7 @@ interface ConversationRow {
   id: string
   bot_id: string
   origin: string | null
+  context: unknown
   created_at: Date
   updated_at: Date
   visitor_email: string | null
@@ -130,29 +164,33 @@ const toMessage = (r: MessageRow): ConversationMessage => ({
   createdAt: r.created_at,
 })
 
-/** One conversation with its messages, only if it belongs to this bot. */
+/** One conversation with its messages, only if it belongs to this bot. One round trip: the inbox waits on it. */
 export async function loadConversation(db: Queryable, botId: string, id: string): Promise<StoredConversation | null> {
   if (!UUID.test(id) || !UUID.test(botId)) return null
-  const { rows } = await db.query<ConversationRow>(
-    `select id, bot_id, origin, created_at, updated_at, visitor_email, visitor_name, visitor_phone, handoff_at
-       from app.conversations where id = $1 and bot_id = $2`,
+  // to_jsonb(c) -> 'context' reads as null instead of failing on a database without migration 0016
+  const { rows } = await db.query<ConversationRow & { messages: MessageRow[] | string }>(
+    `select c.id, c.bot_id, c.origin, to_jsonb(c) -> 'context' as context, c.created_at, c.updated_at,
+            c.visitor_email, c.visitor_name, c.visitor_phone, c.handoff_at,
+            coalesce((select json_agg(m order by m.created_at, m.id)
+                        from (select id, role, content, sources, unanswered, feedback, created_at
+                                from app.messages where conversation_id = c.id and bot_id = c.bot_id) m), '[]') as messages
+       from app.conversations c where c.id = $1 and c.bot_id = $2`,
     [id, botId],
   )
   const c = rows[0]
   if (!c) return null
-  const messages = await db.query<MessageRow>(
-    "select id, role, content, sources, unanswered, feedback, created_at from app.messages where conversation_id = $1 and bot_id = $2 order by created_at, id",
-    [id, botId],
-  )
+  const messages: MessageRow[] = typeof c.messages === "string" ? JSON.parse(c.messages) : c.messages
   return {
     id: c.id,
     botId: c.bot_id,
     origin: c.origin,
+    context: toContext(c.context),
     createdAt: c.created_at,
     updatedAt: c.updated_at,
     visitor: c.visitor_email ? { email: c.visitor_email, name: c.visitor_name, phone: c.visitor_phone } : null,
     handoffAt: c.handoff_at,
-    messages: messages.rows.map(toMessage),
+    // json_agg returns timestamps as text
+    messages: messages.map((m) => toMessage({ ...m, created_at: new Date(m.created_at) })),
   }
 }
 
@@ -175,6 +213,7 @@ export interface ConversationSummary {
   id: string
   preview: string
   origin: string | null
+  context: ConversationContext
   messageCount: number
   unansweredCount: number
   negativeCount: number
@@ -197,16 +236,19 @@ export async function listConversations(
   db: Db,
   who: BotScope,
   /** days: only conversations active in the last N days, the window the overview counts over */
-  options: { filter?: ConversationFilter; before?: Date | null; days?: number | null; limit?: number } = {},
+  /** search: words that must all appear in the visitor's details, the start page or any message */
+  options: { filter?: ConversationFilter; before?: Date | null; days?: number | null; search?: string | null; limit?: number } = {},
 ): Promise<{ conversations: ConversationSummary[]; hasMore: boolean }> {
   const bot = await getBotForUser(db, who)
   // own keys only: an inherited one ("constructor") would put a function's source into the SQL
   const filter = options.filter && Object.hasOwn(FILTERS, options.filter) ? FILTERS[options.filter] : FILTERS.all
   const limit = Math.min(Math.max(options.limit ?? 30, 1), 100)
+  const terms = searchTerms(options.search)
   const { rows } = await db.query<{
     id: string
     preview: string
     origin: string | null
+    context: unknown
     message_count: number
     unanswered_count: number
     negative_count: number
@@ -216,13 +258,17 @@ export async function listConversations(
     created_at: Date
     updated_at: Date
   }>(
-    `select id, preview, origin, message_count, unanswered_count, negative_count, visitor_email, visitor_name, handoff_at, created_at, updated_at
-       from app.conversations
+    `select id, preview, origin, context, message_count, unanswered_count, negative_count, visitor_email, visitor_name, handoff_at, created_at, updated_at
+       from app.conversations c
       where bot_id = $1 and message_count > 0 and ${filter} and ($2::timestamptz is null or updated_at < $2::timestamptz)
         and ($4::int is null or updated_at > now() - make_interval(days => $4::int))
+        and not exists (
+          select 1 from unnest($5::text[]) as t(pattern)
+           where not (concat_ws(' ', c.visitor_name, c.visitor_email, c.visitor_phone, c.context ->> 'page', c.context ->> 'pageTitle') ilike t.pattern
+                      or exists (select 1 from app.messages m where m.conversation_id = c.id and m.bot_id = c.bot_id and m.content ilike t.pattern)))
       order by updated_at desc
       limit $3`,
-    [bot.id, options.before ?? null, limit + 1, options.days ?? null],
+    [bot.id, options.before ?? null, limit + 1, options.days ?? null, terms],
   )
   return {
     hasMore: rows.length > limit,
@@ -230,6 +276,7 @@ export async function listConversations(
       id: r.id,
       preview: r.preview,
       origin: r.origin,
+      context: toContext(r.context),
       messageCount: r.message_count,
       unansweredCount: r.unanswered_count,
       negativeCount: r.negative_count,
@@ -240,6 +287,13 @@ export async function listConversations(
       updatedAt: r.updated_at,
     })),
   }
+}
+
+/** ILIKE patterns for each word of a search (at most 5), with % and _ taken literally. */
+export function searchTerms(raw: string | null | undefined): string[] {
+  if (!raw) return []
+  const words = raw.trim().slice(0, 200).split(/\s+/).filter(Boolean).slice(0, 5)
+  return [...new Set(words)].map((w) => `%${w.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`)
 }
 
 export async function getConversationForUser(db: Db, who: BotScope, id: string): Promise<StoredConversation | null> {

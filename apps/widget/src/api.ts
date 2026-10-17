@@ -45,6 +45,21 @@ export type ChatEvent =
   | { type: "done"; messageId: string; sources: Source[]; handoff: boolean }
   | { type: "error"; code: string };
 
+/**
+ * Where the visitor is, for the dashboard inbox: the page path (never its query string or
+ * fragment), its title, the browser language and time zone. The API keeps it only when a
+ * request starts a conversation.
+ */
+function visitorContext() {
+  let timeZone = "";
+  try {
+    timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone ?? "";
+  } catch {
+    // very old browsers
+  }
+  return { page: location.pathname, title: document.title.slice(0, 200), locale: navigator.language, timeZone };
+}
+
 export class ApiError extends Error {
   constructor(
     readonly code: string,
@@ -72,7 +87,7 @@ export class ApiClient {
       res = await fetch(get ? this.url(path) : this.base + path, {
         ...init,
         credentials: "omit",
-        // never sent to the host page's server, and nothing about the visitor's page leaks to ours
+        // never sent to the host page's server; the Referer carries only the origin (the path goes in `context`, without its query)
         referrerPolicy: "strict-origin",
         headers: get ? undefined : { ...(init.body ? { "content-type": "application/json" } : {}), "x-apex-site-key": this.siteKey },
       });
@@ -99,7 +114,7 @@ export class ApiClient {
   async chat(message: string, conversationId: string | null, onEvent: (e: ChatEvent) => void, signal: AbortSignal, attachments: Attachment[] = []): Promise<void> {
     const res = await this.request("/v1/chat", {
       method: "POST",
-      body: JSON.stringify({ message, conversationId, ...(attachments.length ? { attachments } : {}) }),
+      body: JSON.stringify({ message, conversationId, ...(conversationId ? {} : { context: visitorContext() }), ...(attachments.length ? { attachments } : {}) }),
       signal,
     });
     const parse = createSSEParser((event, data) => onEvent({ type: event, ...JSON.parse(data) } as ChatEvent));
@@ -128,6 +143,7 @@ export class ApiClient {
   }
 
   async lead(body: { conversationId: string | null; email: string; name: string; phone: string }): Promise<string> {
-    return (await (await this.request("/v1/lead", { method: "POST", body: JSON.stringify(body) })).json()).conversationId;
+    const context = body.conversationId ? {} : { context: visitorContext() };
+    return (await (await this.request("/v1/lead", { method: "POST", body: JSON.stringify({ ...body, ...context }) })).json()).conversationId;
   }
 }
