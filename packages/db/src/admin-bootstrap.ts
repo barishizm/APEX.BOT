@@ -1,12 +1,13 @@
 import { createDbFromEnv } from "./db.ts"
 import { AdminError, bootstrapSuperadmin } from "./admin.ts"
 
-// One-time: makes the account in ADMIN_BOOTSTRAP_EMAIL the first superadmin.
+// One-time: makes an existing account the first superadmin.
+//   npm run admin:bootstrap -- you@example.com
 //   ADMIN_BOOTSTRAP_EMAIL=you@example.com npm run admin:bootstrap
 // Running it again is harmless; once a superadmin exists no other account can be made one here.
-const email = process.env.ADMIN_BOOTSTRAP_EMAIL
+const email = process.argv[2] || process.env.ADMIN_BOOTSTRAP_EMAIL
 if (!email) {
-  console.error("ADMIN_BOOTSTRAP_EMAIL is not set")
+  console.error("Give the account's email: npm run admin:bootstrap -- you@example.com (or set ADMIN_BOOTSTRAP_EMAIL)")
   process.exitCode = 1
 } else {
   const db = createDbFromEnv()
