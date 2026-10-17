@@ -5,6 +5,7 @@ import { requireApiUser } from "@/lib/bot"
 import { db } from "@/lib/db"
 import { requestLocale } from "@/lib/i18n/server"
 import { knowledgeErrorResponse, sourceJson } from "@/lib/knowledge"
+import { siteScope } from "@/lib/current-site"
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -12,7 +13,7 @@ type Params = { params: Promise<{ id: string }> }
 export async function GET(_request: Request, { params }: Params) {
   try {
     const user = await requireApiUser()
-    const [detail, locale] = await Promise.all([getSourceDetail(db(), user.id, (await params).id), requestLocale()])
+    const [detail, locale] = await Promise.all([getSourceDetail(db(), await siteScope(user.id), (await params).id), requestLocale()])
     return Response.json({ ...detail, source: sourceJson(detail.source, locale) })
   } catch (err) {
     return knowledgeErrorResponse(err)
@@ -24,7 +25,7 @@ export async function PATCH(request: Request, { params }: Params) {
   try {
     const user = await requireApiUser()
     const body = await readJson(request)
-    const source = await updateSource(db(), user.id, (await params).id, { title: body.title, content: body.content }, (title, content) => chunkText(title, content))
+    const source = await updateSource(db(), await siteScope(user.id), (await params).id, { title: body.title, content: body.content }, (title, content) => chunkText(title, content))
     return Response.json({ source: sourceJson(source, await requestLocale()) })
   } catch (err) {
     return knowledgeErrorResponse(err)
@@ -34,7 +35,7 @@ export async function PATCH(request: Request, { params }: Params) {
 export async function DELETE(_request: Request, { params }: Params) {
   try {
     const user = await requireApiUser()
-    await deleteSource(db(), user.id, (await params).id)
+    await deleteSource(db(), await siteScope(user.id), (await params).id)
     return new Response(null, { status: 204 })
   } catch (err) {
     return knowledgeErrorResponse(err)

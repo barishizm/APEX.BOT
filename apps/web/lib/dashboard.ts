@@ -1,10 +1,16 @@
 import { cache } from "react"
-import { DEFAULT_SETTINGS, getBotForUser, listSources, type Bot } from "@apex/db"
+import { DEFAULT_SETTINGS, getBotForUser, listBotsForUser, listSources, type Bot } from "@apex/db"
+import { siteScope } from "@/lib/current-site"
 import { db } from "@/lib/db"
 
 // One lookup per request, shared by the shell and the page
-export const currentBot = cache((userId: string) => getBotForUser(db(), userId))
-export const currentSources = cache((userId: string) => listSources(db(), userId))
+export const currentScope = cache((userId: string) => siteScope(userId))
+export const currentBot = cache(async (userId: string) => getBotForUser(db(), await currentScope(userId)))
+// by the resolved bot, so a stale cookie doesn't show one site's sources next to another's settings
+export const currentSources = cache(async (userId: string) => listSources(db(), { userId, botId: (await currentBot(userId)).id }))
+export const currentSites = cache((userId: string) => listBotsForUser(db(), userId))
+/** Scope of the website the page shows, for the other per-site queries. */
+export const shownSite = async (userId: string) => ({ userId, botId: (await currentBot(userId)).id })
 
 export type SetupStepId = "account" | "knowledge" | "widget" | "install" | "test"
 export type SetupState = Record<SetupStepId, boolean>

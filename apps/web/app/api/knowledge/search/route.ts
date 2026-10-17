@@ -4,6 +4,7 @@ import { errorJson, readJson } from "@/lib/auth"
 import { requireApiUser } from "@/lib/bot"
 import { db } from "@/lib/db"
 import { knowledgeErrorResponse, minRetrievalScore, previewSemantic } from "@/lib/knowledge"
+import { siteScope } from "@/lib/current-site"
 
 const round = (x: number | null, places: number) => (x === null ? null : Math.round(x * 10 ** places) / 10 ** places)
 
@@ -15,7 +16,7 @@ export async function POST(request: Request) {
     const { query } = await readJson(request)
     const text = typeof query === "string" ? query.trim().slice(0, 500) : ""
     if (!text) return errorJson("invalid_input", "Type a question", { status: 400 })
-    const bot = await getBotForUser(db(), user.id)
+    const bot = await getBotForUser(db(), await siteScope(user.id))
     const chunks = await listKnowledgeChunks(db(), bot.id)
     const index = new KnowledgeBase()
     const generation = index.load(bot.id, chunks)

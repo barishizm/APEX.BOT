@@ -5,7 +5,7 @@ import { AnalyticsDashboard } from "@/components/analytics/dashboard"
 import { DashboardFrame } from "@/components/dashboard/frame"
 import { requireVerifiedUser } from "@/lib/auth"
 import { analyticsJson } from "@/lib/analytics"
-import { currentBot } from "@/lib/dashboard"
+import { currentBot, shownSite } from "@/lib/dashboard"
 import { db } from "@/lib/db"
 import { getAppDictionary } from "@/lib/i18n/app"
 import { requestLocale } from "@/lib/i18n/server"
@@ -20,7 +20,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
   const [{ days }, jar] = await Promise.all([searchParams, cookies()])
   // the zone the browser reported last time; the page corrects it on the client if it changed
   const timeZone = jar.get(TZ_COOKIE)?.value
-  const [bot, data] = await Promise.all([currentBot(user.id), analyticsData(db(), user.id, { days, timeZone: timeZone && decodeURIComponent(timeZone) })])
+  const [bot, data] = await Promise.all([currentBot(user.id), analyticsData(db(), await shownSite(user.id), { days, timeZone: timeZone && decodeURIComponent(timeZone) })])
   return (
     <DashboardFrame active="Analytics">
       <AnalyticsDashboard initial={analyticsJson(data)} canEdit={canEditBot(bot.role)} limits={ANSWER_LIMITS} />
