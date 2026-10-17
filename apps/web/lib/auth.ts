@@ -52,11 +52,6 @@ export function safeNext(raw: unknown): string | null {
   return typeof raw === "string" && INVITE_PATH.test(raw) ? raw : null
 }
 
-/** The invitation token in a `next` path, if it is one. */
-export function inviteTokenFrom(next: unknown): string | null {
-  return typeof next === "string" ? (INVITE_PATH.exec(next)?.[1] ?? null) : null
-}
-
 export async function sessionToken() {
   return (await cookies()).get(SESSION_COOKIE)?.value
 }

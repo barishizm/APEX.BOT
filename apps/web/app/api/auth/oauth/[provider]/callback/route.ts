@@ -1,10 +1,9 @@
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import { timingSafeEqual } from "node:crypto"
-import { AuthError, invitationAllowsSignup, oauthLogin } from "@apex/db"
+import { AuthError, oauthLogin } from "@apex/db"
 import { db } from "@/lib/db"
-import { inviteTokenFrom, requestMeta, safeNext, setChallengeCookie, setSessionCookie } from "@/lib/auth"
-import { SIGNUPS_OPEN } from "@/lib/signups"
+import { requestMeta, safeNext, setChallengeCookie, setSessionCookie } from "@/lib/auth"
 import { OAUTH_COOKIE, credentials, fetchProfile, isProvider, siteOrigin } from "@/lib/oauth"
 
 const to = (path: string) => NextResponse.redirect(`${siteOrigin()}${path}`)
@@ -35,13 +34,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ prov
   try {
     const profile = await fetchProfile(provider, code, flow.verifier, creds)
     const next = safeNext(flow.next)
-    // while sign-ups are closed, an invitation to this address still lets it sign up
-    const allowSignup = SIGNUPS_OPEN || (await invitationAllowsSignup(db(), inviteTokenFrom(next), profile.email))
     const result = await oauthLogin(
       db(),
       { ...profile, accountType: flow.type === "business" ? "business" : "personal" },
       await requestMeta(),
-      { allowSignup },
     )
     if (result.challenge) {
       await setChallengeCookie(result.challenge)
@@ -50,7 +46,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ prov
     await setSessionCookie(result.session)
     return to(next ?? (result.isNew ? "/onboarding" : "/dashboard?welcome=1"))
   } catch (err) {
-    if (err instanceof AuthError && err.code === "signups_closed") return fail("oauth_signups_closed")
     if (err instanceof AuthError && err.code === "invalid_input") return fail("oauth_email_unverified")
     console.error("[oauth]", provider, err instanceof Error ? err.message : err)
     return fail("oauth_failed")

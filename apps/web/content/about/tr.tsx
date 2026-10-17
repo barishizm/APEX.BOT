@@ -12,8 +12,8 @@ function Body() {
         bunu açıkça söyler.
       </p>
       <p>
-        Apex şu anda kapalı beta aşamasında. Beta süresince tüm özellikler ücretsiz; yeni kayıtlar{" "}
-        <a href="/tr/signup">bekleme listesi</a> üzerinden dalgalar halinde açılıyor.
+        Apex şu anda beta aşamasında. Beta süresince tüm özellikler ücretsiz ve herkes{" "}
+        <a href="/tr/signup">kayıt olabilir</a>.
       </p>
 
       <h2 id="why">Neden geliştirdik?</h2>

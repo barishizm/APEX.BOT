@@ -12,8 +12,8 @@ function Body() {
         atbilde, un pasaka, ja kaut ko nezina.
       </p>
       <p>
-        Pašlaik notiek slēgtā beta testēšana. Kamēr tā ilgst, visas funkcijas ir bez maksas, un jauna reģistrācija tiek
-        atvērta pakāpeniski, izmantojot <a href="/lv/signup">gaidīšanas sarakstu</a>.
+        Pašlaik notiek beta testēšana. Kamēr tā ilgst, visas funkcijas ir bez maksas, un ikviens var{" "}
+        <a href="/lv/signup">reģistrēties</a>.
       </p>
 
       <h2 id="why">Kāpēc mēs to izveidojām</h2>

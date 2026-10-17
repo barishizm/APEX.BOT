@@ -84,7 +84,7 @@ function Body() {
           išsiųsime, todėl niekas negali nukreipti sistemos į svetimo žmogaus pašto dėžutę.
         </li>
         <li>
-          <strong>Robotų patikra.</strong> Registraciją, prisijungimą, slaptažodžio atkūrimą ir laukiančiųjų sąrašą saugo
+          <strong>Robotų patikra.</strong> Registraciją, prisijungimą ir slaptažodžio atkūrimą saugo
           Cloudflare Turnstile. Jei patikros atlikti nepavyksta, užklausa atmetama, o ne leidžiama.
         </li>
       </ul>

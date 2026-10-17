@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { CopySnippet } from "@/components/copy-snippet";
-import { ClosingActions, ClosingLede } from "@/components/landing/closing-actions";
+import { ClosingActions } from "@/components/landing/closing-actions";
 import { WidgetShowcase } from "@/components/landing/widget-showcase";
 import { localizePath, type Locale } from "@/lib/i18n";
 import { getDictionary } from "@/lib/i18n/server";
@@ -150,7 +150,7 @@ export function LandingSections({ locale }: { locale: Locale }) {
       <section className="closing" aria-labelledby="closing-title">
         <Image src="/marketing/closing.jpg" alt="" fill sizes="(max-width: 1200px) 100vw, 1200px" className="closing__bg" />
         <h2 id="closing-title">{t.closing.title}</h2>
-        <ClosingLede />
+        <p className="lede">{t.closing.lede}</p>
         <div className="actions">
           <ClosingActions />
           <a href={localizePath("/docs", locale)} className="btn btn--ghost">

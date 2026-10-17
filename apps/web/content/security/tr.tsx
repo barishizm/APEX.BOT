@@ -83,7 +83,7 @@ function Body() {
           böylece kimse sistemi başka birinin gelen kutusuna yöneltemez.
         </li>
         <li>
-          <strong>Bot kontrolleri.</strong> Kayıt, giriş, şifre sıfırlama ve bekleme listesi Cloudflare Turnstile ile korunur.
+          <strong>Bot kontrolleri.</strong> Kayıt, giriş ve şifre sıfırlama Cloudflare Turnstile ile korunur.
           Kontrol tamamlanamazsa istek izin verilmek yerine reddedilir.
         </li>
       </ul>
