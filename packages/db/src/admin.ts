@@ -79,6 +79,26 @@ export async function writeAudit(q: Queryable, entry: AuditEntry): Promise<strin
 }
 
 /**
+ * The checks and the change behind setPlatformRole, without the audit entry, for callers that
+ * write their own (withAdminAction). Run it in a transaction. Nothing changes when the role is the same.
+ */
+export async function changePlatformRole(
+  tx: Queryable,
+  actorId: string,
+  userId: string,
+  role: AssignablePlatformRole | null,
+): Promise<{ before: PlatformRole | null; after: PlatformRole | null }> {
+  if (role !== null && role !== "support") throw new AdminError("forbidden", "That role can't be assigned here")
+  if (!(await isPlatformAdmin(tx, actorId, "superadmin"))) throw new AdminError("forbidden", "Only a superadmin can change staff roles")
+  const { rows } = await tx.query<{ platform_role: string | null }>("select platform_role from app.users where id = $1 for update", [userId])
+  if (!rows.length) throw new AdminError("not_found", "User not found")
+  const before = toRole(rows[0]!.platform_role)
+  if (before === "superadmin") throw new AdminError("forbidden", "A superadmin's role can't be changed here")
+  if (before !== role) await tx.query("update app.users set platform_role = $1 where id = $2", [role, userId])
+  return { before, after: role }
+}
+
+/**
  * Gives or takes away a support role, from the admin UI. Only a superadmin may do it, and it can
  * neither grant superadmin nor change a superadmin: that role is set once, by bootstrapSuperadmin.
  */
@@ -149,6 +169,7 @@ export interface AdminUserRow {
   email: string
   username: string
   display_name: string | null
+  account_type: "personal" | "business"
   platform_role: PlatformRole | null
   email_verified: boolean
   two_factor: boolean
@@ -160,7 +181,7 @@ export interface AdminUserRow {
 
 /** Every account on the platform, for /admin/users. */
 export const ADMIN_USERS_LIST = {
-  select: `u.id, u.email, u.username, u.display_name, u.platform_role,
+  select: `u.id, u.email, u.username, u.display_name, u.account_type, u.platform_role,
     u.email_verified_at is not null as email_verified, u.totp_enabled_at is not null as two_factor,
     (select count(*)::int from app.organization_members m where m.user_id = u.id) as workspaces,
     u.suspended_at, u.last_login_at, u.created_at`,
@@ -176,7 +197,23 @@ export const ADMIN_USERS_LIST = {
   filters: {
     role: { staff: "u.platform_role is not null", superadmin: "u.platform_role = 'superadmin'", support: "u.platform_role = 'support'", none: "u.platform_role is null" },
     status: { active: "u.suspended_at is null and u.email_verified_at is not null", unverified: "u.email_verified_at is null", suspended: "u.suspended_at is not null" },
+    verified: { yes: "u.email_verified_at is not null", no: "u.email_verified_at is null" },
+    suspended: { yes: "u.suspended_at is not null", no: "u.suspended_at is null" },
     twoFactor: { on: "u.totp_enabled_at is not null", off: "u.totp_enabled_at is null" },
+    // "none": signs in with a password only
+    provider: {
+      google: "exists (select 1 from app.oauth_accounts o where o.user_id = u.id and o.provider = 'google')",
+      github: "exists (select 1 from app.oauth_accounts o where o.user_id = u.id and o.provider = 'github')",
+      none: "not exists (select 1 from app.oauth_accounts o where o.user_id = u.id)",
+    },
+    accountType: { personal: "u.account_type = 'personal'", business: "u.account_type = 'business'" },
+    created: {
+      "7d": "u.created_at >= now() - interval '7 days'",
+      "30d": "u.created_at >= now() - interval '30 days'",
+      "90d": "u.created_at >= now() - interval '90 days'",
+      "365d": "u.created_at >= now() - interval '365 days'",
+      older: "u.created_at < now() - interval '365 days'",
+    },
   },
 } satisfies ListSpec
 
