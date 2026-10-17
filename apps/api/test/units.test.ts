@@ -198,22 +198,22 @@ describe("ReplyMarkerFilter", () => {
 
   it("strips the no-answer marker wherever the stream splits it", () => {
     everySplit(`Bilmiyorum. ${NO_ANSWER}`, (r, at) => {
-      assert.equal(r.out, "Bilmiyorum. ", at);
+      assert.equal(r.out, "Bilmiyorum.", at);
       assert.equal(r.noAnswer, true);
       assert.deepEqual(r.used, []);
     });
   });
 
   it("strips the used marker wherever the stream splits it and records the documents", () => {
-    everySplit("Kargo 3 gün sürer. [[used: 2, 1]]", (r, at) => {
-      assert.equal(r.out, "Kargo 3 gün sürer. ", at);
+    everySplit("Kargo 3 gün sürer.\n\n[[used: 2, 1]]", (r, at) => {
+      assert.equal(r.out, "Kargo 3 gün sürer.", at);
       assert.deepEqual(r.used, [2, 1], at);
       assert.equal(r.noAnswer, false);
     });
   });
 
   it("accepts spacing variants and ignores repeats", () => {
-    assert.deepEqual(run(["A [[used:3]] B [[used: 3 ,4 ]]"]), { out: "A  B ", noAnswer: false, used: [3, 4] });
+    assert.deepEqual(run(["A [[used:3]] B [[used: 3 ,4 ]]"]), { out: "A B", noAnswer: false, used: [3, 4] });
   });
 
   it("passes look-alike text through untouched", () => {
@@ -225,11 +225,12 @@ describe("ReplyMarkerFilter", () => {
 
   it("only holds back what could still become a marker", () => {
     const filter = new ReplyMarkerFilter();
-    assert.equal(filter.push("Kargo 3 gün ["), "Kargo 3 gün ");
-    assert.equal(filter.push("x"), "[x");
-    assert.equal(filter.push(" [[us"), " ");
+    assert.equal(filter.push("Kargo 3 gün ["), "Kargo 3 gün");
+    assert.equal(filter.push("x"), " [x");
+    assert.equal(filter.push(" [[us"), "");
     assert.equal(filter.push("ed: 1"), "");
-    assert.equal(filter.push("]] tamam"), " tamam");
+    assert.equal(filter.push("]] tamam "), " tamam");
+    assert.equal(filter.flush(), "");
     assert.deepEqual(filter.used, [1]);
   });
 });
