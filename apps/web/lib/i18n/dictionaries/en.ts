@@ -119,6 +119,7 @@ export const en = {
       oauth_denied: "Sign-in was cancelled. Try again or use your email",
       oauth_email_unverified: "Your provider has no verified email for this account. Verify it there and try again",
       oauth_failed: "Couldn't sign you in with that provider. Try again or use your email",
+      account_suspended: "This account is suspended. Contact support",
       generic: "Something went wrong. Try again",
       network: "Couldn't reach the server. Check your connection and try again",
     },

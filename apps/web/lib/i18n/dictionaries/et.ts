@@ -119,6 +119,7 @@ export const et: Dictionary = {
       oauth_denied: "Sisselogimine katkestati. Proovige uuesti või kasutage e-posti aadressi",
       oauth_email_unverified: "Teie teenusepakkujal pole selle konto jaoks kinnitatud e-posti aadressi. Kinnitage see seal ja proovige uuesti",
       oauth_failed: "Selle teenusepakkujaga sisselogimine ebaõnnestus. Proovige uuesti või kasutage e-posti aadressi",
+      account_suspended: "See konto on peatatud. Võtke ühendust toega",
       generic: "Midagi läks valesti. Proovige uuesti",
       network: "Serveriga ei saadud ühendust. Kontrollige internetiühendust ja proovige uuesti",
     },

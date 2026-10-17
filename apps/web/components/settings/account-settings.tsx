@@ -392,7 +392,8 @@ function TwoFactorSection({
   )
 }
 
-export function AccountSettings({ initial }: { initial: Account }) {
+/** `adminTwoFactor`: a staff member was sent here from /admin to turn on two-step sign-in. */
+export function AccountSettings({ initial, adminTwoFactor = false }: { initial: Account; adminTwoFactor?: boolean }) {
   const { t: app, locale } = useAppI18n()
   const t = app.settings
   const setLocale = useSetLocale()
@@ -484,6 +485,12 @@ export function AccountSettings({ initial }: { initial: Account }) {
       </header>
 
       <div className="flex w-full max-w-2xl flex-col gap-6 p-4 sm:p-6">
+        {adminTwoFactor && !account.twoFactor && (
+          <p role="alert" className="flex items-start gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm">
+            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden />
+            {t.adminTwoFactor}
+          </p>
+        )}
         <Group title={t.profile}>
           <form onSubmit={saveProfile} className="flex flex-col gap-4">
             <TextInput label={t.displayName} value={displayName} onChange={setDisplayName} hint={t.displayNameHint} />

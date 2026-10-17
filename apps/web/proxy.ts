@@ -8,7 +8,7 @@ const SIGNED_IN_COOKIE = "apex_signed_in"
 // The app pages are for logged-in users only; everyone else lands on the login modal.
 // This only checks the cookie exists, as a cheap early redirect. It is NOT an authorization
 // layer: any value passes, so every page and API route must validate the session itself.
-const PROTECTED_PATHS = ["/dashboard", "/onboarding", "/verify-email"]
+const PROTECTED_PATHS = ["/dashboard", "/onboarding", "/verify-email", "/admin"]
 
 const under = (pathname: string, roots: string[]) => roots.some((root) => pathname === root || pathname.startsWith(`${root}/`))
 

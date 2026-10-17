@@ -47,6 +47,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ prov
     return to(next ?? (result.isNew ? "/onboarding" : "/dashboard?welcome=1"))
   } catch (err) {
     if (err instanceof AuthError && err.code === "invalid_input") return fail("oauth_email_unverified")
+    if (err instanceof AuthError && err.code === "account_suspended") return fail("account_suspended")
     console.error("[oauth]", provider, err instanceof Error ? err.message : err)
     return fail("oauth_failed")
   }

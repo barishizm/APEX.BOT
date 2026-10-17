@@ -187,6 +187,7 @@ export default function Hero({
       oauth_denied: t.auth.errors.oauth_denied,
       oauth_email_unverified: t.auth.errors.oauth_email_unverified,
       oauth_failed: t.auth.errors.oauth_failed,
+      account_suspended: t.auth.errors.account_suspended,
     }
     const query = new URLSearchParams(window.location.search)
     const error = query.get("error")

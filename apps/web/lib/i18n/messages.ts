@@ -11,6 +11,13 @@ type Rule = readonly [match: string | RegExp, replacement: string]
 const RULES: Record<Locale, Rule[]> = {
   en: [],
   tr: [
+    // platform admin
+    ["This account is suspended. Contact support", "Bu hesap askıya alındı. Destek ekibiyle iletişime geçin"],
+    ["You don't have access to this", "Buna erişiminiz yok"],
+    ["Turn on two-step sign-in to use the admin area", "Yönetim alanını kullanmak için iki adımlı girişi açın"],
+    ["Confirm this action with a code from your authenticator app", "Bu işlemi doğrulama uygulamanızdaki bir kodla onaylayın"],
+    ["Give a reason for this action", "Bu işlem için bir gerekçe yazın"],
+    ["The reason can be at most 1000 characters", "Gerekçe en fazla 1000 karakter olabilir"],
     // two-step sign-in, email change and team
     ["This is already your email address", "Bu zaten e-posta adresiniz"],
     ["Your sign-in timed out. Log in again", "Giriş işleminizin süresi doldu. Tekrar giriş yapın"],
@@ -185,6 +192,13 @@ const RULES: Record<Locale, Rule[]> = {
     ["This image is too detailed. Try a simpler one", "Bu görsel çok ayrıntılı. Daha sade bir görsel deneyin"],
   ],
   lt: [
+    // platform admin
+    ["This account is suspended. Contact support", "Ši paskyra sustabdyta. Susisiekite su pagalbos tarnyba"],
+    ["You don't have access to this", "Neturite prieigos prie to"],
+    ["Turn on two-step sign-in to use the admin area", "Norėdami naudotis administravimo sritimi, įjunkite dviejų žingsnių prisijungimą"],
+    ["Confirm this action with a code from your authenticator app", "Patvirtinkite šį veiksmą kodu iš autentifikavimo programėlės"],
+    ["Give a reason for this action", "Nurodykite šio veiksmo priežastį"],
+    ["The reason can be at most 1000 characters", "Priežastis gali būti ne ilgesnė nei 1000 simbolių"],
     // two-step sign-in, email change and team
     ["This is already your email address", "Tai jau yra jūsų el. pašto adresas"],
     ["Your sign-in timed out. Log in again", "Prisijungimo laikas baigėsi. Prisijunkite iš naujo"],
@@ -359,6 +373,13 @@ const RULES: Record<Locale, Rule[]> = {
     ["This image is too detailed. Try a simpler one", "Šis paveikslėlis per detalus. Pabandykite paprastesnį"],
   ],
   lv: [
+    // platform admin
+    ["This account is suspended. Contact support", "Šis konts ir apturēts. Sazinieties ar atbalsta dienestu"],
+    ["You don't have access to this", "Jums nav piekļuves tam"],
+    ["Turn on two-step sign-in to use the admin area", "Lai izmantotu administrēšanas sadaļu, ieslēdziet divpakāpju pieteikšanos"],
+    ["Confirm this action with a code from your authenticator app", "Apstipriniet šo darbību ar kodu no autentifikācijas lietotnes"],
+    ["Give a reason for this action", "Norādiet šīs darbības iemeslu"],
+    ["The reason can be at most 1000 characters", "Iemesls var būt ne garāks par 1000 rakstzīmēm"],
     // two-step sign-in, email change and team
     ["This is already your email address", "Šī jau ir jūsu e-pasta adrese"],
     ["Your sign-in timed out. Log in again", "Pieteikšanās laiks beidzās. Piesakieties vēlreiz"],
@@ -533,6 +554,13 @@ const RULES: Record<Locale, Rule[]> = {
     ["This image is too detailed. Try a simpler one", "Šis attēls ir pārāk detalizēts. Izmēģiniet vienkāršāku"],
   ],
   et: [
+    // platform admin
+    ["This account is suspended. Contact support", "See konto on peatatud. Võtke ühendust toega"],
+    ["You don't have access to this", "Teil pole sellele juurdepääsu"],
+    ["Turn on two-step sign-in to use the admin area", "Halduspiirkonna kasutamiseks lülitage sisse kaheastmeline sisselogimine"],
+    ["Confirm this action with a code from your authenticator app", "Kinnitage see toiming autentimisrakenduse koodiga"],
+    ["Give a reason for this action", "Märkige selle toimingu põhjus"],
+    ["The reason can be at most 1000 characters", "Põhjus võib olla kuni 1000 tähemärki"],
     // two-step sign-in, email change and team
     ["This is already your email address", "See on juba teie e-posti aadress"],
     ["Your sign-in timed out. Log in again", "Sisselogimise aeg sai otsa. Logige uuesti sisse"],

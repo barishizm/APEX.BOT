@@ -119,6 +119,7 @@ export const lt: Dictionary = {
       oauth_denied: "Prisijungimas atšauktas. Bandykite dar kartą arba naudokite el. pašto adresą",
       oauth_email_unverified: "Jūsų paslaugų teikėjas neturi patvirtinto šios paskyros el. pašto adreso. Patvirtinkite jį ten ir bandykite dar kartą",
       oauth_failed: "Nepavyko prisijungti per šį paslaugų teikėją. Bandykite dar kartą arba naudokite el. pašto adresą",
+      account_suspended: "Ši paskyra sustabdyta. Susisiekite su pagalbos tarnyba",
       generic: "Kažkas nepavyko. Bandykite dar kartą",
       network: "Nepavyko pasiekti serverio. Patikrinkite interneto ryšį ir bandykite dar kartą",
     },
