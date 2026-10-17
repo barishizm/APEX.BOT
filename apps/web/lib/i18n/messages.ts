@@ -136,6 +136,7 @@ const RULES: Record<Locale, Rule[]> = {
     ["Pick a fallback model from the list", "Listeden bir yedek model seçin"],
     ["Pick a different model than the primary one", "Ana modelden farklı bir model seçin"],
     ["Add the address that receives hand-offs, or turn hand-off off", "Devir taleplerini alacak adresi ekleyin ya da insana devri kapatın"],
+    ["Enter an email address or a full URL starting with https://", "Bir e-posta adresi ya da https:// ile başlayan tam bir adres girin"],
 
     // launcher image upload (widget studio, in the browser)
     ["Use a PNG, JPEG, WebP or GIF image", "PNG, JPEG, WebP veya GIF görseli kullanın"],
@@ -270,6 +271,7 @@ const RULES: Record<Locale, Rule[]> = {
     ["Pick a fallback model from the list", "Pasirinkite atsarginį modelį iš sąrašo"],
     ["Pick a different model than the primary one", "Pasirinkite kitą modelį nei pagrindinis"],
     ["Add the address that receives hand-offs, or turn hand-off off", "Pridėkite adresą, į kurį bus siunčiami perdavimai, arba išjunkite perdavimą žmogui"],
+    ["Enter an email address or a full URL starting with https://", "Įveskite el. pašto adresą arba visą adresą, prasidedantį https://"],
 
     // launcher image upload (widget studio, in the browser)
     ["Use a PNG, JPEG, WebP or GIF image", "Naudokite PNG, JPEG, WebP arba GIF paveikslėlį"],
@@ -404,6 +406,7 @@ const RULES: Record<Locale, Rule[]> = {
     ["Pick a fallback model from the list", "Izvēlieties rezerves modeli no saraksta"],
     ["Pick a different model than the primary one", "Izvēlieties modeli, kas atšķiras no galvenā"],
     ["Add the address that receives hand-offs, or turn hand-off off", "Pievienojiet adresi, uz kuru sūtīt nodošanas pieprasījumus, vai izslēdziet nodošanu cilvēkam"],
+    ["Enter an email address or a full URL starting with https://", "Ievadiet e-pasta adresi vai pilnu adresi, kas sākas ar https://"],
 
     // launcher image upload (widget studio, in the browser)
     ["Use a PNG, JPEG, WebP or GIF image", "Izmantojiet PNG, JPEG, WebP vai GIF attēlu"],
@@ -538,6 +541,7 @@ const RULES: Record<Locale, Rule[]> = {
     ["Pick a fallback model from the list", "Valige loendist varumudel"],
     ["Pick a different model than the primary one", "Valige põhimudelist erinev mudel"],
     ["Add the address that receives hand-offs, or turn hand-off off", "Lisage aadress, kuhu üleandmised saadetakse, või lülitage inimesele üleandmine välja"],
+    ["Enter an email address or a full URL starting with https://", "Sisestage e-posti aadress või täielik aadress, mis algab https://"],
 
     // launcher image upload (widget studio, in the browser)
     ["Use a PNG, JPEG, WebP or GIF image", "Kasutage PNG-, JPEG-, WebP- või GIF-pilti"],

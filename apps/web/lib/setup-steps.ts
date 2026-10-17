@@ -25,6 +25,8 @@ export function buildStages(
     testSite: string | null
     hasText: boolean
     handoffOn: boolean
+    /** A contact email or link the assistant can point to while hand-off is off. */
+    contactSet: boolean
     leadOn: boolean
     hasConversations: boolean
   },
@@ -42,7 +44,15 @@ export function buildStages(
       label: t.stages.improve,
       steps: [
         { key: "text", ...t.steps.text, href: "/dashboard/knowledge", done: input.hasText },
-        { key: "handoff", ...t.steps.handoff, href: "/dashboard/widget?section=handoff", done: input.handoffOn },
+        {
+          key: "handoff",
+          title: t.steps.handoff.title,
+          // with no hand-off and no contact, "I don't know" replies are a dead end; say so
+          description: input.handoffOn || input.contactSet ? t.steps.handoff.description : t.steps.handoff.missing,
+          cta: t.steps.handoff.cta,
+          href: "/dashboard/widget?section=handoff",
+          done: input.handoffOn,
+        },
         { key: "leads", ...t.steps.leads, href: "/dashboard/widget?section=handoff", done: input.leadOn },
         { key: "conversations", ...t.steps.conversations, href: "/dashboard/conversations", done: input.hasConversations },
       ],

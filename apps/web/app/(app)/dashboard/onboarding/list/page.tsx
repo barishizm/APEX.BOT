@@ -26,7 +26,9 @@ export default async function OnboardingListPage() {
     setup,
     testSite: bot.settings.security.allowedOrigins[0] ?? null,
     hasText: sources.some((s) => s.kind === "text"),
-    handoffOn: h.enabled && !!h.email,
+    // an unconfirmed address is never mailed, so it doesn't count
+    handoffOn: h.enabled && !!h.email && bot.handoffVerified,
+    contactSet: !!h.contact,
     leadOn: h.leadCapture !== "off",
     hasConversations: conversations.conversations.length > 0,
   });

@@ -169,6 +169,8 @@ export interface BotSettings {
     email: string
     /** Offer "Talk to a human" when the assistant can't answer. */
     offerWhenUnsure: boolean
+    /** Where visitors can reach the team (an email or a link) while hand-off is off. */
+    contact: string
     /** "before-chat": ask for contact details before the first message. */
     leadCapture: "off" | "before-chat"
     leadFields: { name: boolean; phone: boolean }
@@ -301,6 +303,7 @@ export const DEFAULT_SETTINGS: BotSettings = {
     enabled: true,
     email: "",
     offerWhenUnsure: true,
+    contact: "",
     leadCapture: "off",
     leadFields: { name: true, phone: false },
     leadRequired: false,
@@ -550,6 +553,7 @@ export function parseSettings(raw: unknown): BotSettings {
     enabled: r.bool(h, "handoff", "enabled", D.handoff.enabled),
     email: r.str(h, "handoff", "email", D.handoff.email, 254).toLowerCase(),
     offerWhenUnsure: r.bool(h, "handoff", "offerWhenUnsure", D.handoff.offerWhenUnsure),
+    contact: r.str(h, "handoff", "contact", D.handoff.contact, LIMITS.url),
     leadCapture: r.oneOf(h, "handoff", "leadCapture", D.handoff.leadCapture, ["off", "before-chat"] as const),
     leadFields: {
       name: r.bool(lf, "handoff.leadFields", "name", D.handoff.leadFields.name),
@@ -561,6 +565,9 @@ export function parseSettings(raw: unknown): BotSettings {
     issues.push({ path: "handoff.email", message: "Enter a valid email address" })
   } else if (handoff.enabled && !handoff.email) {
     issues.push({ path: "handoff.email", message: "Add the address that receives hand-offs, or turn hand-off off" })
+  }
+  if (handoff.contact && !EMAIL.test(handoff.contact) && !isHttpUrl(handoff.contact)) {
+    issues.push({ path: "handoff.contact", message: "Enter an email address or a full URL starting with https://" })
   }
 
   const s = section("security")

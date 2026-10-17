@@ -861,6 +861,17 @@ export function HandoffSection({ s, set, err, verification }: SectionProps & { v
             />
           </>
         )}
+        {/* Without a working hand-off, "I don't know" replies point here instead */}
+        {(!h.enabled || !verification.savedVerified) && (
+          <TextInput
+            label={t.contact}
+            value={h.contact}
+            onChange={(contact) => set("handoff", { contact })}
+            error={err("handoff.contact")}
+            placeholder="hello@example.com"
+            hint={t.contactHint}
+          />
+        )}
       </Group>
       <Group title={t.leads} description={t.leadsHint}>
         <ChoiceCards

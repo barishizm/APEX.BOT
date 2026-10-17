@@ -1,7 +1,7 @@
 import type { PluralForms } from "../format"
 import type { Messages } from "./types"
 
-type StepCopy = { title: string; description: string; cta: string }
+type StepCopy = { title: string; description: string; cta: string; missing?: string }
 
 const en = {
   // The "Go live" checklist (lib/setup-steps.ts)
@@ -29,7 +29,7 @@ const en = {
       description: "Paste answers that aren't on your website, so fewer questions end in “I don't know”.",
       cta: "Add text",
     },
-    handoff: { title: "Let visitors reach a human", description: "Turn on hand-off so unanswered questions reach your team by email.", cta: "Set up hand-off" },
+    handoff: { title: "Let visitors reach a human", description: "Turn on hand-off so unanswered questions reach your team by email.", missing: "Right now, visitors the assistant can't help have no way to reach you. Turn on hand-off, or at least add a contact email or link.", cta: "Set up hand-off" },
     leads: {
       title: "Capture leads before the chat",
       description: "Ask for an email (and optionally a name or phone) before the first message.",
@@ -145,6 +145,7 @@ export const setup: Messages<typeof en> = {
       handoff: {
         title: "Ziyaretçilerin bir insana ulaşmasını sağlayın",
         description: "İnsana devri açın; yanıtlanamayan sorular e-postayla ekibinize ulaşsın.",
+        missing: "Şu an asistanın yanıtlayamadığı ziyaretçilerin size ulaşabileceği bir yol yok. İnsana devri açın ya da en azından bir iletişim e-postası veya linki ekleyin.",
         cta: "İnsana devri ayarla",
       },
       leads: {
@@ -256,6 +257,7 @@ export const setup: Messages<typeof en> = {
       handoff: {
         title: "Leiskite lankytojams susisiekti su žmogumi",
         description: "Įjunkite perdavimą žmogui, kad neatsakyti klausimai pasiektų jūsų komandą el. paštu.",
+        missing: "Šiuo metu lankytojai, kuriems asistentas negali padėti, neturi kaip su jumis susisiekti. Įjunkite perdavimą žmogui arba bent pridėkite kontaktinį el. paštą ar nuorodą.",
         cta: "Nustatyti perdavimą",
       },
       leads: {
@@ -371,6 +373,7 @@ export const setup: Messages<typeof en> = {
       handoff: {
         title: "Ļaujiet apmeklētājiem sazināties ar cilvēku",
         description: "Ieslēdziet nodošanu cilvēkam, lai neatbildētie jautājumi nonāktu pie jūsu komandas pa e-pastu.",
+        missing: "Pašlaik apmeklētājiem, kuriem asistents nevar palīdzēt, nav iespējas ar jums sazināties. Ieslēdziet nodošanu cilvēkam vai vismaz pievienojiet kontaktu e-pastu vai saiti.",
         cta: "Iestatīt nodošanu",
       },
       leads: {
@@ -482,6 +485,7 @@ export const setup: Messages<typeof en> = {
       handoff: {
         title: "Laske külastajatel inimesega ühendust võtta",
         description: "Lülitage inimesele üleandmine sisse, et vastuseta küsimused jõuaksid e-posti teel teie meeskonnani.",
+        missing: "Praegu ei saa külastajad, keda assistent aidata ei oska, teiega kuidagi ühendust võtta. Lülitage inimesele üleandmine sisse või lisage vähemalt kontakti e-post või link.",
         cta: "Seadista üleandmine",
       },
       leads: {

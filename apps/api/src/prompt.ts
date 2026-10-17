@@ -124,15 +124,21 @@ export function buildSystem(tenant: Tenant): Anthropic.Beta.BetaTextBlockParam[]
   if (s.useEmoji !== undefined) {
     lines.push(s.useEmoji && s.tone !== "formal" ? "Emoji: an occasional, fitting emoji is fine." : "Emoji: do not use emoji.");
   }
+  const handoffOff = s.handoffEnabled === false;
   if (s.unknownAnswer) {
     lines.push(
-      `When the documents don't answer the question, convey this message in the visitor's language: ${LANGS.filter((l) => s.unknownAnswer?.[l]?.trim())
+      `When the documents don't answer the question, convey the meaning of this owner-written message in the visitor's language, in correct, natural grammar (never copy its spelling or grammar mistakes${handoffOff ? ", and replace any offer to connect the visitor with the team by the hand-off note below" : ""}): ${LANGS.filter((l) => s.unknownAnswer?.[l]?.trim())
         .map((l) => `${LANG_NAMES[l]}: "${oneLine(s.unknownAnswer![l])}"`)
         .join(" / ")}`,
     );
   }
-  if (s.handoffEnabled === false) {
-    lines.push('Human hand-off is not available on this site: never mention a "Talk to a human" option; suggest the contact details from the documents instead.');
+  if (handoffOff) {
+    const contact = s.contact?.trim();
+    lines.push(
+      contact
+        ? `Human hand-off is not available on this site: never mention a "Talk to a human" option. When you don't know, tell the visitor they can reach the team at ${contactLink(contact)}, as a Markdown link.`
+        : 'Human hand-off is not available on this site: never mention a "Talk to a human" option. When you don\'t know, suggest the contact details from the documents if they include any; otherwise just say you don\'t have that information.',
+    );
   }
   if (s.blockedTopics.length > 0) {
     lines.push(`Topics the site owner asked you not to discuss (politely decline): ${s.blockedTopics.join("; ")}`);
@@ -148,6 +154,12 @@ export function buildSystem(tenant: Tenant): Anthropic.Beta.BetaTextBlockParam[]
     // Stable per tenant, so the whole system prompt is one cacheable prefix.
     { type: "text", text: settings, cache_control: { type: "ephemeral" } },
   ];
+}
+
+/** A Markdown link for the owner's contact email or URL. */
+function contactLink(contact: string): string {
+  const c = oneLine(contact).replace(/[[\]()<>]/g, "");
+  return c.includes("@") && !/^https?:/i.test(c) ? `[${c}](mailto:${c})` : `[${c}](${c})`;
 }
 
 const oneLine = (text: string) => text.replace(/\s+/g, " ").replace(/"/g, "'").trim();

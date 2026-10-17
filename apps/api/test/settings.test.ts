@@ -23,6 +23,9 @@ describe("tenantFromBot", () => {
     const t = tenantFromBot(b, publicWidgetSettings(b.settings));
     assert.equal(t.handoffEmail, "");
     assert.equal(t.settings.handoffEnabled, false);
+    // nor shows a "Talk to a human" button that would only fail
+    assert.equal(t.settings.ui?.handoff.enabled, false);
+    assert.equal(tenantFromBot(bot(), publicWidgetSettings(bot().settings)).settings.ui?.handoff.enabled, true);
   });
 
   it("maps dashboard settings onto a tenant", () => {
@@ -116,6 +119,31 @@ describe("system prompt", () => {
     });
     assert.match(text, /Human hand-off is not available/);
     assert.match(text, /do not use emoji/);
+  });
+
+  it("points visitors to the owner's contact when hand-off is off, without promising the team", () => {
+    const text = sys((s) => {
+      s.handoff.enabled = false;
+      s.handoff.contact = "hello@example.com";
+      s.messages.unknownAnswer.en = "I don't really know, My team can help you about it.";
+    });
+    assert.match(text, /correct, natural grammar/);
+    assert.match(text, /replace any offer to connect the visitor with the team/);
+    assert.match(text, /\[hello@example\.com\]\(mailto:hello@example\.com\)/);
+  });
+
+  it("links a contact URL as-is, and falls back to the documents without one", () => {
+    const withUrl = sys((s) => {
+      s.handoff.enabled = false;
+      s.handoff.contact = "https://example.com/contact";
+    });
+    assert.match(withUrl, /\[https:\/\/example\.com\/contact\]\(https:\/\/example\.com\/contact\)/);
+    const without = sys((s) => {
+      s.handoff.enabled = false;
+    });
+    assert.match(without, /contact details from the documents/);
+    // a working hand-off needs no contact line
+    assert.doesNotMatch(sys(() => {}), /reach the team at/);
   });
 });
 
