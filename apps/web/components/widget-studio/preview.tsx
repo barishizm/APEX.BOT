@@ -194,7 +194,8 @@ export function WidgetPreview({
         return <Icon style={iconSize} />
       })()
     )
-  const subtitle = general.subtitle[lang] || [t.ai, general.companyName].filter(Boolean).join(" · ")
+  // on the brand-colored header: a translucent tile in the text color behind an initial or icon
+  const tile = onP === "#ffffff" ? "rgba(255,255,255,.16)" : "rgba(12,12,9,.08)"
   // the widget shows the privacy sentence in a one-line card above the composer
   const notice = !!m.privacyUrl
   const radius = Math.min(a.radius, 28)
@@ -213,12 +214,12 @@ export function WidgetPreview({
   const avatar = (
     <span
       aria-hidden
-      className="grid shrink-0 place-items-center overflow-hidden rounded-full font-semibold"
-      style={{ width: 32, height: 32, background: a.primaryColor, color: onP, fontSize: 14 }}
+      className="grid shrink-0 place-items-center overflow-hidden font-semibold"
+      style={{ width: 30, height: 30, borderRadius: 8, background: a.avatar === "image" && a.avatarUrl ? "transparent" : tile, color: onP, fontSize: 14 }}
     >
       {a.avatar === "image" && a.avatarUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={a.avatarUrl} alt="" className="h-full w-full object-cover" />
+        <img src={a.avatarUrl} alt="" className="h-full w-full object-contain" />
       ) : a.avatar === "icon" ? (
         <Bot className="h-4 w-4" />
       ) : (
@@ -330,11 +331,9 @@ export function WidgetPreview({
             </span>
           </div>
         </div>
-        {(m.showDisclaimer || a.showBranding) && (
-          <div className="text-center" style={{ padding: "0 12px 8px", fontSize: 10.5, color: c.muted }}>
-            {[m.showDisclaimer && m.disclaimer[lang], a.showBranding && t.powered].filter(Boolean).join(" · ")}
-          </div>
-        )}
+        <div className="text-center" style={{ padding: "0 12px 8px", fontSize: 10.5, color: c.muted }}>
+          {[(m.showDisclaimer && m.disclaimer[lang]) || t.ai, a.showBranding && t.powered].filter(Boolean).join(" · ")}
+        </div>
       </>
     )
 
@@ -359,18 +358,14 @@ export function WidgetPreview({
             }
       }
     >
-      <div className="flex items-center gap-2.5" style={{ padding: "10px 8px 10px 12px", borderBottom: `1px solid ${c.line}` }}>
+      {/* same one-line header as the widget: logo, agent name, more and close on the brand color */}
+      <div className="flex items-center gap-3" style={{ padding: "12px 8px 12px 14px", background: a.primaryColor, color: onP }}>
         {avatar}
-        <span className="min-w-0 flex-1" style={{ lineHeight: 1.25 }}>
-          <strong className="block truncate" style={{ fontSize: 14 }}>
-            {general.botName}
-          </strong>
-          <span className="block truncate" style={{ fontSize: 11.5, color: c.muted }}>
-            {subtitle}
-          </span>
-        </span>
-        <Ellipsis className="h-4 w-4" style={{ color: c.muted }} />
-        <button type="button" onClick={onToggle} aria-label={site.showcase.closePanel} className="grid h-7 w-7 cursor-pointer place-items-center rounded-md border-0 bg-transparent" style={{ color: c.muted }}>
+        <strong className="min-w-0 flex-1 truncate" style={{ fontSize: 15 }}>
+          {general.botName}
+        </strong>
+        <Ellipsis className="h-4 w-4" style={{ opacity: 0.8 }} />
+        <button type="button" onClick={onToggle} aria-label={site.showcase.closePanel} className="grid h-7 w-7 cursor-pointer place-items-center rounded-md border-0 bg-transparent" style={{ color: onP, opacity: 0.8 }}>
           <X className="h-4 w-4" />
         </button>
       </div>

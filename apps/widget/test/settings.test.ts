@@ -146,15 +146,18 @@ describe("widget with dashboard settings", () => {
     assert.equal($<HTMLButtonElement>(".compose .send")!.disabled, true);
   });
 
-  it("uses the custom header, placeholder and footer", () => {
-    assert.equal($(".title span")!.textContent, "Saniyeler içinde yanıt");
+  it("uses the one-line header, custom placeholder and footer", () => {
+    const head = $(".head")!;
+    assert.equal(head.querySelector(".title")!.textContent, "Apex", "one line: the agent's name, no subtitle");
+    assert.equal(head.querySelectorAll(".title *").length, 0);
     assert.equal($("textarea")!.getAttribute("placeholder"), "Sorunuzu yazın");
     assert.ok($(".avatar svg"), "bot icon avatar");
     assert.equal($(".notice"), null, "disclaimer off and no privacy link: no notice");
     assert.ok($(".dock")!.classList.contains("bare"));
     const menu = ($$(".menu .item") as HTMLElement[]).map((b) => b.textContent);
     assert.equal(menu.some((l) => /Bir insanla konuş/.test(l!)), false, "hand-off off");
-    assert.equal($(".foot")!.textContent, "Apex Bot ile çalışır");
+    // the disclaimer is off, but the visitor still learns it's an AI
+    assert.equal($(".foot")!.textContent, "Yapay zekâ asistanıApex Bot ile çalışır");
   });
 
   it("shows only well-formed stored tickets, as text", () => {
@@ -192,6 +195,19 @@ describe("custom launcher image", () => {
     assert.deepEqual(at("http://cdn.example/logo.png"), ["appearance.launcherImage", "appearance.launcherImage"]);
     assert.deepEqual(at("data:image/svg+xml;base64,PHN2Zz4="), ["appearance.launcherImage", "appearance.launcherImage"]);
     assert.deepEqual(at(""), ["appearance.launcherImage"]);
+  });
+});
+
+describe("header logo", () => {
+  it("accepts an upload or an https URL, never SVG, http or script URLs", async () => {
+    const { checkSettings } = await import("@apex/db/bot-settings");
+    const at = (avatarUrl: string) => checkSettings({ handoff: { enabled: false }, appearance: { avatar: "image", avatarUrl } }).map((i) => i.path);
+    assert.deepEqual(at("data:image/png;base64,iVBORw0KGgo="), []);
+    assert.deepEqual(at("https://cdn.example/logo.webp"), []);
+    for (const bad of ["http://cdn.example/logo.png", "data:image/svg+xml;base64,PHN2Zz4=", "javascript:alert(1)", "data:text/html;base64,PGI+"]) {
+      assert.ok(at(bad).includes("appearance.avatarUrl"), bad);
+    }
+    assert.deepEqual(at(""), ["appearance.avatarUrl"], "logo style needs a logo");
   });
 });
 
