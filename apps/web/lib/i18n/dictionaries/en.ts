@@ -325,6 +325,7 @@ export const en = {
     closing: {
       title: "Give your visitors answers tonight.",
       lede: "Set up takes a few minutes. Free while Apex is in beta.",
+      ledeWaitlist: "Apex is in closed beta and free while it lasts. Join the waitlist and we'll email you the day sign-ups open.",
       ctaSignedIn: "Go to your dashboard",
       cta: "Join the waitlist",
       docs: "Read the docs",

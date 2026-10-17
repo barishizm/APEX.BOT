@@ -325,6 +325,7 @@ export const lv: Dictionary = {
     closing: {
       title: "Sniedziet apmeklētājiem atbildes jau šonakt.",
       lede: "Iestatīšana aizņem dažas minūtes. Bez maksas, kamēr Apex ir beta versijā.",
+      ledeWaitlist: "Apex ir slēgtajā beta versijā un līdz tam ir bez maksas. Pievienojieties gaidīšanas sarakstam, un mēs jums uzrakstīsim dienā, kad atvērsim reģistrāciju.",
       ctaSignedIn: "Atvērt vadības paneli",
       cta: "Pievienoties gaidīšanas sarakstam",
       docs: "Lasīt dokumentāciju",

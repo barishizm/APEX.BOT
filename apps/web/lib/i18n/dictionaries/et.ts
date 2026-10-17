@@ -325,6 +325,7 @@ export const et: Dictionary = {
     closing: {
       title: "Andke külastajatele vastused juba täna öösel.",
       lede: "Seadistamine võtab mõne minuti. Tasuta, kuni Apex on beetaversioonis.",
+      ledeWaitlist: "Apex on suletud beetaversioonis ja seni tasuta. Liituge ootenimekirjaga ja saadame teile e-kirja päeval, mil registreerimine avaneb.",
       ctaSignedIn: "Ava töölaud",
       cta: "Liitu ootenimekirjaga",
       docs: "Loe dokumentatsiooni",

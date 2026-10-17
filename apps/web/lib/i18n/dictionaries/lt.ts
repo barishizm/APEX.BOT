@@ -325,6 +325,7 @@ export const lt: Dictionary = {
     closing: {
       title: "Atsakykite savo lankytojams dar šiąnakt.",
       lede: "Paruošimas užtrunka kelias minutes. Nemokamai, kol Apex yra beta etape.",
+      ledeWaitlist: "Apex yra uždaroje beta versijoje ir kol kas nemokamas. Prisijunkite prie laukiančiųjų sąrašo ir mes parašysime tą dieną, kai atidarysime registraciją.",
       ctaSignedIn: "Eiti į valdymo skydelį",
       cta: "Prisijungti prie laukiančiųjų sąrašo",
       docs: "Skaityti dokumentaciją",
