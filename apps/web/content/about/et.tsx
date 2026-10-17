@@ -12,8 +12,8 @@ function Body() {
         ütleb ausalt, kui midagi ei tea.
       </p>
       <p>
-        Praegu on käimas suletud beetatestimine. Selle ajal on kõik funktsioonid tasuta ning uusi registreerimisi avatakse
-        järk-järgult <a href="/et/signup">ootenimekirja</a> kaudu.
+        Praegu on käimas beetatestimine. Selle ajal on kõik funktsioonid tasuta ning igaüks saab{" "}
+        <a href="/et/signup">registreeruda</a>.
       </p>
 
       <h2 id="why">Miks me selle lõime</h2>

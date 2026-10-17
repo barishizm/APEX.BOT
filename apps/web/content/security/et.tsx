@@ -82,7 +82,7 @@ function Body() {
           seega ei saa keegi süsteemi võõra inimese postkasti suunata.
         </li>
         <li>
-          <strong>Robotikontroll.</strong> Registreerumist, sisselogimist, parooli lähtestamist ja ootenimekirja kaitseb
+          <strong>Robotikontroll.</strong> Registreerumist, sisselogimist ja parooli lähtestamist kaitseb
           Cloudflare Turnstile. Kui kontrolli ei õnnestu lõpule viia, lükatakse päring tagasi, mitte ei lubata.
         </li>
       </ul>

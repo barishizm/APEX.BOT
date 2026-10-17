@@ -9,7 +9,6 @@ import { GodRays, MeshGradient } from "@paper-design/shaders-react"
 import { useI18n } from "@/components/i18n/provider"
 import { format } from "@/lib/i18n"
 import { useSignedIn } from "@/lib/signed-in"
-import { SIGNUPS_OPEN } from "@/lib/signups"
 
 function GoogleLogo() {
   return (
@@ -127,11 +126,8 @@ export default function Hero({
   const [turnstileReset, setTurnstileReset] = useState(0)
   const [nextPath, setNextPath] = useState("/verify-email")
   const needsVerify = nextPath.startsWith("/verify-email")
-  // An invitation link sends people here with ?next=/invite/<token>: they return there after
-  // signing in, and may sign up with the invited address even while sign-ups are closed
+  // An invitation link sends people here with ?next=/invite/<token>: they return there after signing in
   const [afterAuth, setAfterAuth] = useState<string | null>(null)
-  const inviteToken = afterAuth?.slice("/invite/".length) ?? null
-  const signupsOpen = SIGNUPS_OPEN || !!inviteToken
   const nextQuery = afterAuth ? `?next=${encodeURIComponent(afterAuth)}` : ""
   // Card height follows its content, animated, so switching forms grows/shrinks smoothly
   const [contentEl, setContentEl] = useState<HTMLDivElement | null>(null)
@@ -146,8 +142,6 @@ export default function Hero({
     if (!isExpanded) setCardHeight("auto")
   }, [isExpanded])
   const [authMode, setAuthMode] = useState<"register" | "login">("register")
-  // Sign-ups are closed: the register side collects emails for the waitlist instead
-  const [waitlistDone, setWaitlistDone] = useState(false)
 
   // When opened from the header "Log in" link, the modal grows out of that point
   const [origin, setOrigin] = useState<{ x: number; y: number } | null>(null)
@@ -193,7 +187,6 @@ export default function Hero({
       oauth_denied: t.auth.errors.oauth_denied,
       oauth_email_unverified: t.auth.errors.oauth_email_unverified,
       oauth_failed: t.auth.errors.oauth_failed,
-      oauth_signups_closed: t.auth.errors.oauth_signups_closed,
     }
     const query = new URLSearchParams(window.location.search)
     const error = query.get("error")
@@ -211,7 +204,6 @@ export default function Hero({
     setFormStep("idle")
     setAuthError(null)
     setTurnstileToken(null)
-    setWaitlistDone(false)
     setAuthMode(mode)
   }
 
@@ -222,37 +214,7 @@ export default function Hero({
     // Reset form after a brief delay so the user doesn't see it reset while closing
     setTimeout(() => {
       setFormStep("idle")
-      setWaitlistDone(false)
     }, 500)
-  }
-
-  const handleWaitlist = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    const email = new FormData(e.currentTarget).get("email")
-    if (TURNSTILE_SITE_KEY && !turnstileToken) {
-      setAuthError("Please wait for the human check to finish, then try again")
-      return
-    }
-    setAuthError(null)
-    setFormStep("submitting")
-    try {
-      const res = await fetch("/api/waitlist", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email, turnstileToken }),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setAuthError(data.message ?? t.auth.errors.generic)
-        return
-      }
-      setWaitlistDone(true)
-    } catch {
-      setAuthError(t.auth.errors.network)
-    } finally {
-      setFormStep("idle")
-      setTurnstileReset((n) => n + 1)
-    }
   }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -271,7 +233,6 @@ export default function Hero({
             password: field("password"),
             acceptTerms: form.has("acceptTerms"),
             allowTraining: form.has("allowTraining"),
-            inviteToken,
             turnstileToken,
           }
     if (TURNSTILE_SITE_KEY && !turnstileToken) {
@@ -724,78 +685,6 @@ export default function Hero({
                           </button>
                         </p>
                       </form>
-                    ) : !signupsOpen ? (
-                      waitlistDone ? (
-                        <div className="flex flex-col items-center space-y-5 py-6 text-center text-zinc-900 dark:text-white">
-                          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-500 shadow-lg shadow-green-500/30">
-                            <Check className="h-8 w-8 text-white" />
-                          </div>
-                          <div>
-                            <h3 className="mb-2 text-2xl font-bold">{t.auth.waitlist.doneTitle}</h3>
-                            <p className="text-zinc-600 dark:text-zinc-200">{t.auth.waitlist.doneText}</p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={handleClose}
-                            className="cursor-pointer rounded-lg bg-black/10 px-6 py-2 text-sm font-medium text-zinc-900 transition-colors hover:bg-black/15 dark:bg-white/20 dark:text-white dark:hover:bg-white/30"
-                          >
-                            {t.auth.waitlist.close}
-                          </button>
-                        </div>
-                      ) : (
-                        <form onSubmit={handleWaitlist} className="space-y-4">
-                          <div className="space-y-1 pb-1 text-center text-zinc-900 dark:text-white">
-                            <h2 className="text-3xl font-bold tracking-tight">{t.auth.waitlist.title}</h2>
-                            <p className="text-lg text-zinc-600 dark:text-zinc-300">
-                              {t.auth.waitlist.subtitle}
-                            </p>
-                          </div>
-                          <div>
-                            <label htmlFor="waitlist-email" className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-zinc-600 dark:text-zinc-300">
-                              {t.auth.waitlist.email}
-                            </label>
-                            <input
-                              required
-                              type="email"
-                              id="waitlist-email" {...noExtensionUi}
-                              name="email"
-                              autoComplete="email"
-                              placeholder={t.auth.waitlist.emailPlaceholder}
-                              className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm text-zinc-900 transition-all placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none dark:border-zinc-400/20 dark:bg-zinc-950/40 dark:text-white dark:placeholder:text-white/30 dark:focus:border-white/40"
-                            />
-                          </div>
-
-                          <Turnstile onToken={setTurnstileToken} resetKey={turnstileReset} />
-
-                          {authError && (
-                            <p role="alert" className="text-sm text-red-600 dark:text-red-400">{authError}</p>
-                          )}
-
-                          <button
-                            disabled={formStep === "submitting"}
-                            type="submit"
-                            className="flex w-full cursor-pointer items-center justify-center rounded-lg bg-zinc-900 px-8 py-3 font-semibold text-white transition-all hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-70 dark:bg-white dark:text-zinc-800 dark:hover:bg-zinc-100"
-                          >
-                            {formStep === "submitting" ? (
-                              <span className="flex items-center gap-2">
-                                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/70 border-t-transparent dark:border-zinc-600"></span>
-                                {t.auth.waitlist.submitting}
-                              </span>
-                            ) : t.auth.waitlist.submit}
-                          </button>
-
-                          <p className="text-center text-sm text-zinc-600 dark:text-zinc-300">
-                            {t.auth.register.haveAccount}{" "}
-                            <button
-                              type="button"
-                              onClick={() => switchMode("login")}
-                              className="cursor-pointer border-0 bg-transparent p-0 font-medium text-zinc-900 underline underline-offset-2 dark:text-white"
-                            >
-                              {t.auth.register.logIn}
-                            </button>
-                          </p>
-                        </form>
-                      )
                     ) : (
                       <form onSubmit={handleSubmit} className="space-y-4">
                         <div className="space-y-1 pb-1 text-center text-zinc-900 dark:text-white">

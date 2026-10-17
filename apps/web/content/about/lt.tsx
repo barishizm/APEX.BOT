@@ -12,8 +12,8 @@ function Body() {
         atsakymas, ir pasako, kai ko nors nežino.
       </p>
       <p>
-        Šiuo metu vyksta uždaras beta testavimas. Kol jis trunka, visos funkcijos nemokamos, o nauja registracija
-        atidaroma etapais per <a href="/lt/signup">laukiančiųjų sąrašą</a>.
+        Šiuo metu vyksta beta testavimas. Kol jis trunka, visos funkcijos nemokamos, o užsiregistruoti gali{" "}
+        <a href="/lt/signup">kiekvienas</a>.
       </p>
 
       <h2 id="why">Kodėl jį sukūrėme</h2>

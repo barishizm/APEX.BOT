@@ -84,7 +84,7 @@ function Body() {
           mēs uz to kaut ko sūtām, tāpēc neviens nevar novirzīt sistēmu uz sveša cilvēka pastkastīti.
         </li>
         <li>
-          <strong>Robotu pārbaude.</strong> Reģistrāciju, pieteikšanos, paroles atiestatīšanu un gaidīšanas sarakstu aizsargā
+          <strong>Robotu pārbaude.</strong> Reģistrāciju, pieteikšanos un paroles atiestatīšanu aizsargā
           Cloudflare Turnstile. Ja pārbaudi nevar pabeigt, pieprasījums tiek noraidīts, nevis atļauts.
         </li>
       </ul>

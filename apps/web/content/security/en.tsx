@@ -80,7 +80,7 @@ function Body() {
           nobody can point the system at a stranger's inbox.
         </li>
         <li>
-          <strong>Bot checks.</strong> Sign-up, log-in, password reset and the waitlist are protected by Cloudflare Turnstile.
+          <strong>Bot checks.</strong> Sign-up, log-in and password reset are protected by Cloudflare Turnstile.
           If the check can't be completed, the request is refused rather than allowed.
         </li>
       </ul>

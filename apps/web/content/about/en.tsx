@@ -11,8 +11,8 @@ function Body() {
         you gave it, links the page each answer came from, and says so when it doesn't know.
       </p>
       <p>
-        It is in closed beta. Every feature is free while the beta lasts, and new sign-ups open in waves through the{" "}
-        <a href="/signup">waitlist</a>.
+        It is in beta. Every feature is free while the beta lasts, and anyone can{" "}
+        <a href="/signup">sign up</a>.
       </p>
 
       <h2 id="why">Why we built it</h2>

@@ -3,7 +3,6 @@ import assert from "node:assert/strict"
 import { PGlite, type Transaction } from "@electric-sql/pglite"
 import type { Db, Queryable } from "../src/db.ts"
 import { migrate } from "../src/migrate.ts"
-import { joinWaitlist } from "../src/waitlist.ts"
 import {
   AuthError,
   CODE_FAIL_LIMIT,
@@ -288,12 +287,4 @@ test("the apps know every migration, and can tell what a database is missing", a
   const empty = pgliteDb(new PGlite())
   assert.deepEqual(await missingMigrations(empty), [...MIGRATION_NAMES])
   await empty.close()
-})
-
-test("the waitlist stores an email once, lowercased, and rejects junk", async () => {
-  await joinWaitlist(db, " Jane@Example.com ", "tr")
-  await joinWaitlist(db, "jane@example.com")
-  const { rows } = await db.query<{ email: string; locale: string }>("select email, locale from app.waitlist")
-  assert.deepEqual(rows, [{ email: "jane@example.com", locale: "tr" }])
-  await rejects(joinWaitlist(db, "nope"), "invalid_input")
 })
