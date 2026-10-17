@@ -134,6 +134,10 @@ export interface BotSettings {
     showSources: boolean
     showFeedback: boolean
     soundOnReply: boolean
+    /** Paperclip in the composer: images and text files go to the model with the message. */
+    attachments: boolean
+    /** Microphone in the composer: dictation and a hands-free voice mode (browser speech APIs). */
+    voiceInput: boolean
     /** Where the conversation survives: this tab, this browser, or nowhere. */
     persistence: "tab" | "browser" | "none"
     mobileFullscreen: boolean
@@ -270,6 +274,8 @@ export const DEFAULT_SETTINGS: BotSettings = {
     showSources: true,
     showFeedback: true,
     soundOnReply: false,
+    attachments: true,
+    voiceInput: true,
     persistence: "tab",
     mobileFullscreen: true,
     hiddenPaths: [],
@@ -434,7 +440,8 @@ export function parseSettings(raw: unknown): BotSettings {
     launcherLabel: r.localized(a, "appearance", "launcherLabel", D.appearance.launcherLabel, LIMITS.launcherLabel),
     launcherSize: r.oneOf(a, "appearance", "launcherSize", D.appearance.launcherSize, ["small", "medium", "large"] as const),
     avatar: r.oneOf(a, "appearance", "avatar", D.appearance.avatar, ["initial", "icon", "image"] as const),
-    avatarUrl: r.str(a, "appearance", "avatarUrl", D.appearance.avatarUrl, LIMITS.url),
+    // the header logo: an upload (data: URL) or an https:// image, like the launcher image
+    avatarUrl: r.str(a, "appearance", "avatarUrl", D.appearance.avatarUrl, LIMITS.launcherImage),
     radius: r.num(a, "appearance", "radius", D.appearance.radius, LIMITS.radius),
     font: r.oneOf(a, "appearance", "font", D.appearance.font, ["system", "rounded", "serif", "mono"] as const),
     panelWidth: r.oneOf(a, "appearance", "panelWidth", D.appearance.panelWidth, ["compact", "standard", "wide"] as const),
@@ -444,8 +451,8 @@ export function parseSettings(raw: unknown): BotSettings {
     issues.push({ path: "appearance.primaryColor", message: "Use a hex color like #1f6feb" })
     appearance.primaryColor = D.appearance.primaryColor
   }
-  if (appearance.avatarUrl && !isHttpsUrl(appearance.avatarUrl)) {
-    issues.push({ path: "appearance.avatarUrl", message: "Use an https:// image URL" })
+  if (appearance.avatarUrl && !isHttpsUrl(appearance.avatarUrl) && !IMAGE_DATA_URL.test(appearance.avatarUrl)) {
+    issues.push({ path: "appearance.avatarUrl", message: "Upload a PNG, JPEG, WebP or GIF, or use an https:// image URL" })
     appearance.avatarUrl = ""
   }
   if (appearance.launcherImage && !isHttpsUrl(appearance.launcherImage) && !IMAGE_DATA_URL.test(appearance.launcherImage)) {
@@ -456,7 +463,7 @@ export function parseSettings(raw: unknown): BotSettings {
     issues.push({ path: "appearance.launcherImage", message: "Upload an image or pick one of the icons" })
   }
   if (appearance.avatar === "image" && !appearance.avatarUrl) {
-    issues.push({ path: "appearance.avatarUrl", message: "Add an image URL or pick another avatar style" })
+    issues.push({ path: "appearance.avatarUrl", message: "Upload a logo or pick another avatar style" })
   }
 
   const m = section("messages")
@@ -487,6 +494,8 @@ export function parseSettings(raw: unknown): BotSettings {
     showSources: r.bool(b, "behavior", "showSources", D.behavior.showSources),
     showFeedback: r.bool(b, "behavior", "showFeedback", D.behavior.showFeedback),
     soundOnReply: r.bool(b, "behavior", "soundOnReply", D.behavior.soundOnReply),
+    attachments: r.bool(b, "behavior", "attachments", D.behavior.attachments),
+    voiceInput: r.bool(b, "behavior", "voiceInput", D.behavior.voiceInput),
     persistence: r.oneOf(b, "behavior", "persistence", D.behavior.persistence, ["tab", "browser", "none"] as const),
     mobileFullscreen: r.bool(b, "behavior", "mobileFullscreen", D.behavior.mobileFullscreen),
     hiddenPaths: r.list(b, "behavior", "hiddenPaths", D.behavior.hiddenPaths, LIMITS.hiddenPaths, 200, (s) =>

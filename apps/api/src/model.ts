@@ -1,6 +1,6 @@
 // The LLM behind the chat. The orchestrator only sees ChatModel, so tests swap in a fake.
 // Prompts are built in Anthropic's message shape (prompt.ts); the OpenAI and Gemini
-// adapters flatten it, which is lossless because every turn is plain text.
+// adapters convert it: text blocks, plus the images a visitor attached to the latest turn.
 import Anthropic from "@anthropic-ai/sdk";
 import { findModel, type Provider, type Reasoning } from "@apex/db/bot-settings";
 import type { Config } from "./config.ts";
@@ -38,6 +38,33 @@ const systemText = (system: ChatRequest["system"]) => system.map((b) => b.text).
 function contentText(content: Anthropic.Beta.BetaMessageParam["content"]): string {
   if (typeof content === "string") return content;
   return content.map((b) => (b.type === "text" ? b.text : "")).join("");
+}
+
+/** The base64 images in a turn (prompt.ts only ever adds base64 sources). */
+function contentImages(content: Anthropic.Beta.BetaMessageParam["content"]): { mediaType: string; data: string }[] {
+  if (typeof content === "string") return [];
+  return content.flatMap((b) => (b.type === "image" && b.source.type === "base64" ? [{ mediaType: b.source.media_type, data: b.source.data }] : []));
+}
+
+/** OpenAI Responses input for one turn. */
+export function openAIInput(m: Anthropic.Beta.BetaMessageParam) {
+  const images = contentImages(m.content);
+  if (!images.length) return { role: m.role, content: contentText(m.content) };
+  return {
+    role: m.role,
+    content: [
+      ...images.map((i) => ({ type: "input_image", image_url: `data:${i.mediaType};base64,${i.data}` })),
+      { type: "input_text", text: contentText(m.content) },
+    ],
+  };
+}
+
+/** Gemini content for one turn. */
+export function geminiContent(m: Anthropic.Beta.BetaMessageParam) {
+  return {
+    role: m.role === "assistant" ? "model" : "user",
+    parts: [...contentImages(m.content).map((i) => ({ inlineData: { mimeType: i.mediaType, data: i.data } })), { text: contentText(m.content) }],
+  };
 }
 
 export class ClaudeChatModel implements ChatModel {
@@ -164,7 +191,7 @@ export class OpenAIChatModel implements ChatModel {
       {
         model: model.id,
         instructions: systemText(system),
-        input: messages.map((m) => ({ role: m.role, content: contentText(m.content) })),
+        input: messages.map(openAIInput),
         max_output_tokens: model.maxOutputTokens ?? 1024,
         stream: true,
         // conversations are stored by us, under our retention rules
@@ -230,7 +257,7 @@ export class GeminiChatModel implements ChatModel {
       { "x-goog-api-key": this.apiKey },
       {
         systemInstruction: { parts: [{ text: systemText(system) }] },
-        contents: messages.map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: contentText(m.content) }] })),
+        contents: messages.map(geminiContent),
         generationConfig: {
           maxOutputTokens: model.maxOutputTokens ?? 1024,
           ...(info?.temperature && model.temperature !== undefined ? { temperature: model.temperature } : {}),
@@ -314,11 +341,16 @@ export class ModelRouter implements ChatModel {
 export class EchoChatModel implements ChatModel {
   async *stream({ messages, signal }: ChatRequest): AsyncIterable<ModelEvent> {
     const last = messages[messages.length - 1];
-    const content = typeof last.content === "string" ? last.content : "";
+    const content = contentText(last.content);
     const doc = /<document [^>]*title="([^"]*)"[^>]*>\n([\s\S]*?)\n<\/document>/.exec(content);
-    const text = doc
-      ? `**${doc[1]}**\n\n${doc[2]}`
-      : "Bu konuda sitede bir bilgi bulamadım. İsterseniz **Bir insanla konuş** seçeneğiyle ekibe ulaşabilirsiniz. [[no-answer]]";
+    // shows attachments made it through, without a model to look at them
+    const files = [...content.matchAll(/<attachment name="([^"]*)"/g)].map((m) => m[1]);
+    const received = files.length ? `📎 ${files.join(", ")} alındı.\n\n` : "";
+    const text =
+      received +
+      (doc
+        ? `**${doc[1]}**\n\n${doc[2]}`
+        : "Bu konuda sitede bir bilgi bulamadım. İsterseniz **Bir insanla konuş** seçeneğiyle ekibe ulaşabilirsiniz. [[no-answer]]");
     for (const word of text.split(/(?<= )/)) {
       if (signal?.aborted) return;
       await new Promise((r) => setTimeout(r, 25));

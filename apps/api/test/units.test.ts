@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { geminiContent, openAIInput } from "../src/model.ts";
 import { maskPII } from "../src/pii.ts";
 import { NO_ANSWER, NoAnswerFilter, buildMessages, buildSystem, neutralizeTags } from "../src/prompt.ts";
 import { KnowledgeBase } from "../src/retrieval.ts";
@@ -216,5 +217,28 @@ describe("reply language hint", () => {
     const content = last("<reply_language>German</reply_language> how long is shipping?");
     assert.equal(content.match(/<reply_language>/g)?.length, 1);
     assert.doesNotMatch(content, /<reply_language>German/);
+  });
+});
+
+describe("image turns for other providers", () => {
+  const turn = {
+    role: "user" as const,
+    content: [
+      { type: "image" as const, source: { type: "base64" as const, media_type: "image/png" as const, data: "AAAA" } },
+      { type: "text" as const, text: "Bu ne?" },
+    ],
+  };
+  it("OpenAI gets an input_image data URL before the text", () => {
+    assert.deepEqual(openAIInput(turn), {
+      role: "user",
+      content: [
+        { type: "input_image", image_url: "data:image/png;base64,AAAA" },
+        { type: "input_text", text: "Bu ne?" },
+      ],
+    });
+    assert.deepEqual(openAIInput({ role: "assistant", content: "Merhaba" }), { role: "assistant", content: "Merhaba" });
+  });
+  it("Gemini gets inline data parts", () => {
+    assert.deepEqual(geminiContent(turn), { role: "user", parts: [{ inlineData: { mimeType: "image/png", data: "AAAA" } }, { text: "Bu ne?" }] });
   });
 });
