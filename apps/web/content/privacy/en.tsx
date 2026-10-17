@@ -150,6 +150,11 @@ function Body() {
             <td>The visitor's message, recent messages of the conversation and the relevant parts of the customer's content</td>
           </tr>
           <tr>
+            <td>Google (Gemini API)</td>
+            <td>Search: turning the customer's content and visitors' questions into vectors so the assistant finds the right pages</td>
+            <td>The text of the customer's pages and added content, and the visitor's message (with the previous one for follow-up questions). We store the resulting vectors in our own database. While we use Google's unpaid tier, Google's terms allow it to use this data to improve its products</td>
+          </tr>
+          <tr>
             <td>Supabase (managed PostgreSQL)</td>
             <td>Database</td>
             <td>Everything we store: accounts, settings, knowledge, conversations</td>
