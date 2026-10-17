@@ -5,7 +5,7 @@ import { PROVIDERS, conversationStats, findModel } from "@apex/db"
 import { CopySnippet } from "@/components/copy-snippet"
 import { DashboardFrame } from "@/components/dashboard/frame"
 import { requireVerifiedUser } from "@/lib/auth"
-import { currentBot, currentSources, getSetup } from "@/lib/dashboard"
+import { currentBot, currentSources, getSetup, shownSite } from "@/lib/dashboard"
 import { db } from "@/lib/db"
 import { SETUP_STEPS } from "@/lib/setup-steps"
 import { embedSnippet } from "@/lib/site"
@@ -29,7 +29,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const t = app.overview
   const num = (n: number) => formatNumber(n, locale)
   const { welcome } = await searchParams
-  const [bot, sources, setup, stats] = await Promise.all([currentBot(user.id), currentSources(user.id), getSetup(user.id), conversationStats(db(), user.id, 7)])
+  const [bot, sources, setup, stats] = await Promise.all([currentBot(user.id), currentSources(user.id), getSetup(user.id), conversationStats(db(), await shownSite(user.id), 7)])
   const s = bot.settings
   const model = findModel(s.model.provider, s.model.id)
   const next = SETUP_STEPS.find((step) => !setup[step.id])

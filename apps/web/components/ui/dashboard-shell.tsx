@@ -1,23 +1,26 @@
 "use client"
 
-import { ChartColumn, BookOpen, CircleHelp, LayoutDashboard, ListChecks, MessageSquareText, Palette, Search, Settings, type LucideIcon } from "lucide-react"
+import { ChartColumn, BookOpen, CircleHelp, Globe, LayoutDashboard, ListChecks, MessageSquareText, Palette, Search, Settings, type LucideIcon } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useEffect, useState, type ReactNode } from "react"
 import { useAppI18n } from "@/components/i18n/app-provider"
+import { SiteSwitcher } from "@/components/sites/site-switcher"
+import type { SitesJson } from "@/lib/bot"
 import { CommandPalette } from "./command-palette"
 import { PrismFluxLoader } from "./prism-flux-loader"
 import { ProfileMenu } from "./profile-menu"
 
-export type NavLabel = "Overview" | "Analytics" | "Knowledge" | "Conversations" | "Widget" | "Setup" | "Settings"
+export type NavLabel = "Overview" | "Analytics" | "Knowledge" | "Conversations" | "Widget" | "Setup" | "Sites" | "Settings"
 
-const NAV: { id: NavLabel; key: "overview" | "analytics" | "knowledge" | "conversations" | "widget" | "setup"; icon: LucideIcon; href: string }[] = [
+const NAV: { id: NavLabel; key: "overview" | "analytics" | "knowledge" | "conversations" | "widget" | "setup" | "sites"; icon: LucideIcon; href: string }[] = [
   { id: "Overview", key: "overview", icon: LayoutDashboard, href: "/dashboard" },
   { id: "Analytics", key: "analytics", icon: ChartColumn, href: "/dashboard/analytics" },
   { id: "Knowledge", key: "knowledge", icon: BookOpen, href: "/dashboard/knowledge" },
   { id: "Conversations", key: "conversations", icon: MessageSquareText, href: "/dashboard/conversations" },
   { id: "Widget", key: "widget", icon: Palette, href: "/dashboard/widget" },
   { id: "Setup", key: "setup", icon: ListChecks, href: "/dashboard/onboarding/list" },
+  { id: "Sites", key: "sites", icon: Globe, href: "/dashboard/sites" },
 ]
 
 const pill = "flex h-9 items-center gap-2 rounded-full border border-[var(--color-line)] bg-[var(--color-raised)] px-3 text-sm"
@@ -62,12 +65,14 @@ export function DashboardShell({
   children,
   intro,
   user,
+  sites,
   setup,
   active = "Overview",
 }: {
   children?: ReactNode
   intro?: boolean
   user: { username: string; email: string }
+  sites: SitesJson
   setup: { done: number; total: number }
   /** Label of the rail item to highlight. */
   active?: NavLabel
@@ -113,6 +118,8 @@ export function DashboardShell({
         <Link href="/dashboard" aria-label={t.home} className="-mr-3 flex h-14 w-16 shrink-0 items-center justify-center">
           <img src="/brand/mini-logo.png" alt="" className="block h-11 w-11 rounded-xl" />
         </Link>
+
+        <SiteSwitcher sites={sites} />
 
         {!complete && (
           <Link href="/dashboard/onboarding/list" className={`${pill} text-[var(--color-text)] no-underline max-sm:hidden`}>

@@ -1,5 +1,5 @@
 import type { Db, Queryable } from "./db.ts"
-import { canEditBot, getBotForUser } from "./bots.ts"
+import { canEditBot, getBotForUser, scopeUser, type BotScope } from "./bots.ts"
 import { replyIdList, resolveReplies } from "./conversations.ts"
 
 export const KNOWLEDGE_LIMITS = {
@@ -91,8 +91,8 @@ const toSource = (r: SourceRow): KnowledgeSource => ({
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-async function editableBot(db: Db, userId: string) {
-  const bot = await getBotForUser(db, userId)
+async function editableBot(db: Db, who: BotScope) {
+  const bot = await getBotForUser(db, who)
   if (!canEditBot(bot.role)) throw new KnowledgeError("forbidden", "Only workspace owners and admins can change the knowledge base")
   return bot
 }
@@ -133,8 +133,8 @@ async function chunkRoom(q: Queryable, botId: string, sourceId: string | null) {
   return Math.max(0, KNOWLEDGE_LIMITS.chunksPerBot - rows[0].n)
 }
 
-export async function listSources(db: Db, userId: string): Promise<KnowledgeSource[]> {
-  const bot = await getBotForUser(db, userId)
+export async function listSources(db: Db, who: BotScope): Promise<KnowledgeSource[]> {
+  const bot = await getBotForUser(db, who)
   const { rows } = await db.query<SourceRow>(
     `select ${COLUMNS} from app.knowledge_sources where bot_id = $1 order by created_at desc`,
     [bot.id],
@@ -143,8 +143,8 @@ export async function listSources(db: Db, userId: string): Promise<KnowledgeSour
 }
 
 /** Adds a website to crawl. `url` must already be normalized; the caller starts the sync. */
-export async function addWebsiteSource(db: Db, userId: string, url: string, title?: string): Promise<KnowledgeSource> {
-  const bot = await editableBot(db, userId)
+export async function addWebsiteSource(db: Db, who: BotScope, url: string, title?: string): Promise<KnowledgeSource> {
+  const bot = await editableBot(db, who)
   if (!/^https?:\/\/[^\s]+$/i.test(url) || url.length > 2048) throw new KnowledgeError("invalid_input", "Enter a valid website address")
   return db.transaction(async (tx) => {
     // serializes concurrent adds for this bot, so the source limit holds
@@ -157,7 +157,7 @@ export async function addWebsiteSource(db: Db, userId: string, url: string, titl
     await checkRoom(tx, bot.id)
     const { rows } = await tx.query<SourceRow>(
       `insert into app.knowledge_sources (bot_id, kind, title, url, created_by) values ($1, 'website', $2, $3, $4) returning ${COLUMNS}`,
-      [bot.id, cleanTitle(title || new URL(url).hostname + (new URL(url).pathname === "/" ? "" : new URL(url).pathname)), url, userId],
+      [bot.id, cleanTitle(title || new URL(url).hostname + (new URL(url).pathname === "/" ? "" : new URL(url).pathname)), url, scopeUser(who)],
     )
     return toSource(rows[0])
   })
@@ -166,11 +166,11 @@ export async function addWebsiteSource(db: Db, userId: string, url: string, titl
 /** Adds pasted text, already chunked by the caller; it is searchable immediately. */
 export async function addTextSource(
   db: Db,
-  userId: string,
+  who: BotScope,
   input: { title: unknown; content: unknown },
   chunk: (title: string, content: string) => ChunkRecord[],
 ): Promise<KnowledgeSource> {
-  const bot = await editableBot(db, userId)
+  const bot = await editableBot(db, who)
   const title = cleanTitle(input.title)
   const content = typeof input.content === "string" ? input.content.trim() : ""
   if (content.length < 20) throw new KnowledgeError("invalid_input", "Add at least a sentence or two of text")
@@ -186,7 +186,7 @@ export async function addTextSource(
     const { rows } = await tx.query<SourceRow>(
       `insert into app.knowledge_sources (bot_id, kind, title, content, status, chunks, synced_at, created_by)
        values ($1, 'text', $2, $3, 'ready', $4, now(), $5) returning ${COLUMNS}`,
-      [bot.id, title, content, chunks.length, userId],
+      [bot.id, title, content, chunks.length, scopeUser(who)],
     )
     await insertChunks(tx, bot.id, rows[0].id, chunks)
     await bumpKnowledge(tx, bot.id)
@@ -204,11 +204,11 @@ export const ANSWER_LIMITS = { question: 300, answerMin: 10, answer: 4000 } as c
  */
 export async function addAnswerToKnowledge(
   db: Db,
-  userId: string,
+  who: BotScope,
   input: { question: unknown; answer: unknown; replyIds: unknown; title: string },
   chunk: (title: string, content: string) => ChunkRecord[],
 ): Promise<{ source: KnowledgeSource; resolved: number }> {
-  const bot = await editableBot(db, userId)
+  const bot = await editableBot(db, who)
   const question = typeof input.question === "string" ? input.question.replace(/\s+/g, " ").trim() : ""
   const answer = typeof input.answer === "string" ? input.answer.replace(/\r\n?/g, "\n").replace(/[ \t]+\n/g, "\n").replace(/\n{2,}/g, "\n").trim() : ""
   if (!question) throw new KnowledgeError("invalid_input", "Write the question")
@@ -251,7 +251,7 @@ export async function addAnswerToKnowledge(
       const { rows } = await tx.query<SourceRow>(
         `insert into app.knowledge_sources (bot_id, kind, title, content, status, chunks, synced_at, created_by, managed)
          values ($1, 'text', $2, $3, 'ready', $4, now(), $5, true) returning ${COLUMNS}`,
-        [bot.id, title, content, chunks.length, userId],
+        [bot.id, title, content, chunks.length, scopeUser(who)],
       )
       row = rows[0]
     }
@@ -265,8 +265,8 @@ export async function addAnswerToKnowledge(
  * Marks a website source as syncing and returns it; "busy" if a sync is already running.
  * The caller crawls, then calls finishSync or failSync with the returned id.
  */
-export async function startSync(db: Db, userId: string, sourceId: string): Promise<KnowledgeSource & { botId: string; url: string }> {
-  const bot = await editableBot(db, userId)
+export async function startSync(db: Db, who: BotScope, sourceId: string): Promise<KnowledgeSource & { botId: string; url: string }> {
+  const bot = await editableBot(db, who)
   if (!UUID.test(sourceId)) throw new KnowledgeError("not_found", "That source doesn't exist")
   const running = await db.query<{ n: number }>(
     `select count(*)::int as n from app.knowledge_sources
@@ -320,8 +320,8 @@ export async function failSync(db: Db, sourceId: string, message: string): Promi
   ])
 }
 
-export async function deleteSource(db: Db, userId: string, sourceId: string): Promise<void> {
-  const bot = await editableBot(db, userId)
+export async function deleteSource(db: Db, who: BotScope, sourceId: string): Promise<void> {
+  const bot = await editableBot(db, who)
   if (!UUID.test(sourceId)) throw new KnowledgeError("not_found", "That source doesn't exist")
   await db.transaction(async (tx) => {
     const { rows } = await tx.query<{ chunks: number }>("delete from app.knowledge_sources where id = $1 and bot_id = $2 returning chunks", [
@@ -343,8 +343,8 @@ export interface SourceDetail {
 }
 
 /** One source with what it was turned into; every workspace member can look. */
-export async function getSourceDetail(db: Db, userId: string, sourceId: string): Promise<SourceDetail> {
-  const bot = await getBotForUser(db, userId)
+export async function getSourceDetail(db: Db, who: BotScope, sourceId: string): Promise<SourceDetail> {
+  const bot = await getBotForUser(db, who)
   if (!UUID.test(sourceId)) throw new KnowledgeError("not_found", "That source doesn't exist")
   const found = await db.query<SourceRow & { content: string | null }>(
     `select ${COLUMNS}, content from app.knowledge_sources where id = $1 and bot_id = $2`,
@@ -372,12 +372,12 @@ export async function getSourceDetail(db: Db, userId: string, sourceId: string):
  */
 export async function updateSource(
   db: Db,
-  userId: string,
+  who: BotScope,
   sourceId: string,
   input: { title?: unknown; content?: unknown },
   chunk: (title: string, content: string) => ChunkRecord[],
 ): Promise<KnowledgeSource> {
-  const bot = await editableBot(db, userId)
+  const bot = await editableBot(db, who)
   if (!UUID.test(sourceId)) throw new KnowledgeError("not_found", "That source doesn't exist")
   if (input.title === undefined && input.content === undefined) throw new KnowledgeError("invalid_input", "Nothing to update")
   return db.transaction(async (tx) => {
@@ -419,8 +419,8 @@ export async function updateSource(
  * excerpt's url and title, not its source: a website page matches by url, pasted text (no url)
  * by title. Sources nobody cited are left out.
  */
-export async function sourceUsage(db: Db, userId: string, days = 30): Promise<Record<string, number>> {
-  const bot = await getBotForUser(db, userId)
+export async function sourceUsage(db: Db, who: BotScope, days = 30): Promise<Record<string, number>> {
+  const bot = await getBotForUser(db, who)
   const { rows } = await db.query<{ source_id: string; replies: number }>(
     `with cited as (
        select distinct m.id, coalesce(s ->> 'url', '') as url, coalesce(s ->> 'title', '') as title

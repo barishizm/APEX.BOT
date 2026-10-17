@@ -164,7 +164,7 @@ export function WidgetStudio({
       const res = await fetch("/api/bot", {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ settings: draft, version: bot.version }),
+        body: JSON.stringify({ botId: bot.id, settings: draft, version: bot.version }),
       })
       const body = await res.json().catch(() => ({}))
       if (res.ok) {
@@ -194,7 +194,7 @@ export function WidgetStudio({
   }
 
   const rotate = async () => {
-    const res = await fetch("/api/bot/site-key", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })
+    const res = await fetch("/api/bot/site-key", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ botId: bot.id }) })
     const body = await res.json().catch(() => ({}))
     if (!res.ok) {
       setSave({ kind: "error", message: body.message ?? t.rotateFailed })
@@ -343,6 +343,7 @@ export function WidgetStudio({
               <HandoffSection
                 {...props}
                 verification={{
+                  botId: bot.id,
                   savedVerified: bot.handoffVerified,
                   savedEmail: bot.settings.handoff.email,
                   onConfirmed: (next) => setBot((b) => ({ ...b, ...next })),

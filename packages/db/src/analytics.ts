@@ -1,5 +1,5 @@
 import type { Db } from "./db.ts"
-import { getBotForUser } from "./bots.ts"
+import { getBotForUser, type BotScope } from "./bots.ts"
 
 // Read side of the dashboard's analytics page. Everything is scoped to the signed-in user's
 // bot and to what retention has kept: conversations older than the bot's retention period
@@ -137,8 +137,8 @@ function periodColumns() {
 const PERIOD_COLUMNS = periodColumns()
 
 /** Everything the analytics page shows, for the user's bot, over the last `days` local days. */
-export async function analyticsData(db: Db, userId: string, options: { days?: unknown; timeZone?: unknown } = {}): Promise<AnalyticsData> {
-  const bot = await getBotForUser(db, userId)
+export async function analyticsData(db: Db, who: BotScope, options: { days?: unknown; timeZone?: unknown } = {}): Promise<AnalyticsData> {
+  const bot = await getBotForUser(db, who)
   const days = parseRange(options.days)
   const tz = safeTimeZone(options.timeZone)
   const args = [bot.id, tz, days]

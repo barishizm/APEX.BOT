@@ -5,7 +5,7 @@ import { getAppDictionary } from "@/lib/i18n/app";
 import { requestLocale } from "@/lib/i18n/server";
 import { buildStages } from "@/lib/setup-steps";
 import { requireVerifiedUser } from "@/lib/auth";
-import { currentBot, currentSources, getSetup } from "@/lib/dashboard";
+import { currentBot, currentSources, getSetup, shownSite } from "@/lib/dashboard";
 import { db } from "@/lib/db";
 import { listConversations } from "@apex/db";
 
@@ -19,7 +19,7 @@ export default async function OnboardingListPage() {
     currentBot(user.id),
     currentSources(user.id),
     getSetup(user.id),
-    listConversations(db(), user.id, { limit: 1 }),
+    listConversations(db(), await shownSite(user.id), { limit: 1 }),
   ]);
   const h = bot.settings.handoff;
   const stages = buildStages(getAppDictionary(await requestLocale()).setup, {

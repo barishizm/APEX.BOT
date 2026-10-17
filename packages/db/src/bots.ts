@@ -9,6 +9,22 @@ export type BotErrorCode = "not_found" | "forbidden" | "conflict" | "invalid_cod
 /** Confirmation codes the dashboard may send per bot in 24 hours, whatever the address. */
 export const HANDOFF_CODES_PER_DAY = 10
 
+/** Websites (bots) one workspace may have. */
+export const BOTS_PER_WORKSPACE = 10
+export const BOT_NAME_MAX = 80
+
+/**
+ * Which bot a dashboard call acts on: a bare user id means the workspace's first bot, and
+ * `botId` picks another one the user is a member of. An unknown `botId` falls back to the
+ * first bot for reads; writes that name a bot fail instead of changing a different one.
+ */
+export type BotScope = string | { userId: string; botId?: string | null }
+
+export const scopeUser = (who: BotScope) => (typeof who === "string" ? who : who.userId)
+const scopeBot = (who: BotScope) => (typeof who === "string" ? null : who.botId || null)
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 export class BotError extends Error {
   constructor(
     readonly code: BotErrorCode,
@@ -22,6 +38,8 @@ export type MemberRole = "owner" | "admin" | "member"
 
 export interface Bot {
   id: string
+  /** The dashboard's label for the website; visitors never see it. */
+  name: string
   organizationId: string
   organizationName: string
   siteKey: string
@@ -40,6 +58,7 @@ export interface Bot {
 
 interface BotRow {
   id: string
+  name: string
   organization_id: string
   organization_name: string
   site_key: string
@@ -54,6 +73,7 @@ interface BotRow {
 
 const toBot = (r: BotRow): Bot => ({
   id: r.id,
+  name: r.name,
   organizationId: r.organization_id,
   organizationName: r.organization_name,
   siteKey: r.site_key,
@@ -97,7 +117,7 @@ const HANDOFF_VERIFIED = `(coalesce(lower(b.settings -> 'handoff' ->> 'email') =
                                          and hu.email_verified_at is not null
                                          and lower(hu.email) = lower(b.settings -> 'handoff' ->> 'email')))`
 
-const SELECT_BOT = `select b.id, b.organization_id, o.name as organization_name, b.site_key, b.settings,
+const SELECT_BOT = `select b.id, b.name, b.organization_id, o.name as organization_name, b.site_key, b.settings,
                            b.version, b.updated_at, m.role, a.widget_seen_at, a.widget_seen_origin,
                            ${HANDOFF_VERIFIED} as handoff_verified
                       from app.bots b
@@ -105,23 +125,128 @@ const SELECT_BOT = `select b.id, b.organization_id, o.name as organization_name,
                       join app.organization_members m on m.organization_id = b.organization_id and m.user_id = $1
                       left join app.bot_activity a on a.bot_id = b.id`
 
-/** The user's workspace bot, created with defaults on first visit. */
-export async function getBotForUser(db: Db, userId: string): Promise<Bot> {
+/** The bot `who` names, else the workspace's first bot, created with defaults on first visit. */
+export async function getBotForUser(db: Db, who: BotScope): Promise<Bot> {
+  const userId = scopeUser(who)
+  const botId = scopeBot(who)
+  // the membership join in SELECT_BOT keeps other workspaces' bots out
+  if (botId && UUID.test(botId)) {
+    const { rows } = await db.query<BotRow>(`${SELECT_BOT} where b.id = $2`, [userId, botId])
+    if (rows[0]) return toBot(rows[0])
+  }
   const member = await membership(db, userId)
-  const found = await db.query<BotRow>(`${SELECT_BOT} where b.organization_id = $2`, [userId, member.organization_id])
+  const first = () => db.query<BotRow>(`${SELECT_BOT} where b.organization_id = $2 order by b.created_at, b.id limit 1`, [userId, member.organization_id])
+  const found = await first()
   if (found.rows[0]) return toBot(found.rows[0])
 
+  // the row lock makes two first visits at once create one bot, not two
+  await db.transaction(async (tx) => {
+    await tx.query("select 1 from app.organizations where id = $1 for update", [member.organization_id])
+    const { rows } = await tx.query("select 1 from app.bots where organization_id = $1 limit 1", [member.organization_id])
+    if (!rows.length) await insertBot(tx, member, userId, member.name)
+  })
+  return toBot((await first()).rows[0])
+}
+
+async function insertBot(q: Queryable, member: { organization_id: string; name: string; email: string }, userId: string, name: string) {
   const settings: BotSettings = structuredClone(DEFAULT_SETTINGS)
   settings.general.companyName = member.name.slice(0, 80)
   settings.handoff.email = member.email
-  // "on conflict do nothing": two first visits at once must not both insert
-  await db.query(
-    `insert into app.bots (organization_id, site_key, settings, updated_by)
-     values ($1, $2, $3::jsonb, $4) on conflict (organization_id) do nothing`,
-    [member.organization_id, newSiteKey(), JSON.stringify(settings), userId],
+  const { rows } = await q.query<{ id: string }>(
+    `insert into app.bots (organization_id, name, site_key, settings, updated_by) values ($1, $2, $3, $4::jsonb, $5) returning id`,
+    [member.organization_id, name, newSiteKey(), JSON.stringify(settings), userId],
   )
-  const created = await db.query<BotRow>(`${SELECT_BOT} where b.organization_id = $2`, [userId, member.organization_id])
-  return toBot(created.rows[0])
+  return rows[0].id
+}
+
+/** The bot a write acts on: it must be the one `who` names, and the user must be allowed to change it. */
+async function botForWrite(db: Db, who: BotScope): Promise<Bot> {
+  const bot = await getBotForUser(db, who)
+  const botId = scopeBot(who)
+  if (botId && bot.id !== botId) throw new BotError("not_found", "This website was removed. Reload to see your websites")
+  if (!canEditBot(bot.role)) throw new BotError("forbidden", "Only workspace owners and admins can change the bot")
+  return bot
+}
+
+// ---------- Websites of a workspace ----------
+
+export interface BotSummary {
+  id: string
+  name: string
+  siteKey: string
+  allowedOrigins: string[]
+  widgetSeenAt: Date | null
+  createdAt: Date
+}
+
+/** Every website of the user's workspace, oldest first (the first one is the default). */
+export async function listBotsForUser(db: Db, userId: string): Promise<{ bots: BotSummary[]; canEdit: boolean; limit: number }> {
+  const member = await membership(db, userId)
+  const { rows } = await db.query<{ id: string; name: string; site_key: string; settings: unknown; widget_seen_at: Date | null; created_at: Date }>(
+    `select b.id, b.name, b.site_key, b.settings, a.widget_seen_at, b.created_at
+       from app.bots b left join app.bot_activity a on a.bot_id = b.id
+      where b.organization_id = $1
+      order by b.created_at, b.id`,
+    [member.organization_id],
+  )
+  return {
+    bots: rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      siteKey: r.site_key,
+      allowedOrigins: repairSettings(typeof r.settings === "string" ? JSON.parse(r.settings) : r.settings).security.allowedOrigins,
+      widgetSeenAt: r.widget_seen_at,
+      createdAt: r.created_at,
+    })),
+    canEdit: canEditBot(member.role),
+    limit: BOTS_PER_WORKSPACE,
+  }
+}
+
+function cleanBotName(raw: unknown): string {
+  const name = typeof raw === "string" ? raw.replace(/\s+/g, " ").trim() : ""
+  if (!name) throw new BotSettingsError([{ path: "name", message: "Give the website a name" }])
+  if (name.length > BOT_NAME_MAX) throw new BotSettingsError([{ path: "name", message: `Keep the name under ${BOT_NAME_MAX} characters` }])
+  return name
+}
+
+/** Adds a website to the user's workspace: a new bot with default settings and its own site key. */
+export async function createBot(db: Db, userId: string, rawName: unknown): Promise<Bot> {
+  const name = cleanBotName(rawName)
+  const member = await membership(db, userId)
+  if (!canEditBot(member.role)) throw new BotError("forbidden", "Only workspace owners and admins can add websites")
+  const id = await db.transaction(async (tx) => {
+    // serializes concurrent adds so the limit holds
+    await tx.query("select 1 from app.organizations where id = $1 for update", [member.organization_id])
+    const { rows } = await tx.query<{ n: number }>("select count(*)::int as n from app.bots where organization_id = $1", [member.organization_id])
+    if (rows[0].n >= BOTS_PER_WORKSPACE) {
+      throw new BotError("conflict", `A workspace can have up to ${BOTS_PER_WORKSPACE} websites. Remove one to add another`)
+    }
+    return insertBot(tx, member, userId, name)
+  })
+  return getBotForUser(db, { userId, botId: id })
+}
+
+export async function renameBot(db: Db, who: BotScope, rawName: unknown): Promise<Bot> {
+  const name = cleanBotName(rawName)
+  const bot = await botForWrite(db, who)
+  // a label only: the version stays, so an open editor doesn't hit a conflict
+  await db.query("update app.bots set name = $1 where id = $2", [name, bot.id])
+  return getBotForUser(db, { userId: scopeUser(who), botId: bot.id })
+}
+
+/**
+ * Removes a website with its knowledge and conversations. Its embed stops working at once.
+ * The workspace's last website can't be removed: the dashboard always has a bot to show.
+ */
+export async function deleteBot(db: Db, who: BotScope): Promise<void> {
+  const bot = await botForWrite(db, who)
+  await db.transaction(async (tx) => {
+    await tx.query("select 1 from app.organizations where id = $1 for update", [bot.organizationId])
+    const { rows } = await tx.query<{ n: number }>("select count(*)::int as n from app.bots where organization_id = $1", [bot.organizationId])
+    if (rows[0].n <= 1) throw new BotError("conflict", "This is your only website. Add another before removing it")
+    await tx.query("delete from app.bots where id = $1", [bot.id])
+  })
 }
 
 /**
@@ -129,10 +254,10 @@ export async function getBotForUser(db: Db, userId: string): Promise<Bot> {
  * if someone saved in between, this fails with "conflict" instead of overwriting.
  * Throws BotSettingsError (from bot-settings.ts) when the settings are invalid.
  */
-export async function saveBotSettings(db: Db, userId: string, raw: unknown, baseVersion: number): Promise<Bot> {
+export async function saveBotSettings(db: Db, who: BotScope, raw: unknown, baseVersion: number): Promise<Bot> {
   const settings = parseSettings(raw)
-  const bot = await getBotForUser(db, userId)
-  if (!canEditBot(bot.role)) throw new BotError("forbidden", "Only workspace owners and admins can change the bot")
+  const bot = await botForWrite(db, who)
+  const userId = scopeUser(who)
   if (settings.handoff.enabled && settings.handoff.email && !(await isHandoffEmailVerified(db, bot, settings.handoff.email))) {
     throw new BotSettingsError([{ path: "handoff.email", message: "Confirm this address with the code we email you before using it" }])
   }
@@ -142,36 +267,36 @@ export async function saveBotSettings(db: Db, userId: string, raw: unknown, base
     [JSON.stringify(settings), userId, bot.id, baseVersion],
   )
   if (!rows[0]) throw new BotError("conflict", "These settings were changed somewhere else. Reload to see the latest version")
-  return getBotForUser(db, userId)
+  return getBotForUser(db, { userId, botId: bot.id })
 }
 
 /**
  * Adds a website origin to the allowlist unless it's there already or the list is full.
  * Used when onboarding learns the customer's site, so the widget works there right away.
  */
-export async function addAllowedOrigin(db: Db, userId: string, origin: string): Promise<Bot> {
+export async function addAllowedOrigin(db: Db, who: BotScope, origin: string): Promise<Bot> {
   for (let attempt = 0; attempt < 3; attempt++) {
-    const bot = await getBotForUser(db, userId)
+    const bot = await getBotForUser(db, who)
     if (!canEditBot(bot.role)) return bot
     const origins = bot.settings.security.allowedOrigins
     if (origins.includes(origin) || origins.length >= LIMITS.origins) return bot
     const next = { ...bot.settings, security: { ...bot.settings.security, allowedOrigins: [...origins, origin] } }
     try {
-      return await saveBotSettings(db, userId, next, bot.version)
+      return await saveBotSettings(db, { userId: scopeUser(who), botId: bot.id }, next, bot.version)
     } catch (err) {
       // someone saved in between: re-read and try again
       if (!(err instanceof BotError && err.code === "conflict")) throw err
     }
   }
-  return getBotForUser(db, userId)
+  return getBotForUser(db, who)
 }
 
 /** Issues a new public key; embeds using the old one stop working immediately. */
-export async function rotateSiteKey(db: Db, userId: string): Promise<Bot> {
-  const bot = await getBotForUser(db, userId)
-  if (!canEditBot(bot.role)) throw new BotError("forbidden", "Only workspace owners and admins can change the bot")
+export async function rotateSiteKey(db: Db, who: BotScope): Promise<Bot> {
+  const bot = await botForWrite(db, who)
+  const userId = scopeUser(who)
   await db.query("update app.bots set site_key = $1, version = version + 1, updated_by = $2 where id = $3", [newSiteKey(), userId, bot.id])
-  return getBotForUser(db, userId)
+  return getBotForUser(db, { userId, botId: bot.id })
 }
 
 export interface BotRecord {
@@ -209,6 +334,12 @@ export async function listBotsChangedSince(db: Queryable, since: Date | null): P
   }))
 }
 
+/** Ids of every bot, so the chat API's sync can drop the ones that were deleted. */
+export async function listBotIds(db: Queryable): Promise<string[]> {
+  const { rows } = await db.query<{ id: string }>("select id from app.bots")
+  return rows.map((r) => r.id)
+}
+
 /** Called by the chat API when the widget loads on an allowed site (throttled there). */
 export async function recordWidgetSeen(db: Queryable, botId: string, origin: string, at: Date = new Date()): Promise<void> {
   await db.query(
@@ -241,13 +372,12 @@ async function isHandoffEmailVerified(db: Queryable, bot: Bot, email: string): P
  * to email to that address. Limited to one code per CODE_RESEND_SECONDS and
  * HANDOFF_CODES_PER_DAY per bot, so this can't be used to mail strangers in bulk.
  */
-export async function startHandoffVerification(db: Db, userId: string, rawEmail: unknown): Promise<{ email: string; code: string }> {
+export async function startHandoffVerification(db: Db, who: BotScope, rawEmail: unknown): Promise<{ email: string; code: string }> {
   const email = normalizeEmail(rawEmail)
   if (email.length > 254 || !EMAIL.test(email)) {
     throw new BotSettingsError([{ path: "handoff.email", message: "Enter a valid email address" }])
   }
-  const bot = await getBotForUser(db, userId)
-  if (!canEditBot(bot.role)) throw new BotError("forbidden", "Only workspace owners and admins can change the bot")
+  const bot = await botForWrite(db, who)
   const code = newVerificationCode()
   const day = 24 * 60 * 60 * 1000
   return db.transaction(async (tx) => {
@@ -279,11 +409,11 @@ export async function startHandoffVerification(db: Db, userId: string, rawEmail:
 }
 
 /** Checks the emailed code and, if right, marks that address as confirmed for the bot's hand-offs. */
-export async function confirmHandoffEmail(db: Db, userId: string, rawCode: unknown): Promise<Bot> {
+export async function confirmHandoffEmail(db: Db, who: BotScope, rawCode: unknown): Promise<Bot> {
   const code = typeof rawCode === "string" ? rawCode.trim() : ""
   if (!/^\d{6}$/.test(code)) throw new BotError("invalid_code", "Enter the 6-digit code we sent you")
-  const bot = await getBotForUser(db, userId)
-  if (!canEditBot(bot.role)) throw new BotError("forbidden", "Only workspace owners and admins can change the bot")
+  const bot = await botForWrite(db, who)
+  const userId = scopeUser(who)
 
   // A wrong guess must still count, so failures are returned (committing the attempt) and thrown after
   const outcome = await db.transaction(async (tx) => {
@@ -305,5 +435,5 @@ export async function confirmHandoffEmail(db: Db, userId: string, rawCode: unkno
     return null
   })
   if (outcome) throw outcome
-  return getBotForUser(db, userId)
+  return getBotForUser(db, { userId, botId: bot.id })
 }
