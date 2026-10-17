@@ -80,3 +80,17 @@ test("OAuth-only accounts can't log in with a password", async () => {
   await oauthLogin(db, google())
   await assert.rejects(login(db, { email: "jane@example.com", password: "anything1" }), (e) => e instanceof AuthError && e.code === "invalid_credentials")
 })
+
+test("the provider's name becomes the display name, and fills one in for older accounts", async () => {
+  const { user } = await oauthLogin(db, google({ displayName: "  Jane   Doe " }))
+  assert.equal(user.displayName, "Jane Doe")
+
+  await db.query("update app.users set display_name = null where id = $1", [user.id])
+  assert.equal((await oauthLogin(db, google({ displayName: "Jane Doe" }))).user.displayName, "Jane Doe")
+})
+
+test("a display name the user chose survives later sign-ins", async () => {
+  const { user } = await oauthLogin(db, google({ displayName: "Jane Doe" }))
+  await db.query("update app.users set display_name = 'JD' where id = $1", [user.id])
+  assert.equal((await oauthLogin(db, google({ displayName: "Jane Doe" }))).user.displayName, "JD")
+})

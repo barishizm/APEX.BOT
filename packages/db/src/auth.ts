@@ -54,6 +54,8 @@ export interface User {
   id: string
   email: string
   username: string
+  // what to call them; null when unknown, so callers fall back to the username
+  displayName: string | null
   accountType: AccountType
   emailVerified: boolean
   createdAt: Date
@@ -74,17 +76,19 @@ interface UserRow {
   id: string
   email: string
   username: string
+  display_name: string | null
   account_type: AccountType
   email_verified_at: Date | null
   created_at: Date
 }
 
-const USER_COLUMNS = "u.id, u.email, u.username, u.account_type, u.email_verified_at, u.created_at"
+const USER_COLUMNS = "u.id, u.email, u.username, u.display_name, u.account_type, u.email_verified_at, u.created_at"
 
 const toUser = (r: UserRow): User => ({
   id: r.id,
   email: r.email,
   username: r.username,
+  displayName: r.display_name,
   accountType: r.account_type,
   emailVerified: r.email_verified_at !== null,
   createdAt: r.created_at,
@@ -92,6 +96,13 @@ const toUser = (r: UserRow): User => ({
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const USERNAME_RE = /^[A-Za-z0-9_.-]{3,32}$/
+
+/** Trims and collapses whitespace, drops control characters; null when nothing is left. */
+export function cleanDisplayName(raw: unknown): string | null {
+  if (typeof raw !== "string") return null
+  const name = raw.replace(/[\p{Cc}\p{Cf}]/gu, "").replace(/\s+/g, " ").trim()
+  return name ? Array.from(name).slice(0, 64).join("").trim() : null
+}
 
 function normalizeEmail(raw: unknown): string {
   const email = typeof raw === "string" ? raw.trim().toLowerCase() : ""
@@ -447,12 +458,25 @@ export interface OAuthProfile {
   emailVerified: boolean
   // login/display name, used to suggest a username for new accounts
   username?: string
+  // the person's real name, if the provider has one
+  displayName?: string
   accountType?: AccountType
 }
 
 function suggestUsername(raw: string | undefined, email: string): string {
   const base = (raw || email.split("@")[0]).replace(/[^A-Za-z0-9_.-]/g, "").slice(0, 24)
   return base.length >= 3 ? base : `${base}user`.slice(0, 24)
+}
+
+// Records the login and, for accounts that have no display name yet, takes the provider's.
+// A name the user chose is never overwritten.
+async function touchOAuthLogin(tx: Queryable, userId: string, profile: OAuthProfile): Promise<UserRow> {
+  const { rows } = await tx.query<UserRow>(
+    `update app.users u set last_login_at = now(), display_name = coalesce(u.display_name, $2)
+      where u.id = $1 returning ${USER_COLUMNS}`,
+    [userId, cleanDisplayName(profile.displayName)],
+  )
+  return rows[0]
 }
 
 // Sign in (or sign up) with a Google/GitHub identity. Returns the existing
@@ -477,9 +501,8 @@ export async function oauthLogin(
         [profile.provider, profile.providerAccountId],
       )
       if (linked.rows[0]) {
-        const user = toUser(linked.rows[0])
+        const user = toUser(await touchOAuthLogin(tx, linked.rows[0].id, profile))
         const session = await createSession(tx, user.id, true, meta)
-        await tx.query("update app.users set last_login_at = now() where id = $1", [user.id])
         await logEvent(tx, "login", meta, user.id, user.email)
         return { user, session, isNew: false }
       }
@@ -505,8 +528,8 @@ export async function oauthLogin(
           "insert into app.oauth_accounts (provider, provider_account_id, user_id, email) values ($1, $2, $3, $4)",
           [profile.provider, profile.providerAccountId, row.id, email],
         )
+        row = await touchOAuthLogin(tx, row.id, profile)
         const session = await createSession(tx, row.id, true, meta)
-        await tx.query("update app.users set last_login_at = now() where id = $1", [row.id])
         await logEvent(tx, "login", meta, row.id, email)
         return { user: toUser(row), session, isNew: false }
       }
@@ -523,9 +546,9 @@ export async function oauthLogin(
         if (i === 5) throw new AuthError("username_taken", "Couldn't pick a username. Try signing up with email instead")
       }
       const created = await tx.query<UserRow>(
-        `insert into app.users as u (email, username, password_hash, account_type, email_verified_at, terms_accepted_at, terms_version, allow_training)
-         values ($1, $2, null, $3, now(), now(), $4, false) returning ${USER_COLUMNS}`,
-        [email, username, profile.accountType === "business" ? "business" : "personal", TERMS_VERSION],
+        `insert into app.users as u (email, username, display_name, password_hash, account_type, email_verified_at, terms_accepted_at, terms_version, allow_training)
+         values ($1, $2, $3, null, $4, now(), now(), $5, false) returning ${USER_COLUMNS}`,
+        [email, username, cleanDisplayName(profile.displayName), profile.accountType === "business" ? "business" : "personal", TERMS_VERSION],
       )
       const user = toUser(created.rows[0])
       const org = await tx.query<{ id: string }>("insert into app.organizations (name) values ($1) returning id", [username])
@@ -649,7 +672,7 @@ export async function getAccount(db: Db, userId: string, currentSessionId: strin
 export async function updateProfile(
   db: Db,
   userId: string,
-  input: { username?: unknown; allowTraining?: unknown },
+  input: { username?: unknown; displayName?: unknown; allowTraining?: unknown },
   meta: RequestMeta = {},
 ): Promise<User> {
   const sets: string[] = []
@@ -659,6 +682,12 @@ export async function updateProfile(
     if (!USERNAME_RE.test(username)) throw new AuthError("invalid_input", "Username must be 3-32 letters, numbers, dots, dashes or underscores")
     params.push(username)
     sets.push(`username = $${params.length}`)
+  }
+  if (input.displayName !== undefined) {
+    if (input.displayName !== null && typeof input.displayName !== "string") throw new AuthError("invalid_input", "Enter a name")
+    // an empty name clears it, and the greeting falls back to the username
+    params.push(cleanDisplayName(input.displayName))
+    sets.push(`display_name = $${params.length}`)
   }
   if (input.allowTraining !== undefined) {
     if (typeof input.allowTraining !== "boolean") throw new AuthError("invalid_input", "Choose yes or no")

@@ -9,6 +9,7 @@ import { currentBot, currentSources, getSetup, shownSite } from "@/lib/dashboard
 import { db } from "@/lib/db"
 import { SETUP_STEPS } from "@/lib/setup-steps"
 import { embedSnippet } from "@/lib/site"
+import { firstName } from "@/lib/display-name"
 import { format } from "@/lib/i18n"
 import { getAppDictionary } from "@/lib/i18n/app"
 import { formatNumber, formatPercent, plural, timeAgo } from "@/lib/i18n/format"
@@ -43,7 +44,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     <DashboardFrame active="Overview" intro={welcome === "1"}>
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8 sm:px-8">
         <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold tracking-tight">{format(t.welcome, { name: user.username })}</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">{format(t.welcome, { name: firstName(user, locale) })}</h1>
           <p className="text-[var(--color-muted)]">
             {next ? t.stepsLeft : format(t.live, { bot: s.general.botName })}
           </p>
