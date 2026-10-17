@@ -3,8 +3,12 @@ import type { Db, Queryable } from "./db.ts"
 import {
   burnPasswordCheck,
   hashPassword,
+  matchTotp,
+  newRecoveryCode,
   newSessionToken,
+  newTotpSecret,
   newVerificationCode,
+  normalizeRecoveryCode,
   sha256,
   verifyPassword,
 } from "./crypto.ts"
@@ -14,6 +18,9 @@ export const SESSION_TTL_MS = { persistent: 30 * DAY_MS, browser: DAY_MS }
 export const CODE_TTL_MS = 15 * 60 * 1000
 export const CODE_MAX_ATTEMPTS = 5
 export const CODE_RESEND_SECONDS = 30
+// Time to type the authenticator code after the password (or Google/GitHub) check passed
+export const CHALLENGE_TTL_MS = 10 * 60 * 1000
+export const RECOVERY_CODE_COUNT = 10
 // Wrong codes allowed per account across ALL codes in the window. The per-code
 // limit alone is reset by every resend, so this caps total guessing.
 export const CODE_FAIL_LIMIT = { max: 10, windowMinutes: 60 }
@@ -39,6 +46,9 @@ export type AuthErrorCode =
   | "already_verified"
   | "unauthorized"
   | "signups_closed"
+  | "forbidden"
+  | "not_found"
+  | "conflict"
 
 export class AuthError extends Error {
   constructor(
@@ -58,6 +68,8 @@ export interface User {
   displayName: string | null
   accountType: AccountType
   emailVerified: boolean
+  /** Signing in also needs a code from an authenticator app. */
+  twoFactor: boolean
   createdAt: Date
 }
 
@@ -79,10 +91,12 @@ interface UserRow {
   display_name: string | null
   account_type: AccountType
   email_verified_at: Date | null
+  two_factor: boolean
   created_at: Date
 }
 
-const USER_COLUMNS = "u.id, u.email, u.username, u.display_name, u.account_type, u.email_verified_at, u.created_at"
+const USER_COLUMNS =
+  "u.id, u.email, u.username, u.display_name, u.account_type, u.email_verified_at, u.totp_enabled_at is not null as two_factor, u.created_at"
 
 const toUser = (r: UserRow): User => ({
   id: r.id,
@@ -91,6 +105,7 @@ const toUser = (r: UserRow): User => ({
   displayName: r.display_name,
   accountType: r.account_type,
   emailVerified: r.email_verified_at !== null,
+  twoFactor: r.two_factor,
   createdAt: r.created_at,
 })
 
@@ -104,7 +119,7 @@ export function cleanDisplayName(raw: unknown): string | null {
   return name ? Array.from(name).slice(0, 64).join("").trim() : null
 }
 
-function normalizeEmail(raw: unknown): string {
+export function normalizeEmail(raw: unknown): string {
   const email = typeof raw === "string" ? raw.trim().toLowerCase() : ""
   if (!EMAIL_RE.test(email) || email.length > 254) throw new AuthError("invalid_input", "Enter a valid email address")
   return email
@@ -135,6 +150,10 @@ type AuthEvent =
   | "sessions_revoked"
   | "profile_updated"
   | "account_deleted"
+  | "two_factor_enabled"
+  | "two_factor_disabled"
+  | "two_factor_failed"
+  | "recovery_codes_created"
 
 async function logEvent(q: Queryable, event: AuthEvent, meta: RequestMeta, userId: string | null, email: string | null) {
   await q.query(
@@ -144,7 +163,7 @@ async function logEvent(q: Queryable, event: AuthEvent, meta: RequestMeta, userI
 }
 
 // Throws once an account has had too many wrong codes recently, whichever code they were for.
-async function assertCodeGuessesLeft(q: Queryable, userId: string, event: "verify_failed" | "reset_failed") {
+async function assertCodeGuessesLeft(q: Queryable, userId: string, event: "verify_failed" | "reset_failed" | "two_factor_failed") {
   const { rows } = await q.query<{ n: number }>(
     `select count(*)::int as n from app.auth_events
       where user_id = $1 and event = $2 and created_at > now() - make_interval(mins => $3)`,
@@ -197,6 +216,30 @@ async function createSession(q: Queryable, userId: string, persistent: boolean, 
     [userId, sha256(token), persistent, expiresAt, cleanIp(meta.ip), cleanAgent(meta.userAgent)],
   )
   return { token, expiresAt, persistent }
+}
+
+/**
+ * What a correct password or Google/GitHub sign-in gets: a session, or for accounts with
+ * two-step sign-in a challenge that an authenticator code must answer first.
+ */
+export type SignIn = { user: User; session: NewSession; challenge?: undefined } | { user: User; session?: undefined; challenge: NewSession }
+
+async function signIn(tx: Queryable, user: User, persistent: boolean, meta: RequestMeta): Promise<SignIn> {
+  if (user.twoFactor) {
+    await tx.query("delete from app.login_challenges where user_id = $1 and expires_at <= now()", [user.id])
+    const token = newSessionToken()
+    const expiresAt = new Date(Date.now() + CHALLENGE_TTL_MS)
+    await tx.query("insert into app.login_challenges (user_id, token_hash, persistent, expires_at) values ($1, $2, $3, $4)", [
+      user.id,
+      sha256(token),
+      persistent,
+      expiresAt,
+    ])
+    return { user, challenge: { token, expiresAt, persistent } }
+  }
+  const session = await createSession(tx, user.id, persistent, meta)
+  await logEvent(tx, "login", meta, user.id, user.email)
+  return { user, session }
 }
 
 type CodePurpose = "email_verify" | "password_reset"
@@ -291,7 +334,7 @@ export async function login(
   db: Db,
   input: { email: unknown; password: unknown; remember?: unknown },
   meta: RequestMeta = {},
-): Promise<{ user: User; session: NewSession }> {
+): Promise<SignIn> {
   const email = normalizeEmail(input.email)
   const password = typeof input.password === "string" ? input.password.slice(0, 200) : ""
   const ip = cleanIp(meta.ip)
@@ -323,10 +366,9 @@ export async function login(
   }
 
   return db.transaction(async (tx) => {
-    const session = await createSession(tx, row.id, input.remember === true, meta)
-    await tx.query("update app.users set last_login_at = now() where id = $1", [row.id])
-    await logEvent(tx, "login", meta, row.id, email)
-    return { user: toUser(row), session }
+    const result = await signIn(tx, toUser(row), input.remember === true, meta)
+    if (result.session) await tx.query("update app.users set last_login_at = now() where id = $1", [row.id])
+    return result
   })
 }
 
@@ -487,7 +529,7 @@ export async function oauthLogin(
   profile: OAuthProfile,
   meta: RequestMeta = {},
   options: { allowSignup?: boolean } = {},
-): Promise<{ user: User; session: NewSession; isNew: boolean }> {
+): Promise<SignIn & { isNew: boolean }> {
   if (!profile.emailVerified) {
     throw new AuthError("invalid_input", "Your provider has no verified email for this account. Verify it there and try again")
   }
@@ -502,9 +544,7 @@ export async function oauthLogin(
       )
       if (linked.rows[0]) {
         const user = toUser(await touchOAuthLogin(tx, linked.rows[0].id, profile))
-        const session = await createSession(tx, user.id, true, meta)
-        await logEvent(tx, "login", meta, user.id, user.email)
-        return { user, session, isNew: false }
+        return { ...(await signIn(tx, user, true, meta)), isNew: false }
       }
 
       const existing = await tx.query<UserRow>(`select ${USER_COLUMNS} from app.users u where u.email = $1 for update`, [email])
@@ -523,15 +563,18 @@ export async function oauthLogin(
             "update app.verification_codes set consumed_at = now() where user_id = $1 and consumed_at is null",
             [row.id],
           )
+          // nor may an authenticator they set up lock the owner out
+          await tx.query("update app.users set totp_secret = null, totp_enabled_at = null, totp_last_step = null where id = $1", [row.id])
+          await tx.query("delete from app.recovery_codes where user_id = $1", [row.id])
+          await tx.query("delete from app.login_challenges where user_id = $1", [row.id])
+          row = { ...row, two_factor: false }
         }
         await tx.query(
           "insert into app.oauth_accounts (provider, provider_account_id, user_id, email) values ($1, $2, $3, $4)",
           [profile.provider, profile.providerAccountId, row.id, email],
         )
         row = await touchOAuthLogin(tx, row.id, profile)
-        const session = await createSession(tx, row.id, true, meta)
-        await logEvent(tx, "login", meta, row.id, email)
-        return { user: toUser(row), session, isNew: false }
+        return { ...(await signIn(tx, toUser(row), true, meta)), isNew: false }
       }
 
       if (options.allowSignup === false) throw new AuthError("signups_closed", "Sign-ups are closed for now. Join the waitlist")
@@ -594,12 +637,15 @@ export async function requestPasswordReset(db: Db, rawEmail: unknown, meta: Requ
   })
 }
 
-/** Sets a new password with an emailed code, signs out every device and starts a new session. */
+/**
+ * Sets a new password with an emailed code, signs out every device and starts a new session
+ * (or, with two-step sign-in on, a challenge: the inbox alone doesn't skip the authenticator).
+ */
 export async function resetPassword(
   db: Db,
   input: { email: unknown; code: unknown; password: unknown },
   meta: RequestMeta = {},
-): Promise<{ user: User; session: NewSession }> {
+): Promise<SignIn> {
   const email = normalizeEmail(input.email)
   const code = typeof input.code === "string" ? input.code.trim() : ""
   if (!/^\d{6}$/.test(code)) throw new AuthError("invalid_input", "Enter the 6-digit code we sent you")
@@ -636,9 +682,8 @@ export async function resetPassword(
       [live.user_id, passwordHash],
     )
     await tx.query("delete from app.sessions where user_id = $1", [live.user_id])
-    const session = await createSession(tx, live.user_id, false, meta)
     await logEvent(tx, "password_reset", meta, live.user_id, email)
-    return { user: toUser(updated.rows[0]), session }
+    return signIn(tx, toUser(updated.rows[0]), false, meta)
   })
   if ("error" in outcome) throw outcome.error
   return outcome
@@ -654,19 +699,31 @@ export interface Account {
   /** Signed-in devices other than this one. */
   otherSessions: number
   allowTraining: boolean
+  /** Unused recovery codes; 0 when two-step sign-in is off. */
+  recoveryCodesLeft: number
 }
 
 export async function getAccount(db: Db, userId: string, currentSessionId: string): Promise<Account> {
-  const { rows } = await db.query<UserRow & { has_password: boolean; allow_training: boolean; providers: OAuthProvider[] | null; other_sessions: number }>(
+  const { rows } = await db.query<
+    UserRow & { has_password: boolean; allow_training: boolean; providers: OAuthProvider[] | null; other_sessions: number; recovery_left: number }
+  >(
     `select ${USER_COLUMNS}, u.password_hash is not null as has_password, u.allow_training,
             (select array_agg(provider order by provider) from app.oauth_accounts o where o.user_id = u.id) as providers,
-            (select count(*)::int from app.sessions s where s.user_id = u.id and s.id <> $2 and s.expires_at > now()) as other_sessions
+            (select count(*)::int from app.sessions s where s.user_id = u.id and s.id <> $2 and s.expires_at > now()) as other_sessions,
+            (select count(*)::int from app.recovery_codes r where r.user_id = u.id and r.used_at is null) as recovery_left
        from app.users u where u.id = $1`,
     [userId, currentSessionId],
   )
   const row = rows[0]
   if (!row) throw new AuthError("unauthorized", "Log in again")
-  return { user: toUser(row), hasPassword: row.has_password, providers: row.providers ?? [], otherSessions: row.other_sessions, allowTraining: row.allow_training }
+  return {
+    user: toUser(row),
+    hasPassword: row.has_password,
+    providers: row.providers ?? [],
+    otherSessions: row.other_sessions,
+    allowTraining: row.allow_training,
+    recoveryCodesLeft: row.two_factor ? row.recovery_left : 0,
+  }
 }
 
 export async function updateProfile(
@@ -757,6 +814,18 @@ export async function deleteAccount(db: Db, userId: string, confirmEmail: unknow
     if (typeof confirmEmail !== "string" || confirmEmail.trim().toLowerCase() !== rows[0].email) {
       throw new AuthError("invalid_input", "Type your email address exactly to confirm")
     }
+    // a workspace this user owns alone but shares with others passes to its longest-serving admin, else member
+    await tx.query(
+      `update app.organization_members set role = 'owner'
+        where (organization_id, user_id) in (
+          select distinct on (m.organization_id) m.organization_id, m.user_id
+            from app.organization_members m
+           where m.user_id <> $1
+             and exists (select 1 from app.organization_members me where me.organization_id = m.organization_id and me.user_id = $1 and me.role = 'owner')
+             and not exists (select 1 from app.organization_members o where o.organization_id = m.organization_id and o.user_id <> $1 and o.role = 'owner')
+           order by m.organization_id, (m.role = 'admin') desc, m.created_at)`,
+      [userId],
+    )
     await tx.query(
       `delete from app.organizations o
         where exists (select 1 from app.organization_members m where m.organization_id = o.id and m.user_id = $1)
@@ -767,4 +836,225 @@ export async function deleteAccount(db: Db, userId: string, confirmEmail: unknow
     // kept without the user id so the log still shows the erasure happened
     await logEvent(tx, "account_deleted", meta, null, null)
   })
+}
+
+// ---------- Changing the account email ----------
+
+/**
+ * Sends a code to a new address; the account email changes once `verifyEmail` accepts it.
+ * The current password is required whenever the account has one.
+ */
+export async function requestEmailChange(
+  db: Db,
+  userId: string,
+  input: { email: unknown; password?: unknown },
+  meta: RequestMeta = {},
+): Promise<{ code: string; email: string }> {
+  const email = normalizeEmail(input.email)
+  const { rows } = await db.query<{ email: string; password_hash: string | null }>("select email, password_hash from app.users where id = $1", [userId])
+  const row = rows[0]
+  if (!row) throw new AuthError("unauthorized", "Log in again")
+  if (email === row.email) throw new AuthError("invalid_input", "This is already your email address")
+  if (row.password_hash) {
+    const password = typeof input.password === "string" ? input.password.slice(0, 200) : ""
+    if (!(await verifyPassword(password, row.password_hash))) {
+      await logEvent(db, "login_failed", meta, userId, row.email)
+      throw new AuthError("invalid_credentials", "Your current password is incorrect")
+    }
+  }
+  return issueEmailCode(db, userId, { email }, meta)
+}
+
+// ---------- Two-step sign-in ----------
+
+const TOTP_ISSUER = "Apex Bot"
+
+/**
+ * Checks a second-factor code for an account with two-step sign-in on: a 6-digit authenticator
+ * code (each one works once) or an unused recovery code, which is then spent.
+ */
+async function checkSecondFactor(q: Queryable, userId: string, raw: unknown): Promise<"totp" | "recovery" | null> {
+  const input = typeof raw === "string" ? raw.trim().slice(0, 40) : ""
+  const { rows } = await q.query<{ totp_secret: string | null; totp_last_step: string | number | null }>(
+    "select totp_secret, totp_last_step from app.users where id = $1 and totp_enabled_at is not null for update",
+    [userId],
+  )
+  const row = rows[0]
+  if (!row?.totp_secret) return null
+  const digits = input.replace(/\s/g, "")
+  if (/^\d{6}$/.test(digits)) {
+    const step = matchTotp(row.totp_secret, digits, row.totp_last_step === null ? null : Number(row.totp_last_step))
+    if (step === null) return null
+    await q.query("update app.users set totp_last_step = $2 where id = $1", [userId, step])
+    return "totp"
+  }
+  const recovery = normalizeRecoveryCode(input)
+  if (recovery.length !== 10) return null
+  const { rows: spent } = await q.query(
+    "update app.recovery_codes set used_at = now() where user_id = $1 and code_hash = $2 and used_at is null returning id",
+    [userId, sha256(recovery)],
+  )
+  return spent.length ? "recovery" : null
+}
+
+/**
+ * Runs `check` with the account's wrong-code budget: a wrong code is logged (and committed) before
+ * the error is thrown, so guesses always count.
+ */
+async function withSecondFactor<T>(
+  db: Db,
+  userId: string,
+  code: unknown,
+  meta: RequestMeta,
+  then: (tx: Queryable, factor: "totp" | "recovery") => Promise<T>,
+): Promise<T> {
+  const outcome = await db.transaction(async (tx): Promise<{ error: AuthError } | { value: T }> => {
+    try {
+      await assertCodeGuessesLeft(tx, userId, "two_factor_failed")
+    } catch (error) {
+      return { error: error as AuthError }
+    }
+    const factor = await checkSecondFactor(tx, userId, code)
+    if (!factor) {
+      await logEvent(tx, "two_factor_failed", meta, userId, null)
+      return { error: new AuthError("invalid_code", "Incorrect code. Try again") }
+    }
+    return { value: await then(tx, factor) }
+  })
+  if ("error" in outcome) throw outcome.error
+  return outcome.value
+}
+
+async function replaceRecoveryCodes(q: Queryable, userId: string, meta: RequestMeta): Promise<string[]> {
+  const codes = Array.from({ length: RECOVERY_CODE_COUNT }, newRecoveryCode)
+  await q.query("delete from app.recovery_codes where user_id = $1", [userId])
+  for (const code of codes) {
+    await q.query("insert into app.recovery_codes (user_id, code_hash) values ($1, $2)", [userId, sha256(normalizeRecoveryCode(code))])
+  }
+  await logEvent(q, "recovery_codes_created", meta, userId, null)
+  return codes
+}
+
+/** Second step of signing in: the challenge from `login`/`oauthLogin` and a code. Creates the session. */
+export async function completeTwoFactorLogin(
+  db: Db,
+  token: string | undefined | null,
+  code: unknown,
+  meta: RequestMeta = {},
+): Promise<{ user: User; session: NewSession; usedRecoveryCode: boolean; recoveryCodesLeft: number }> {
+  const expired = () => new AuthError("unauthorized", "Your sign-in timed out. Log in again")
+  if (!token) throw expired()
+  const outcome = await db.transaction(async (tx) => {
+    const { rows } = await tx.query<{ id: string; user_id: string; persistent: boolean; attempts: number; expired: boolean }>(
+      `select id, user_id, persistent, attempts, expires_at <= now() as expired
+         from app.login_challenges where token_hash = $1 for update`,
+      [sha256(token)],
+    )
+    const challenge = rows[0]
+    if (!challenge || challenge.expired) return { error: expired() }
+    if (challenge.attempts >= CODE_MAX_ATTEMPTS) {
+      await tx.query("delete from app.login_challenges where id = $1", [challenge.id])
+      return { error: new AuthError("too_many_attempts", "Too many incorrect codes. Log in again") }
+    }
+    try {
+      await assertCodeGuessesLeft(tx, challenge.user_id, "two_factor_failed")
+    } catch (error) {
+      return { error: error as AuthError }
+    }
+    const factor = await checkSecondFactor(tx, challenge.user_id, code)
+    if (!factor) {
+      await tx.query("update app.login_challenges set attempts = attempts + 1 where id = $1", [challenge.id])
+      await logEvent(tx, "two_factor_failed", meta, challenge.user_id, null)
+      return { error: new AuthError("invalid_code", "Incorrect code. Try again") }
+    }
+    await tx.query("delete from app.login_challenges where id = $1", [challenge.id])
+    const session = await createSession(tx, challenge.user_id, challenge.persistent, meta)
+    const updated = await tx.query<UserRow>(`update app.users u set last_login_at = now() where u.id = $1 returning ${USER_COLUMNS}`, [
+      challenge.user_id,
+    ])
+    const left = await tx.query<{ n: number }>("select count(*)::int as n from app.recovery_codes where user_id = $1 and used_at is null", [
+      challenge.user_id,
+    ])
+    const user = toUser(updated.rows[0])
+    await logEvent(tx, "login", meta, user.id, user.email)
+    return { user, session, usedRecoveryCode: factor === "recovery", recoveryCodesLeft: left.rows[0].n }
+  })
+  if ("error" in outcome) throw outcome.error
+  return outcome
+}
+
+/** Whether a challenge token from `login`/`oauthLogin` is still waiting for its code. */
+export async function hasLoginChallenge(db: Db, token: string | undefined | null): Promise<boolean> {
+  if (!token) return false
+  const { rows } = await db.query("select 1 from app.login_challenges where token_hash = $1 and expires_at > now()", [sha256(token)])
+  return rows.length > 0
+}
+
+/**
+ * Starts setting up an authenticator app: a fresh secret, not in force until `enableTwoFactor`
+ * confirms a code from it. `uri` is what the QR code holds.
+ */
+export async function beginTwoFactorSetup(db: Db, userId: string): Promise<{ secret: string; uri: string }> {
+  const secret = newTotpSecret()
+  const { rows } = await db.query<{ email: string }>(
+    `update app.users set totp_secret = $2, totp_last_step = null
+      where id = $1 and totp_enabled_at is null and email_verified_at is not null returning email`,
+    [userId, secret],
+  )
+  if (!rows[0]) {
+    const { rows: found } = await db.query<{ enabled: boolean }>("select totp_enabled_at is not null as enabled from app.users where id = $1", [userId])
+    if (!found[0]) throw new AuthError("unauthorized", "Log in again")
+    if (!found[0].enabled) throw new AuthError("forbidden", "Verify your email first")
+    throw new AuthError("conflict", "Two-step sign-in is already on")
+  }
+  const label = encodeURIComponent(`${TOTP_ISSUER}:${rows[0].email}`)
+  const uri = `otpauth://totp/${label}?secret=${secret}&issuer=${encodeURIComponent(TOTP_ISSUER)}&algorithm=SHA1&digits=6&period=30`
+  return { secret, uri }
+}
+
+/** Turns two-step sign-in on with a code from the app just set up. Returns the recovery codes, shown once. */
+export async function enableTwoFactor(db: Db, userId: string, rawCode: unknown, meta: RequestMeta = {}): Promise<{ recoveryCodes: string[] }> {
+  const code = typeof rawCode === "string" ? rawCode.replace(/\s/g, "") : ""
+  if (!/^\d{6}$/.test(code)) throw new AuthError("invalid_input", "Enter the 6-digit code from your authenticator app")
+  const outcome = await db.transaction(async (tx): Promise<{ error: AuthError } | { recoveryCodes: string[] }> => {
+    const { rows } = await tx.query<{ totp_secret: string | null; enabled: boolean }>(
+      "select totp_secret, totp_enabled_at is not null as enabled from app.users where id = $1 for update",
+      [userId],
+    )
+    const row = rows[0]
+    if (!row) return { error: new AuthError("unauthorized", "Log in again") }
+    if (row.enabled) return { error: new AuthError("conflict", "Two-step sign-in is already on") }
+    if (!row.totp_secret) return { error: new AuthError("invalid_input", "Start the setup again") }
+    try {
+      await assertCodeGuessesLeft(tx, userId, "two_factor_failed")
+    } catch (error) {
+      return { error: error as AuthError }
+    }
+    const step = matchTotp(row.totp_secret, code, null)
+    if (step === null) {
+      await logEvent(tx, "two_factor_failed", meta, userId, null)
+      return { error: new AuthError("invalid_code", "That code didn't match. Check the time on your phone and try the newest code") }
+    }
+    await tx.query("update app.users set totp_enabled_at = now(), totp_last_step = $2 where id = $1", [userId, step])
+    const recoveryCodes = await replaceRecoveryCodes(tx, userId, meta)
+    await logEvent(tx, "two_factor_enabled", meta, userId, null)
+    return { recoveryCodes }
+  })
+  if ("error" in outcome) throw outcome.error
+  return outcome
+}
+
+/** Turns two-step sign-in off. Needs an authenticator or recovery code. */
+export async function disableTwoFactor(db: Db, userId: string, code: unknown, meta: RequestMeta = {}): Promise<void> {
+  await withSecondFactor(db, userId, code, meta, async (tx) => {
+    await tx.query("update app.users set totp_secret = null, totp_enabled_at = null, totp_last_step = null where id = $1", [userId])
+    await tx.query("delete from app.recovery_codes where user_id = $1", [userId])
+    await tx.query("delete from app.login_challenges where user_id = $1", [userId])
+    await logEvent(tx, "two_factor_disabled", meta, userId, null)
+  })
+}
+
+/** Replaces the recovery codes (the old ones stop working). Needs an authenticator or recovery code. */
+export async function regenerateRecoveryCodes(db: Db, userId: string, code: unknown, meta: RequestMeta = {}): Promise<{ recoveryCodes: string[] }> {
+  return withSecondFactor(db, userId, code, meta, async (tx) => ({ recoveryCodes: await replaceRecoveryCodes(tx, userId, meta) }))
 }

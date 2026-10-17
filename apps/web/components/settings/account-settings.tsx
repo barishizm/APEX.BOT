@@ -1,6 +1,6 @@
 "use client"
 
-import { Check, LoaderCircle } from "lucide-react"
+import { Check, Copy, Download, LoaderCircle, ShieldCheck } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { useAppI18n } from "@/components/i18n/app-provider"
@@ -19,6 +19,8 @@ type Account = {
   providers: string[]
   otherSessions: number
   allowTraining: boolean
+  twoFactor: boolean
+  recoveryCodesLeft: number
 }
 
 type Status = { kind: "idle" } | { kind: "busy" } | { kind: "ok"; message: string } | { kind: "error"; message: string }
@@ -55,6 +57,340 @@ function StatusText({ status }: { status: Status }) {
 }
 
 const PROVIDER_NAME: Record<string, string> = { google: "Google", github: "GitHub" }
+
+const field =
+  "h-10 rounded-lg border border-[var(--color-line)] bg-[var(--color-raised)] px-3 text-sm font-normal outline-none focus:border-[var(--color-secondary)]"
+const label = "flex flex-col gap-1.5 text-sm font-medium"
+
+type Send = (path: string, method: string, body?: object) => ReturnType<typeof call>
+type T = ReturnType<typeof useAppI18n>["t"]["settings"]
+
+/** New address and (when there is one) the password, then the code mailed to the new address. */
+function EmailSection({ t, send, email, hasPassword, onChanged }: { t: T; send: Send; email: string; hasPassword: boolean; onChanged: (email: string) => void }) {
+  const [step, setStep] = useState<"idle" | "form" | "code">("idle")
+  const [next, setNext] = useState("")
+  const [password, setPassword] = useState("")
+  const [code, setCode] = useState("")
+  const [sentTo, setSentTo] = useState("")
+  const [status, setStatus] = useState<Status>({ kind: "idle" })
+
+  const reset = () => {
+    setStep("idle")
+    setNext("")
+    setPassword("")
+    setCode("")
+  }
+
+  const request = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setStatus({ kind: "busy" })
+    const { ok, data } = await send("/api/account/email", "POST", { email: next, password })
+    if (!ok) return setStatus({ kind: "error", message: data.message ?? t.emailFailed })
+    setSentTo(data.email)
+    setPassword("")
+    setStep("code")
+    setStatus({ kind: "idle" })
+  }
+
+  const confirm = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setStatus({ kind: "busy" })
+    const { ok, data } = await send("/api/account/email/confirm", "POST", { code })
+    if (!ok) return setStatus({ kind: "error", message: data.message ?? t.emailFailed })
+    reset()
+    onChanged(data.user.email)
+    setStatus({ kind: "ok", message: format(t.emailChanged, { email: data.user.email }) })
+  }
+
+  const busy = status.kind === "busy"
+  return (
+    <Group title={t.email} description={t.emailHint}>
+      {step === "idle" && (
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="break-all text-sm font-medium">{email}</span>
+          <button type="button" className={ghost} onClick={() => (setStep("form"), setStatus({ kind: "idle" }))}>
+            {t.changeEmail}
+          </button>
+          <StatusText status={status} />
+        </div>
+      )}
+      {step === "form" && (
+        <form onSubmit={request} className="flex flex-col gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className={label}>
+              {t.newEmail}
+              <input type="email" autoComplete="email" autoFocus required value={next} onChange={(e) => setNext(e.target.value)} className={field} />
+            </label>
+            {hasPassword && (
+              <label className={label}>
+                {t.currentPassword}
+                <input type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} className={field} />
+              </label>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <button type="submit" className={primary} disabled={busy || !next.trim() || (hasPassword && !password)}>
+              {busy && <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />}
+              {t.sendCode}
+            </button>
+            <button type="button" className={ghost} onClick={() => (reset(), setStatus({ kind: "idle" }))}>
+              {t.cancel}
+            </button>
+            <StatusText status={status} />
+          </div>
+        </form>
+      )}
+      {step === "code" && (
+        <form onSubmit={confirm} className="flex flex-col gap-4">
+          <p className="text-sm">{format(t.emailCodeSent, { email: sentTo })}</p>
+          <label className={label}>
+            {t.emailCode}
+            <input
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              autoFocus
+              maxLength={6}
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+              className={`${field} w-40 font-mono tracking-[0.3em]`}
+            />
+          </label>
+          <div className="flex flex-wrap items-center gap-3">
+            <button type="submit" className={primary} disabled={busy || code.length !== 6}>
+              {busy && <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />}
+              {t.confirm}
+            </button>
+            <button type="button" className={ghost} onClick={() => (reset(), setStatus({ kind: "idle" }))}>
+              {t.cancel}
+            </button>
+            <StatusText status={status} />
+          </div>
+        </form>
+      )}
+    </Group>
+  )
+}
+
+function RecoveryCodes({ t, codes, onDone }: { t: T; codes: string[]; onDone: () => void }) {
+  const [copied, setCopied] = useState(false)
+  const text = codes.join("\n")
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+    } catch {}
+  }
+  const download = () => {
+    const url = URL.createObjectURL(new Blob([`Apex Bot recovery codes\n\n${text}\n`], { type: "text/plain" }))
+    const a = Object.assign(document.createElement("a"), { href: url, download: "apex-bot-recovery-codes.txt" })
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+  return (
+    <div className="flex flex-col gap-4 rounded-xl border border-amber-500/40 bg-amber-500/5 p-4">
+      <div className="flex flex-col gap-1">
+        <h3 className="text-sm font-semibold">{t.recoveryTitle}</h3>
+        <p className="text-sm text-[var(--color-muted)]">{t.recoveryText}</p>
+      </div>
+      <ul className="m-0 grid list-none grid-cols-2 gap-x-6 gap-y-1.5 p-0 font-mono text-sm sm:grid-cols-3">
+        {codes.map((c) => (
+          <li key={c}>{c}</li>
+        ))}
+      </ul>
+      <div className="flex flex-wrap items-center gap-3">
+        <button type="button" className={ghost} onClick={copy}>
+          {copied ? <Check className="h-4 w-4" aria-hidden /> : <Copy className="h-4 w-4" aria-hidden />}
+          {copied ? t.copied : t.copy}
+        </button>
+        <button type="button" className={ghost} onClick={download}>
+          <Download className="h-4 w-4" aria-hidden />
+          {t.download}
+        </button>
+        <button type="button" className={primary} onClick={onDone}>
+          {t.savedThem}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/** Authenticator-app sign-in: set up with a QR code, then recovery codes; turning off needs a code. */
+function TwoFactorSection({
+  t,
+  send,
+  enabled,
+  recoveryLeft,
+  onChange,
+}: {
+  t: T
+  send: Send
+  enabled: boolean
+  recoveryLeft: number
+  onChange: (state: { twoFactor: boolean; recoveryCodesLeft: number }) => void
+}) {
+  const [mode, setMode] = useState<"idle" | "setup" | "codes" | "off" | "regenerate">("idle")
+  const [setup, setSetup] = useState<{ secret: string; qr: string } | null>(null)
+  const [code, setCode] = useState("")
+  const [codes, setCodes] = useState<string[]>([])
+  const [status, setStatus] = useState<Status>({ kind: "idle" })
+  const busy = status.kind === "busy"
+
+  const go = (next: typeof mode) => {
+    setMode(next)
+    setCode("")
+    setStatus({ kind: "idle" })
+  }
+
+  const begin = async () => {
+    setStatus({ kind: "busy" })
+    const { ok, data } = await send("/api/account/two-factor", "POST")
+    if (!ok) return setStatus({ kind: "error", message: data.message ?? t.twoFactorFailed })
+    setSetup(data)
+    go("setup")
+  }
+
+  const turnOn = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setStatus({ kind: "busy" })
+    const { ok, data } = await send("/api/account/two-factor", "PUT", { code })
+    if (!ok) return setStatus({ kind: "error", message: data.message ?? t.twoFactorFailed })
+    setCodes(data.recoveryCodes)
+    setSetup(null)
+    onChange({ twoFactor: true, recoveryCodesLeft: data.recoveryCodes.length })
+    go("codes")
+  }
+
+  const confirm = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setStatus({ kind: "busy" })
+    if (mode === "off") {
+      const { ok, data } = await send("/api/account/two-factor", "DELETE", { code })
+      if (!ok) return setStatus({ kind: "error", message: data.message ?? t.twoFactorFailed })
+      onChange({ twoFactor: false, recoveryCodesLeft: 0 })
+      setMode("idle")
+      setCode("")
+      return setStatus({ kind: "ok", message: t.twoFactorDisabled })
+    }
+    const { ok, data } = await send("/api/account/two-factor/recovery-codes", "POST", { code })
+    if (!ok) return setStatus({ kind: "error", message: data.message ?? t.twoFactorFailed })
+    setCodes(data.recoveryCodes)
+    onChange({ twoFactor: true, recoveryCodesLeft: data.recoveryCodes.length })
+    go("codes")
+  }
+
+  return (
+    <Group title={t.twoFactor} description={t.twoFactorHint}>
+      {mode !== "setup" && mode !== "codes" && (
+        <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
+          <dt className="text-[var(--color-muted)]">{t.status}</dt>
+          <dd className="m-0 flex items-center gap-1.5">
+            {enabled && <ShieldCheck className="h-4 w-4 text-green-600" aria-hidden />}
+            {enabled ? t.on : t.off}
+          </dd>
+          {enabled && (
+            <>
+              <dt className="text-[var(--color-muted)]">{t.recoveryLeft}</dt>
+              <dd className={`m-0 ${recoveryLeft <= 2 ? "font-semibold text-amber-600 dark:text-amber-400" : ""}`}>{recoveryLeft}</dd>
+            </>
+          )}
+        </dl>
+      )}
+
+      {mode === "idle" && (
+        <div className="flex flex-wrap items-center gap-3">
+          {enabled ? (
+            <>
+              <button type="button" className={ghost} onClick={() => go("regenerate")}>
+                {t.newRecoveryCodes}
+              </button>
+              <button type="button" className={ghost} onClick={() => go("off")}>
+                {t.turnOff}
+              </button>
+            </>
+          ) : (
+            <button type="button" className={primary} onClick={begin} disabled={busy}>
+              {busy && <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />}
+              {t.setUp}
+            </button>
+          )}
+          <StatusText status={status} />
+        </div>
+      )}
+
+      {mode === "setup" && setup && (
+        <form onSubmit={turnOn} className="flex flex-col gap-4">
+          <p className="text-sm">{t.scanQr}</p>
+          <div className="flex flex-wrap items-start gap-5">
+            {/* the QR code is black on white whatever the theme, so every camera reads it */}
+            <img src={`data:image/svg+xml;utf8,${encodeURIComponent(setup.qr)}`} alt={t.qrAlt} width={168} height={168} className="rounded-lg bg-white p-2" />
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5 text-sm">
+              <span className="text-[var(--color-muted)]">{t.cantScan}</span>
+              <code className="break-all font-mono text-sm tracking-wider select-all">{setup.secret.match(/.{1,4}/g)?.join(" ")}</code>
+            </div>
+          </div>
+          <label className={label}>
+            {t.appCode}
+            <input
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              autoFocus
+              maxLength={6}
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+              className={`${field} w-40 font-mono tracking-[0.3em]`}
+            />
+          </label>
+          <div className="flex flex-wrap items-center gap-3">
+            <button type="submit" className={primary} disabled={busy || code.length !== 6}>
+              {busy && <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />}
+              {t.turnOn}
+            </button>
+            <button type="button" className={ghost} onClick={() => (setSetup(null), go("idle"))}>
+              {t.cancel}
+            </button>
+            <StatusText status={status} />
+          </div>
+        </form>
+      )}
+
+      {mode === "codes" && (
+        <RecoveryCodes
+          t={t}
+          codes={codes}
+          onDone={() => {
+            setCodes([])
+            go("idle")
+            setStatus({ kind: "ok", message: t.twoFactorEnabled })
+          }}
+        />
+      )}
+
+      {(mode === "off" || mode === "regenerate") && (
+        <form onSubmit={confirm} className="flex flex-col gap-4">
+          <p className="text-sm">{t.codeToConfirm}</p>
+          <label className={label}>
+            {t.codeOrRecovery}
+            <input autoComplete="one-time-code" autoFocus maxLength={20} value={code} onChange={(e) => setCode(e.target.value)} className={`${field} w-56 font-mono`} />
+          </label>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="submit"
+              className={mode === "off" ? `${ghost} border-red-500/50 text-red-600 hover:border-red-500 dark:text-red-400` : primary}
+              disabled={busy || code.trim().length < 6}
+            >
+              {busy && <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />}
+              {mode === "off" ? t.turnOff : t.newRecoveryCodes}
+            </button>
+            <button type="button" className={ghost} onClick={() => go("idle")}>
+              {t.cancel}
+            </button>
+            <StatusText status={status} />
+          </div>
+        </form>
+      )}
+    </Group>
+  )
+}
 
 export function AccountSettings({ initial }: { initial: Account }) {
   const { t: app, locale } = useAppI18n()
@@ -152,7 +488,6 @@ export function AccountSettings({ initial }: { initial: Account }) {
           <form onSubmit={saveProfile} className="flex flex-col gap-4">
             <TextInput label={t.displayName} value={displayName} onChange={setDisplayName} hint={t.displayNameHint} />
             <TextInput label={t.username} value={username} onChange={setUsername} hint={t.usernameHint} />
-            <TextInput label={t.email} value={account.email} onChange={() => {}} disabled hint={t.emailHint} />
             <div className="flex items-center gap-3">
               <button type="submit" className={primary} disabled={profile.kind === "busy" || (username.trim() === account.username && displayName.trim() === account.displayName)}>
                 {profile.kind === "busy" && <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />}
@@ -162,6 +497,17 @@ export function AccountSettings({ initial }: { initial: Account }) {
             </div>
           </form>
         </Group>
+
+        <EmailSection
+          t={t}
+          send={send}
+          email={account.email}
+          hasPassword={account.hasPassword}
+          onChanged={(email) => {
+            setAccount((a) => ({ ...a, email }))
+            router.refresh()
+          }}
+        />
 
         <Group title={t.language} description={t.languageHint}>
           <select
@@ -249,6 +595,14 @@ export function AccountSettings({ initial }: { initial: Account }) {
             <StatusText status={sessions} />
           </div>
         </Group>
+
+        <TwoFactorSection
+          t={t}
+          send={send}
+          enabled={account.twoFactor}
+          recoveryLeft={account.recoveryCodesLeft}
+          onChange={(state) => setAccount((a) => ({ ...a, ...state }))}
+        />
 
         <Group title={t.privacy}>
           <Toggle

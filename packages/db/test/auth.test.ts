@@ -46,7 +46,7 @@ let db: Db
 before(async () => {
   pg = new PGlite()
   db = pgliteDb(pg)
-  assert.deepEqual(await migrate(db), ["0001_auth.sql", "0002_function_search_path.sql", "0003_bots.sql", "0004_knowledge.sql", "0005_bot_activity.sql", "0006_account.sql", "0007_conversations.sql", "0008_handoff_verification.sql", "0009_token_usage.sql", "0010_waitlist.sql", "0011_analytics.sql", "0012_knowledge_embeddings.sql", "0013_multi_site.sql", "0014_display_name.sql", "0015_message_topics.sql", "0016_conversation_context.sql"])
+  assert.deepEqual(await migrate(db), ["0001_auth.sql", "0002_function_search_path.sql", "0003_bots.sql", "0004_knowledge.sql", "0005_bot_activity.sql", "0006_account.sql", "0007_conversations.sql", "0008_handoff_verification.sql", "0009_token_usage.sql", "0010_waitlist.sql", "0011_analytics.sql", "0012_knowledge_embeddings.sql", "0013_multi_site.sql", "0014_display_name.sql", "0015_message_topics.sql", "0016_conversation_context.sql", "0017_account_security.sql"])
 })
 after(() => db.close())
 beforeEach(async () => {
@@ -137,10 +137,10 @@ describe("login", () => {
   test("right password signs in; remember controls persistence", async () => {
     await register(db, input())
     const short = await login(db, { email: " JANE@example.com ", password: "correct horse" }, meta)
-    assert.equal(short.session.persistent, false)
+    assert.equal(short.session!.persistent, false)
     const long = await login(db, { email: "jane@example.com", password: "correct horse", remember: true }, meta)
-    assert.equal(long.session.persistent, true)
-    assert.equal((await getSession(db, long.session.token))?.user.username, "janedoe")
+    assert.equal(long.session!.persistent, true)
+    assert.equal((await getSession(db, long.session!.token))?.user.username, "janedoe")
   })
 
   test("wrong password and unknown email fail the same way", async () => {

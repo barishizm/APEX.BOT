@@ -10,6 +10,8 @@ import { requestLocale } from "@/lib/i18n/server"
 export const SESSION_COOKIE = "apex_session"
 // Mirrors lib/signed-in.ts, which is client-only
 export const SIGNED_IN_COOKIE = "apex_signed_in"
+// Between a correct password (or Google/GitHub) and the authenticator code; see /two-factor
+export const CHALLENGE_COOKIE = "apex_2fa"
 
 export async function setSessionCookie(session: NewSession) {
   const jar = await cookies()
@@ -23,6 +25,36 @@ export async function setSessionCookie(session: NewSession) {
   jar.set(SESSION_COOKIE, session.token, { ...options, httpOnly: true })
   // readable hint for the static marketing pages; see lib/signed-in.ts
   jar.set(SIGNED_IN_COOKIE, "1", options)
+}
+
+export async function setChallengeCookie(challenge: NewSession) {
+  ;(await cookies()).set(CHALLENGE_COOKIE, challenge.token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    expires: challenge.expiresAt,
+  })
+}
+
+export async function challengeToken() {
+  return (await cookies()).get(CHALLENGE_COOKIE)?.value
+}
+
+export async function clearChallengeCookie() {
+  ;(await cookies()).delete(CHALLENGE_COOKIE)
+}
+
+const INVITE_PATH = /^\/invite\/([A-Za-z0-9_-]{20,100})$/
+
+/** Where to go after signing in: only an invitation link, so `?next=` can't send anyone off-site. */
+export function safeNext(raw: unknown): string | null {
+  return typeof raw === "string" && INVITE_PATH.test(raw) ? raw : null
+}
+
+/** The invitation token in a `next` path, if it is one. */
+export function inviteTokenFrom(next: unknown): string | null {
+  return typeof next === "string" ? (INVITE_PATH.exec(next)?.[1] ?? null) : null
 }
 
 export async function sessionToken() {
@@ -104,6 +136,9 @@ const STATUS: Record<AuthError["code"], number> = {
   code_expired: 400,
   already_verified: 409,
   signups_closed: 403,
+  forbidden: 403,
+  not_found: 404,
+  conflict: 409,
 }
 
 // A JSON error in the requester's language; `error` stays a stable code for the client

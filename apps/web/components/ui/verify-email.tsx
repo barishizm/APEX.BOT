@@ -25,7 +25,8 @@ async function postJson(path: string, body: object, networkError: string): Promi
   }
 }
 
-export default function VerifyEmail({ initialEmail }: { initialEmail: string }) {
+// `next` is an invitation link to return to once verified; otherwise onboarding comes next
+export default function VerifyEmail({ initialEmail, next }: { initialEmail: string; next?: string | null }) {
   const { t: app, locale } = useAppI18n()
   const a = app.account
   const t = a.verify
@@ -97,7 +98,7 @@ export default function VerifyEmail({ initialEmail }: { initialEmail: string }) 
       return
     }
     setVerified(true)
-    setTimeout(() => router.push("/onboarding"), 3000)
+    setTimeout(() => router.push(next ?? "/onboarding"), 3000)
   }
 
   const startEdit = () => {

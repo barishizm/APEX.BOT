@@ -21,7 +21,7 @@ export const LOCALE_COOKIE = "NEXT_LOCALE"
 export const isLocale = (value: unknown): value is Locale => typeof value === "string" && (LOCALES as readonly string[]).includes(value)
 
 // The signed-in app (outside app/[lang]) is not localized; its URLs never get a prefix
-export const APP_PATHS = ["/dashboard", "/onboarding", "/verify-email", "/forgot-password", "/database-update"]
+export const APP_PATHS = ["/dashboard", "/onboarding", "/verify-email", "/forgot-password", "/database-update", "/two-factor", "/invite"]
 const isAppPath = (path: string) =>
   APP_PATHS.some((root) => path.startsWith(root) && (path.length === root.length || "/?#".includes(path[root.length])))
 

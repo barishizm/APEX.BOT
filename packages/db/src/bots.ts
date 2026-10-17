@@ -90,15 +90,15 @@ export const newSiteKey = () => `apex_pk_${randomBytes(18).toString("hex")}`
 
 export const canEditBot = (role: MemberRole) => role === "owner" || role === "admin"
 
-// The workspace a user works in: the oldest one they own, else the oldest membership.
-async function membership(q: Queryable, userId: string) {
+// The workspace a user works in: the one they picked, else the oldest one they own, else the oldest membership.
+export async function membership(q: Queryable, userId: string) {
   const { rows } = await q.query<{ organization_id: string; name: string; role: MemberRole; email: string }>(
     `select m.organization_id, o.name, m.role, u.email
        from app.organization_members m
        join app.organizations o on o.id = m.organization_id
        join app.users u on u.id = m.user_id
       where m.user_id = $1
-      order by (m.role = 'owner') desc, m.created_at
+      order by coalesce(m.organization_id = u.active_organization_id, false) desc, (m.role = 'owner') desc, m.created_at
       limit 1`,
     [userId],
   )

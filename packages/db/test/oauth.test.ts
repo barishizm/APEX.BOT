@@ -35,7 +35,7 @@ test("new identity creates a verified account with a workspace", async () => {
   assert.equal(user.email, "jane@example.com")
   assert.equal(user.username, "JaneDoe")
   assert.equal(user.emailVerified, true)
-  assert.equal((await getSession(db, session.token))?.user.id, user.id)
+  assert.equal((await getSession(db, session!.token))?.user.id, user.id)
   const { rows } = await db.query<{ n: number }>("select count(*)::int as n from app.organization_members where user_id = $1", [user.id])
   assert.equal(rows[0].n, 1)
 })

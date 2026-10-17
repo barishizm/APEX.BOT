@@ -21,6 +21,7 @@ import {
   Settings2,
   Sparkles,
   SunMoon,
+  Users,
   type LucideIcon,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
@@ -57,7 +58,8 @@ function buildCommands(t: Strings, locale: Locale, setLocale: (l: Locale) => voi
     { group: g.goTo, label: c.analytics, icon: ChartColumn, keywords: "analytics stats reports charts topics unanswered analitik istatistik rapor konu yanıtsız", run: nav("/dashboard/analytics") },
     { group: g.goTo, label: c.sites, icon: Globe, keywords: "websites sites domains switch add web siteleri alan adı ekle", run: nav("/dashboard/sites") },
     { group: g.goTo, label: c.setup, icon: ListChecks, keywords: "onboarding progress kurulum", run: nav("/dashboard/onboarding/list") },
-    { group: g.goTo, label: c.settings, icon: Settings, keywords: "password username profile şifre kullanıcı", run: nav("/dashboard/settings") },
+    { group: g.goTo, label: c.team, icon: Users, keywords: "team members invite roles people ekip üye davet rol kişi", run: nav("/dashboard/team") },
+    { group: g.goTo, label: c.settings, icon: Settings, keywords: "password username profile email two-step 2fa authenticator şifre kullanıcı e-posta iki adımlı doğrulama", run: nav("/dashboard/settings") },
     { group: g.widget, label: c.general, icon: Settings2, keywords: "name company language isim şirket dil", run: nav("/dashboard/widget?section=general") },
     { group: g.widget, label: c.appearance, icon: Palette, keywords: "color launcher theme font renk tema", run: nav("/dashboard/widget?section=appearance") },
     { group: g.widget, label: c.messages, icon: MessageSquareText, keywords: "greeting suggestions disclaimer karşılama öneri", run: nav("/dashboard/widget?section=messages") },

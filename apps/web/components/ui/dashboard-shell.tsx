@@ -1,6 +1,6 @@
 "use client"
 
-import { ChartColumn, BookOpen, CircleHelp, Globe, LayoutDashboard, ListChecks, MessageSquareText, Palette, Search, Settings, type LucideIcon } from "lucide-react"
+import { ChartColumn, BookOpen, CircleHelp, Globe, LayoutDashboard, ListChecks, MessageSquareText, Palette, Search, Settings, Users, type LucideIcon } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useEffect, useState, type ReactNode } from "react"
@@ -11,9 +11,9 @@ import { CommandPalette } from "./command-palette"
 import { PrismFluxLoader } from "./prism-flux-loader"
 import { ProfileMenu } from "./profile-menu"
 
-export type NavLabel = "Overview" | "Analytics" | "Knowledge" | "Conversations" | "Widget" | "Setup" | "Sites" | "Settings"
+export type NavLabel = "Overview" | "Analytics" | "Knowledge" | "Conversations" | "Widget" | "Setup" | "Sites" | "Team" | "Settings"
 
-const NAV: { id: NavLabel; key: "overview" | "analytics" | "knowledge" | "conversations" | "widget" | "setup" | "sites"; icon: LucideIcon; href: string }[] = [
+const NAV: { id: NavLabel; key: "overview" | "analytics" | "knowledge" | "conversations" | "widget" | "setup" | "sites" | "team"; icon: LucideIcon; href: string }[] = [
   { id: "Overview", key: "overview", icon: LayoutDashboard, href: "/dashboard" },
   { id: "Analytics", key: "analytics", icon: ChartColumn, href: "/dashboard/analytics" },
   { id: "Knowledge", key: "knowledge", icon: BookOpen, href: "/dashboard/knowledge" },
@@ -21,6 +21,7 @@ const NAV: { id: NavLabel; key: "overview" | "analytics" | "knowledge" | "conver
   { id: "Widget", key: "widget", icon: Palette, href: "/dashboard/widget" },
   { id: "Setup", key: "setup", icon: ListChecks, href: "/dashboard/onboarding/list" },
   { id: "Sites", key: "sites", icon: Globe, href: "/dashboard/sites" },
+  { id: "Team", key: "team", icon: Users, href: "/dashboard/team" },
 ]
 
 const pill = "flex h-9 items-center gap-2 rounded-full border border-[var(--color-line)] bg-[var(--color-raised)] px-3 text-sm"
