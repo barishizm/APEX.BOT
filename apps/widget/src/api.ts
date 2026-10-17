@@ -30,6 +30,12 @@ export interface StoredMessage {
   feedback?: "up" | "down";
 }
 
+/** A hand-off request as the server acknowledged it. */
+export interface Ticket {
+  id: string;
+  createdAt: string;
+}
+
 export type ChatEvent =
   | { type: "meta"; conversationId: string }
   | { type: "delta"; text: string }
@@ -58,11 +64,14 @@ export class ApiClient {
 
   private async request(path: string, init: RequestInit = {}): Promise<Response> {
     let res: Response;
+    const get = !init.method || init.method === "GET";
     try {
-      res = await fetch(init.method && init.method !== "GET" ? this.base + path : this.url(path), {
+      res = await fetch(get ? this.url(path) : this.base + path, {
         ...init,
         credentials: "omit",
-        headers: init.body ? { "content-type": "application/json", "x-apex-site-key": this.siteKey } : undefined,
+        // never sent to the host page's server, and nothing about the visitor's page leaks to ours
+        referrerPolicy: "strict-origin",
+        headers: get ? undefined : { ...(init.body ? { "content-type": "application/json" } : {}), "x-apex-site-key": this.siteKey },
       });
     } catch (error) {
       if ((error as Error).name === "AbortError") throw error;
@@ -103,8 +112,16 @@ export class ApiClient {
     await this.request("/v1/feedback", { method: "POST", body: JSON.stringify({ conversationId, messageId, rating }) });
   }
 
-  async handoff(body: { conversationId: string | null; email: string; name: string; message: string }): Promise<void> {
-    await this.request("/v1/handoff", { method: "POST", body: JSON.stringify(body) });
+  /** The ticket, or null from an older API that doesn't issue them. */
+  async handoff(body: { conversationId: string | null; email: string; name: string; message: string }): Promise<Ticket | null> {
+    const res = await (await this.request("/v1/handoff", { method: "POST", body: JSON.stringify(body) })).json().catch(() => ({}));
+    const ticket = res?.ticket;
+    return ticket && /^[A-Z0-9-]{4,24}$/.test(ticket.id) && !Number.isNaN(Date.parse(ticket.createdAt)) ? { id: ticket.id, createdAt: ticket.createdAt } : null;
+  }
+
+  /** KVKK/GDPR erasure of the visitor's own conversation. */
+  async deleteConversation(id: string): Promise<void> {
+    await this.request(`/v1/conversations/${encodeURIComponent(id)}`, { method: "DELETE" });
   }
 
   async lead(body: { conversationId: string | null; email: string; name: string; phone: string }): Promise<string> {

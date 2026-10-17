@@ -1,4 +1,4 @@
-import { ApiClient, ApiError, type RemoteConfig, type Source, type StoredMessage, type WidgetUi } from "./api.ts";
+import { ApiClient, ApiError, type RemoteConfig, type Source, type StoredMessage, type Ticket, type WidgetUi } from "./api.ts";
 import { pickLang, strings, type Lang, type Strings } from "./i18n.ts";
 import { renderMarkdown } from "./markdown.ts";
 import { css } from "./styles.ts";
@@ -20,7 +20,12 @@ const ICONS = {
   chevron: '<path d="m6 9 6 6 6-6"/>',
   close: '<path d="M18 6 6 18M6 6l12 12"/>',
   send: '<path d="M12 19V5M5 12l7-7 7 7"/>',
-  reset: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/>',
+  more: '<circle cx="5" cy="12" r="1.7" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.7" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.7" fill="currentColor" stroke="none"/>',
+  compose: '<path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.4 2.6a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4Z"/>',
+  end: '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/><path d="m15 9-6 6M9 9l6 6"/>',
+  ticket: '<path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2M13 11v2M13 17v2"/>',
+  back: '<path d="m15 18-6-6 6-6"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
   up: '<path d="M7 10v12"/><path d="M15 5.9 14 10h5.8a2 2 0 0 1 1.9 2.6l-2.3 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.8a2 2 0 0 0 1.8-1.1L12 2a3.1 3.1 0 0 1 3 3.9Z"/>',
   down: '<path d="M17 14V2"/><path d="M9 18.1 10 14H4.2a2 2 0 0 1-1.9-2.6l2.3-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.8a2 2 0 0 0-1.8 1.1L12 22a3.1 3.1 0 0 1-3-3.9Z"/>',
   sparkle: '<path d="M12 3 14 9l6 2-6 2-2 6-2-6-6-2 6-2Z"/><path d="M19 3v4M21 5h-4"/>',
@@ -53,6 +58,45 @@ export function hiddenHere(ui: WidgetUi | undefined, path = location.pathname): 
 }
 
 const media = (query: string) => (typeof matchMedia === "function" ? matchMedia(query) : null);
+/** The visitor asked for less motion: transitions are skipped, not just shortened. */
+const still = () => !!media("(prefers-reduced-motion: reduce)")?.matches;
+
+/** Runs a short entrance animation where the Web Animations API exists and motion is welcome. */
+function enter(el: Element, from: Keyframe, ms = 220): void {
+  if (!still() && typeof el.animate === "function") el.animate([from, { opacity: 1, transform: "none" }], { duration: ms, easing: "cubic-bezier(.2,.8,.2,1)" });
+}
+
+/** Only web links: a javascript: or data: URL from settings or sources never becomes a link. */
+const webUrl = (url: unknown): string | undefined => (typeof url === "string" && /^https?:\/\//i.test(url) ? url : undefined);
+
+// Matches the API's own check (no whitespace or RFC 5322 specials), so the form never sends what the API rejects
+const EMAIL = /^[^\s@<>()[\]\\,;:"]{1,64}@[^\s@<>()[\]\\,;:"]+\.[^\s@<>()[\]\\,;:"]{2,}$/;
+const PHONE = /^\+?[\d\s().-]{7,40}$/;
+const TICKET_ID = /^[A-Z0-9-]{4,24}$/;
+const MAX_TICKETS = 20;
+// how long the panel's closing transition runs (styles.ts) before it is taken out of the layout
+const CLOSE_MS = 220;
+
+interface StoredTicket extends Ticket {
+  email: string;
+  note: string;
+}
+
+/** Storage is the visitor's, but other scripts on the page can write to it: only well-formed entries are read. */
+function isTicket(x: unknown): x is StoredTicket {
+  const t = x as StoredTicket;
+  return (
+    !!t &&
+    typeof t.id === "string" &&
+    TICKET_ID.test(t.id) &&
+    typeof t.createdAt === "string" &&
+    !Number.isNaN(Date.parse(t.createdAt)) &&
+    typeof t.email === "string" &&
+    t.email.length <= 254 &&
+    typeof t.note === "string" &&
+    t.note.length <= 280
+  );
+}
 
 // A short two-tone chime, synthesized so the bundle carries no audio file.
 function chime(): void {
@@ -108,9 +152,6 @@ function readableOn(hex: string): string {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.45 ? "#0c0c09" : "#ffffff";
 }
 
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-const PHONE = /^\+?[\d\s().-]{7,40}$/;
-
 export class Widget {
   private t: Strings;
   private lang: Lang;
@@ -118,20 +159,38 @@ export class Widget {
   private root: HTMLDivElement;
   private launcher: HTMLButtonElement;
   private panel: HTMLElement;
+  private head: HTMLDivElement;
   private chatView: HTMLDivElement;
+  /** What the panel shows under the header: the chat, a form or a pane. */
+  private view: HTMLElement;
   private log: HTMLDivElement;
+  private jump: HTMLButtonElement;
   private suggest: HTMLDivElement;
   private input: HTMLTextAreaElement;
   private sendBtn: HTMLButtonElement;
+  private menuWrap: HTMLDivElement;
+  private menuBtn: HTMLButtonElement;
+  private menu: HTMLDivElement;
+  private items: { fresh: HTMLButtonElement; end: HTMLButtonElement; tickets: HTMLButtonElement };
+  private ticketCount: HTMLSpanElement;
   private isOpen = false;
   private busy = false;
+  /** "End chat" was chosen: the panel shows the closing pane until a new chat starts. */
+  private ended = false;
+  /** Following the newest message; false once the visitor scrolls up to read. */
+  private pinned = true;
+  private lastTop = 0;
+  private hideTimer: ReturnType<typeof setTimeout> | undefined;
+  private ticketsFrom: HTMLElement | null = null;
   private controller: AbortController | null = null;
   private ready: Promise<void> | null = null;
   private conversationId: string | null;
   private listeners = new Map<string, Set<Listener>>();
   private identity = { name: "", email: "" };
   private storageKey: string;
+  private ticketsKey: string;
   private storage: Storage | null;
+  private tickets: StoredTicket[];
   private ui?: WidgetUi;
   private handoffOn: boolean;
   private teaser: HTMLElement | null = null;
@@ -151,8 +210,10 @@ export class Widget {
     }
     this.handoffOn = ui ? ui.handoff.enabled : true;
     this.storageKey = `apex:${siteKey}:conversation`;
+    this.ticketsKey = `apex:${siteKey}:tickets`;
     this.storage = pickStorage(ui);
     this.conversationId = this.load();
+    this.tickets = this.loadTickets();
 
     const primary = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(opts.theme?.primary ?? cfg.primaryColor)
       ? (opts.theme?.primary ?? cfg.primaryColor)
@@ -161,6 +222,8 @@ export class Widget {
     const a = ui?.appearance;
 
     this.log = h("div", { class: "log", role: "log", "aria-live": "polite", "aria-label": cfg.botName });
+    this.log.addEventListener("scroll", () => this.onScroll(), { passive: true });
+    this.jump = h("button", { class: "jump", type: "button", "aria-label": t.jump, title: t.jump, onclick: () => this.scroll(true, true) }, icon("chevron"));
     this.suggest = h("div", { class: "suggest" });
     this.input = h("textarea", {
       rows: 1,
@@ -177,8 +240,9 @@ export class Widget {
     });
     this.sendBtn = h("button", { class: "send", type: "submit", "aria-label": t.send, disabled: true }, icon("send"));
 
+    const privacy = webUrl(cfg.privacyUrl);
     const links = [
-      cfg.privacyUrl && h("a", { href: cfg.privacyUrl, target: "_blank", rel: "noopener noreferrer" }, t.privacy),
+      privacy && h("a", { href: privacy, target: "_blank", rel: "noopener noreferrer" }, t.privacy),
       this.handoffOn && h("button", { type: "button", onclick: () => this.showHandoff() }, t.human),
     ].filter((x): x is HTMLAnchorElement | HTMLButtonElement => !!x);
     const footer = h(
@@ -192,7 +256,7 @@ export class Widget {
     this.chatView = h(
       "div",
       { class: "view" },
-      this.log,
+      h("div", { class: "lw" }, this.log, this.jump),
       this.suggest,
       h(
         "form",
@@ -208,21 +272,70 @@ export class Widget {
       ),
       footer,
     );
+    this.view = this.chatView;
 
     const avatar = h("div", { class: "avatar", "aria-hidden": "true" });
     if (a?.avatar === "image" && a.avatarUrl) avatar.append(h("img", { src: a.avatarUrl, alt: "" }));
     else if (a?.avatar === "icon") avatar.append(icon("bot"));
     else avatar.append(cfg.botName.slice(0, 1).toUpperCase());
-    const header = h(
+
+    // "More options": a menu button (WAI-ARIA APG pattern) next to close
+    const item = (label: string, glyph: keyof typeof ICONS, action: () => void, ...extra: Kid[]) =>
+      h(
+        "button",
+        {
+          class: "item",
+          type: "button",
+          role: "menuitem",
+          tabindex: -1,
+          onclick: () => {
+            this.closeMenu();
+            action();
+          },
+        },
+        icon(glyph),
+        h("span", {}, label),
+        ...extra,
+      );
+    this.ticketCount = h("span", { class: "count" });
+    this.items = {
+      fresh: item(t.startNew, "compose", () => this.reset()),
+      end: item(t.endChat, "end", () => this.confirmEnd()),
+      tickets: item(t.viewTickets, "ticket", () => this.showTickets(), this.ticketCount),
+    };
+    this.menu = h("div", { class: "menu", id: "apex-menu", role: "menu", tabindex: -1, "aria-label": t.more }, this.items.fresh, this.items.end, this.items.tickets);
+    this.menu.addEventListener("keydown", (e) => this.menuKeys(e));
+    this.menuBtn = h(
+      "button",
+      {
+        class: "icon",
+        type: "button",
+        "aria-label": t.more,
+        title: t.more,
+        "aria-haspopup": "menu",
+        "aria-expanded": "false",
+        "aria-controls": "apex-menu",
+        onclick: () => (this.menu.classList.contains("on") ? this.closeMenu() : this.openMenu(0)),
+        onkeydown: ((e: KeyboardEvent) => {
+          if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+          e.preventDefault();
+          this.openMenu(e.key === "ArrowDown" ? 0 : -1);
+        }) as EventListener,
+      },
+      icon("more"),
+    );
+    this.menuWrap = h("div", { class: "mw" }, this.menuBtn, this.menu);
+
+    this.head = h(
       "div",
       { class: "head" },
       avatar,
       h("div", { class: "title" }, h("strong", {}, cfg.botName), h("span", {}, ui?.general.subtitle[this.lang] || `${t.ai} · ${cfg.siteName}`)),
-      h("button", { class: "icon", type: "button", "aria-label": t.newChat, title: t.newChat, onclick: () => this.reset() }, icon("reset")),
+      this.menuWrap,
       h("button", { class: "icon", type: "button", "aria-label": t.close, title: t.close, onclick: () => this.close(true) }, icon("close")),
     );
 
-    this.panel = h("section", { class: "panel", id: "apex-panel", role: "dialog", "aria-label": `${cfg.botName}, ${t.ai}`, hidden: true }, header, this.chatView);
+    this.panel = h("section", { class: "panel", id: "apex-panel", role: "dialog", "aria-label": `${cfg.botName}, ${t.ai}`, hidden: true }, this.head, this.chatView);
     this.panel.addEventListener("keydown", (e) => {
       if (e.key === "Escape") this.close(true);
     });
@@ -231,6 +344,10 @@ export class Widget {
     this.paintLauncher();
 
     this.root = h("div", { class: "root", "data-pos": position === "bottom-left" ? "left" : "right", lang: this.lang, "data-float": ui?.behavior.mobileFullscreen === false }, this.panel, this.launcher);
+    // a press anywhere in the widget outside the menu closes it (presses on the page: see outside())
+    this.root.addEventListener("pointerdown", (e) => {
+      if (!e.composedPath().includes(this.menuWrap)) this.closeMenu();
+    });
     const style = this.root.style;
     style.setProperty("--p", primary);
     style.setProperty("--on-p", readableOn(primary));
@@ -273,9 +390,12 @@ export class Widget {
   }
 
   private hideTeaser(): void {
-    this.teaser?.remove();
+    const teaser = this.teaser;
     this.teaser = null;
     this.flag("teaser", true);
+    if (!teaser) return;
+    teaser.classList.add("out");
+    setTimeout(() => teaser.remove(), still() ? 0 : 180);
   }
 
   /** Once-per-visit markers (teaser dismissed, auto-open done, lead form handled). */
@@ -318,7 +438,10 @@ export class Widget {
   open(): void {
     if (this.isOpen) return;
     this.isOpen = true;
+    clearTimeout(this.hideTimer);
     this.panel.hidden = false;
+    // the closed state has to be laid out once, or the opening transition has nothing to start from
+    void this.panel.offsetWidth;
     this.root.toggleAttribute("data-open", true);
     this.launcher.setAttribute("aria-expanded", "true");
     this.launcher.setAttribute("aria-label", this.t.close);
@@ -326,18 +449,23 @@ export class Widget {
     this.flag("auto", true);
     if (this.teaser) this.hideTeaser();
     this.ready ??= this.hydrate();
-    if (this.chatView.isConnected) this.input.focus();
+    if (this.view === this.chatView) this.input.focus();
     this.emit("open");
   }
 
   close(returnFocus = false): void {
     if (!this.isOpen) return;
     this.isOpen = false;
-    this.panel.hidden = true;
+    this.closeMenu();
     this.root.toggleAttribute("data-open", false);
     this.launcher.setAttribute("aria-expanded", "false");
     this.launcher.setAttribute("aria-label", this.t.open);
     this.paintLauncher();
+    // out of the layout (and the accessibility tree) once the closing transition has played
+    clearTimeout(this.hideTimer);
+    this.hideTimer = setTimeout(() => {
+      if (!this.isOpen) this.panel.hidden = true;
+    }, still() ? 0 : CLOSE_MS);
     if (returnFocus) this.launcher.focus();
     this.emit("close");
   }
@@ -364,18 +492,19 @@ export class Widget {
     const text = String(raw ?? "").trim();
     if (!text || this.busy) return;
     this.open();
+    if (this.ended) this.reset();
     await this.ready;
     if (this.leadPending()) return;
-    if (!this.chatView.isConnected) this.backToChat();
+    if (this.view !== this.chatView) this.backToChat();
     this.busy = true;
     this.input.value = "";
     this.autogrow();
     this.suggest.replaceChildren();
 
-    const userBubble = this.addUser(text);
-    const bubble = this.addBot("");
+    const userBubble = this.addUser(text, true);
+    const bubble = this.addBot("", true);
     bubble.append(h("div", { class: "typing", role: "status", "aria-label": this.t.typing }, h("i"), h("i"), h("i")));
-    this.scroll();
+    this.scroll(true, true);
     this.log.setAttribute("aria-busy", "true");
 
     let answer = "";
@@ -401,7 +530,7 @@ export class Widget {
           } else if (event.type === "done") {
             cancelAnimationFrame(frame);
             paint();
-            this.addMeta(bubble, event.messageId, event.sources, event.handoff);
+            this.addMeta(bubble, event.messageId, event.sources, event.handoff, undefined, true);
             finished = true;
             if (this.ui?.behavior.soundOnReply && (document.hidden || !this.isOpen)) chime();
             this.emit("message", { text: answer, sources: event.sources });
@@ -447,7 +576,7 @@ export class Widget {
       else this.addMeta(this.addBot(m.content), m.id, m.sources ?? [], false, m.feedback);
     }
     if (history.length === 0) this.renderSuggestions();
-    this.scroll();
+    this.scroll(true);
     const h = this.ui?.handoff;
     if (h?.leadCapture === "before-chat" && history.length === 0 && !this.flag("lead")) this.showLead();
   }
@@ -459,36 +588,293 @@ export class Widget {
     );
   }
 
-  private reset(): void {
+  /** Stops a reply that is still streaming; its bubble stays as far as it got. */
+  private abort(): void {
     this.controller?.abort();
     this.controller = null;
     this.busy = false;
     this.log.removeAttribute("aria-busy");
+  }
+
+  /** "Start a new chat": forgets the conversation and greets again. */
+  private reset(): void {
+    this.abort();
+    this.ended = false;
     this.save(null);
     this.log.replaceChildren();
-    if (!this.chatView.isConnected) this.backToChat();
+    this.suggest.replaceChildren();
+    this.backToChat();
     this.ready = this.hydrate();
     this.updateSend();
     this.input.focus();
+    this.emit("reset");
   }
 
-  private addUser(text: string): HTMLDivElement {
-    const el = h("div", { class: "msg user" }, text);
+  private hasChat(): boolean {
+    return !!this.conversationId || !!this.log.querySelector(".user");
+  }
+
+  // ----- "more options" menu -----
+
+  private enabledItems(): HTMLButtonElement[] {
+    return Object.values(this.items).filter((b) => !b.disabled && !b.hidden);
+  }
+
+  /** Opens the menu with focus on the item at `index` (negative counts from the end). */
+  private openMenu(index: number): void {
+    const { fresh, end, tickets } = this.items;
+    // a required contact form can't be skipped from here either
+    const locked = this.leadPending();
+    fresh.disabled = locked;
+    end.disabled = locked || this.ended || !this.hasChat();
+    tickets.disabled = locked;
+    tickets.hidden = !this.handoffOn && !this.tickets.length;
+    this.ticketCount.textContent = this.tickets.length ? String(this.tickets.length) : "";
+    this.menu.classList.add("on");
+    this.menuBtn.setAttribute("aria-expanded", "true");
+    document.addEventListener("pointerdown", this.outside, true);
+    const items = this.enabledItems();
+    (items[index < 0 ? items.length + index : index] ?? this.menu).focus();
+  }
+
+  private closeMenu(returnFocus = false): void {
+    if (!this.menu.classList.contains("on")) return;
+    this.menu.classList.remove("on");
+    this.menuBtn.setAttribute("aria-expanded", "false");
+    document.removeEventListener("pointerdown", this.outside, true);
+    if (returnFocus) this.menuBtn.focus();
+  }
+
+  /** Presses on the host page; inside the closed shadow root they all target the host element. */
+  private outside = (e: Event) => {
+    if (e.target !== this.host) this.closeMenu();
+  };
+
+  private menuKeys(e: KeyboardEvent): void {
+    const items = this.enabledItems();
+    const at = items.indexOf(e.target as HTMLButtonElement);
+    let next = -1;
+    if (e.key === "ArrowDown") next = (at + 1) % items.length;
+    else if (e.key === "ArrowUp") next = at <= 0 ? items.length - 1 : at - 1;
+    else if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = items.length - 1;
+    else if (e.key === "Tab") this.closeMenu();
+    else if (e.key === "Escape") {
+      // only the menu closes, not the whole panel
+      e.preventDefault();
+      e.stopPropagation();
+      this.closeMenu(true);
+    }
+    if (next >= 0 && items[next]) {
+      e.preventDefault();
+      items[next].focus();
+    }
+  }
+
+  // ----- views -----
+
+  /** Swaps what the panel shows under the header, with a short fade. */
+  private show(next: HTMLElement): void {
+    if (this.view === next) return;
+    this.view.replaceWith(next);
+    this.view = next;
+    enter(next, { opacity: 0, transform: "translateY(6px)" });
+  }
+
+  /** "End chat" asks first, in a sheet over the panel. */
+  private confirmEnd(): void {
+    const t = this.t;
+    const ok = h("button", { class: "btn danger", type: "button" }, t.endConfirm);
+    const cancel = h("button", { class: "btn ghost", type: "button" }, t.cancel);
+    const sheet = h(
+      "div",
+      { class: "sheet" },
+      h(
+        "div",
+        { class: "card", role: "alertdialog", "aria-modal": "true", "aria-labelledby": "apex-end-t", "aria-describedby": "apex-end-d" },
+        h("h2", { id: "apex-end-t" }, t.endTitle),
+        h("p", { id: "apex-end-d" }, t.endIntro),
+        h("div", { class: "row" }, ok, cancel),
+      ),
+    );
+    // the rest of the panel can't be reached while the question is open
+    const behind = [this.head, this.view];
+    let settled = false;
+    const dismiss = (then: () => void) => {
+      if (settled) return;
+      settled = true;
+      for (const el of behind) el.removeAttribute("inert");
+      // the sheet fades out over the panel but takes no more input
+      sheet.setAttribute("inert", "");
+      sheet.classList.add("out");
+      setTimeout(() => sheet.remove(), still() ? 0 : 180);
+      then();
+    };
+    ok.addEventListener("click", () => dismiss(() => this.endChat()));
+    cancel.addEventListener("click", () => dismiss(() => this.menuBtn.focus()));
+    sheet.addEventListener("pointerdown", (e) => {
+      if (e.target === sheet) cancel.click();
+    });
+    sheet.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        cancel.click();
+      } else if (e.key === "Tab") {
+        e.preventDefault();
+        (e.target === ok ? cancel : ok).focus();
+      }
+    });
+    for (const el of behind) el.setAttribute("inert", "");
+    this.panel.append(sheet);
+    // the safe choice has focus, so a stray Enter doesn't end the chat
+    cancel.focus();
+  }
+
+  private endChat(): void {
+    const t = this.t;
+    const id = this.conversationId;
+    this.abort();
+    this.ended = true;
+    this.save(null);
+    this.log.replaceChildren();
+    this.suggest.replaceChildren();
+
+    const status = h("p", { class: "note", role: "status" });
+    const fresh = h("button", { class: "btn primary", type: "button", onclick: () => this.reset() }, t.startNew);
+    const kids: Kid[] = [
+      h("div", { class: "badge" }, icon("check")),
+      h("h2", {}, t.ended),
+      h("p", { class: "note" }, t.endedIntro),
+      h("div", { class: "row" }, fresh, h("button", { class: "btn ghost", type: "button", onclick: () => this.close(true) }, t.closeShort)),
+    ];
+    if (id) {
+      // KVKK/GDPR: the visitor can also erase what was said
+      const erase: HTMLButtonElement = h(
+        "button",
+        {
+          class: "link",
+          type: "button",
+          onclick: async () => {
+            erase.disabled = true;
+            try {
+              await this.api.deleteConversation(id);
+            } catch (err) {
+              const code = err instanceof ApiError ? err.code : "generic";
+              // already gone (expired, or erased elsewhere) is what was asked for
+              if (code !== "not_found") {
+                erase.disabled = false;
+                status.textContent = t.errors[code as keyof Strings["errors"]] ?? t.errors.generic;
+                return;
+              }
+            }
+            erase.remove();
+            status.textContent = t.deleted;
+            this.emit("delete", { conversationId: id });
+          },
+        },
+        t.deleteChat,
+      );
+      kids.push(erase);
+    }
+    kids.push(status);
+    this.show(h("div", { class: "pane end" }, ...kids));
+    fresh.focus();
+    this.emit("end", { conversationId: id });
+  }
+
+  /** The hand-off requests sent from this browser, newest first. */
+  private showTickets(): void {
+    const t = this.t;
+    const from = this.view.classList.contains("tks") ? (this.ticketsFrom ?? this.chatView) : this.view;
+    this.ticketsFrom = from;
+    const back = h(
+      "button",
+      {
+        class: "icon",
+        type: "button",
+        "aria-label": t.goBack,
+        title: t.goBack,
+        onclick: () => {
+          if (from === this.chatView) return this.backToChat();
+          this.show(from);
+          from.querySelector<HTMLElement>("button,input,textarea")?.focus();
+        },
+      },
+      icon("back"),
+    );
+    const date = (iso: string) => {
+      try {
+        return new Intl.DateTimeFormat(this.lang, { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso));
+      } catch {
+        return iso.slice(0, 16).replace("T", " ");
+      }
+    };
+    const list = this.tickets.length
+      ? h(
+          "ul",
+          { class: "tickets" },
+          ...this.tickets.map((k, i) => {
+            const li = h(
+              "li",
+              { class: "ticket" },
+              h("div", { class: "tt" }, h("strong", {}, `#${k.id}`), h("span", { class: "pill" }, t.ticketSent)),
+              h("p", { class: k.note ? undefined : "muted" }, k.note || t.noNote),
+              h("p", { class: "tm" }, h("time", { datetime: k.createdAt }, date(k.createdAt)), ` · ${t.replyTo}: ${k.email}`),
+            );
+            // CSSOM, not a style attribute, so strict-CSP hosts allow it
+            li.style.animationDelay = `${Math.min(i, 6) * 40}ms`;
+            return li;
+          }),
+        )
+      : h(
+          "div",
+          { class: "empty" },
+          icon("ticket"),
+          h("p", {}, t.noTickets),
+          this.handoffOn && h("button", { class: "btn primary", type: "button", onclick: () => this.showHandoff() }, t.human),
+        );
+    this.show(h("div", { class: "pane tks" }, h("div", { class: "ph" }, back, h("h2", {}, t.tickets)), !!this.tickets.length && h("p", { class: "note" }, t.ticketsIntro), list));
+    back.focus();
+  }
+
+  private addTicket(ticket: StoredTicket): void {
+    this.tickets = [ticket, ...this.tickets.filter((x) => x.id !== ticket.id)].slice(0, MAX_TICKETS);
+    try {
+      this.storage?.setItem(this.ticketsKey, JSON.stringify(this.tickets));
+    } catch {
+      // storage blocked; the list lasts for this page view
+    }
+  }
+
+  private loadTickets(): StoredTicket[] {
+    try {
+      const raw: unknown = JSON.parse(this.storage?.getItem(this.ticketsKey) ?? "[]");
+      if (!Array.isArray(raw)) return [];
+      return raw
+        .filter(isTicket)
+        .slice(0, MAX_TICKETS)
+        .map(({ id, createdAt, email, note }) => ({ id, createdAt, email, note }));
+    } catch {
+      return [];
+    }
+  }
+
+  private addUser(text: string, live = false): HTMLDivElement {
+    const el = h("div", { class: live ? "msg user in" : "msg user" }, text);
     this.log.append(el);
-    this.scroll();
     return el;
   }
 
-  private addBot(markdown: string): HTMLDivElement {
-    const el = h("div", { class: "msg bot" });
+  private addBot(markdown: string, live = false): HTMLDivElement {
+    const el = h("div", { class: live ? "msg bot in" : "msg bot" });
     el.append(renderMarkdown(markdown));
     this.log.append(el);
     return el;
   }
 
-  private addMeta(after: HTMLElement, messageId: string, sources: Source[], handoff: boolean, feedback?: "up" | "down"): void {
+  private addMeta(after: HTMLElement, messageId: string, sources: Source[], handoff: boolean, feedback?: "up" | "down", live = false): void {
     const t = this.t;
-    const meta = h("div", { class: "meta" });
+    const meta = h("div", { class: live ? "meta in" : "meta" });
     const show = this.ui?.behavior;
     if (show?.showSources === false) sources = [];
     if (sources.length) {
@@ -497,7 +883,12 @@ export class Widget {
           "div",
           { class: "sources" },
           h("span", {}, `${t.sources}:`),
-          ...sources.map((s) => h("a", { class: "chip", href: s.url, target: "_blank", rel: "noopener noreferrer", title: s.url }, s.title)),
+          ...sources.map((s) => {
+            const href = webUrl(s.url);
+            return href
+              ? h("a", { class: "chip", href, target: "_blank", rel: "noopener noreferrer", title: href }, s.title)
+              : h("span", { class: "chip" }, s.title);
+          }),
         ),
       );
     }
@@ -532,7 +923,7 @@ export class Widget {
     } else if (code === "network" || code === "generic" || code === "upstream" || code === "rate_limited") {
       action = h("button", { class: "chip", type: "button", onclick: retry }, t.retry);
     }
-    if (action) bubble.after(h("div", { class: "meta" }, h("div", {}, action)));
+    if (action) bubble.after(h("div", { class: "meta in" }, h("div", {}, action)));
     this.scroll();
   }
 
@@ -560,6 +951,7 @@ export class Widget {
       "form",
       {
         class: "form",
+        "data-lead": "1",
         novalidate: true,
         onsubmit: async (e: Event) => {
           e.preventDefault();
@@ -590,7 +982,7 @@ export class Widget {
       error,
       h("div", { class: "row" }, submit, !req && h("button", { class: "btn ghost", type: "button", onclick: done }, t.skip)),
     );
-    (this.panel.querySelector(".form") ?? this.chatView).replaceWith(form);
+    this.show(form);
     email.focus();
   }
 
@@ -611,22 +1003,32 @@ export class Widget {
         novalidate: true,
         onsubmit: async (e: Event) => {
           e.preventDefault();
-          if (!EMAIL.test(email.value.trim())) {
+          const address = email.value.trim();
+          if (!EMAIL.test(address)) {
             error.textContent = t.invalidEmail;
             email.setAttribute("aria-invalid", "true");
             email.focus();
             return;
           }
+          email.removeAttribute("aria-invalid");
           error.textContent = "";
           submit.disabled = true;
           submit.textContent = t.sending;
           try {
-            await this.api.handoff({ conversationId: this.conversationId, email: email.value.trim(), name: name.value.trim(), message: note.value.trim() });
-            this.identity = { name: name.value.trim(), email: email.value.trim() };
-            const back = h("button", { class: "btn ghost", type: "button", onclick: () => this.backToChat() }, t.back);
-            form.replaceChildren(h("h2", {}, t.handoffTitle), h("p", { role: "status" }, t.handoffSent), h("div", { class: "row" }, back));
+            const ticket = await this.api.handoff({ conversationId: this.conversationId, email: address, name: name.value.trim(), message: note.value.trim() });
+            this.identity = { name: name.value.trim(), email: address };
+            if (ticket) this.addTicket({ ...ticket, email: address, note: note.value.trim().slice(0, 280) });
+            const back = h("button", { class: "btn primary", type: "button", onclick: () => this.backToChat() }, t.back);
+            form.replaceChildren(
+              h("div", { class: "badge" }, icon("check")),
+              h("h2", {}, t.handoffTitle),
+              h("p", { role: "status" }, t.handoffSent),
+              ticket ? h("p", { class: "ref" }, `${t.ticketNo} `, h("strong", {}, `#${ticket.id}`)) : "",
+              h("div", { class: "row" }, back, ticket && h("button", { class: "btn ghost", type: "button", onclick: () => this.showTickets() }, t.viewTickets)),
+            );
+            enter(form, { opacity: 0, transform: "translateY(6px)" });
             back.focus();
-            this.emit("handoff");
+            this.emit("handoff", ticket ? { ticket: ticket.id } : undefined);
           } catch (err) {
             const code = err instanceof ApiError ? err.code : "generic";
             error.textContent = t.errors[code as keyof Strings["errors"]] ?? t.errors.generic;
@@ -643,22 +1045,21 @@ export class Widget {
       error,
       h("div", { class: "row" }, submit, cancel),
     );
-    const current = this.panel.querySelector(".form");
-    (current ?? this.chatView).replaceWith(form);
+    this.show(form);
     email.focus();
   }
 
   /** A required lead form is still open: no route back to the chat skips it. */
   private leadPending(): boolean {
     const h = this.ui?.handoff;
-    return h?.leadCapture === "before-chat" && h.leadRequired && !this.flag("lead") && !!this.panel.querySelector(".form");
+    return h?.leadCapture === "before-chat" && h.leadRequired && !this.flag("lead") && this.view.dataset.lead === "1";
   }
 
   private backToChat(): void {
     if (this.leadPending()) return;
-    this.panel.querySelector(".form")?.replaceWith(this.chatView);
+    this.show(this.chatView);
     this.input.focus();
-    this.scroll();
+    this.scroll(true);
   }
 
   private autogrow(): void {
@@ -671,8 +1072,23 @@ export class Widget {
     this.sendBtn.disabled = this.busy || !this.input.value.trim();
   }
 
-  private scroll(): void {
-    this.log.scrollTop = this.log.scrollHeight;
+  private onScroll(): void {
+    const { scrollTop, scrollHeight, clientHeight } = this.log;
+    // near the bottom re-pins; only moving up unpins, so a smooth scroll down never does
+    if (scrollHeight - scrollTop - clientHeight < 40) this.pinned = true;
+    else if (scrollTop < this.lastTop - 2) this.pinned = false;
+    this.lastTop = scrollTop;
+    this.jump.classList.toggle("on", !this.pinned);
+  }
+
+  /** Keeps the newest message in view, unless the visitor scrolled up to read (`force` overrides). */
+  private scroll(force = false, smooth = false): void {
+    if (force) this.pinned = true;
+    if (!this.pinned) return;
+    const top = this.log.scrollHeight;
+    if (smooth && !still() && typeof this.log.scrollTo === "function") this.log.scrollTo({ top, behavior: "smooth" });
+    else this.log.scrollTop = top;
+    this.jump.classList.remove("on");
   }
 
   private emit(event: string, payload?: unknown): void {
