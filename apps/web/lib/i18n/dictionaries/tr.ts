@@ -127,16 +127,16 @@ export const tr: Dictionary = {
       title: "Listenin başında olun",
       text: "Bekleme listesine katılın, Apex kayıtlara açıldığı gün size haber verelim",
       items: [
-        { title: "7/24 Kesintisiz", text: "Ekibinizi büyütmeden müşteri sorularını günün her saatinde anında yanıtlayın." },
+        { title: "7/24 kesintisiz", text: "Ekibinizi büyütmeden müşteri sorularını günün her saatinde anında yanıtlayın." },
         {
-          title: "Müşterinizin Dilini Konuşur",
+          title: "Müşterinizin dilini konuşur",
           text: "Ziyaretçi Türkçe, İngilizce, Litvanca, Letonca ya da Estonca, hangi dilde yazarsa o dilde ve yalnızca sizin içeriğinizle yanıt verir.",
         },
-        { title: "Ekibinize Devreder", text: "Yanıt veremediğinde ziyaretçiler, tüm konuşmayla birlikte size e-postayla ulaşır." },
+        { title: "Ekibinize devreder", text: "Yanıt veremediğinde ziyaretçiler, tüm konuşmayla birlikte size e-postayla ulaşır." },
       ],
       quote:
         "Apex'i, her müşteri günün her saatinde anında ve doğru bir yanıt alsın, destek ekipleri de nihayet zor vakalara odaklanabilsin diye geliştirdik.",
-      quoteRole: "APEX BOT CEO'su",
+      quoteRole: "Apex Bot CEO'su",
     },
     success: {
       welcomeBack: "Tekrar hoş geldiniz!",
