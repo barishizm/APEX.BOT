@@ -406,7 +406,7 @@ export default function Hero({
 
           <p
             style={{ animationDelay: "0.2s" }}
-            className="hero-in text-base sm:text-lg md:text-xl text-zinc-600 dark:text-zinc-400 max-w-4xl px-4 leading-relaxed"
+            className="hero-in text-base sm:text-lg md:text-xl text-zinc-600 dark:text-zinc-400 max-w-4xl px-4 leading-relaxed text-balance"
           >
             {t.hero.lede1}{" "}
             <br className="hidden md:block" />
