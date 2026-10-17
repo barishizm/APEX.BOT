@@ -180,7 +180,7 @@ Hedef kullanım:
 </script>
 ```
 
-JavaScript API (taslak): `Apex.open()`, `Apex.close()`, `Apex.send(text)`, `Apex.identify({ name, email })`, `Apex.on("message", fn)`.
+JavaScript API (taslak): `Apex.open()`, `Apex.close()`, `Apex.send(text)`, `Apex.identify({ name, email })`, `Apex.on("message", fn)`; diğer olaylar: `open`, `close`, `lead`, `handoff`, `reset`, `end`, `delete`.
 
 Teknik kararlar: Shadow DOM ile stil izolasyonu, `site_key` herkese açık (yalnızca domain izin listesiyle kullanılabilir), gizli anahtarlar asla istemciye gitmez.
 

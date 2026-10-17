@@ -3,8 +3,12 @@ import { build, context } from "esbuild";
 import { readFileSync } from "node:fs";
 import { gzipSync } from "node:zlib";
 
-// Raised from 36 KB after adding Latvian locale strings; keeps a strict cap while unblocking CI.
-const LIMIT = 40 * 1024;
+// Raised from 40 KB for the header menu (new chat, end chat, tickets), then for the composer's
+// file and voice input, each with its five locales. What visitors download is the gzip size,
+// so that has its own, tighter cap.
+const LIMIT = 76 * 1024;
+const GZIP_LIMIT = 25 * 1024;
+
 const options = {
   entryPoints: ["src/index.ts"],
   outfile: "dist/widget.js",
@@ -23,8 +27,8 @@ if (process.argv.includes("--watch")) {
   const bytes = readFileSync(options.outfile);
   const gz = gzipSync(bytes).length;
   console.log(`widget.js: ${(bytes.length / 1024).toFixed(1)} KB (${(gz / 1024).toFixed(1)} KB gzip)`);
-  if (bytes.length > LIMIT) {
-    console.error(`widget.js exceeds the ${LIMIT / 1024} KB budget`);
+  if (bytes.length > LIMIT || gz > GZIP_LIMIT) {
+    console.error(`widget.js exceeds its budget (${LIMIT / 1024} KB, ${GZIP_LIMIT / 1024} KB gzip)`);
     process.exit(1);
   }
 }

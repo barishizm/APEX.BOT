@@ -12,7 +12,7 @@ const settings = parseSettings({
   general: { languageMode: "fixed", defaultLang: "tr", subtitle: { tr: "Saniyeler içinde yanıt", en: "" } },
   appearance: { theme: "dark", launcherIcon: "help", launcherLabel: { tr: "Bize sorun", en: "Ask us" }, panelWidth: "wide", radius: 4, offsetX: 40, avatar: "icon", font: "serif" },
   messages: { placeholder: { tr: "Sorunuzu yazın", en: "Ask" }, showDisclaimer: false },
-  behavior: { showSources: false, showFeedback: false, teaser: { tr: "Sorunuz mu var?", en: "" }, persistence: "browser" },
+  behavior: { showSources: false, showFeedback: false, teaser: { tr: "Sorunuz mu var?", en: "" }, persistence: "browser", attachments: false, voiceInput: false },
   handoff: { enabled: false, leadCapture: "before-chat", leadFields: { name: true, phone: false }, leadRequired: true },
 });
 const t = tenants.findById("tn_a")!;
@@ -57,6 +57,23 @@ async function until<T>(fn: () => T, what: string, ms = 2000): Promise<NonNullab
 }
 const apex = () => (win as unknown as { Apex: { send(text: string): void } }).Apex;
 
+// Another script on the page could write anything into the widget's storage; only well-formed tickets may show.
+const at = "2026-10-01T10:00:00.000Z";
+win.localStorage.setItem(
+  `apex:${A.key}:tickets`,
+  JSON.stringify([
+    { id: "K7Q2-M9XA", createdAt: at, email: "ada@example.com", note: '<img src=x onerror="alert(1)">' },
+    { id: "<script>alert(1)</script>", createdAt: at, email: "ada@example.com", note: "" },
+    { id: "AAAA-BBBB", createdAt: "not a date", email: "ada@example.com", note: "" },
+    { id: "AAAA-CCCC", createdAt: at, email: "x".repeat(300), note: "" },
+    { id: "AAAA-DDDD", createdAt: at, email: "ada@example.com", note: "x".repeat(5000) },
+    { id: "WXYZ-2345", createdAt: at, email: "ada@example.com", note: "", onclick: "alert(1)", __proto__: { polluted: true } },
+    null,
+    42,
+    "ABCD-2345",
+  ]),
+);
+
 before(async () => {
   await import("../src/index.ts");
   await until(() => win.document.getElementById("apex-bot"), "widget mount");
@@ -73,13 +90,14 @@ describe("widget with dashboard settings", () => {
     assert.equal(root.getAttribute("lang"), "tr", "fixed language beats the page's");
   });
 
-  it("shows a labeled launcher and a dismissible teaser", () => {
+  it("shows a labeled launcher and a dismissible teaser", async () => {
     const launcher = $("button.launcher")!;
     assert.ok(launcher.classList.contains("lbl"));
     assert.equal(launcher.textContent, "Bize sorun");
     assert.equal($(".teaser span")!.textContent, "Sorunuz mu var?");
     ($(".teaser .x") as HTMLButtonElement).click();
-    assert.equal($(".teaser"), null);
+    assert.ok($(".teaser")!.classList.contains("out"), "fades out");
+    await until(() => !$(".teaser"), "teaser removed");
     assert.ok(win.sessionStorage.getItem(`apex:${A.key}:conversation:teaser`));
   });
 
@@ -92,6 +110,16 @@ describe("widget with dashboard settings", () => {
     apex().send("Kargo?");
     await new Promise((r) => setTimeout(r, 50));
     assert.equal(model.requests.length, 0);
+  });
+
+  it("the menu can't skip a required lead form", () => {
+    const btn = $<HTMLButtonElement>(".head .mw > .icon")!;
+    btn.click();
+    const items = $$(".menu .item") as HTMLButtonElement[];
+    assert.ok(items.every((b) => b.disabled), "every item is locked");
+    assert.equal(shadow.activeElement, $(".menu"), "focus stays in the menu");
+    $(".menu")!.dispatchEvent(new win.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    assert.ok($("form.form"), "still on the lead form");
   });
 
   it("validates the lead form, then records the lead and opens the chat", async () => {
@@ -111,14 +139,41 @@ describe("widget with dashboard settings", () => {
     assert.equal(mailer.outbox.length, 1);
   });
 
-  it("uses the custom header, placeholder and footer", () => {
-    assert.equal($(".title span")!.textContent, "Saniyeler içinde yanıt");
+  it("leaves out the paperclip and microphone when they are turned off", () => {
+    assert.equal($(".compose .tool"), null);
+    // with nothing to send and no voice, the round button is a disabled Send
+    assert.equal($(".compose .send")!.getAttribute("aria-label"), "Gönder");
+    assert.equal($<HTMLButtonElement>(".compose .send")!.disabled, true);
+  });
+
+  it("uses the one-line header, custom placeholder and footer", () => {
+    const head = $(".head")!;
+    assert.equal(head.querySelector(".title")!.textContent, "Apex", "one line: the agent's name, no subtitle");
+    assert.equal(head.querySelectorAll(".title *").length, 0);
     assert.equal($("textarea")!.getAttribute("placeholder"), "Sorunuzu yazın");
     assert.ok($(".avatar svg"), "bot icon avatar");
-    const foot = $(".foot")!;
-    assert.doesNotMatch(foot.textContent!, /yapay zekâ ile üretilir/, "disclaimer off");
-    assert.doesNotMatch(foot.textContent!, /Bir insanla konuş/, "hand-off off");
-    assert.match(foot.textContent!, /Apex Bot ile çalışır/);
+    assert.equal($(".notice"), null, "disclaimer off and no privacy link: no notice");
+    assert.ok($(".dock")!.classList.contains("bare"));
+    const menu = ($$(".menu .item") as HTMLElement[]).map((b) => b.textContent);
+    assert.equal(menu.some((l) => /Bir insanla konuş/.test(l!)), false, "hand-off off");
+    // the disclaimer is off, but the visitor still learns it's an AI
+    assert.equal($(".foot")!.textContent, "Yapay zekâ asistanıApex Bot ile çalışır");
+  });
+
+  it("shows only well-formed stored tickets, as text", () => {
+    $<HTMLButtonElement>(".head .mw > .icon")!.click();
+    const tickets = ($$(".menu .item") as HTMLButtonElement[]).find((b) => /Taleplerimi gör/.test(b.textContent!))!;
+    assert.equal(tickets.hidden, false, "hand-off is off, but there are tickets to show");
+    assert.equal(tickets.querySelector(".count")!.textContent, "2");
+    tickets.click();
+    const cards = $$(".pane.tks .ticket");
+    assert.deepEqual(cards.map((c) => c.querySelector("strong")!.textContent), ["#K7Q2-M9XA", "#WXYZ-2345"]);
+    assert.equal(cards[0].querySelector("p")!.textContent, '<img src=x onerror="alert(1)">');
+    assert.equal($$("img, script").length, 0);
+    assert.equal(cards[1].hasAttribute("onclick"), false);
+    assert.equal(({} as Record<string, unknown>).polluted, undefined);
+    ($(".pane.tks .ph button") as HTMLButtonElement).click();
+    assert.ok($("form.compose"));
   });
 
   it("hides sources and feedback when turned off", async () => {
@@ -140,6 +195,19 @@ describe("custom launcher image", () => {
     assert.deepEqual(at("http://cdn.example/logo.png"), ["appearance.launcherImage", "appearance.launcherImage"]);
     assert.deepEqual(at("data:image/svg+xml;base64,PHN2Zz4="), ["appearance.launcherImage", "appearance.launcherImage"]);
     assert.deepEqual(at(""), ["appearance.launcherImage"]);
+  });
+});
+
+describe("header logo", () => {
+  it("accepts an upload or an https URL, never SVG, http or script URLs", async () => {
+    const { checkSettings } = await import("@apex/db/bot-settings");
+    const at = (avatarUrl: string) => checkSettings({ handoff: { enabled: false }, appearance: { avatar: "image", avatarUrl } }).map((i) => i.path);
+    assert.deepEqual(at("data:image/png;base64,iVBORw0KGgo="), []);
+    assert.deepEqual(at("https://cdn.example/logo.webp"), []);
+    for (const bad of ["http://cdn.example/logo.png", "data:image/svg+xml;base64,PHN2Zz4=", "javascript:alert(1)", "data:text/html;base64,PGI+"]) {
+      assert.ok(at(bad).includes("appearance.avatarUrl"), bad);
+    }
+    assert.deepEqual(at(""), ["appearance.avatarUrl"], "logo style needs a logo");
   });
 });
 

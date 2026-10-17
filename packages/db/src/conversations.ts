@@ -93,7 +93,7 @@ export async function setMessageFeedback(db: Db, botId: string, conversationId: 
 }
 
 export async function deleteConversation(db: Queryable, botId: string, id: string): Promise<boolean> {
-  if (!UUID.test(id)) return false
+  if (!UUID.test(id) || !UUID.test(botId)) return false
   const { rows } = await db.query("delete from app.conversations where id = $1 and bot_id = $2 returning id", [id, botId])
   return rows.length > 0
 }
@@ -199,7 +199,8 @@ export async function listConversations(
   options: { filter?: ConversationFilter; before?: Date | null; limit?: number } = {},
 ): Promise<{ conversations: ConversationSummary[]; hasMore: boolean }> {
   const bot = await getBotForUser(db, userId)
-  const filter = FILTERS[options.filter ?? "all"] ?? FILTERS.all
+  // own keys only: an inherited one ("constructor") would put a function's source into the SQL
+  const filter = options.filter && Object.hasOwn(FILTERS, options.filter) ? FILTERS[options.filter] : FILTERS.all
   const limit = Math.min(Math.max(options.limit ?? 30, 1), 100)
   const { rows } = await db.query<{
     id: string
