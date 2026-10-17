@@ -196,7 +196,8 @@ const FILTERS: Record<ConversationFilter, string> = {
 export async function listConversations(
   db: Db,
   who: BotScope,
-  options: { filter?: ConversationFilter; before?: Date | null; limit?: number } = {},
+  /** days: only conversations active in the last N days, the window the overview counts over */
+  options: { filter?: ConversationFilter; before?: Date | null; days?: number | null; limit?: number } = {},
 ): Promise<{ conversations: ConversationSummary[]; hasMore: boolean }> {
   const bot = await getBotForUser(db, who)
   // own keys only: an inherited one ("constructor") would put a function's source into the SQL
@@ -218,9 +219,10 @@ export async function listConversations(
     `select id, preview, origin, message_count, unanswered_count, negative_count, visitor_email, visitor_name, handoff_at, created_at, updated_at
        from app.conversations
       where bot_id = $1 and message_count > 0 and ${filter} and ($2::timestamptz is null or updated_at < $2::timestamptz)
+        and ($4::int is null or updated_at > now() - make_interval(days => $4::int))
       order by updated_at desc
       limit $3`,
-    [bot.id, options.before ?? null, limit + 1],
+    [bot.id, options.before ?? null, limit + 1, options.days ?? null],
   )
   return {
     hasMore: rows.length > limit,

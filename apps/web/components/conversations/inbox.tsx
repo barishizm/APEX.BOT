@@ -1,11 +1,11 @@
 "use client"
 
-import { ArrowLeft, BookPlus, CircleHelp, LifeBuoy, LoaderCircle, Mail, MessageSquareText, ThumbsDown, ThumbsUp, Trash2, UserRound } from "lucide-react"
+import { ArrowLeft, BookPlus, CircleHelp, LifeBuoy, LoaderCircle, Mail, MessageSquareText, ThumbsDown, ThumbsUp, Trash2, UserRound, X } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Fragment, useEffect, useState, type ReactNode } from "react"
 import { useAppI18n } from "@/components/i18n/app-provider"
-import { FILTERS, type ConversationJson, type SummaryJson } from "@/lib/conversations"
+import { FILTERS, conversationsHref, type ConversationJson, type SummaryJson } from "@/lib/conversations"
 import { format } from "@/lib/i18n"
 import { formatDate, plural, timeAgo } from "@/lib/i18n/format"
 import { cn } from "@/lib/utils"
@@ -235,12 +235,15 @@ export function ConversationInbox({
   initial,
   hasMore: initialHasMore,
   filter,
+  days = null,
   canEdit,
   open,
 }: {
   initial: SummaryJson[]
   hasMore: boolean
   filter: ConversationFilter
+  /** Only the last N days, set when arriving from a stats card that counts over that window. */
+  days?: number | null
   canEdit: boolean
   /** Conversation to show first (linked from the analytics page), even if it isn't on the first page. */
   open?: string | null
@@ -264,13 +267,15 @@ export function ConversationInbox({
     const last = items.at(-1)
     if (!last) return
     setLoadingMore(true)
-    const res = await fetch(`/api/conversations?filter=${filter}&before=${encodeURIComponent(last.updatedAt)}`).catch(() => null)
+    const res = await fetch(`/api/conversations?filter=${filter}${days ? `&days=${days}` : ""}&before=${encodeURIComponent(last.updatedAt)}`).catch(() => null)
     setLoadingMore(false)
     if (!res?.ok) return
     const data = await res.json()
     setItems((list) => [...list, ...data.conversations.filter((c: SummaryJson) => !list.some((x) => x.id === c.id))])
     setHasMore(data.hasMore)
   }
+
+  const unfiltered = filter === "all" && !days
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -283,7 +288,7 @@ export function ConversationInbox({
           {FILTERS.map((f) => (
             <Link
               key={f}
-              href={f === "all" ? "/dashboard/conversations" : `/dashboard/conversations?filter=${f}`}
+              href={conversationsHref(f, days)}
               aria-current={filter === f ? "page" : undefined}
               className={cn(
                 "flex h-8 shrink-0 items-center rounded-md px-2.5 text-xs font-semibold no-underline transition-colors",
@@ -294,6 +299,17 @@ export function ConversationInbox({
             </Link>
           ))}
         </nav>
+        {days && (
+          <Link
+            href={conversationsHref(filter)}
+            title={t.allTime}
+            className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-[var(--color-line)] bg-[var(--color-surface)] pr-2 pl-3 text-xs font-semibold text-[var(--color-text)] no-underline transition-colors hover:border-[var(--color-muted)]"
+          >
+            {plural(days, t.lastDays, locale)}
+            <X className="h-3.5 w-3.5 text-[var(--color-muted)]" aria-hidden />
+            <span className="sr-only">{t.allTime}</span>
+          </Link>
+        )}
       </header>
 
       {items.length === 0 ? (
@@ -301,11 +317,11 @@ export function ConversationInbox({
           <span className="grid h-11 w-11 place-items-center rounded-xl bg-[var(--color-bubble)]" aria-hidden>
             <MessageSquareText className="h-5 w-5" />
           </span>
-          <p className="font-medium">{filter === "all" ? t.emptyAll : t.emptyFiltered}</p>
+          <p className="font-medium">{unfiltered ? t.emptyAll : t.emptyFiltered}</p>
           <p className="max-w-sm text-sm text-[var(--color-muted)]">
-            {filter === "all" ? t.emptyAllText : t.emptyFilteredText}
+            {unfiltered ? t.emptyAllText : t.emptyFilteredText}
           </p>
-          {filter === "all" ? (
+          {unfiltered ? (
             <Link href="/dashboard/widget?section=install" className="mt-2 text-sm font-semibold">
               {t.install}
             </Link>

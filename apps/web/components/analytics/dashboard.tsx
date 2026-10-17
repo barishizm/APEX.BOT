@@ -1,10 +1,11 @@
 "use client"
 
-import { ArrowDownRight, ArrowUpRight, ChartColumn, ChevronDown, Download, ExternalLink, FileText, Globe, Minus, RefreshCw } from "lucide-react"
+import { ArrowDownRight, ArrowUpRight, ChartColumn, ChevronDown, ChevronRight, Download, ExternalLink, FileText, Globe, Minus, RefreshCw } from "lucide-react"
 import Link from "next/link"
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { useAppI18n } from "@/components/i18n/app-provider"
 import type { AnalyticsJson } from "@/lib/analytics"
+import { conversationsHref } from "@/lib/conversations"
 import { format } from "@/lib/i18n"
 import { formatNumber, formatPercent, plural } from "@/lib/i18n/format"
 import { LOCALE_META } from "@/lib/i18n/config"
@@ -22,11 +23,15 @@ const ratio = (a: number, b: number) => (b > 0 ? a / b : null)
 
 type Trend = { text: string; direction: "up" | "down" | "flat"; tone: "good" | "bad" | "neutral" }
 
-function Kpi({ label, value, help, trend, vs }: { label: string; value: string; help: string; trend: Trend | null; vs: string }) {
+/** A tile with an href opens the conversations behind it, over the same period. */
+function Kpi({ label, value, help, trend, vs, href }: { label: string; value: string; help: string; trend: Trend | null; vs: string; href?: string }) {
   const Icon = trend?.direction === "up" ? ArrowUpRight : trend?.direction === "down" ? ArrowDownRight : Minus
-  return (
-    <div className="flex min-w-0 flex-col gap-1 rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface)] p-4">
-      <span className="text-xs font-medium text-[var(--color-muted)]">{label}</span>
+  const body = (
+    <>
+      <span className="flex items-start justify-between gap-2 text-xs font-medium text-[var(--color-muted)]">
+        {label}
+        {href && <ChevronRight className="h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5 group-hover:text-[var(--color-text)]" aria-hidden />}
+      </span>
       <span className="text-2xl font-semibold tracking-tight tabular-nums">{value}</span>
       {trend && (
         <span
@@ -44,7 +49,15 @@ function Kpi({ label, value, help, trend, vs }: { label: string; value: string; 
         </span>
       )}
       <span className="mt-auto pt-1 text-xs leading-snug text-[var(--color-muted)]">{help}</span>
-    </div>
+    </>
+  )
+  const box = "flex min-w-0 flex-col gap-1 rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface)] p-4"
+  return href ? (
+    <Link href={href} className={cn(box, "group text-[var(--color-text)] no-underline transition-colors hover:border-[var(--color-muted)] focus-visible:border-[var(--color-muted)]")}>
+      {body}
+    </Link>
+  ) : (
+    <div className={box}>{body}</div>
   )
 }
 
@@ -347,33 +360,54 @@ export function AnalyticsDashboard({ initial, canEdit, limits }: { initial: Anal
   const rp = rate(prev)
   const show = (v: number | null) => (v === null ? t.noData : pctNum(v))
 
-  const kpis: { key: string; label: string; value: string; help: string; trend: Trend | null }[] = [
-    { key: "conversations", label: t.kpi.conversations, value: formatNumber(cur.conversations, locale), help: t.kpiHelp.conversations, trend: countTrend(cur.conversations, prev.conversations) },
+  const kpis: { key: string; label: string; value: string; help: string; trend: Trend | null; href?: string }[] = [
+    {
+      key: "conversations",
+      label: t.kpi.conversations,
+      value: formatNumber(cur.conversations, locale),
+      help: t.kpiHelp.conversations,
+      trend: countTrend(cur.conversations, prev.conversations),
+      href: conversationsHref("all", data.days),
+    },
     { key: "questions", label: t.kpi.questions, value: formatNumber(cur.questions, locale), help: t.kpiHelp.questions, trend: countTrend(cur.questions, prev.questions) },
     { key: "sourced", label: t.kpi.sourcedRate, value: show(rc.sourced), help: t.kpiHelp.sourcedRate, trend: rateTrend(rc.sourced, rp.sourced, true) },
-    { key: "unanswered", label: t.kpi.unansweredRate, value: show(rc.unanswered), help: t.kpiHelp.unansweredRate, trend: rateTrend(rc.unanswered, rp.unanswered, false) },
-    { key: "helpful", label: t.kpi.satisfaction, value: show(rc.helpful), help: t.kpiHelp.satisfaction, trend: rateTrend(rc.helpful, rp.helpful, true) },
+    {
+      key: "unanswered",
+      label: t.kpi.unansweredRate,
+      value: show(rc.unanswered),
+      help: t.kpiHelp.unansweredRate,
+      trend: rateTrend(rc.unanswered, rp.unanswered, false),
+      href: conversationsHref("unanswered", data.days),
+    },
+    {
+      key: "helpful",
+      label: t.kpi.satisfaction,
+      value: show(rc.helpful),
+      help: t.kpiHelp.satisfaction,
+      trend: rateTrend(rc.helpful, rp.helpful, true),
+      href: conversationsHref("negative", data.days),
+    },
     {
       key: "leads",
       label: t.kpi.leads,
       value: formatNumber(cur.leads, locale),
       help: format(t.kpiHelp.leads, { handoffs: formatNumber(cur.handoffs, locale) }),
       trend: countTrend(cur.leads, prev.leads),
+      href: conversationsHref("leads", data.days),
     },
   ]
 
   const empty = cur.conversations === 0 && prev.conversations === 0 && data.unanswered.length === 0
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8 sm:px-8">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div className="flex min-w-0 flex-col gap-1">
-          <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
-            <ChartColumn className="h-6 w-6 text-[var(--color-muted)]" aria-hidden />
+    <div className="flex min-h-full flex-col">
+      <header className="sticky top-0 z-10 flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-[var(--color-line)] bg-[var(--color-raised)]/95 px-4 py-3 backdrop-blur sm:px-6">
+        <div className="flex min-w-0 flex-1 flex-col">
+          <h1 className="flex items-center gap-2 text-lg font-semibold">
             {t.title}
             <BetaBadge className="text-xs" />
           </h1>
-          <p className="max-w-2xl text-[var(--color-muted)]">{t.lede}</p>
+          <p className="text-xs text-[var(--color-muted)]">{t.lede}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div role="radiogroup" aria-label={t.range} className="flex rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] p-0.5 text-sm">
@@ -415,45 +449,47 @@ export function AnalyticsDashboard({ initial, canEdit, limits }: { initial: Anal
         </div>
       </header>
 
-      <div className="-mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--color-muted)]">
-        <span>{format(t.timeZone, { tz: data.timeZone.replace(/_/g, " ") })}</span>
-        {data.days > data.retentionDays && (
-          <span>
-            {format(t.retentionNote, { n: data.retentionDays })}{" "}
-            <Link href="/dashboard/widget?section=install" className="font-semibold">
-              {t.retentionLink}
-            </Link>
-          </span>
-        )}
-      </div>
-
-      {error && (
-        <p role="alert" className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-300">
-          {error}
-        </p>
-      )}
-
-      <div aria-busy={loading} className={cn("flex flex-col gap-6 transition-opacity", loading && "pointer-events-none opacity-60")}>
-        {empty && <Empty />}
-        <section aria-label={t.title} className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-          {kpis.map(({ key, ...k }) => (
-            <Kpi key={key} {...k} vs={vs} />
-          ))}
-        </section>
-
-        <ActivityChart daily={data.daily} />
-
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-          <TopicsCard data={data} />
-          <div className="flex min-w-0 flex-col gap-6">
-            <QualityChart daily={data.daily} />
-            <LanguagesCard languages={data.languages} />
-          </div>
+      <div className="flex flex-col gap-6 p-4 sm:p-6">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--color-muted)]">
+          <span>{format(t.timeZone, { tz: data.timeZone.replace(/_/g, " ") })}</span>
+          {data.days > data.retentionDays && (
+            <span>
+              {format(t.retentionNote, { n: data.retentionDays })}{" "}
+              <Link href="/dashboard/widget?section=install" className="font-semibold">
+                {t.retentionLink}
+              </Link>
+            </span>
+          )}
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-          <UnansweredQuestions groups={data.unanswered} open={data.unansweredOpen} canEdit={canEdit} limits={limits} />
-          <HoursChart hours={data.hours} />
+        {error && (
+          <p role="alert" className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-300">
+            {error}
+          </p>
+        )}
+
+        <div aria-busy={loading} className={cn("flex flex-col gap-6 transition-opacity", loading && "pointer-events-none opacity-60")}>
+          {empty && <Empty />}
+          <section aria-label={t.title} className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+            {kpis.map(({ key, ...k }) => (
+              <Kpi key={key} {...k} vs={vs} />
+            ))}
+          </section>
+
+          <ActivityChart daily={data.daily} />
+
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+            <TopicsCard data={data} />
+            <div className="flex min-w-0 flex-col gap-6">
+              <QualityChart daily={data.daily} />
+              <LanguagesCard languages={data.languages} />
+            </div>
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+            <UnansweredQuestions groups={data.unanswered} open={data.unansweredOpen} canEdit={canEdit} limits={limits} />
+            <HoursChart hours={data.hours} />
+          </div>
         </div>
       </div>
     </div>

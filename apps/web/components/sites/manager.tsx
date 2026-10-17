@@ -41,70 +41,73 @@ export function SitesManager({ initial }: { initial: SitesJson }) {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-8 sm:px-8">
-      <div className="flex flex-col gap-1">
-        <h1 className="m-0 text-2xl font-semibold tracking-tight">{t.title}</h1>
-        <p className="m-0 text-[var(--color-muted)]">{t.intro}</p>
+    <div className="flex min-h-full flex-col">
+      <header className="sticky top-0 z-10 border-b border-[var(--color-line)] bg-[var(--color-raised)]/95 px-4 py-3 backdrop-blur sm:px-6">
+        <h1 className="m-0 text-lg font-semibold">{t.title}</h1>
+        <p className="m-0 text-xs text-[var(--color-muted)]">{t.intro}</p>
+      </header>
+
+      <div className="flex w-full max-w-3xl flex-col gap-6 p-4 sm:p-6">
+
+        <ul className="m-0 flex list-none flex-col gap-3 p-0">
+          {sites.map((site) => (
+            <SiteRow
+              key={site.id}
+              site={site}
+              current={site.id === initial.currentId}
+              canEdit={initial.canEdit}
+              onlyOne={sites.length === 1}
+              nameMax={initial.nameMax}
+              onRenamed={(next) => {
+                setSites((all) => all.map((s) => (s.id === site.id ? { ...s, name: next } : s)))
+                // the header's switcher is server-rendered
+                router.refresh()
+              }}
+              onRemoved={() => {
+                // the dashboard was showing it: load whichever site the server falls back to
+                if (site.id === initial.currentId) return window.location.reload()
+                setSites((all) => all.filter((s) => s.id !== site.id))
+                router.refresh()
+              }}
+            />
+          ))}
+        </ul>
+
+        {initial.canEdit ? (
+          <section className={card} aria-labelledby="add-site">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 id="add-site" className="m-0 text-lg font-semibold">
+                {t.add.title}
+              </h2>
+              <span className="text-sm text-[var(--color-muted)]">{format(t.count, { count: sites.length, limit: initial.limit })}</span>
+            </div>
+            {full ? (
+              <p className="m-0 text-sm text-[var(--color-muted)]">{format(t.add.limit, { limit: initial.limit })}</p>
+            ) : (
+              <form onSubmit={add} className="flex flex-col gap-2">
+                <label htmlFor="site-name" className="text-sm font-medium">
+                  {t.add.label}
+                </label>
+                <div className="flex gap-2 max-sm:flex-col">
+                  <input id="site-name" value={name} maxLength={initial.nameMax} onChange={(e) => setName(e.target.value)} placeholder={t.add.placeholder} className={input} />
+                  <button type="submit" disabled={busy || !name.trim()} className={primary}>
+                    <Plus className="h-4 w-4" aria-hidden />
+                    {t.add.submit}
+                  </button>
+                </div>
+                <p className="m-0 text-xs text-[var(--color-muted)]">{t.add.hint}</p>
+                {message && (
+                  <p role="alert" className={errorText}>
+                    {message}
+                  </p>
+                )}
+              </form>
+            )}
+          </section>
+        ) : (
+          <p className="m-0 text-sm text-[var(--color-muted)]">{t.readOnly}</p>
+        )}
       </div>
-
-      <ul className="m-0 flex list-none flex-col gap-3 p-0">
-        {sites.map((site) => (
-          <SiteRow
-            key={site.id}
-            site={site}
-            current={site.id === initial.currentId}
-            canEdit={initial.canEdit}
-            onlyOne={sites.length === 1}
-            nameMax={initial.nameMax}
-            onRenamed={(next) => {
-              setSites((all) => all.map((s) => (s.id === site.id ? { ...s, name: next } : s)))
-              // the header's switcher is server-rendered
-              router.refresh()
-            }}
-            onRemoved={() => {
-              // the dashboard was showing it: load whichever site the server falls back to
-              if (site.id === initial.currentId) return window.location.reload()
-              setSites((all) => all.filter((s) => s.id !== site.id))
-              router.refresh()
-            }}
-          />
-        ))}
-      </ul>
-
-      {initial.canEdit ? (
-        <section className={card} aria-labelledby="add-site">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 id="add-site" className="m-0 text-lg font-semibold">
-              {t.add.title}
-            </h2>
-            <span className="text-sm text-[var(--color-muted)]">{format(t.count, { count: sites.length, limit: initial.limit })}</span>
-          </div>
-          {full ? (
-            <p className="m-0 text-sm text-[var(--color-muted)]">{format(t.add.limit, { limit: initial.limit })}</p>
-          ) : (
-            <form onSubmit={add} className="flex flex-col gap-2">
-              <label htmlFor="site-name" className="text-sm font-medium">
-                {t.add.label}
-              </label>
-              <div className="flex gap-2 max-sm:flex-col">
-                <input id="site-name" value={name} maxLength={initial.nameMax} onChange={(e) => setName(e.target.value)} placeholder={t.add.placeholder} className={input} />
-                <button type="submit" disabled={busy || !name.trim()} className={primary}>
-                  <Plus className="h-4 w-4" aria-hidden />
-                  {t.add.submit}
-                </button>
-              </div>
-              <p className="m-0 text-xs text-[var(--color-muted)]">{t.add.hint}</p>
-              {message && (
-                <p role="alert" className={errorText}>
-                  {message}
-                </p>
-              )}
-            </form>
-          )}
-        </section>
-      ) : (
-        <p className="m-0 text-sm text-[var(--color-muted)]">{t.readOnly}</p>
-      )}
     </div>
   )
 }
