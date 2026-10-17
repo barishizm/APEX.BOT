@@ -87,13 +87,18 @@ export function UsersTable({ initialQuery }: { initialQuery: TableQuery }) {
       label={t.title}
       columns={columns}
       rowKey={(u) => u.id}
+      rowHref={(u) => `/admin/users/${u.id}`}
       defaultSort={{ key: "created", dir: "desc" }}
       initialQuery={initialQuery}
       searchPlaceholder={t.search}
       filters={[
         { key: "role", label: t.filters.role, options: (["staff", "superadmin", "support", "none"] as const).map((v) => ({ value: v, label: t.roles[v] })) },
-        { key: "status", label: t.filters.status, options: (["active", "unverified", "suspended"] as const).map((v) => ({ value: v, label: t.statuses[v] })) },
+        { key: "verified", label: t.filters.verified, options: (["yes", "no"] as const).map((v) => ({ value: v, label: t.verified[v] })) },
         { key: "twoFactor", label: t.filters.twoFactor, options: (["on", "off"] as const).map((v) => ({ value: v, label: t.twoFactor[v] })) },
+        { key: "suspended", label: t.filters.suspended, options: (["yes", "no"] as const).map((v) => ({ value: v, label: t.suspended[v] })) },
+        { key: "provider", label: t.filters.provider, options: (["google", "github", "none"] as const).map((v) => ({ value: v, label: t.providers[v] })) },
+        { key: "accountType", label: t.filters.accountType, options: (["personal", "business"] as const).map((v) => ({ value: v, label: t.accountTypes[v] })) },
+        { key: "created", label: t.filters.created, options: (["7d", "30d", "90d", "365d", "older"] as const).map((v) => ({ value: v, label: t.created[v] })) },
       ]}
     />
   )

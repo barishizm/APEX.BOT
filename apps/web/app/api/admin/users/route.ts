@@ -10,6 +10,7 @@ export const GET = adminListRoute<AdminUserRow>({
     { header: "email", value: (u) => u.email },
     { header: "username", value: (u) => u.username },
     { header: "display_name", value: (u) => u.display_name },
+    { header: "account_type", value: (u) => u.account_type },
     { header: "platform_role", value: (u) => u.platform_role },
     { header: "email_verified", value: (u) => u.email_verified },
     { header: "two_factor", value: (u) => u.two_factor },
