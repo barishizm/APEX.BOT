@@ -23,7 +23,7 @@ import {
   verifyEmail,
 } from "../src/auth.ts"
 import { getBotForUser, listBotsForUser } from "../src/bots.ts"
-import { totpCode, totpStep } from "../src/crypto.ts"
+import { openTotpSecret, sealTotpSecret, totpCode, totpStep } from "../src/crypto.ts"
 import {
   acceptInvitation,
   changeMemberRole,
@@ -35,6 +35,9 @@ import {
   revokeInvite,
   setActiveWorkspace,
 } from "../src/team.ts"
+
+// a fixed test key; production reads its own from the environment
+process.env.TOTP_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64")
 
 let pg: PGlite
 let db: Db
@@ -155,6 +158,34 @@ describe("two-step sign-in", () => {
     const out = await oauthLogin(db, { provider: "google", providerAccountId: "g-1", email: "jane@example.com", emailVerified: true })
     assert.ok(out.session)
     assert.equal(out.user.twoFactor, false)
+  })
+
+  test("the secret is stored encrypted and bound to its account", async () => {
+    const { user, secret } = await withTwoFactor()
+    const { rows } = await db.query<{ totp_secret: string }>("select totp_secret from app.users where id = $1", [user.id])
+    assert.match(rows[0].totp_secret, /^v1\./)
+    assert.ok(!rows[0].totp_secret.includes(secret))
+    assert.equal(openTotpSecret(rows[0].totp_secret, user.id).secret, secret)
+    // copied onto another account, or opened with another key, it fails
+    assert.throws(() => openTotpSecret(rows[0].totp_secret, "00000000-0000-0000-0000-000000000000"))
+    const key = process.env.TOTP_ENCRYPTION_KEY
+    process.env.TOTP_ENCRYPTION_KEY = Buffer.alloc(32, 8).toString("base64")
+    try {
+      assert.throws(() => openTotpSecret(rows[0].totp_secret, user.id))
+      delete process.env.TOTP_ENCRYPTION_KEY
+      assert.throws(() => sealTotpSecret(secret, user.id), /TOTP_ENCRYPTION_KEY is not set/)
+    } finally {
+      process.env.TOTP_ENCRYPTION_KEY = key
+    }
+  })
+
+  test("a secret saved unencrypted before still works and gets encrypted on first use", async () => {
+    const { user, secret } = await withTwoFactor()
+    await db.query("update app.users set totp_secret = $2 where id = $1", [user.id, secret])
+    const { challenge } = await login(db, { email: "jane@example.com", password: PASSWORD })
+    assert.ok(await completeTwoFactorLogin(db, challenge!.token, appCode(secret, 1)))
+    const { rows } = await db.query<{ totp_secret: string }>("select totp_secret from app.users where id = $1", [user.id])
+    assert.equal(openTotpSecret(rows[0].totp_secret, user.id).legacy, false)
   })
 
   test("turning off and new recovery codes need a code", async () => {

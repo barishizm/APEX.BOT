@@ -9,6 +9,8 @@ import {
   newTotpSecret,
   newVerificationCode,
   normalizeRecoveryCode,
+  openTotpSecret,
+  sealTotpSecret,
   sha256,
   verifyPassword,
 } from "./crypto.ts"
@@ -883,9 +885,20 @@ async function checkSecondFactor(q: Queryable, userId: string, raw: unknown): Pr
   if (!row?.totp_secret) return null
   const digits = input.replace(/\s/g, "")
   if (/^\d{6}$/.test(digits)) {
-    const step = matchTotp(row.totp_secret, digits, row.totp_last_step === null ? null : Number(row.totp_last_step))
+    const { secret, legacy } = openTotpSecret(row.totp_secret, userId)
+    const step = matchTotp(secret, digits, row.totp_last_step === null ? null : Number(row.totp_last_step))
     if (step === null) return null
-    await q.query("update app.users set totp_last_step = $2 where id = $1", [userId, step])
+    // a secret saved before encryption existed is sealed on its first use; a missing key must
+    // not turn that into a lock-out, so it then waits for a later sign-in
+    let sealed: string | null = null
+    if (legacy) {
+      try {
+        sealed = sealTotpSecret(secret, userId)
+      } catch (err) {
+        console.error("[auth]", err instanceof Error ? err.message : err)
+      }
+    }
+    await q.query("update app.users set totp_last_step = $2, totp_secret = coalesce($3, totp_secret) where id = $1", [userId, step, sealed])
     return "totp"
   }
   const recovery = normalizeRecoveryCode(input)
@@ -996,10 +1009,11 @@ export async function hasLoginChallenge(db: Db, token: string | undefined | null
  */
 export async function beginTwoFactorSetup(db: Db, userId: string): Promise<{ secret: string; uri: string }> {
   const secret = newTotpSecret()
+  const sealed = sealTotpSecret(secret, userId)
   const { rows } = await db.query<{ email: string }>(
     `update app.users set totp_secret = $2, totp_last_step = null
       where id = $1 and totp_enabled_at is null and email_verified_at is not null returning email`,
-    [userId, secret],
+    [userId, sealed],
   )
   if (!rows[0]) {
     const { rows: found } = await db.query<{ enabled: boolean }>("select totp_enabled_at is not null as enabled from app.users where id = $1", [userId])
@@ -1030,7 +1044,7 @@ export async function enableTwoFactor(db: Db, userId: string, rawCode: unknown, 
     } catch (error) {
       return { error: error as AuthError }
     }
-    const step = matchTotp(row.totp_secret, code, null)
+    const step = matchTotp(openTotpSecret(row.totp_secret, userId).secret, code, null)
     if (step === null) {
       await logEvent(tx, "two_factor_failed", meta, userId, null)
       return { error: new AuthError("invalid_code", "That code didn't match. Check the time on your phone and try the newest code") }

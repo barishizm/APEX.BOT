@@ -20,6 +20,7 @@ export const MIGRATION_NAMES = [
   "0015_message_topics.sql",
   "0016_conversation_context.sql",
   "0017_account_security.sql",
+  "0018_totp_secret_sealed.sql",
 ] as const
 
 /** Migrations this code expects that the database hasn't applied (run `npm run db:migrate`). */
