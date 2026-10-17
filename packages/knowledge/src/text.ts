@@ -83,11 +83,28 @@ const WORDS: Record<Lang, Set<string>> = {
   et: new Set(["ja", "kuidas", "mis", "kus", "millal", "miks", "tere", "aitah", "palun", "jah", "ei", "ma", "mina", "teie", "soovin", "tahan", "kui", "palju", "ning", "voi", "mulle", "minu", "olen"]),
 };
 
+/**
+ * The text without capitalised words inside a sentence: those are names ("Who is Barış?", "Is
+ * Jūratė in?"), and their letters say nothing about the visitor's language. A sentence's first
+ * word and words in all capitals stay.
+ */
+function withoutNames(text: string): string {
+  const parts = text.split(/(\s+)/);
+  return parts
+    .filter((word, i) => {
+      if (!/^\p{Lu}/u.test(word) || word === word.toUpperCase()) return true;
+      const previous = parts.slice(0, i).reverse().find((p) => p.trim());
+      return !previous || /[.!?:]["'”’)]*$/.test(previous);
+    })
+    .join("");
+}
+
 /** Best-effort language guess; null when the text gives no clear signal (e.g. "ok", "👍"). */
 export function detectLang(text: string): Lang | null {
-  for (const [lang, chars] of UNIQUE_CHARS) if (chars.test(text)) return lang;
+  const letters = withoutNames(text);
+  for (const [lang, chars] of UNIQUE_CHARS) if (chars.test(letters)) return lang;
   const score: Record<Lang, number> = { tr: 0, en: 0, lt: 0, lv: 0, et: 0 };
-  for (const [chars, langs] of SHARED_CHARS) if (chars.test(text)) for (const lang of langs) score[lang]++;
+  for (const [chars, langs] of SHARED_CHARS) if (chars.test(letters)) for (const lang of langs) score[lang]++;
   for (const word of fold(text).split(/[^a-z]+/)) {
     for (const lang of LANGS) if (WORDS[lang].has(word)) score[lang] += 2;
   }

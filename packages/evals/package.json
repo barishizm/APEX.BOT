@@ -8,7 +8,8 @@
     "test": "tsx --test test/*.test.ts",
     "typecheck": "tsc --noEmit",
     "eval:live": "tsx --env-file-if-exists=../../apps/api/.env src/live.ts",
-    "experiment:embeddings": "tsx --env-file-if-exists=../../apps/api/.env src/experiments/embeddings.ts"
+    "experiment:embeddings": "tsx --env-file-if-exists=../../apps/api/.env src/experiments/embeddings.ts",
+    "experiment:hybrid": "tsx --env-file-if-exists=../../apps/api/.env src/experiments/hybrid.ts"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",

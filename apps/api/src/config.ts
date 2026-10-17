@@ -27,6 +27,14 @@ export interface Config {
   maxOutputTokens: number;
   /** Server-side refusal fallbacks; Claude API only, and not available for Haiku models. */
   fallbacks: boolean;
+  /**
+   * Embedder for hybrid search ("provider:model@dims", e.g. gemini:gemini-embedding-2@768), or null
+   * for lexical search only. Off unless APEX_EMBEDDINGS names one: it sends every customer's content
+   * and visitor messages to that provider.
+   */
+  embeddings: string | null;
+  /** How long a visitor message waits for its embedding before searching lexically. */
+  embeddingTimeoutMs: number;
   limits: Limits;
 }
 
@@ -68,6 +76,13 @@ export const defaultLimits: Limits = {
   maxDailyTokensPerTenant: 20_000_000,
 };
 
+function embeddingsSpec(raw: string | undefined): string | null {
+  const value = raw?.trim() ?? "";
+  if (value === "" || value === "off") return null;
+  if (!/^(openai|gemini):[\w.-]+@\d+$/.test(value)) throw new Error("APEX_EMBEDDINGS must be off or provider:model@dims, e.g. gemini:gemini-embedding-2@768");
+  return value;
+}
+
 export function loadConfig(): Config {
   const effort = (process.env.APEX_EFFORT || "medium") as Effort;
   if (!["low", "medium", "high", "xhigh", "max"].includes(effort)) {
@@ -81,6 +96,8 @@ export function loadConfig(): Config {
     maxOutputTokens: num("APEX_MAX_OUTPUT_TOKENS", 8000),
     // Haiku has no server-side fallback, so it is opt-in (e.g. with a Sonnet/Opus model).
     fallbacks: process.env.APEX_FALLBACKS === "on",
+    embeddings: embeddingsSpec(process.env.APEX_EMBEDDINGS),
+    embeddingTimeoutMs: num("APEX_EMBEDDING_TIMEOUT_MS", 2500),
     limits: {
       ...defaultLimits,
       minRetrievalScore: num("APEX_MIN_RETRIEVAL_SCORE", defaultLimits.minRetrievalScore),

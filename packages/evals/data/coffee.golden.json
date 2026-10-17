@@ -47,11 +47,11 @@
     { "id": "tr-unknown-franchise", "q": "Franchise veriyor musunuz?", "expect": null, "tags": ["tr", "unknown"] },
     { "id": "tr-unknown-parking", "q": "Dükkanın otoparkı var mı?", "expect": null, "tags": ["tr", "unknown", "hard-negative"] },
     { "id": "tr-unknown-machine", "q": "Kahve makinesi satıyor musunuz?", "expect": null, "tags": ["tr", "unknown", "hard-negative"] },
-    { "id": "tr-smalltalk", "q": "Merhaba", "expect": null, "tags": ["tr", "unknown"] },
+    { "id": "tr-smalltalk", "q": "Merhaba", "expect": null, "tags": ["tr", "smalltalk"] },
     { "id": "en-unknown-vegan", "q": "Do you have vegan pastries?", "expect": null, "tags": ["en", "unknown"] },
     { "id": "en-unknown-founder", "q": "Who founded the company?", "expect": null, "tags": ["en", "unknown"] },
     { "id": "en-unknown-jobs", "q": "Are you hiring baristas?", "expect": null, "tags": ["en", "unknown"] },
-    { "id": "en-unknown-weather", "q": "What's the weather like today?", "expect": null, "tags": ["en", "unknown"] },
+    { "id": "en-unknown-weather", "q": "What's the weather like today?", "expect": null, "tags": ["en", "offtopic"] },
     { "id": "en-unknown-machine", "q": "Do you sell espresso machines?", "expect": null, "tags": ["en", "unknown", "hard-negative"] }
   ]
 }

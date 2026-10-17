@@ -19,6 +19,7 @@ Kayıt / giriş için veritabanı şeması, migration çalıştırıcısı ve au
 | `app.auth_events` | Güvenlik logu; başarısız girişler de burada sayılıp kısıtlanıyor (15 dk'da e-posta başına 10, IP başına 50) |
 | `app.bots` | Çalışma alanı başına bir bot: ayarlar (JSON, uygulama doğrular), herkese açık `site_key`, `version` (iyimser kilit), `knowledge_version` |
 | `app.knowledge_sources` / `app.knowledge_chunks` | Bilgi tabanı: web sitesi (taranır) veya metin kaynakları ve retrieval parçaları; her parça `bot_id` taşır |
+| `app.knowledge_embeddings` | Parçaların embedding vektörleri (`bytea`, float32), `bot_id` + model + metin hash'iyle; sohbet API'si yazar ve bellekte arar. pgvector gerekmez ([ADR 0002](../../docs/adr/0002-hybrid-retrieval.md)) |
 | `app.bot_activity` | Widget'ın en son hangi sitede ve ne zaman yüklendiği (sohbet API'si yazar) |
 | `app.conversations` / `app.messages` | Panel botlarının konuşmaları; botun saklama süresi dolunca saatlik temizlikle silinir |
 | `app.schema_migrations` | Hangi migration'ların uygulandığı |

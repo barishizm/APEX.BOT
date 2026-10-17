@@ -1,5 +1,6 @@
-import { KNOWLEDGE_LIMITS, KnowledgeError, failSync, finishSync, type KnowledgeSource } from "@apex/db"
-import { CrawlError, chunkPage, crawlSite } from "@apex/knowledge"
+import { KNOWLEDGE_LIMITS, KnowledgeError, failSync, finishSync, loadEmbeddings, type ChunkRecord, type KnowledgeSource } from "@apex/db"
+import { CrawlError, chunkPage, crawlSite, type KnowledgeBase, type SemanticQuery } from "@apex/knowledge"
+import { chunkHash, createEmbedder, embedderDims, vectorFromBytes } from "@apex/knowledge/embed"
 import { errorJson } from "@/lib/auth"
 import { botErrorResponse } from "@/lib/bot"
 import type { Locale } from "@/lib/i18n"
@@ -8,6 +9,42 @@ import { db } from "@/lib/db"
 
 // Same floor the chat API uses (APEX_MIN_RETRIEVAL_SCORE there), for the dashboard's search preview
 export const minRetrievalScore = () => Number(process.env.APEX_MIN_RETRIEVAL_SCORE) || 2
+
+/** The chat API's embedder (APEX_EMBEDDINGS there), so the search preview matches by meaning too; null when off. */
+export function previewEmbedder() {
+  const spec = process.env.APEX_EMBEDDINGS?.trim()
+  if (!spec || spec === "off") return null
+  try {
+    return createEmbedder(spec, { openai: process.env.OPENAI_API_KEY, gemini: process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY })
+  } catch (err) {
+    console.error("[knowledge] APEX_EMBEDDINGS is set but can't be used; the preview matches keywords only", err)
+    return null
+  }
+}
+
+/**
+ * Attaches the bot's stored vectors (written by the chat API) to `index` and embeds the question,
+ * for the search preview. Chunks the API hasn't embedded yet stay keyword-only, as they are in chat.
+ */
+export async function previewSemantic(index: KnowledgeBase, generation: number, botId: string, chunks: ChunkRecord[], question: string) {
+  const embedder = previewEmbedder()
+  const dims = embedder && embedderDims(embedder.id)
+  if (!embedder || !dims) return { semantic: null, embedded: 0 }
+  const hashes = chunks.map(chunkHash)
+  const key = (h: Uint8Array) => Buffer.from(h).toString("hex")
+  const stored = new Map((await loadEmbeddings(db(), botId, embedder.id, hashes)).map((r) => [key(r.hash), vectorFromBytes(r.vector, dims)]))
+  const vectors = hashes.map((h) => stored.get(key(h)) ?? null)
+  const embedded = vectors.filter(Boolean).length
+  if (!embedded) return { semantic: null, embedded }
+  index.attachVectors(botId, generation, embedder.id, vectors)
+  try {
+    const [vector] = await embedder.embed([question], "query", AbortSignal.timeout(5000))
+    return { semantic: { embedder: embedder.id, vectors: [vector] } satisfies SemanticQuery, embedded }
+  } catch (err) {
+    console.error("[knowledge] couldn't embed the preview question", err instanceof Error ? err.message : err)
+    return { semantic: null, embedded }
+  }
+}
 
 /** Reads the website and stores its chunks; runs after the response, so it reports through the source's status. */
 export async function crawlInto(sourceId: string, url: string) {
