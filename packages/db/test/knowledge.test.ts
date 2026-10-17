@@ -7,6 +7,7 @@ import { migrate } from "../src/migrate.ts"
 import { register } from "../src/auth.ts"
 import { addAllowedOrigin, getBotForUser, listBotsChangedSince, recordWidgetSeen } from "../src/bots.ts"
 import { insertConversation, insertMessage } from "../src/conversations.ts"
+import { CRAWL_PAGE_CEILING, PLAN_LIMITS } from "../src/plans.ts"
 import {
   KNOWLEDGE_LIMITS,
   KnowledgeError,
@@ -14,6 +15,7 @@ import {
   addTextSource,
   addWebsiteSource,
   dueRefreshes,
+  knowledgeLimits,
   deleteSource,
   failSync,
   finishSync,
@@ -318,6 +320,38 @@ describe("source detail and editing", () => {
 
     assert.deepEqual(await sourceUsage(db, user.id), { [site.id]: 2, [text.id]: 1 })
     assert.deepEqual(await sourceUsage(db, user.id, 60), { [site.id]: 2, [text.id]: 2 })
+  })
+})
+
+describe("plans", () => {
+  const setPlan = (orgOf: string, plan: string) =>
+    db.query("update app.organizations set plan = $2 where id = (select organization_id from app.organization_members where user_id = $1)", [orgOf, plan])
+
+  test("a website is read up to its workspace plan's page limit, capped at what one crawl can read", async () => {
+    const user = await newUser()
+    const site = await addWebsiteSource(db, user.id, "https://kahve.example/")
+    // every workspace starts on Free
+    assert.equal((await knowledgeLimits(db, user.id)).plan, "free")
+    assert.equal((await knowledgeLimits(db, user.id)).websitePages, PLAN_LIMITS.free.websitePages)
+    let claimed = await startSync(db, user.id, site.id)
+    assert.deepEqual([claimed.plan, claimed.pageLimit], ["free", 50])
+    await finishSync(db, site.id, { pages: 1, chunks: [] })
+
+    await setPlan(user.id, "starter")
+    claimed = await startScheduledSync(db, site.id)
+    assert.deepEqual([claimed.plan, claimed.pageLimit], ["starter", 300])
+    await finishSync(db, site.id, { pages: 1, chunks: [] })
+
+    await setPlan(user.id, "business")
+    claimed = await startSync(db, user.id, site.id)
+    assert.equal(claimed.pageLimit, CRAWL_PAGE_CEILING)
+    assert.ok(PLAN_LIMITS.business.websitePages > CRAWL_PAGE_CEILING)
+    assert.equal((await knowledgeLimits(db, user.id)).websitePages, CRAWL_PAGE_CEILING)
+  })
+
+  test("the schema only accepts known plans", async () => {
+    const user = await newUser()
+    await assert.rejects(setPlan(user.id, "platinum"))
   })
 })
 

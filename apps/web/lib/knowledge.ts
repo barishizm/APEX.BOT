@@ -1,5 +1,5 @@
 import { timingSafeEqual } from "node:crypto"
-import { KNOWLEDGE_LIMITS, KnowledgeError, failSync, finishSync, loadEmbeddings, type ChunkRecord, type KnowledgeSource } from "@apex/db"
+import { KNOWLEDGE_LIMITS, KnowledgeError, failSync, finishSync, loadEmbeddings, type ChunkRecord, type ClaimedSync, type KnowledgeSource } from "@apex/db"
 import { CrawlError, DocumentError, chunkPage, crawlSite, documentKind, extractDocument, titleFromName, type KnowledgeBase, type SemanticQuery } from "@apex/knowledge"
 import { chunkHash, createEmbedder, embedderDims, vectorFromBytes } from "@apex/knowledge/embed"
 import { errorJson } from "@/lib/auth"
@@ -47,12 +47,15 @@ export async function previewSemantic(index: KnowledgeBase, generation: number, 
   }
 }
 
-/** Reads the website and stores its chunks; runs after the response, so it reports through the source's status. */
-export async function crawlInto(sourceId: string, url: string) {
+/**
+ * Reads the website, up to its plan's page limit, and stores its chunks; runs after the response,
+ * so it reports through the source's status.
+ */
+export async function crawlInto({ id: sourceId, url, pageLimit }: Pick<ClaimedSync, "id" | "url" | "pageLimit">) {
   try {
     const result = await crawlSite(url, {
-      maxPages: KNOWLEDGE_LIMITS.websitePages,
-      maxDocuments: KNOWLEDGE_LIMITS.websiteDocuments,
+      maxPages: pageLimit,
+      maxDocuments: Math.min(KNOWLEDGE_LIMITS.websiteDocuments, pageLimit),
       // leaves room under the route's maxDuration to store what was read
       timeBudgetMs: 200_000,
       // local development only: lets you point the crawler at a site on your own machine

@@ -9,6 +9,7 @@ import type { SourceJson } from "@/lib/knowledge"
 import { cn } from "@/lib/utils"
 
 export type Limits = {
+  plan: "free" | "starter" | "pro" | "business"
   sources: number
   websitePages: number
   websiteDocuments: number

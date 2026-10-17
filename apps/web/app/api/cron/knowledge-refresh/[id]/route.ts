@@ -10,7 +10,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!cronAuthorized(request)) return new Response(null, { status: 401 })
   try {
     const source = await startScheduledSync(db(), (await params).id)
-    after(() => crawlInto(source.id, source.url))
+    after(() => crawlInto(source))
     return new Response(null, { status: 202 })
   } catch (err) {
     // busy: a manual sync is running, or the bot's other websites are; tomorrow's run tries again

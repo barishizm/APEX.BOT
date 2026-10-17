@@ -1,5 +1,5 @@
 import { after } from "next/server"
-import { KNOWLEDGE_LIMITS, KnowledgeError, addAllowedOrigin, addFileSource, addTextSource, addWebsiteSource, listSources, startSync } from "@apex/db"
+import { KnowledgeError, addAllowedOrigin, addFileSource, addTextSource, addWebsiteSource, knowledgeLimits, listSources, startSync } from "@apex/db"
 import { chunkText, normalizeStartUrl } from "@apex/knowledge"
 import { errorJson, readJson } from "@/lib/auth"
 import { requireApiUser } from "@/lib/bot"
@@ -12,8 +12,9 @@ import { siteScope } from "@/lib/current-site"
 export async function GET() {
   try {
     const user = await requireApiUser()
-    const [sources, locale] = await Promise.all([listSources(db(), await siteScope(user.id)), requestLocale()])
-    return Response.json({ sources: sources.map((s) => sourceJson(s, locale)), limits: KNOWLEDGE_LIMITS })
+    const scope = await siteScope(user.id)
+    const [sources, limits, locale] = await Promise.all([listSources(db(), scope), knowledgeLimits(db(), scope), requestLocale()])
+    return Response.json({ sources: sources.map((s) => sourceJson(s, locale)), limits })
   } catch (err) {
     return knowledgeErrorResponse(err)
   }
@@ -51,7 +52,7 @@ export async function POST(request: Request) {
     if (added.status === "syncing") return Response.json({ source: sourceJson(added, locale) }, { status: 200 })
     try {
       const source = await startSync(db(), await siteScope(user.id), added.id)
-      after(() => crawlInto(source.id, source.url))
+      after(() => crawlInto(source))
       return Response.json({ source: sourceJson(source, locale) }, { status: 201 })
     } catch (err) {
       // saved, but other websites are still being read: it waits for a manual sync

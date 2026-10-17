@@ -151,7 +151,7 @@ export function AddPanel({
 
       {tab === "website" ? (
         <form id="add-panel-website" role="tabpanel" aria-labelledby="add-tab-website" onSubmit={addSite} className="flex flex-col gap-3" noValidate>
-          <p className="text-sm text-[var(--color-muted)]">{format(k.website.description, { n: limits.websitePages, docs: limits.websiteDocuments })}</p>
+          <p className="text-sm text-[var(--color-muted)]">{format(k.website.description, { plan: k.plans[limits.plan], n: limits.websitePages, docs: Math.min(limits.websiteDocuments, limits.websitePages) })}</p>
           <TextInput
             label={k.website.label}
             type="url"

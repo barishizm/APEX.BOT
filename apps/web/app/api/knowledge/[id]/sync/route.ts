@@ -13,7 +13,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   try {
     const user = await requireApiUser()
     const source = await startSync(db(), await siteScope(user.id), (await params).id)
-    after(() => crawlInto(source.id, source.url))
+    after(() => crawlInto(source))
     return Response.json({ source: sourceJson(source, await requestLocale()) })
   } catch (err) {
     return knowledgeErrorResponse(err)
