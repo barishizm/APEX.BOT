@@ -7,13 +7,16 @@ import { CONTACT_EMAIL } from "@/components/site-nav";
 import { openAuth } from "@/components/ui/login-button";
 import { cn } from "@/lib/utils";
 
-type PlanId = "starter" | "pro" | "enterprise";
+type PlanId = "free" | "starter" | "pro" | "business";
 
-// Names, blurbs and features come from the dictionary; prices stay the same in every language
-const PLANS: { id: PlanId; price: { monthly: string; annual: string } | string | null; action: "register" | "contact"; featured?: boolean }[] = [
-  { id: "starter", price: "$0", action: "register" },
-  { id: "pro", price: { monthly: "$39", annual: "$29" }, action: "register", featured: true },
-  { id: "enterprise", price: null, action: "contact" },
+// Names, blurbs and features come from the dictionary; prices stay the same in every language.
+// Each plan's monthly AI replies keep a gross margin above 50% even at full use on the costliest
+// model mix, and around 75% at typical use; recheck against the model prices before changing them.
+const PLANS: { id: PlanId; price: { monthly: string; annual: string } | string; featured?: boolean }[] = [
+  { id: "free", price: "$0" },
+  { id: "starter", price: { monthly: "$29", annual: "$24" } },
+  { id: "pro", price: { monthly: "$79", annual: "$65" }, featured: true },
+  { id: "business", price: { monthly: "$249", annual: "$199" } },
 ];
 
 export const Component = () => {
@@ -23,7 +26,7 @@ export const Component = () => {
 
   return (
     <section className="relative w-full bg-[var(--color-surface)] pb-24 pt-32 text-[var(--color-text)] sm:pb-32 sm:pt-40">
-      <div className="mx-auto max-w-6xl px-6 md:px-8">
+      <div className="mx-auto max-w-7xl px-6 md:px-8">
         <div className="mb-14 flex flex-col items-center text-center">
           <p className="eyebrow mb-4">{t.eyebrow}</p>
           <h1 className="mb-4 max-w-2xl text-balance text-4xl font-semibold tracking-tight sm:text-5xl">
@@ -60,16 +63,15 @@ export const Component = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
           {PLANS.map((plan) => {
             const copy = t.plans[plan.id];
-            const price =
-              plan.price === null ? t.customPrice : typeof plan.price === "string" ? plan.price : annual ? plan.price.annual : plan.price.monthly;
+            const price = typeof plan.price === "string" ? plan.price : annual ? plan.price.annual : plan.price.monthly;
             return (
               <article
                 key={plan.id}
                 className={cn(
-                  "relative flex flex-col rounded-xl border p-8",
+                  "relative flex flex-col rounded-xl border p-7",
                   plan.featured
                     ? "border-[color-mix(in_srgb,var(--color-text)_30%,transparent)] bg-[var(--color-raised)] shadow-xl"
                     : "border-[var(--color-line)] bg-[var(--color-raised)]",
@@ -90,33 +92,24 @@ export const Component = () => {
                 <div className="mb-8 flex items-baseline gap-1.5">
                   <span className="text-4xl font-semibold tracking-tight">{price}</span>
                   {copy.unit && <span className="text-sm font-medium text-[var(--color-muted)]">{copy.unit}</span>}
-                  {plan.price !== null && typeof plan.price !== "string" && annual && (
+                  {typeof plan.price !== "string" && annual && (
                     <span className="text-xs text-[var(--color-muted)]">{t.billedYearly}</span>
                   )}
                 </div>
 
-                {plan.action === "contact" ? (
-                  <a
-                    href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent("Apex Bot Enterprise")}`}
-                    className="mb-8 flex h-10 w-full items-center justify-center rounded-md border border-[var(--color-line)] text-sm font-medium no-underline transition-colors hover:border-[var(--color-muted)]"
-                  >
-                    {copy.cta}
-                  </a>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={(e) => openAuth("register", e.currentTarget)}
-                    className={cn(
-                      "mb-8 flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-md text-sm font-medium transition-opacity hover:opacity-90 active:scale-[0.98]",
-                      plan.featured
-                        ? "border-0 bg-[var(--color-text)] text-[var(--color-surface)]"
-                        : "border border-[var(--color-line)] bg-transparent text-[var(--color-text)]",
-                    )}
-                  >
-                    {copy.cta}
-                    {plan.featured && <ArrowRight className="h-4 w-4" aria-hidden />}
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={(e) => openAuth("register", e.currentTarget)}
+                  className={cn(
+                    "mb-8 flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-md text-sm font-medium transition-opacity hover:opacity-90 active:scale-[0.98]",
+                    plan.featured
+                      ? "border-0 bg-[var(--color-text)] text-[var(--color-surface)]"
+                      : "border border-[var(--color-line)] bg-transparent text-[var(--color-text)]",
+                  )}
+                >
+                  {copy.cta}
+                  {plan.featured && <ArrowRight className="h-4 w-4" aria-hidden />}
+                </button>
 
                 <div className="mb-6 h-px w-full bg-[var(--color-line)]" />
 
@@ -136,9 +129,11 @@ export const Component = () => {
           })}
         </div>
 
-        <p className="mt-12 text-center text-sm text-[var(--color-muted)]">
+        <p className="mx-auto mt-10 max-w-3xl text-center text-xs leading-relaxed text-[var(--color-muted)]">{t.usageNote}</p>
+
+        <p className="mt-6 text-center text-sm text-[var(--color-muted)]">
           {t.footerPre}{" "}
-          <a href={`mailto:${CONTACT_EMAIL}`} className="text-[var(--color-text)] underline underline-offset-2">
+          <a href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent("Apex Bot Enterprise")}`} className="text-[var(--color-text)] underline underline-offset-2">
             {t.emailUs}
           </a>
           {t.footerPost}
