@@ -6,7 +6,8 @@ import { JSDOM } from "jsdom";
 import { A, setup } from "../../api/test/helpers.ts";
 
 const { app, store, mailer, model } = setup();
-model.reply = ["**Kargo** ", "750 TL üzeri ", "ücretsizdir."];
+// the model cites the excerpt it used, so the widget shows it as a source
+model.reply = ["**Kargo** ", "750 TL üzeri ", "ücretsizdir. [[used: 1]]"];
 
 const dom = new JSDOM(
   `<!doctype html><html lang="tr"><body><script src="https://cdn.example/widget.js" data-site-key="${A.key}" data-api="https://api.example"></script></body></html>`,
@@ -278,7 +279,8 @@ describe("widget", () => {
     const reply = $$(".msg.bot").at(-1)!;
     assert.equal(reply.querySelector("a"), null, "javascript: link stays text");
     assert.match(reply.textContent!, /<script>alert\(2\)<\/script>/);
-    model.reply = ["**Kargo** ", "750 TL üzeri ", "ücretsizdir."];
+    // the model cites the excerpt it used, so the widget shows it as a source
+model.reply = ["**Kargo** ", "750 TL üzeri ", "ücretsizdir. [[used: 1]]"];
   });
 
   it("closes on Escape with a transition and returns focus to the launcher", async () => {

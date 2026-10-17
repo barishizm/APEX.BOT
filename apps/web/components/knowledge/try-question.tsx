@@ -9,14 +9,21 @@ import { format } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 import { primaryButton, useSend } from "./shared"
 
-type SearchResult = { title: string; url: string; text: string; score: number; used: boolean }
+type SearchResult = { title: string; url: string; text: string; keywords: number | null; meaning: number | null; used: boolean }
+type SearchResponse = {
+  answered: boolean
+  confidence: string
+  threshold: number
+  meaning: { on: boolean; embedded: number; chunks: number }
+  results: SearchResult[]
+}
 
 export function TryQuestion({ disabled }: { disabled: boolean }) {
   const t = useAppI18n().t.knowledge.try
   const send = useSend()
   const [query, setQuery] = useState("")
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState<{ answered: boolean; confidence: string; threshold: number; results: SearchResult[] } | null>(null)
+  const [result, setResult] = useState<SearchResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const run = async (e: React.FormEvent) => {
@@ -62,11 +69,11 @@ export function TryQuestion({ disabled }: { disabled: boolean }) {
           >
             {result.answered ? (
               t.answered
-            ) : result.results.length === 0 ? (
+            ) : result.meaning.on || result.results[0]?.keywords == null ? (
               t.nothing
             ) : (
               <>
-                {format(t.belowThreshold, { score: result.results[0].score, threshold: result.threshold })}{" "}
+                {format(t.belowThreshold, { score: result.results[0].keywords, threshold: result.threshold })}{" "}
                 {result.confidence !== "lenient" ? (
                   <>
                     {t.lenientPre}{" "}
@@ -81,6 +88,9 @@ export function TryQuestion({ disabled }: { disabled: boolean }) {
               </>
             )}
           </p>
+          {result.meaning.embedded > 0 && result.meaning.embedded < result.meaning.chunks && (
+            <p className="text-xs text-[var(--color-muted)]">{format(t.partialMeaning, { embedded: result.meaning.embedded, chunks: result.meaning.chunks })}</p>
+          )}
           {result.results.map((r, i) => (
             <article
               key={i}
@@ -98,8 +108,13 @@ export function TryQuestion({ disabled }: { disabled: boolean }) {
                   <span className="truncate font-medium">{r.title}</span>
                 )}
                 <span className="shrink-0 font-mono text-[0.6875rem] text-[var(--color-muted)]">
-                  {r.used ? t.used : ""}
-                  {format(t.score, { score: r.score })}
+                  {[
+                    r.used ? t.used : null,
+                    r.keywords !== null ? format(t.keywords, { score: r.keywords }) : null,
+                    r.meaning !== null ? format(t.meaning, { score: Math.round(r.meaning * 100) }) : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
                 </span>
               </div>
               <p className="line-clamp-3 text-xs leading-relaxed text-[var(--color-muted)]">{r.text}</p>

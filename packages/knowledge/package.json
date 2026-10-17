@@ -5,6 +5,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./retrieval": "./src/retrieval.ts",
+    "./embed": "./src/embed.ts",
     "./text": "./src/text.ts"
   },
   "scripts": {

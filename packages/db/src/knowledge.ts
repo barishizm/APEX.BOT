@@ -450,3 +450,48 @@ export async function listKnowledgeChunks(db: Queryable, botId: string): Promise
   )
   return rows
 }
+
+/** A chunk's stored embedding: `hash` is the sha256 of the embedded text, `vector` float32 LE bytes. */
+export interface StoredEmbedding {
+  hash: Uint8Array
+  vector: Uint8Array
+}
+
+/** Stored vectors of one bot and model, for the given text hashes (the ones not stored are left out). */
+export async function loadEmbeddings(db: Queryable, botId: string, model: string, hashes: Uint8Array[]): Promise<StoredEmbedding[]> {
+  if (!UUID.test(botId) || !hashes.length) return []
+  const { rows } = await db.query<StoredEmbedding>(
+    "select hash, vector from app.knowledge_embeddings where bot_id = $1 and model = $2 and hash = any($3::bytea[])",
+    [botId, model, hashes.map(toBuffer)],
+  )
+  return rows
+}
+
+/** Stores vectors; a hash already stored (a concurrent writer) keeps its vector. */
+export async function saveEmbeddings(db: Queryable, botId: string, model: string, embeddings: StoredEmbedding[]): Promise<void> {
+  if (!UUID.test(botId)) return
+  // a few hundred rows per statement keeps each request small (a 768-dim vector is 3 KB)
+  for (let i = 0; i < embeddings.length; i += 200) {
+    const batch = embeddings.slice(i, i + 200)
+    await db.query(
+      `insert into app.knowledge_embeddings (bot_id, model, hash, vector)
+       select $1, $2, e.hash, e.vector from unnest($3::bytea[], $4::bytea[]) as e(hash, vector)
+       on conflict do nothing`,
+      [botId, model, batch.map((e) => toBuffer(e.hash)), batch.map((e) => toBuffer(e.vector))],
+    )
+  }
+}
+
+/** Deletes a bot's vectors that no current chunk uses, and every vector of other models. */
+export async function pruneEmbeddings(db: Queryable, botId: string, model: string, keep: Uint8Array[]): Promise<number> {
+  if (!UUID.test(botId)) return 0
+  const { rows } = await db.query<{ n: number }>(
+    `with gone as (
+       delete from app.knowledge_embeddings where bot_id = $1 and not (model = $2 and hash = any($3::bytea[])) returning 1
+     ) select count(*)::int as n from gone`,
+    [botId, model, keep.map(toBuffer)],
+  )
+  return rows[0].n
+}
+
+const toBuffer = (bytes: Uint8Array) => Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength)

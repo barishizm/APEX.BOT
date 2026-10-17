@@ -8,11 +8,13 @@ import { fileURLToPath } from "node:url";
 import { serve } from "@hono/node-server";
 import { getConnInfo } from "@hono/node-server/conninfo";
 import type { Context } from "hono";
+import { createEmbedder } from "@apex/knowledge/embed";
 import { createApp } from "./app.ts";
 import { loadConfig } from "./config.ts";
 import { log } from "./log.ts";
 import { mailerFromEnv } from "./mailer.ts";
 import { startBotSync, type BotSync } from "./bot-sync.ts";
+import { ChunkIndexer, QueryEmbedder, memoryVectorStore, type VectorStore } from "./embeddings.ts";
 import { ClaudeChatModel, EchoChatModel, GeminiChatModel, ModelRouter, OpenAIChatModel, type ChatModel } from "./model.ts";
 import { KnowledgeBase, type ChunkInput } from "./retrieval.ts";
 import { postgresPersistence } from "./persistence.ts";
@@ -30,11 +32,32 @@ const loadDemoTenants = process.env.NODE_ENV !== "production" || process.env.APE
 const tenants = new TenantRegistry(loadDemoTenants ? (JSON.parse(readFileSync(join(root, "data/tenants.json"), "utf8")) as Tenant[]) : []);
 if (!loadDemoTenants) log("info", "demo tenant not loaded (production)");
 const knowledge = new KnowledgeBase();
+
+// Hybrid search (docs/adr/0002-hybrid-retrieval.md): with APEX_EMBEDDINGS set, chunks are embedded
+// in the background and visitor messages on the chat path. A missing key leaves search lexical
+// rather than stopping the API.
+let queryEmbedder: QueryEmbedder | undefined;
+let indexerFor: ((store: VectorStore) => ChunkIndexer) | undefined;
+if (config.embeddings) {
+  const keys = { openai: process.env.OPENAI_API_KEY, gemini: process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY };
+  try {
+    // the chat path never retries (a slow answer is worse than a lexical one); indexing waits out rate limits
+    queryEmbedder = new QueryEmbedder(createEmbedder(config.embeddings, keys), { timeoutMs: config.embeddingTimeoutMs });
+    const bulk = createEmbedder(config.embeddings, keys, { retries: 6, batchSize: 50 });
+    indexerFor = (store) => new ChunkIndexer(knowledge, bulk, store);
+    log("info", "hybrid search on", { embedder: config.embeddings });
+  } catch (error) {
+    log("error", "APEX_EMBEDDINGS is set but can't be used; search stays lexical", { error });
+  }
+}
+
+const demoIndexer = indexerFor?.(memoryVectorStore());
 for (const tenant of tenants.all()) {
   const file = join(root, "data/knowledge", `${tenant.id}.json`);
   const chunks = existsSync(file) ? (JSON.parse(readFileSync(file, "utf8")) as ChunkInput[]) : [];
-  knowledge.load(tenant.id, chunks);
+  const generation = knowledge.load(tenant.id, chunks);
   log("info", "knowledge loaded", { tenant: tenant.id, chunks: chunks.length });
+  void demoIndexer?.index(tenant.id, generation, chunks);
 }
 
 // Dashboard bots, their knowledge and their conversations live in the database (same
@@ -44,7 +67,8 @@ let onWidgetSeen: ((tenant: Tenant, origin: string) => void) | undefined;
 let tokenUsage: TokenUsageStore | undefined;
 let store = new ConversationStore();
 if (process.env.DATABASE_URL) {
-  const { addTokenUsage, createDbFromEnv, missingMigrations, tokensUsedOn, recordWidgetSeen, sweepConversations } = await import("@apex/db");
+  const { addTokenUsage, createDbFromEnv, loadEmbeddings, missingMigrations, pruneEmbeddings, saveEmbeddings, tokensUsedOn, recordWidgetSeen, sweepConversations } =
+    await import("@apex/db");
   const db = createDbFromEnv();
   const missing = await missingMigrations(db).catch((error) => {
     log("error", "database not reachable at startup", { error });
@@ -56,7 +80,12 @@ if (process.env.DATABASE_URL) {
     load: (id, day) => (tenants.findById(id)?.managed ? tokensUsedOn(db, id, day) : Promise.resolve(0)),
     add: (id, day, tokens) => (tenants.findById(id)?.managed ? addTokenUsage(db, id, day, tokens) : Promise.resolve()),
   };
-  botSync = startBotSync(db, tenants, knowledge);
+  const vectors: VectorStore = {
+    load: (id, model, hashes) => loadEmbeddings(db, id, model, hashes),
+    save: (id, model, rows) => saveEmbeddings(db, id, model, rows),
+    prune: (id, model, keep) => pruneEmbeddings(db, id, model, keep),
+  };
+  botSync = startBotSync(db, tenants, knowledge, undefined, indexerFor?.(vectors));
   log("info", "syncing dashboard bots from the database");
 
   store = new ConversationStore({
@@ -106,6 +135,7 @@ function clientIp(c: Context): string {
 const app = createApp({
   tenants,
   knowledge,
+  embedder: queryEmbedder,
   store,
   model: chatModel(),
   mailer: mailerFromEnv(),
@@ -113,7 +143,7 @@ const app = createApp({
   clientIp,
   tokenUsage,
   onWidgetSeen,
-  health: () => ({ botSync: botSync ? botSync.status() : "off" }),
+  health: () => ({ botSync: botSync ? botSync.status() : "off", semanticSearch: queryEmbedder ? queryEmbedder.status() : "off" }),
 });
 
 // Development helpers; in production the widget is served from the CDN.

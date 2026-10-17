@@ -1,6 +1,6 @@
 import { after, before, beforeEach, describe, test } from "node:test"
 import assert from "node:assert/strict"
-import { randomUUID } from "node:crypto"
+import { createHash, randomUUID } from "node:crypto"
 import { PGlite } from "@electric-sql/pglite"
 import type { Db } from "../src/db.ts"
 import { migrate } from "../src/migrate.ts"
@@ -18,6 +18,9 @@ import {
   getSourceDetail,
   listKnowledgeChunks,
   listSources,
+  loadEmbeddings,
+  pruneEmbeddings,
+  saveEmbeddings,
   sourceUsage,
   startSync,
   updateSource,
@@ -312,5 +315,64 @@ describe("source detail and editing", () => {
 
     assert.deepEqual(await sourceUsage(db, user.id), { [site.id]: 2, [text.id]: 1 })
     assert.deepEqual(await sourceUsage(db, user.id, 60), { [site.id]: 2, [text.id]: 2 })
+  })
+})
+
+describe("chunk embeddings", () => {
+  const MODEL = "gemini:test@4"
+  const hash = (text: string) => new Uint8Array(createHash("sha256").update(text).digest())
+  const vector = (...xs: number[]) => new Uint8Array(Float32Array.from(xs).buffer)
+  const floats = (bytes: Uint8Array) => [...new Float32Array(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength))]
+
+  test("round-trip by text hash, scoped to one bot and model", async () => {
+    const bot = await getBotForUser(db, (await newUser()).id)
+    const other = await getBotForUser(db, (await newUser("other@example.com", "other")).id)
+    await saveEmbeddings(db, bot.id, MODEL, [{ hash: hash("a"), vector: vector(1, 0, 0, 0) }, { hash: hash("b"), vector: vector(0, 1, 0, 0) }])
+    await saveEmbeddings(db, other.id, MODEL, [{ hash: hash("a"), vector: vector(0, 0, 0, 1) }])
+
+    const rows = await loadEmbeddings(db, bot.id, MODEL, [hash("a"), hash("c")])
+    assert.equal(rows.length, 1)
+    assert.deepEqual([...rows[0].hash], [...hash("a")])
+    assert.deepEqual(floats(rows[0].vector), [1, 0, 0, 0])
+    // another bot's identical text never leaks across, and another model's vectors aren't returned
+    assert.deepEqual(floats((await loadEmbeddings(db, other.id, MODEL, [hash("a")]))[0].vector), [0, 0, 0, 1])
+    assert.deepEqual(await loadEmbeddings(db, bot.id, "gemini:other@4", [hash("a")]), [])
+    assert.deepEqual(await loadEmbeddings(db, "not-a-uuid", MODEL, [hash("a")]), [])
+  })
+
+  test("saving an existing hash again is a no-op", async () => {
+    const bot = await getBotForUser(db, (await newUser()).id)
+    await saveEmbeddings(db, bot.id, MODEL, [{ hash: hash("a"), vector: vector(1, 0, 0, 0) }])
+    await saveEmbeddings(db, bot.id, MODEL, [{ hash: hash("a"), vector: vector(0, 1, 0, 0) }])
+    assert.deepEqual(floats((await loadEmbeddings(db, bot.id, MODEL, [hash("a")]))[0].vector), [1, 0, 0, 0])
+  })
+
+  test("prune keeps only the given hashes of the current model, for that bot", async () => {
+    const bot = await getBotForUser(db, (await newUser()).id)
+    const other = await getBotForUser(db, (await newUser("other@example.com", "other")).id)
+    await saveEmbeddings(db, bot.id, MODEL, ["a", "b", "c"].map((t) => ({ hash: hash(t), vector: vector(1, 0, 0, 0) })))
+    await saveEmbeddings(db, bot.id, "gemini:old@4", [{ hash: hash("a"), vector: vector(1, 0, 0, 0) }])
+    await saveEmbeddings(db, other.id, MODEL, [{ hash: hash("b"), vector: vector(1, 0, 0, 0) }])
+
+    assert.equal(await pruneEmbeddings(db, bot.id, MODEL, [hash("a"), hash("c")]), 2)
+    assert.deepEqual((await loadEmbeddings(db, bot.id, MODEL, ["a", "b", "c"].map(hash))).length, 2)
+    assert.equal((await loadEmbeddings(db, other.id, MODEL, [hash("b")])).length, 1)
+    // an empty keep list clears the bot (all its sources were deleted)
+    assert.equal(await pruneEmbeddings(db, bot.id, MODEL, []), 2)
+  })
+
+  test("are deleted with the bot", async () => {
+    const user = await newUser()
+    const bot = await getBotForUser(db, user.id)
+    await saveEmbeddings(db, bot.id, MODEL, [{ hash: hash("a"), vector: vector(1, 0, 0, 0) }])
+    await db.query("delete from app.bots where id = $1", [bot.id])
+    const { rows } = await db.query<{ n: number }>("select count(*)::int as n from app.knowledge_embeddings")
+    assert.equal(rows[0].n, 0)
+  })
+
+  test("the schema rejects malformed rows", async () => {
+    const bot = await getBotForUser(db, (await newUser()).id)
+    await assert.rejects(saveEmbeddings(db, bot.id, MODEL, [{ hash: new Uint8Array(5), vector: vector(1) }]))
+    await assert.rejects(saveEmbeddings(db, bot.id, MODEL, [{ hash: hash("a"), vector: new Uint8Array(0) }]))
   })
 })
