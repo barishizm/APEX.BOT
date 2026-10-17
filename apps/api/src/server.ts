@@ -22,6 +22,7 @@ import type { TokenUsageStore } from "./limits.ts";
 import { ConversationStore } from "./store.ts";
 import { TenantRegistry, type Tenant } from "./tenants.ts";
 import { ClaudeTopicLabeler, startTopicLabeler } from "./topics.ts";
+import { WIDGET_CACHE_CONTROL, widgetHandler } from "./widget-bundle.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const config = loadConfig();
@@ -157,16 +158,9 @@ const app = createApp({
   health: () => ({ botSync: botSync ? botSync.status() : "off", semanticSearch: queryEmbedder ? queryEmbedder.status() : "off" }),
 });
 
-// Development helpers; in production the widget is served from the CDN.
+// The embed snippet loads the widget from here, behind Cloudflare in production.
 const widgetBundle = join(root, "../widget/dist/widget.js");
-app.get("/widget.js", async (c) => {
-  if (!existsSync(widgetBundle)) return c.text("Widget not built. Run: npm run build -w @apex/widget", 404);
-  return c.body(await readFile(widgetBundle), 200, {
-    "Content-Type": "text/javascript; charset=utf-8",
-    "Cache-Control": "no-cache",
-    "Access-Control-Allow-Origin": "*",
-  });
-});
+app.get("/widget.js", widgetHandler(widgetBundle, process.env.NODE_ENV === "production" ? WIDGET_CACHE_CONTROL : "no-cache"));
 app.get("/demo", async (c) => c.html(await readFile(join(root, "public/demo.html"), "utf8")));
 
 serve({ fetch: app.fetch, port: config.port }, ({ port }) => {
