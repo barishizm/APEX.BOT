@@ -1,7 +1,7 @@
 "use client"
 
 import { AnimatePresence, motion } from "framer-motion"
-import { BookOpen, Contrast, Moon, Power, Settings, Sun } from "lucide-react"
+import { BookOpen, Contrast, Moon, Power, Settings, ShieldCheck, Sun } from "lucide-react"
 import Link from "next/link"
 import { useEffect, useRef, useState } from "react"
 import { useAppI18n } from "@/components/i18n/app-provider"
@@ -41,7 +41,16 @@ const row =
 const rowButton = `${row} cursor-pointer transition-colors hover:bg-[color-mix(in_srgb,var(--color-text)_6%,transparent)]`
 const divider = "border-t border-[var(--color-surface)]"
 
-export function ProfileMenu({ name, email }: { name: string; email: string }) {
+export function ProfileMenu({
+  name,
+  email,
+  platformRole = null,
+}: {
+  name: string
+  email: string
+  /** Platform staff get a badge on the avatar and in the menu. */
+  platformRole?: "superadmin" | "support" | null
+}) {
   const { t: app, locale, href } = useAppI18n()
   const t = app.shell.profile
   const setLocale = useSetLocale()
@@ -97,6 +106,14 @@ export function ProfileMenu({ name, email }: { name: string; email: string }) {
         className="relative flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border-0 bg-[var(--color-secondary)] text-sm font-semibold text-[var(--color-surface)] transition-transform active:scale-95"
       >
         {initial}
+        {platformRole && (
+          <span
+            aria-hidden
+            className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full border-2 border-[var(--color-surface)] bg-amber-500 text-white"
+          >
+            <ShieldCheck className="h-2.5 w-2.5" strokeWidth={3} />
+          </span>
+        )}
       </button>
 
       <AnimatePresence>
@@ -118,6 +135,12 @@ export function ProfileMenu({ name, email }: { name: string; email: string }) {
               <div className="min-w-0">
                 <p className="truncate font-semibold">{name}</p>
                 <p className="truncate text-sm text-[var(--color-muted)]">{email}</p>
+                {platformRole && (
+                  <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-300">
+                    <ShieldCheck className="h-3.5 w-3.5" />
+                    {t[platformRole]}
+                  </span>
+                )}
               </div>
             </div>
 

@@ -3,7 +3,7 @@ import assert from "node:assert/strict"
 import { PGlite } from "@electric-sql/pglite"
 import type { Db } from "../src/db.ts"
 import { migrate } from "../src/migrate.ts"
-import { register } from "../src/auth.ts"
+import { getSession, register } from "../src/auth.ts"
 import {
   AdminError,
   bootstrapSuperadmin,
@@ -128,6 +128,17 @@ describe("platform roles", () => {
     await assert.rejects(setPlatformRole(db, { id: boss }, "00000000-0000-0000-0000-000000000000", "support"), code("not_found"))
     assert.equal(await getPlatformRole(db, boss), "superadmin")
     assert.equal(await getPlatformRole(db, bob), null)
+  })
+})
+
+describe("session user", () => {
+  test("carries the platform role, hidden while the account is suspended", async () => {
+    const { user, session } = await register(db, { email: "boss@example.com", username: "boss", password: "correct horse", accountType: "personal", acceptTerms: true })
+    assert.equal(user.platformRole, null)
+    await bootstrapSuperadmin(db, "boss@example.com")
+    assert.equal((await getSession(db, session!.token))?.user.platformRole, "superadmin")
+    await db.query("update app.users set suspended_at = now() where id = $1", [user.id])
+    assert.equal((await getSession(db, session!.token))?.user.platformRole, null)
   })
 })
 

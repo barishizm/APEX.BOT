@@ -13,7 +13,7 @@ export async function DashboardFrame({ active, intro, children }: { active?: Nav
   const setup = Object.values(steps)
   return (
     <DashboardShell
-      user={{ name: user.displayName ?? user.username, email: user.email }}
+      user={{ name: user.displayName ?? user.username, email: user.email, platformRole: user.platformRole }}
       sites={sitesJson(sites, bot.id)}
       active={active}
       intro={intro}

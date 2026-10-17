@@ -72,6 +72,8 @@ export interface User {
   emailVerified: boolean
   /** Signing in also needs a code from an authenticator app. */
   twoFactor: boolean
+  /** Staff of the platform itself; null for customers and suspended staff. */
+  platformRole: "superadmin" | "support" | null
   createdAt: Date
 }
 
@@ -94,11 +96,13 @@ interface UserRow {
   account_type: AccountType
   email_verified_at: Date | null
   two_factor: boolean
+  platform_role: "superadmin" | "support" | null
   created_at: Date
 }
 
 const USER_COLUMNS =
-  "u.id, u.email, u.username, u.display_name, u.account_type, u.email_verified_at, u.totp_enabled_at is not null as two_factor, u.created_at"
+  "u.id, u.email, u.username, u.display_name, u.account_type, u.email_verified_at, u.totp_enabled_at is not null as two_factor, " +
+  "case when u.suspended_at is null then u.platform_role end as platform_role, u.created_at"
 
 const toUser = (r: UserRow): User => ({
   id: r.id,
@@ -108,6 +112,7 @@ const toUser = (r: UserRow): User => ({
   accountType: r.account_type,
   emailVerified: r.email_verified_at !== null,
   twoFactor: r.two_factor,
+  platformRole: r.platform_role,
   createdAt: r.created_at,
 })
 
