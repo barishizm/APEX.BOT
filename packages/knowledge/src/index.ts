@@ -5,3 +5,4 @@ export * from "./chunk.ts";
 export * from "./robots.ts";
 export * from "./net.ts";
 export * from "./crawl.ts";
+export * from "./documents.ts";

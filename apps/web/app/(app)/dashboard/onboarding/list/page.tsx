@@ -25,7 +25,7 @@ export default async function OnboardingListPage() {
   const stages = buildStages(getAppDictionary(await requestLocale()).setup, {
     setup,
     testSite: bot.settings.security.allowedOrigins[0] ?? null,
-    hasText: sources.some((s) => s.kind === "text"),
+    hasText: sources.some((s) => s.kind === "text" || s.kind === "file"),
     // an unconfirmed address is never mailed, so it doesn't count
     handoffOn: h.enabled && !!h.email && bot.handoffVerified,
     contactSet: !!h.contact,

@@ -6,6 +6,8 @@ import { db } from "@/lib/db"
 import { crawlInto, knowledgeErrorResponse, sourceJson } from "@/lib/knowledge"
 import { siteScope } from "@/lib/current-site"
 
+export const maxDuration = 300
+
 // Reads a website source again; its current content stays searchable until the new crawl finishes
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {

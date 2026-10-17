@@ -1,12 +1,12 @@
 import { after } from "next/server"
-import { KNOWLEDGE_LIMITS, KnowledgeError, addAllowedOrigin, addTextSource, addWebsiteSource, listSources, startSync } from "@apex/db"
+import { KNOWLEDGE_LIMITS, KnowledgeError, addAllowedOrigin, addFileSource, addTextSource, addWebsiteSource, listSources, startSync } from "@apex/db"
 import { chunkText, normalizeStartUrl } from "@apex/knowledge"
 import { errorJson, readJson } from "@/lib/auth"
 import { requireApiUser } from "@/lib/bot"
 import { db } from "@/lib/db"
 import { translateMessage } from "@/lib/i18n/messages"
 import { requestLocale } from "@/lib/i18n/server"
-import { crawlInto, knowledgeErrorResponse, sourceJson } from "@/lib/knowledge"
+import { crawlInto, knowledgeErrorResponse, readUpload, sourceJson } from "@/lib/knowledge"
 import { siteScope } from "@/lib/current-site"
 
 export async function GET() {
@@ -19,11 +19,24 @@ export async function GET() {
   }
 }
 
-// Body: { kind: "website", url, allowOrigin? } or { kind: "text", title, content }
+// a website is read in the background (after()), which shares this limit
+export const maxDuration = 300
+
+// Body: { kind: "website", url, allowOrigin? } or { kind: "text", title, content }, or a form with `file`
 export async function POST(request: Request) {
   try {
     const user = await requireApiUser()
     const locale = await requestLocale()
+    if ((request.headers.get("content-type") ?? "").startsWith("multipart/form-data")) {
+      // a cross-site <form> can send multipart without a preflight (readJson's guard); only our own page may
+      const site = request.headers.get("sec-fetch-site")
+      if (site && site !== "same-origin") return errorJson("forbidden", "Upload the file from your dashboard", { status: 403 })
+      const file = (await request.formData().catch(() => null))?.get("file")
+      if (!(file instanceof File)) return errorJson("invalid_input", "Choose a file", { status: 400 })
+      const upload = await readUpload(file)
+      const source = await addFileSource(db(), await siteScope(user.id), upload, (title, content) => chunkText(title, content))
+      return Response.json({ source: sourceJson(source, locale) }, { status: 201 })
+    }
     const body = await readJson(request)
     if (body.kind === "text") {
       const source = await addTextSource(db(), await siteScope(user.id), { title: body.title, content: body.content }, (title, content) => chunkText(title, content))

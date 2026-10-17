@@ -20,12 +20,12 @@ export async function GET(_request: Request, { params }: Params) {
   }
 }
 
-// Body: { title?, content? }; content only for text sources
+// Body: { title?, content?, refresh? }; content only for text and file sources, refresh only for websites
 export async function PATCH(request: Request, { params }: Params) {
   try {
     const user = await requireApiUser()
     const body = await readJson(request)
-    const source = await updateSource(db(), await siteScope(user.id), (await params).id, { title: body.title, content: body.content }, (title, content) => chunkText(title, content))
+    const source = await updateSource(db(), await siteScope(user.id), (await params).id, { title: body.title, content: body.content, refresh: body.refresh }, (title, content) => chunkText(title, content))
     return Response.json({ source: sourceJson(source, await requestLocale()) })
   } catch (err) {
     return knowledgeErrorResponse(err)

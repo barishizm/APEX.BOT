@@ -8,7 +8,7 @@ import type { SourceJson } from "@/lib/knowledge"
 import { cn } from "@/lib/utils"
 import { Badge, CitedLine, SourceIcon, StatusLine, needsAttention, outlineButton, segment, segmented, useSend, type Usage } from "./shared"
 
-export type Kind = "all" | "website" | "text" | "attention"
+export type Kind = "all" | "website" | "text" | "file" | "attention"
 type Sort = "newest" | "name" | "cited" | "excerpts"
 
 function SourceRow({
@@ -162,6 +162,7 @@ export function SourceList({
       all: sources.length,
       website: sources.filter((s) => s.kind === "website").length,
       text: sources.filter((s) => s.kind === "text").length,
+      file: sources.filter((s) => s.kind === "file").length,
       attention: sources.filter(needsAttention).length,
     }),
     [sources],
@@ -188,6 +189,7 @@ export function SourceList({
     ["all", t.all],
     ["website", t.websites],
     ["text", t.texts],
+    ...(counts.file ? [["file", t.files] as [Kind, string]] : []),
     ...(counts.attention ? [["attention", t.attention] as [Kind, string]] : []),
   ]
 
