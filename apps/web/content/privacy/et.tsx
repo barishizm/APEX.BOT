@@ -154,6 +154,11 @@ function Body() {
             <td>Külastaja sõnum, vestluse viimased sõnumid ja kliendi sisu asjakohased osad</td>
           </tr>
           <tr>
+            <td>Google (Gemini API)</td>
+            <td>Otsing: kliendi sisu ja külastajate küsimuste teisendamine vektoriteks, et assistent leiaks õiged lehed</td>
+            <td>Kliendi lehtede ja lisatud sisu tekst ning külastaja sõnum (jätkuküsimuste puhul koos eelmisega). Saadud vektorid säilitame oma andmebaasis. Seni kuni kasutame Google'i tasuta taset, lubavad Google'i tingimused tal neid andmeid oma toodete täiustamiseks kasutada</td>
+          </tr>
+          <tr>
             <td>Supabase (hallatud PostgreSQL)</td>
             <td>Andmebaas</td>
             <td>Kõik, mida säilitame: kontod, seaded, teadmised, vestlused</td>
