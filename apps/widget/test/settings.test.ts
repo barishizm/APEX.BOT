@@ -12,7 +12,7 @@ const settings = parseSettings({
   general: { languageMode: "fixed", defaultLang: "tr", subtitle: { tr: "Saniyeler içinde yanıt", en: "" } },
   appearance: { theme: "dark", launcherIcon: "help", launcherLabel: { tr: "Bize sorun", en: "Ask us" }, panelWidth: "wide", radius: 4, offsetX: 40, avatar: "icon", font: "serif" },
   messages: { placeholder: { tr: "Sorunuzu yazın", en: "Ask" }, showDisclaimer: false },
-  behavior: { showSources: false, showFeedback: false, teaser: { tr: "Sorunuz mu var?", en: "" }, persistence: "browser" },
+  behavior: { showSources: false, showFeedback: false, teaser: { tr: "Sorunuz mu var?", en: "" }, persistence: "browser", attachments: false, voiceInput: false },
   handoff: { enabled: false, leadCapture: "before-chat", leadFields: { name: true, phone: false }, leadRequired: true },
 });
 const t = tenants.findById("tn_a")!;
@@ -139,14 +139,22 @@ describe("widget with dashboard settings", () => {
     assert.equal(mailer.outbox.length, 1);
   });
 
+  it("leaves out the paperclip and microphone when they are turned off", () => {
+    assert.equal($(".compose .tool"), null);
+    // with nothing to send and no voice, the round button is a disabled Send
+    assert.equal($(".compose .send")!.getAttribute("aria-label"), "Gönder");
+    assert.equal($<HTMLButtonElement>(".compose .send")!.disabled, true);
+  });
+
   it("uses the custom header, placeholder and footer", () => {
     assert.equal($(".title span")!.textContent, "Saniyeler içinde yanıt");
     assert.equal($("textarea")!.getAttribute("placeholder"), "Sorunuzu yazın");
     assert.ok($(".avatar svg"), "bot icon avatar");
-    const foot = $(".foot")!;
-    assert.doesNotMatch(foot.textContent!, /yapay zekâ ile üretilir/, "disclaimer off");
-    assert.doesNotMatch(foot.textContent!, /Bir insanla konuş/, "hand-off off");
-    assert.match(foot.textContent!, /Apex Bot ile çalışır/);
+    assert.equal($(".notice"), null, "disclaimer off and no privacy link: no notice");
+    assert.ok($(".dock")!.classList.contains("bare"));
+    const menu = ($$(".menu .item") as HTMLElement[]).map((b) => b.textContent);
+    assert.equal(menu.some((l) => /Bir insanla konuş/.test(l!)), false, "hand-off off");
+    assert.equal($(".foot")!.textContent, "Apex Bot ile çalışır");
   });
 
   it("shows only well-formed stored tickets, as text", () => {

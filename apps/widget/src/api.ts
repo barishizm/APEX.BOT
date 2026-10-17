@@ -30,6 +30,9 @@ export interface StoredMessage {
   feedback?: "up" | "down";
 }
 
+/** A file sent with a message: images as base64 JPEG/PNG/WebP/GIF, text files as text. */
+export type Attachment = { kind: "image"; name: string; data: string } | { kind: "text"; name: string; text: string };
+
 /** A hand-off request as the server acknowledged it. */
 export interface Ticket {
   id: string;
@@ -93,10 +96,10 @@ export class ApiClient {
     return body.messages;
   }
 
-  async chat(message: string, conversationId: string | null, onEvent: (e: ChatEvent) => void, signal: AbortSignal): Promise<void> {
+  async chat(message: string, conversationId: string | null, onEvent: (e: ChatEvent) => void, signal: AbortSignal, attachments: Attachment[] = []): Promise<void> {
     const res = await this.request("/v1/chat", {
       method: "POST",
-      body: JSON.stringify({ message, conversationId }),
+      body: JSON.stringify({ message, conversationId, ...(attachments.length ? { attachments } : {}) }),
       signal,
     });
     const parse = createSSEParser((event, data) => onEvent({ type: event, ...JSON.parse(data) } as ChatEvent));

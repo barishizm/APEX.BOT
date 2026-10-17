@@ -1,6 +1,7 @@
 import { ApiClient, ApiError, type RemoteConfig, type Source, type StoredMessage, type Ticket, type WidgetUi } from "./api.ts";
 import { pickLang, strings, type Lang, type Strings } from "./i18n.ts";
 import { renderMarkdown } from "./markdown.ts";
+import { ACCEPT, FileError, LOCALES, MAX_FILES, prepareFile, recognition, speakable, type FileProblem, type Prepared, type Recognition, type RecognitionCtor, type RecognitionResultEvent } from "./media.ts";
 import { css } from "./styles.ts";
 
 /** Optional page-level overrides from `window.Apex = {...}` set before the script loads. */
@@ -26,6 +27,11 @@ const ICONS = {
   ticket: '<path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2M13 11v2M13 17v2"/>',
   back: '<path d="m15 18-6-6 6-6"/>',
   check: '<path d="M20 6 9 17l-5-5"/>',
+  clip: '<path d="m16 6-8.4 8.6a2 2 0 0 0 2.8 2.8l8.4-8.6a4 4 0 0 0-5.6-5.6l-8.4 8.6a6 6 0 1 0 8.5 8.5L21 12.3"/>',
+  mic: '<rect x="9" y="2" width="6" height="13" rx="3"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v3"/>',
+  wave: '<path d="M2 10v3M6 6v11M10 3v18M14 8v7M18 5v13M22 10v3"/>',
+  stop: '<rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" stroke="none"/>',
+  file: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v5h5"/>',
   up: '<path d="M7 10v12"/><path d="M15 5.9 14 10h5.8a2 2 0 0 1 1.9 2.6l-2.3 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.8a2 2 0 0 0 1.8-1.1L12 2a3.1 3.1 0 0 1 3 3.9Z"/>',
   down: '<path d="M17 14V2"/><path d="M9 18.1 10 14H4.2a2 2 0 0 1-1.9-2.6l2.3-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.8a2 2 0 0 0-1.8 1.1L12 22a3.1 3.1 0 0 1-3-3.9Z"/>',
   sparkle: '<path d="M12 3 14 9l6 2-6 2-2 6-2-6-6-2 6-2Z"/><path d="M19 3v4M21 5h-4"/>',
@@ -168,10 +174,28 @@ export class Widget {
   private suggest: HTMLDivElement;
   private input: HTMLTextAreaElement;
   private sendBtn: HTMLButtonElement;
+  /** What the round button does right now (its icon follows). */
+  private sendMode: "send" | "voice" | "stop" | "" = "";
+  private dock: HTMLDivElement;
+  private notice: HTMLElement | null = null;
+  private composeError: HTMLParagraphElement;
+  private errorTimer: ReturnType<typeof setTimeout> | undefined;
+  private fileList: HTMLDivElement;
+  private fileInput: HTMLInputElement | null = null;
+  /** Files picked for the next message; `prepared` is null while one is still being read. */
+  private files: { prepared: Prepared | null; chip: HTMLElement }[] = [];
+  private canAttach: boolean;
+  /** Speech recognition, when the browser has it and the bot allows voice. */
+  private voice: RecognitionCtor | null;
+  private micBtn: HTMLButtonElement | null = null;
+  private rec: Recognition | null = null;
+  /** Listening in voice mode: what is heard is sent, and the reply read aloud. */
+  private voiceListening = false;
+  private speaking = false;
   private menuWrap: HTMLDivElement;
   private menuBtn: HTMLButtonElement;
   private menu: HTMLDivElement;
-  private items: { fresh: HTMLButtonElement; end: HTMLButtonElement; tickets: HTMLButtonElement };
+  private items: { fresh: HTMLButtonElement; end: HTMLButtonElement; human?: HTMLButtonElement; tickets: HTMLButtonElement };
   private ticketCount: HTMLSpanElement;
   private isOpen = false;
   private busy = false;
@@ -234,45 +258,86 @@ export class Widget {
       onkeydown: ((e: KeyboardEvent) => {
         if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
           e.preventDefault();
-          void this.send(this.input.value);
+          void this.submit();
         }
       }) as EventListener,
     });
-    this.sendBtn = h("button", { class: "send", type: "submit", "aria-label": t.send, disabled: true }, icon("send"));
 
-    const privacy = webUrl(cfg.privacyUrl);
-    const links = [
-      privacy && h("a", { href: privacy, target: "_blank", rel: "noopener noreferrer" }, t.privacy),
-      this.handoffOn && h("button", { type: "button", onclick: () => this.showHandoff() }, t.human),
-    ].filter((x): x is HTMLAnchorElement | HTMLButtonElement => !!x);
-    const footer = h(
-      "div",
-      { class: "foot" },
-      t.disclaimer,
-      ...links.flatMap((l, i) => [i || t.disclaimer ? (i ? " · " : " ") : "", l]),
-      a?.showBranding !== false && ui && h("span", { class: "brand" }, t.powered),
+    // Composer: a pill with paperclip, text, microphone and one round button that sends,
+    // starts voice chat when there is nothing to send, or stops a reply being read aloud.
+    this.canAttach = ui?.behavior.attachments !== false;
+    this.voice = ui?.behavior.voiceInput === false ? null : recognition();
+    this.sendBtn = h("button", { class: "send", type: "button", onclick: () => this.primaryAction() });
+    this.fileList = h("div", { class: "files" });
+    this.composeError = h("p", { class: "cerr", role: "alert" });
+    const clip = this.canAttach && h("button", { class: "tool", type: "button", "aria-label": t.attach, title: t.attach, onclick: () => this.pickFiles() }, icon("clip"));
+    if (this.voice) {
+      this.micBtn = h("button", { class: "tool", type: "button", "aria-label": t.dictate, title: t.dictate, "aria-pressed": "false", onclick: () => this.dictate() }, icon("mic"));
+    }
+    const compose = h(
+      "form",
+      {
+        class: "compose",
+        onsubmit: (e: Event) => {
+          e.preventDefault();
+          void this.submit();
+        },
+      },
+      this.fileList,
+      h("div", { class: "bar" }, clip, this.input, this.micBtn, this.sendBtn),
     );
+
+    // The privacy policy in one short line, dismissible for the rest of the visit
+    const privacy = webUrl(cfg.privacyUrl);
+    if (privacy && !this.flag("notice")) {
+      const line = h("p", {}, t.privacyPre, h("a", { href: privacy, target: "_blank", rel: "noopener noreferrer" }, t.privacyLink), t.privacyPost);
+      // a narrow panel or a long translation can still cut it; the full sentence stays on hover
+      line.title = line.textContent!;
+      this.notice = h(
+        "div",
+        { class: "notice" },
+        h("div", {}, line, h("button", { class: "x", type: "button", "aria-label": t.dismiss, title: t.dismiss, onclick: () => this.hideNotice() }, icon("close"))),
+      );
+    }
+    this.dock = h("div", { class: this.notice ? "dock" : "dock bare" }, this.notice, this.composeError, compose);
 
     this.chatView = h(
       "div",
       { class: "view" },
       h("div", { class: "lw" }, this.log, this.jump),
       this.suggest,
-      h(
-        "form",
-        {
-          class: "compose",
-          onsubmit: (e: Event) => {
-            e.preventDefault();
-            void this.send(this.input.value);
-          },
-        },
-        this.input,
-        this.sendBtn,
-      ),
-      footer,
+      this.dock,
+      // the AI disclaimer sits with the branding, small, under the composer
+      (t.disclaimer || (a?.showBranding !== false && ui)) &&
+        h("div", { class: "foot" }, t.disclaimer && h("span", {}, t.disclaimer), a?.showBranding !== false && ui && h("span", {}, t.powered)),
     );
     this.view = this.chatView;
+    this.updateSend();
+
+    if (this.canAttach) {
+      // pasted screenshots and files dropped anywhere on the chat
+      this.input.addEventListener("paste", (e) => {
+        const files = [...(e.clipboardData?.files ?? [])];
+        if (!files.length) return;
+        e.preventDefault();
+        this.addFiles(files);
+      });
+      const dragging = (e: DragEvent) => !!e.dataTransfer?.types.includes("Files");
+      this.chatView.addEventListener("dragover", (e) => {
+        if (!dragging(e)) return;
+        e.preventDefault();
+        this.chatView.classList.add("drop");
+      });
+      this.chatView.addEventListener("dragleave", (e) => {
+        if (!this.chatView.contains(e.relatedTarget as Node | null)) this.chatView.classList.remove("drop");
+      });
+      this.chatView.addEventListener("drop", (e) => {
+        this.chatView.classList.remove("drop");
+        if (!dragging(e)) return;
+        e.preventDefault();
+        this.addFiles([...e.dataTransfer!.files]);
+      });
+    }
 
     const avatar = h("div", { class: "avatar", "aria-hidden": "true" });
     if (a?.avatar === "image" && a.avatarUrl) avatar.append(h("img", { src: a.avatarUrl, alt: "" }));
@@ -301,9 +366,10 @@ export class Widget {
     this.items = {
       fresh: item(t.startNew, "compose", () => this.reset()),
       end: item(t.endChat, "end", () => this.confirmEnd()),
+      ...(this.handoffOn ? { human: item(t.human, "headset", () => this.showHandoff()) } : {}),
       tickets: item(t.viewTickets, "ticket", () => this.showTickets(), this.ticketCount),
     };
-    this.menu = h("div", { class: "menu", id: "apex-menu", role: "menu", tabindex: -1, "aria-label": t.more }, this.items.fresh, this.items.end, this.items.tickets);
+    this.menu = h("div", { class: "menu", id: "apex-menu", role: "menu", tabindex: -1, "aria-label": t.more }, ...Object.values(this.items));
     this.menu.addEventListener("keydown", (e) => this.menuKeys(e));
     this.menuBtn = h(
       "button",
@@ -457,6 +523,8 @@ export class Widget {
     if (!this.isOpen) return;
     this.isOpen = false;
     this.closeMenu();
+    this.stopListening(true);
+    this.hush();
     this.root.toggleAttribute("data-open", false);
     this.launcher.setAttribute("aria-expanded", "false");
     this.launcher.setAttribute("aria-label", this.t.open);
@@ -488,9 +556,20 @@ export class Widget {
     this.listeners.get(event)?.delete(fn);
   }
 
-  async send(raw: string): Promise<void> {
+  /** Sends what is in the composer: its text and the files picked for it. */
+  private async submit(): Promise<void> {
+    // a file still being read would otherwise be left behind
+    if (this.busy || this.files.some((f) => !f.prepared)) return;
+    const files = this.files.map((f) => f.prepared!);
+    if (!this.input.value.trim() && !files.length) return;
+    this.stopListening(true);
+    this.clearFiles();
+    await this.send(this.input.value, files);
+  }
+
+  async send(raw: string, files: Prepared[] = [], speak = false): Promise<void> {
     const text = String(raw ?? "").trim();
-    if (!text || this.busy) return;
+    if ((!text && !files.length) || this.busy) return;
     this.open();
     if (this.ended) this.reset();
     await this.ready;
@@ -501,7 +580,7 @@ export class Widget {
     this.autogrow();
     this.suggest.replaceChildren();
 
-    const userBubble = this.addUser(text, true);
+    const userBubble = this.addUser(text, true, files);
     const bubble = this.addBot("", true);
     bubble.append(h("div", { class: "typing", role: "status", "aria-label": this.t.typing }, h("i"), h("i"), h("i")));
     this.scroll(true, true);
@@ -532,11 +611,13 @@ export class Widget {
             paint();
             this.addMeta(bubble, event.messageId, event.sources, event.handoff, undefined, true);
             finished = true;
-            if (this.ui?.behavior.soundOnReply && (document.hidden || !this.isOpen)) chime();
+            if (speak) this.say(answer);
+            else if (this.ui?.behavior.soundOnReply && (document.hidden || !this.isOpen)) chime();
             this.emit("message", { text: answer, sources: event.sources });
           } else if (event.type === "error") failure = event.code;
         },
         controller.signal,
+        files.map((f) => f.attachment),
       );
       if (!finished) throw new ApiError(failure ?? "network");
     } catch (error) {
@@ -546,7 +627,7 @@ export class Widget {
         userBubble.remove();
         bubble.nextElementSibling?.classList.contains("meta") && bubble.nextElementSibling.remove();
         bubble.remove();
-        void this.send(text);
+        void this.send(text, files, speak);
       });
     } finally {
       if (this.controller === controller) {
@@ -590,6 +671,8 @@ export class Widget {
 
   /** Stops a reply that is still streaming; its bubble stays as far as it got. */
   private abort(): void {
+    this.stopListening(true);
+    this.hush();
     this.controller?.abort();
     this.controller = null;
     this.busy = false;
@@ -601,6 +684,7 @@ export class Widget {
     this.abort();
     this.ended = false;
     this.save(null);
+    this.clearFiles();
     this.log.replaceChildren();
     this.suggest.replaceChildren();
     this.backToChat();
@@ -617,15 +701,16 @@ export class Widget {
   // ----- "more options" menu -----
 
   private enabledItems(): HTMLButtonElement[] {
-    return Object.values(this.items).filter((b) => !b.disabled && !b.hidden);
+    return Object.values(this.items).filter((b): b is HTMLButtonElement => !!b && !b.disabled && !b.hidden);
   }
 
   /** Opens the menu with focus on the item at `index` (negative counts from the end). */
   private openMenu(index: number): void {
-    const { fresh, end, tickets } = this.items;
+    const { fresh, end, human, tickets } = this.items;
     // a required contact form can't be skipped from here either
     const locked = this.leadPending();
     fresh.disabled = locked;
+    if (human) human.disabled = locked;
     end.disabled = locked || this.ended || !this.hasChat();
     tickets.disabled = locked;
     tickets.hidden = !this.handoffOn && !this.tickets.length;
@@ -736,6 +821,7 @@ export class Widget {
     this.abort();
     this.ended = true;
     this.save(null);
+    this.clearFiles();
     this.log.replaceChildren();
     this.suggest.replaceChildren();
 
@@ -859,10 +945,202 @@ export class Widget {
     }
   }
 
-  private addUser(text: string, live = false): HTMLDivElement {
-    const el = h("div", { class: live ? "msg user in" : "msg user" }, text);
+  /** A visitor message; files show as thumbnails (live) or by the names the transcript kept. */
+  private addUser(text: string, live = false, files: Prepared[] = []): HTMLDivElement {
+    const el = h("div", { class: live ? "msg user in" : "msg user" });
+    const kept = files.length ? [] : [...text.matchAll(/^📎 (.+)$/gm)].map((m) => m[1]);
+    const body = kept.length ? text.replace(/\n*^📎 .+$/gm, "").trim() : text;
+    const pill = (name: string) => h("span", { class: "upfile" }, icon("file"), name);
+    const shown = files.map(({ attachment: f, preview }) => {
+      if (!preview) return pill(f.name);
+      const img = h("img", { class: "upimg", src: preview, alt: f.name });
+      // a host page's CSP may block data: images; the name still says what was sent
+      img.addEventListener("error", () => img.replaceWith(pill(f.name)), { once: true });
+      return img;
+    });
+    if (shown.length || kept.length) el.append(h("div", { class: "ups" }, ...shown, ...kept.map(pill)));
+    if (body) el.append(body);
     this.log.append(el);
     return el;
+  }
+
+  // ----- files -----
+
+  private pickFiles(): void {
+    if (!this.fileInput) {
+      const input = (this.fileInput = h("input", { type: "file", multiple: true, accept: ACCEPT, hidden: true, tabindex: -1 }));
+      input.addEventListener("change", () => {
+        this.addFiles([...(input.files ?? [])]);
+        input.value = "";
+      });
+      this.dock.append(input);
+    }
+    this.fileInput.click();
+  }
+
+  private addFiles(list: File[]): void {
+    const t = this.t;
+    for (const file of list) {
+      if (this.files.length >= MAX_FILES) {
+        this.composeFail("tooManyFiles");
+        break;
+      }
+      const thumb = h("span", { class: "fthumb" }, icon("file"));
+      const chip = h("div", { class: "fchip busy", title: file.name }, thumb, h("span", { class: "fname" }, file.name));
+      const entry: (typeof this.files)[number] = { prepared: null, chip };
+      chip.append(h("button", { class: "x", type: "button", "aria-label": `${t.removeFile}: ${file.name}`, onclick: () => this.removeFile(entry) }, icon("close")));
+      this.files.push(entry);
+      this.fileList.append(chip);
+      prepareFile(file).then(
+        (prepared) => {
+          entry.prepared = prepared;
+          chip.classList.remove("busy");
+          if (prepared.preview) thumb.replaceChildren(h("img", { src: prepared.preview, alt: "" }));
+          this.updateSend();
+        },
+        (error) => {
+          this.removeFile(entry);
+          this.composeFail(error instanceof FileError ? error.problem : "fileRead");
+        },
+      );
+    }
+    this.updateSend();
+    this.input.focus();
+  }
+
+  private removeFile(entry: (typeof this.files)[number]): void {
+    this.files = this.files.filter((f) => f !== entry);
+    entry.chip.remove();
+    this.updateSend();
+  }
+
+  private clearFiles(): void {
+    this.files = [];
+    this.fileList.replaceChildren();
+    this.updateSend();
+  }
+
+  /** A short problem under the composer (unreadable file, microphone denied...). */
+  private composeFail(problem: FileProblem | "tooManyFiles" | "micDenied"): void {
+    this.composeError.textContent = this.t[problem];
+    clearTimeout(this.errorTimer);
+    this.errorTimer = setTimeout(() => (this.composeError.textContent = ""), 5000);
+  }
+
+  private hideNotice(): void {
+    const notice = this.notice;
+    this.notice = null;
+    this.flag("notice", true);
+    if (!notice) return;
+    notice.classList.add("gone");
+    this.dock.classList.add("bare");
+    setTimeout(() => notice.remove(), still() ? 0 : 260);
+    this.input.focus();
+  }
+
+  // ----- voice -----
+
+  /** The round button: send, start or stop voice chat, or stop a reply being read aloud. */
+  private primaryAction(): void {
+    if (this.sendMode === "stop") this.hush();
+    else if (this.sendMode === "voice") {
+      if (this.voiceListening) this.stopListening();
+      else this.listen(true);
+    } else void this.submit();
+  }
+
+  /** The microphone: dictation into the text field, until pressed again. */
+  private dictate(): void {
+    if (this.rec) this.stopListening();
+    else this.listen(false);
+  }
+
+  private listen(voiceMode: boolean): void {
+    if (!this.voice || this.rec) return;
+    this.hush();
+    const rec = new this.voice();
+    rec.lang = LOCALES[this.lang];
+    rec.interimResults = true;
+    // voice chat sends after one utterance; dictation keeps going until stopped
+    rec.continuous = !voiceMode;
+    const before = this.input.value.trim();
+    let heard = "";
+    rec.addEventListener("result", (e) => {
+      const { resultIndex, results } = e as RecognitionResultEvent;
+      let interim = "";
+      for (let i = resultIndex; i < results.length; i++) {
+        if (results[i].isFinal) heard += results[i][0].transcript;
+        else interim += results[i][0].transcript;
+      }
+      this.input.value = [before, `${heard}${interim}`.trim()].filter(Boolean).join(" ");
+      this.autogrow();
+    });
+    rec.addEventListener("error", (e) => {
+      const code = (e as Event & { error?: string }).error;
+      if (code === "not-allowed" || code === "service-not-allowed") this.composeFail("micDenied");
+    });
+    rec.addEventListener("end", () => {
+      if (this.rec !== rec) return;
+      this.rec = null;
+      this.setListening(false);
+      if (voiceMode && heard.trim()) void this.send(this.input.value, [], true);
+    });
+    this.rec = rec;
+    this.setListening(true, voiceMode);
+    try {
+      rec.start();
+    } catch {
+      this.rec = null;
+      this.setListening(false);
+    }
+  }
+
+  /** Stops listening; `drop` discards whatever is still being recognised. */
+  private stopListening(drop = false): void {
+    const rec = this.rec;
+    if (!rec) return;
+    if (drop) {
+      this.rec = null;
+      rec.abort();
+      this.setListening(false);
+    } else rec.stop();
+  }
+
+  private setListening(on: boolean, voiceMode = false): void {
+    const t = this.t;
+    this.voiceListening = on && voiceMode;
+    this.root.classList.toggle("rec", on);
+    if (this.micBtn) {
+      this.micBtn.setAttribute("aria-pressed", String(on && !voiceMode));
+      this.micBtn.setAttribute("aria-label", on && !voiceMode ? t.stopDictate : t.dictate);
+      this.micBtn.title = this.micBtn.getAttribute("aria-label")!;
+    }
+    this.input.placeholder = on ? t.listening : t.placeholder;
+    this.updateSend();
+  }
+
+  /** Reads a reply aloud (voice chat), with the browser's own speech synthesis. */
+  private say(markdown: string): void {
+    const synth = typeof speechSynthesis === "undefined" ? null : speechSynthesis;
+    const text = speakable(markdown);
+    if (!synth || !text) return;
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = LOCALES[this.lang];
+    utterance.onend = utterance.onerror = () => {
+      this.speaking = false;
+      this.updateSend();
+    };
+    synth.cancel();
+    this.speaking = true;
+    this.updateSend();
+    synth.speak(utterance);
+  }
+
+  private hush(): void {
+    if (!this.speaking) return;
+    if (typeof speechSynthesis !== "undefined") speechSynthesis.cancel();
+    this.speaking = false;
+    this.updateSend();
   }
 
   private addBot(markdown: string, live = false): HTMLDivElement {
@@ -1069,7 +1347,17 @@ export class Widget {
   }
 
   private updateSend(): void {
-    this.sendBtn.disabled = this.busy || !this.input.value.trim();
+    const t = this.t;
+    const hasInput = !!this.input.value.trim() || this.files.length > 0;
+    const mode = this.speaking ? "stop" : this.voice && (this.voiceListening || (!hasInput && !this.busy)) ? "voice" : "send";
+    this.sendBtn.disabled = mode === "send" && (this.busy || !hasInput || this.files.some((f) => !f.prepared));
+    this.sendBtn.classList.toggle("live", this.voiceListening);
+    if (mode === this.sendMode) return;
+    this.sendMode = mode;
+    const label = mode === "stop" ? t.stopVoice : mode === "voice" ? t.voiceMode : t.send;
+    this.sendBtn.setAttribute("aria-label", label);
+    this.sendBtn.title = label;
+    this.sendBtn.replaceChildren(icon(mode === "stop" ? "stop" : mode === "voice" ? "wave" : "send"));
   }
 
   private onScroll(): void {

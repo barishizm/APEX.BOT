@@ -105,7 +105,8 @@ describe("widget", () => {
 
   it("validates and submits the handoff form", async () => {
     apex().identify({ name: "Ayşe" });
-    ($$(".foot button")[0] as HTMLButtonElement).click();
+    menuBtn().click();
+    item(/Bir insanla konuş/).click();
     const form = $<HTMLFormElement>("form.form")!;
     const [email, name] = [...form.querySelectorAll("input")];
     assert.equal(name.value, "Ayşe");
@@ -144,7 +145,7 @@ describe("widget", () => {
     assert.equal(btn.getAttribute("aria-haspopup"), "menu");
     assert.equal(btn.getAttribute("aria-expanded"), "false");
     assert.equal(btn.parentElement!.nextElementSibling!.getAttribute("aria-label"), "Sohbeti kapat");
-    assert.deepEqual(items().map((b) => b.textContent!.replace(/\d+$/, "")), ["Yeni sohbet başlat", "Sohbeti sonlandır", "Taleplerimi gör"]);
+    assert.deepEqual(items().map((b) => b.textContent!.replace(/\d+$/, "")), ["Yeni sohbet başlat", "Sohbeti sonlandır", "Bir insanla konuş", "Taleplerimi gör"]);
     assert.ok(items().every((b) => b.getAttribute("role") === "menuitem"));
   });
 
@@ -156,12 +157,12 @@ describe("widget", () => {
     key(items()[0], "ArrowDown");
     assert.equal(shadow.activeElement, items()[1]);
     key(items()[1], "End");
-    assert.equal(shadow.activeElement, items()[2]);
-    key(items()[2], "ArrowDown");
+    assert.equal(shadow.activeElement, items()[3]);
+    key(items()[3], "ArrowDown");
     assert.equal(shadow.activeElement, items()[0], "wraps around");
     key(items()[0], "ArrowUp");
-    assert.equal(shadow.activeElement, items()[2]);
-    key(items()[2], "Home");
+    assert.equal(shadow.activeElement, items()[3]);
+    key(items()[3], "Home");
     assert.equal(shadow.activeElement, items()[0]);
   });
 
@@ -175,7 +176,7 @@ describe("widget", () => {
 
   it("opens from the keyboard at the last item, and closes on a press outside it", () => {
     key(menuBtn(), "ArrowUp");
-    assert.equal(shadow.activeElement, items()[2]);
+    assert.equal(shadow.activeElement, items()[3]);
     $(".log")!.dispatchEvent(new win.MouseEvent("pointerdown", { bubbles: true, composed: true }));
     assert.equal($(".menu")!.classList.contains("on"), false);
     menuBtn().click();

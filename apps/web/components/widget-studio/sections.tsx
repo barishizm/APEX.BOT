@@ -422,6 +422,8 @@ export function BehaviorSection({ s, set, lang, err, listErr }: SectionProps) {
         <Toggle label={t.sources} description={t.sourcesHint} checked={b.showSources} onChange={(showSources) => set("behavior", { showSources })} />
         <Toggle label={t.feedback} description={t.feedbackHint} checked={b.showFeedback} onChange={(showFeedback) => set("behavior", { showFeedback })} />
         <Toggle label={t.sound} description={t.soundHint} checked={b.soundOnReply} onChange={(soundOnReply) => set("behavior", { soundOnReply })} />
+        <Toggle label={t.attachments} description={t.attachmentsHint} checked={b.attachments} onChange={(attachments) => set("behavior", { attachments })} />
+        <Toggle label={t.voice} description={t.voiceHint} checked={b.voiceInput} onChange={(voiceInput) => set("behavior", { voiceInput })} />
         <Toggle label={t.fullscreen} description={t.fullscreenHint} checked={b.mobileFullscreen} onChange={(mobileFullscreen) => set("behavior", { mobileFullscreen })} />
         <ChoiceCards
           label={t.remember}

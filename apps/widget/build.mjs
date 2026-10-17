@@ -3,10 +3,11 @@ import { build, context } from "esbuild";
 import { readFileSync } from "node:fs";
 import { gzipSync } from "node:zlib";
 
-// Raised from 40 KB for the header menu (new chat, end chat, tickets) and its five locales.
-// What visitors download is the gzip size, so that has its own, tighter cap.
-const LIMIT = 60 * 1024;
-const GZIP_LIMIT = 20 * 1024;
+// Raised from 40 KB for the header menu (new chat, end chat, tickets), then for the composer's
+// file and voice input, each with its five locales. What visitors download is the gzip size,
+// so that has its own, tighter cap.
+const LIMIT = 76 * 1024;
+const GZIP_LIMIT = 25 * 1024;
 
 const options = {
   entryPoints: ["src/index.ts"],
