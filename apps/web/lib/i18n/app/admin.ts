@@ -1,0 +1,162 @@
+import type { PluralForms } from "../format"
+import type { Messages } from "./types"
+
+// The platform admin area (/admin). Sent to the browser only for staff (see getAppDictionary),
+// so customers never download it. Staff work in English or Turkish for now; the other languages
+// fall back to English until the area settles.
+const en = {
+  badge: "Admin",
+  home: "Apex Bot admin",
+  mainNav: "Admin",
+  // ProfileMenu and the command palette in the customer dashboard
+  entry: "Admin panel",
+  backToDashboard: "Back to dashboard",
+  nav: {
+    overview: "Overview",
+    users: "Users",
+    workspaces: "Workspaces",
+    bots: "Sites & bots",
+    knowledge: "Knowledge base",
+    conversations: "Conversations",
+    usage: "Usage & cost",
+    security: "Security",
+    support: "Support tickets",
+    settings: "Waitlist & settings",
+    system: "System",
+    audit: "Audit log",
+  },
+  palette: {
+    group: "Admin",
+  },
+  overview: {
+    title: "Overview",
+    lede: "Platform administration. Every change you make here is recorded in the audit log with your reason.",
+    signedInAs: "Signed in as {role}",
+  },
+  placeholder: {
+    soon: "This section is on its way.",
+    back: "Go to overview",
+  },
+  table: {
+    search: "Search…",
+    searchLabel: "Search the list",
+    allValues: "All",
+    exportCsv: "Export CSV",
+    exporting: "Exporting…",
+    exportFailed: "Couldn't export. Try again",
+    exportTruncated: "Only the first {n} rows were exported. Narrow the list to get the rest.",
+    loadFailed: "Couldn't load the list. Try again",
+    retry: "Retry",
+    empty: "Nothing matches.",
+    clearFilters: "Clear search and filters",
+    previous: "Previous",
+    next: "Next",
+    first: "First page",
+    pageRows: { one: "{n} row on this page", other: "{n} rows on this page" } as PluralForms,
+    sortBy: "Sort by {column}",
+    loading: "Loading…",
+  },
+  users: {
+    title: "Users",
+    lede: "Every account on the platform.",
+    search: "Email, username, name or ID",
+    columns: {
+      user: "User",
+      role: "Platform role",
+      status: "Status",
+      twoFactor: "2FA",
+      workspaces: "Workspaces",
+      lastLogin: "Last login",
+      created: "Signed up",
+    },
+    filters: {
+      role: "Role",
+      status: "Status",
+      twoFactor: "2FA",
+    },
+    roles: { staff: "Any staff", superadmin: "Superadmin", support: "Support", none: "Customer" },
+    statuses: { active: "Active", unverified: "Unverified", suspended: "Suspended" },
+    twoFactor: { on: "On", off: "Off" },
+    never: "Never",
+  },
+}
+
+export type AdminMessages = typeof en
+
+const tr: AdminMessages = {
+  badge: "Admin",
+  home: "Apex Bot yönetim",
+  mainNav: "Yönetim",
+  entry: "Admin paneli",
+  backToDashboard: "Panele dön",
+  nav: {
+    overview: "Genel Bakış",
+    users: "Kullanıcılar",
+    workspaces: "Çalışma Alanları",
+    bots: "Siteler/Botlar",
+    knowledge: "Bilgi Tabanı",
+    conversations: "Konuşmalar",
+    usage: "Kullanım & Maliyet",
+    security: "Güvenlik",
+    support: "Destek Talepleri",
+    settings: "Bekleme Listesi & Ayarlar",
+    system: "Sistem",
+    audit: "Audit Log",
+  },
+  palette: {
+    group: "Yönetim",
+  },
+  overview: {
+    title: "Genel Bakış",
+    lede: "Platform yönetimi. Burada yaptığınız her değişiklik, gerekçenizle birlikte audit log'a kaydedilir.",
+    signedInAs: "{role} olarak giriş yapıldı",
+  },
+  placeholder: {
+    soon: "Bu bölüm hazırlanıyor.",
+    back: "Genel bakışa git",
+  },
+  table: {
+    search: "Ara…",
+    searchLabel: "Listede ara",
+    allValues: "Tümü",
+    exportCsv: "CSV dışa aktar",
+    exporting: "Dışa aktarılıyor…",
+    exportFailed: "Dışa aktarılamadı. Tekrar deneyin",
+    exportTruncated: "Yalnızca ilk {n} satır dışa aktarıldı. Geri kalanı için listeyi daraltın.",
+    loadFailed: "Liste yüklenemedi. Tekrar deneyin",
+    retry: "Tekrar dene",
+    empty: "Eşleşen kayıt yok.",
+    clearFilters: "Aramayı ve filtreleri temizle",
+    previous: "Önceki",
+    next: "Sonraki",
+    first: "İlk sayfa",
+    pageRows: { one: "Bu sayfada {n} satır", other: "Bu sayfada {n} satır" },
+    sortBy: "{column} sütununa göre sırala",
+    loading: "Yükleniyor…",
+  },
+  users: {
+    title: "Kullanıcılar",
+    lede: "Platformdaki tüm hesaplar.",
+    search: "E-posta, kullanıcı adı, isim veya ID",
+    columns: {
+      user: "Kullanıcı",
+      role: "Platform rolü",
+      status: "Durum",
+      twoFactor: "2FA",
+      workspaces: "Çalışma alanı",
+      lastLogin: "Son giriş",
+      created: "Kayıt",
+    },
+    filters: {
+      role: "Rol",
+      status: "Durum",
+      twoFactor: "2FA",
+    },
+    roles: { staff: "Tüm personel", superadmin: "Superadmin", support: "Destek", none: "Müşteri" },
+    statuses: { active: "Aktif", unverified: "Doğrulanmamış", suspended: "Askıda" },
+    twoFactor: { on: "Açık", off: "Kapalı" },
+    never: "Hiç",
+  },
+}
+
+export const admin: Messages<AdminMessages> = { en, tr, lt: en, lv: en, et: en }

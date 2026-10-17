@@ -1,8 +1,9 @@
 "use client"
 
 import { AnimatePresence, motion } from "framer-motion"
-import { BookOpen, Contrast, Moon, Power, Settings, ShieldCheck, Sun } from "lucide-react"
+import { ArrowLeft, BookOpen, Contrast, Moon, Power, Settings, ShieldCheck, Sun } from "lucide-react"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { useEffect, useRef, useState } from "react"
 import { useAppI18n } from "@/components/i18n/app-provider"
 import { useSetLocale } from "@/components/i18n/use-set-locale"
@@ -53,6 +54,9 @@ export function ProfileMenu({
 }) {
   const { t: app, locale, href } = useAppI18n()
   const t = app.shell.profile
+  // staff only (the dictionary carries it only for them): the admin panel, or back out of it
+  const admin = platformRole ? app.admin : undefined
+  const inAdmin = usePathname().startsWith("/admin")
   const setLocale = useSetLocale()
   const [open, setOpen] = useState(false)
   const [theme, setTheme] = useState<Theme>("system")
@@ -208,6 +212,17 @@ export function ProfileMenu({
                   </div>
                 </div>
               </div>
+
+              {admin && (
+                <Link
+                  href={inAdmin ? "/dashboard" : "/admin"}
+                  onClick={() => setOpen(false)}
+                  className={`${rowButton} rounded-xl bg-amber-500/15 text-amber-800 no-underline hover:bg-amber-500/25 dark:text-amber-200`}
+                >
+                  {inAdmin ? admin.backToDashboard : admin.entry}
+                  {inAdmin ? <ArrowLeft className="h-4 w-4" aria-hidden /> : <ShieldCheck className="h-4 w-4" aria-hidden />}
+                </Link>
+              )}
 
               <div className={group}>
                 <Link href="/dashboard/settings" onClick={() => setOpen(false)} className={`${rowButton} no-underline`}>

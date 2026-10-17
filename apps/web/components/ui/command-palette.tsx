@@ -2,6 +2,7 @@
 
 import {
   Activity,
+  ArrowLeft,
   BookOpen,
   ChartColumn,
   Code2,
@@ -24,12 +25,13 @@ import {
   Users,
   type LucideIcon,
 } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { useEffect, useMemo, useRef, useState } from "react"
+import { ADMIN_NAV } from "@/components/admin/nav"
 import { useAppI18n } from "@/components/i18n/app-provider"
 import { useSetLocale } from "@/components/i18n/use-set-locale"
 import { LOCALE_META, LOCALES, localizePath, type Locale } from "@/lib/i18n"
-import type { AppDictionary } from "@/lib/i18n/app"
+import type { AdminDictionary, AppDictionary } from "@/lib/i18n/app"
 import { cn } from "@/lib/utils"
 
 type Command = { label: string; group: string; icon: LucideIcon; keywords?: string; run: (go: (href: string) => void) => void }
@@ -91,14 +93,39 @@ function buildCommands(t: Strings, locale: Locale, setLocale: (l: Locale) => voi
   ]
 }
 
+// Platform staff only: every admin section, plus a way back to the customer dashboard from inside it
+function adminCommands(t: AdminDictionary, inAdmin: boolean): Command[] {
+  const group = t.palette.group
+  return [
+    ...ADMIN_NAV.map(({ key, href, icon, keywords }) => ({ group, label: t.nav[key], icon, keywords, run: nav(href) })),
+    ...(inAdmin ? [{ group, label: t.backToDashboard, icon: ArrowLeft, keywords: "dashboard panel müşteri customer", run: nav("/dashboard") }] : []),
+  ]
+}
+
 // Case- and accent-insensitive, so "turkce" finds "Türkçe" and "i" finds "İ"
 const norm = (s: string) => s.toLocaleLowerCase("tr").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/ı/g, "i")
 
-export function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function CommandPalette({
+  open,
+  onClose,
+  platformRole = null,
+}: {
+  open: boolean
+  onClose: () => void
+  /** Platform staff also get the admin commands; for everyone else they don't exist. */
+  platformRole?: "superadmin" | "support" | null
+}) {
   const { t: app, locale } = useAppI18n()
   const t = app.shell.palette
   const setLocale = useSetLocale()
-  const commands = useMemo(() => buildCommands(t, locale, setLocale), [t, locale, setLocale])
+  const inAdmin = usePathname().startsWith("/admin")
+  const admin = platformRole ? app.admin : undefined
+  const commands = useMemo(() => {
+    const base = buildCommands(t, locale, setLocale)
+    if (!admin) return base
+    // inside the admin area its sections come first
+    return inAdmin ? [...adminCommands(admin, true), ...base] : [...base, ...adminCommands(admin, false)]
+  }, [t, locale, setLocale, admin, inAdmin])
   const router = useRouter()
   const [query, setQuery] = useState("")
   const [index, setIndex] = useState(0)

@@ -18,6 +18,10 @@ const RULES: Record<Locale, Rule[]> = {
     ["Confirm this action with a code from your authenticator app", "Bu işlemi doğrulama uygulamanızdaki bir kodla onaylayın"],
     ["Give a reason for this action", "Bu işlem için bir gerekçe yazın"],
     ["The reason can be at most 1000 characters", "Gerekçe en fazla 1000 karakter olabilir"],
+    ["This page link is out of date. Go back to the first page", "Bu sayfa bağlantısı eskidi. İlk sayfaya dönün"],
+    ["This list can't be sorted that way", "Bu liste bu şekilde sıralanamaz"],
+    ["The search can be at most 200 characters", "Arama en fazla 200 karakter olabilir"],
+    ["Unknown filter", "Bilinmeyen filtre"],
     // two-step sign-in, email change and team
     ["This is already your email address", "Bu zaten e-posta adresiniz"],
     ["Your sign-in timed out. Log in again", "Giriş işleminizin süresi doldu. Tekrar giriş yapın"],
