@@ -1,17 +1,17 @@
 "use client"
 
-import { CircleCheck, FileUp, Globe, LoaderCircle, Type } from "lucide-react"
+import { CircleCheck, FileUp, Globe, LoaderCircle, Paperclip, Type } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 import { useAppI18n } from "@/components/i18n/app-provider"
 import { ErrorText, TextArea, TextInput } from "@/components/widget-studio/fields"
 import { format } from "@/lib/i18n"
-import { formatNumber } from "@/lib/i18n/format"
 import type { SourceJson } from "@/lib/knowledge"
 import { cn } from "@/lib/utils"
 import { primaryButton, segment, segmented, useSend, type Limits } from "./shared"
 
-type Tab = "website" | "text"
-const FILE_TYPES = /\.(txt|md|markdown|csv)$/i
+type Tab = "website" | "text" | "file"
+const FILE_TYPES = /\.(pdf|docx|txt|md|markdown|csv)$/i
+const FILE_ACCEPT = ".pdf,.docx,.txt,.md,.markdown,.csv,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown,text/csv"
 
 export function AddPanel({
   limits,
@@ -27,7 +27,7 @@ export function AddPanel({
   onAdded: (s: SourceJson) => void
   onNotice: (message: string) => void
 }) {
-  const { t: app, locale } = useAppI18n()
+  const { t: app } = useAppI18n()
   const k = app.knowledge
   const t = k.add
   const send = useSend()
@@ -41,8 +41,10 @@ export function AddPanel({
   const [title, setTitle] = useState(prefillTitle ?? "")
   const [content, setContent] = useState("")
   const [textError, setTextError] = useState<string | undefined>()
-  const [fileError, setFileError] = useState<string | undefined>()
   const [addingText, setAddingText] = useState(false)
+
+  const [fileError, setFileError] = useState<string | undefined>()
+  const [uploading, setUploading] = useState<string | null>(null)
   const [dragging, setDragging] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const panelRef = useRef<HTMLElement>(null)
@@ -87,24 +89,32 @@ export function AddPanel({
     setDone(t.added)
   }
 
-  const importFile = async (file: File | undefined) => {
+  // the server reads the file (PDF and Word need it) and stores the text as a source of its own
+  const upload = async (file: File | undefined) => {
     setFileError(undefined)
     if (!file) return
-    if (!FILE_TYPES.test(file.name)) return setFileError(t.importType)
+    if (!FILE_TYPES.test(file.name)) return setFileError(t.fileType)
+    if (file.size > limits.fileBytes) return setFileError(format(t.fileTooLarge, { n: limits.fileBytes / 1_000_000 }))
+    setUploading(file.name)
+    const form = new FormData()
+    form.append("file", file)
+    let result: { ok: boolean; data: { message?: string; source?: SourceJson } }
     try {
-      const text = (await file.text()).replace(/^﻿/, "").trim()
-      if (text.length > limits.textChars) return setFileError(format(t.importTooLong, { n: formatNumber(limits.textChars, locale) }))
-      setContent(text)
-      if (!title.trim()) setTitle(file.name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ").slice(0, limits.title))
-      setTextError(undefined)
+      const res = await fetch("/api/knowledge", { method: "POST", body: form })
+      result = { ok: res.ok, data: await res.json().catch(() => ({})) }
     } catch {
-      setFileError(t.importFailed)
+      result = { ok: false, data: { message: k.offline } }
     }
+    setUploading(null)
+    if (!result.ok || !result.data.source) return setFileError(result.data.message ?? t.fileFailed)
+    onAdded(result.data.source)
+    setDone(t.added)
   }
 
   const tabs: [Tab, string, typeof Globe][] = [
     ["website", t.website, Globe],
     ["text", t.text, Type],
+    ["file", t.file, Paperclip],
   ]
 
   return (
@@ -141,7 +151,7 @@ export function AddPanel({
 
       {tab === "website" ? (
         <form id="add-panel-website" role="tabpanel" aria-labelledby="add-tab-website" onSubmit={addSite} className="flex flex-col gap-3" noValidate>
-          <p className="text-sm text-[var(--color-muted)]">{format(k.website.description, { n: limits.websitePages })}</p>
+          <p className="text-sm text-[var(--color-muted)]">{format(k.website.description, { n: limits.websitePages, docs: limits.websiteDocuments })}</p>
           <TextInput
             label={k.website.label}
             type="url"
@@ -160,28 +170,8 @@ export function AddPanel({
             {addingSite ? k.website.adding : k.website.add}
           </button>
         </form>
-      ) : (
-        <form
-          id="add-panel-text"
-          role="tabpanel"
-          aria-labelledby="add-tab-text"
-          onSubmit={addText}
-          onDragOver={(e) => {
-            if (full || !e.dataTransfer.types.includes("Files")) return
-            e.preventDefault()
-            setDragging(true)
-          }}
-          onDragLeave={(e) => {
-            if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragging(false)
-          }}
-          onDrop={(e) => {
-            if (full) return
-            e.preventDefault()
-            setDragging(false)
-            importFile(e.dataTransfer.files[0])
-          }}
-          className={cn("relative flex flex-col gap-3 rounded-xl", dragging && "outline-2 outline-offset-4 outline-[var(--color-secondary)] outline-dashed")}
-        >
+      ) : tab === "text" ? (
+        <form id="add-panel-text" role="tabpanel" aria-labelledby="add-tab-text" onSubmit={addText} className="flex flex-col gap-3">
           <p className="text-sm text-[var(--color-muted)]">{prefillTitle ? t.answering : k.text.description}</p>
           <TextInput label={k.text.titleLabel} value={title} onChange={setTitle} max={limits.title} placeholder={k.text.titlePlaceholder} disabled={full} />
           <TextArea
@@ -197,31 +187,51 @@ export function AddPanel({
             error={textError}
             disabled={full}
           />
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <input ref={fileRef} type="file" accept=".txt,.md,.markdown,.csv,text/plain,text/markdown,text/csv" className="sr-only" tabIndex={-1} onChange={(e) => {
-              importFile(e.target.files?.[0])
-              e.target.value = ""
-            }} />
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              disabled={full}
-              className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md border border-dashed border-[var(--color-line)] bg-transparent px-2.5 text-xs font-semibold text-[var(--color-text)] hover:border-[var(--color-muted)] disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <FileUp className="h-3.5 w-3.5" aria-hidden />
-              {t.import}
-            </button>
-            <span className="text-xs text-[var(--color-muted)]">{t.importHint}</span>
-          </div>
-          {fileError && <ErrorText>{fileError}</ErrorText>}
           <button type="submit" disabled={addingText || full || !title.trim() || !content.trim()} className={primaryButton}>
             {addingText && <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />}
             {addingText ? k.text.adding : k.text.add}
           </button>
-          {dragging && (
-            <div className="pointer-events-none absolute inset-0 grid place-items-center rounded-xl bg-[var(--color-surface)]/85 text-sm font-semibold">{t.drop}</div>
-          )}
         </form>
+      ) : (
+        <div id="add-panel-file" role="tabpanel" aria-labelledby="add-tab-file" className="flex flex-col gap-3">
+          <p className="text-sm text-[var(--color-muted)]">{format(t.fileDescription, { n: limits.fileBytes / 1_000_000 })}</p>
+          <input
+            ref={fileRef}
+            type="file"
+            accept={FILE_ACCEPT}
+            className="sr-only"
+            tabIndex={-1}
+            onChange={(e) => {
+              upload(e.target.files?.[0])
+              e.target.value = ""
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            disabled={full || uploading !== null}
+            onDragOver={(e) => {
+              if (full || uploading || !e.dataTransfer.types.includes("Files")) return
+              e.preventDefault()
+              setDragging(true)
+            }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={(e) => {
+              e.preventDefault()
+              setDragging(false)
+              if (!full && !uploading) upload(e.dataTransfer.files[0])
+            }}
+            className={cn(
+              "flex min-h-36 cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-[var(--color-line)] bg-transparent p-6 text-center text-[var(--color-text)] transition-colors hover:border-[var(--color-muted)] disabled:cursor-not-allowed disabled:opacity-60",
+              dragging && "border-[var(--color-secondary)] bg-[var(--color-secondary)]/5",
+            )}
+          >
+            {uploading ? <LoaderCircle className="h-6 w-6 animate-spin" aria-hidden /> : <FileUp className="h-6 w-6 text-[var(--color-muted)]" aria-hidden />}
+            <span className="text-sm font-semibold">{uploading ? format(t.uploading, { name: uploading }) : dragging ? t.drop : t.choose}</span>
+            {!uploading && <span className="text-xs text-[var(--color-muted)]">{t.fileHint}</span>}
+          </button>
+          {fileError && <ErrorText>{fileError}</ErrorText>}
+        </div>
       )}
       {full && <p className="text-xs text-[var(--color-muted)]">{format(k.full, { n: limits.sources })}</p>}
     </section>

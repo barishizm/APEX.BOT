@@ -18,6 +18,8 @@
     "typescript": "^7.0.2"
   },
   "dependencies": {
-    "node-html-parser": "^9.0.4"
+    "fflate": "0.8.2",
+    "node-html-parser": "^9.0.4",
+    "unpdf": "1.8.1"
   }
 }

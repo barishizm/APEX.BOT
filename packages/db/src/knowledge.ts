@@ -4,8 +4,15 @@ import { replyIdList, resolveReplies } from "./conversations.ts"
 
 export const KNOWLEDGE_LIMITS = {
   sources: 20,
-  websitePages: 50,
+  /** Web pages and linked documents read from one website. */
+  websitePages: 200,
+  /** Linked PDF and Word files read from one website, within websitePages. */
+  websiteDocuments: 20,
   textChars: 50_000,
+  /** Text extracted from one uploaded file. */
+  fileChars: 100_000,
+  /** One uploaded file; the hosting platform caps request bodies at 4.5 MB. */
+  fileBytes: 4_000_000,
   title: 200,
   /** Across all sources of one bot; keeps the chat API's in-memory index small. */
   chunksPerBot: 5000,
@@ -16,15 +23,21 @@ export const KNOWLEDGE_LIMITS = {
 // A sync left in "syncing" this long (the server restarted mid-crawl) can be started again
 export const STALE_SYNC_MS = 10 * 60_000
 
-export type SourceKind = "website" | "text"
+export type SourceKind = "website" | "text" | "file"
 export type SourceStatus = "pending" | "syncing" | "ready" | "failed"
+/** How often a website is read again on its own. */
+export type SourceRefresh = "off" | "daily" | "weekly"
+export const SOURCE_REFRESH: readonly SourceRefresh[] = ["off", "daily", "weekly"]
+
+// The daily job runs at about the same time each day; a little slack keeps "daily" from slipping a day
+const REFRESH_AFTER: Record<Exclude<SourceRefresh, "off">, string> = { daily: "20 hours", weekly: "6 days 20 hours" }
 
 export interface KnowledgeSource {
   id: string
   kind: SourceKind
   title: string
   url: string | null
-  /** Text sources only: the beginning of the content. */
+  /** Text and file sources only: the beginning of the content. */
   preview: string | null
   /** The text source answers from the analytics page are appended to. */
   managed: boolean
@@ -32,6 +45,8 @@ export interface KnowledgeSource {
   error: string | null
   pages: number
   chunks: number
+  /** Websites only. */
+  refresh: SourceRefresh
   syncedAt: Date | null
   createdAt: Date
   updatedAt: Date
@@ -65,12 +80,13 @@ interface SourceRow {
   error: string | null
   pages: number
   chunks: number
+  refresh: SourceRefresh
   synced_at: Date | null
   created_at: Date
   updated_at: Date
 }
 
-const COLUMNS = `id, kind, title, url, left(content, 240) as preview, managed, status, error, pages, chunks, synced_at, created_at, updated_at`
+const COLUMNS = `id, kind, title, url, left(content, 240) as preview, managed, status, error, pages, chunks, refresh, synced_at, created_at, updated_at`
 
 const toSource = (r: SourceRow): KnowledgeSource => ({
   id: r.id,
@@ -84,6 +100,7 @@ const toSource = (r: SourceRow): KnowledgeSource => ({
   error: r.status === "syncing" && Date.now() - new Date(r.updated_at).getTime() > STALE_SYNC_MS ? "The sync was interrupted. Try again" : r.error,
   pages: r.pages,
   chunks: r.chunks,
+  refresh: r.refresh,
   syncedAt: r.synced_at,
   createdAt: r.created_at,
   updatedAt: r.updated_at,
@@ -163,6 +180,23 @@ export async function addWebsiteSource(db: Db, who: BotScope, url: string, title
   })
 }
 
+/** Checks a text or file source's content; the limit is the kind's. */
+function cleanContent(kind: "text" | "file", raw: unknown): string {
+  const content = typeof raw === "string" ? raw.trim() : ""
+  if (kind === "file") {
+    if (content.length < 20) throw new KnowledgeError("invalid_input", "No readable text was found in this file")
+    if (content.length > KNOWLEDGE_LIMITS.fileChars) {
+      throw new KnowledgeError("invalid_input", `Keep each file under ${KNOWLEDGE_LIMITS.fileChars.toLocaleString("en")} characters of text, or split it in two`)
+    }
+    return content
+  }
+  if (content.length < 20) throw new KnowledgeError("invalid_input", "Add at least a sentence or two of text")
+  if (content.length > KNOWLEDGE_LIMITS.textChars) {
+    throw new KnowledgeError("invalid_input", `Keep each text under ${KNOWLEDGE_LIMITS.textChars.toLocaleString("en")} characters, or split it in two`)
+  }
+  return content
+}
+
 /** Adds pasted text, already chunked by the caller; it is searchable immediately. */
 export async function addTextSource(
   db: Db,
@@ -170,13 +204,29 @@ export async function addTextSource(
   input: { title: unknown; content: unknown },
   chunk: (title: string, content: string) => ChunkRecord[],
 ): Promise<KnowledgeSource> {
+  return addContentSource(db, who, "text", input, chunk)
+}
+
+/** Adds an uploaded file as the text extracted from it (by the caller); searchable immediately like pasted text. */
+export async function addFileSource(
+  db: Db,
+  who: BotScope,
+  input: { title: unknown; content: unknown },
+  chunk: (title: string, content: string) => ChunkRecord[],
+): Promise<KnowledgeSource> {
+  return addContentSource(db, who, "file", input, chunk)
+}
+
+async function addContentSource(
+  db: Db,
+  who: BotScope,
+  kind: "text" | "file",
+  input: { title: unknown; content: unknown },
+  chunk: (title: string, content: string) => ChunkRecord[],
+): Promise<KnowledgeSource> {
   const bot = await editableBot(db, who)
   const title = cleanTitle(input.title)
-  const content = typeof input.content === "string" ? input.content.trim() : ""
-  if (content.length < 20) throw new KnowledgeError("invalid_input", "Add at least a sentence or two of text")
-  if (content.length > KNOWLEDGE_LIMITS.textChars) {
-    throw new KnowledgeError("invalid_input", `Keep each text under ${KNOWLEDGE_LIMITS.textChars.toLocaleString("en")} characters, or split it in two`)
-  }
+  const content = cleanContent(kind, input.content)
   return db.transaction(async (tx) => {
     await tx.query("select id from app.bots where id = $1 for update", [bot.id])
     await checkRoom(tx, bot.id)
@@ -185,8 +235,8 @@ export async function addTextSource(
     if (chunks.length > room) throw new KnowledgeError("limit", "Your knowledge base is full. Remove a source to add more")
     const { rows } = await tx.query<SourceRow>(
       `insert into app.knowledge_sources (bot_id, kind, title, content, status, chunks, synced_at, created_by)
-       values ($1, 'text', $2, $3, 'ready', $4, now(), $5) returning ${COLUMNS}`,
-      [bot.id, title, content, chunks.length, scopeUser(who)],
+       values ($1, $6, $2, $3, 'ready', $4, now(), $5) returning ${COLUMNS}`,
+      [bot.id, title, content, chunks.length, scopeUser(who), kind],
     )
     await insertChunks(tx, bot.id, rows[0].id, chunks)
     await bumpKnowledge(tx, bot.id)
@@ -268,10 +318,50 @@ export async function addAnswerToKnowledge(
 export async function startSync(db: Db, who: BotScope, sourceId: string): Promise<KnowledgeSource & { botId: string; url: string }> {
   const bot = await editableBot(db, who)
   if (!UUID.test(sourceId)) throw new KnowledgeError("not_found", "That source doesn't exist")
+  return claimSync(db, bot.id, sourceId)
+}
+
+/**
+ * startSync for the scheduled refresh, which acts for no user: the source must still be a website
+ * set to refresh. Same "busy" and "not_found" errors.
+ */
+export async function startScheduledSync(db: Db, sourceId: string): Promise<KnowledgeSource & { botId: string; url: string }> {
+  if (!UUID.test(sourceId)) throw new KnowledgeError("not_found", "That source doesn't exist")
+  const { rows } = await db.query<{ bot_id: string }>(
+    "select bot_id from app.knowledge_sources where id = $1 and kind = 'website' and refresh <> 'off'",
+    [sourceId],
+  )
+  if (!rows[0]) throw new KnowledgeError("not_found", "That source doesn't exist")
+  return claimSync(db, rows[0].bot_id, sourceId)
+}
+
+/**
+ * Websites due to be read again, oldest first: still waiting for their first read, or last read
+ * longer ago than their setting. A failed one waits a full interval before it is tried again, so a site that is down
+ * isn't hit every day.
+ */
+export async function dueRefreshes(db: Queryable, limit: number): Promise<{ id: string; botId: string }[]> {
+  const { rows } = await db.query<{ id: string; bot_id: string }>(
+    `select id, bot_id from app.knowledge_sources
+      where kind = 'website' and refresh <> 'off'
+        and (status <> 'syncing' or updated_at < now() - make_interval(secs => $2))
+        and (
+          -- left waiting because other websites were being read when it was added
+          (status = 'pending' and created_at < now() - interval '15 minutes')
+          or (coalesce(synced_at, created_at) < now() - case refresh when 'daily' then $3::interval else $4::interval end
+              and (status <> 'failed' or updated_at < now() - case refresh when 'daily' then $3::interval else $4::interval end)))
+      order by synced_at nulls first, created_at
+      limit $1`,
+    [limit, STALE_SYNC_MS / 1000, REFRESH_AFTER.daily, REFRESH_AFTER.weekly],
+  )
+  return rows.map((r) => ({ id: r.id, botId: r.bot_id }))
+}
+
+async function claimSync(db: Db, botId: string, sourceId: string): Promise<KnowledgeSource & { botId: string; url: string }> {
   const running = await db.query<{ n: number }>(
     `select count(*)::int as n from app.knowledge_sources
       where bot_id = $1 and id <> $2 and status = 'syncing' and updated_at >= now() - make_interval(secs => $3)`,
-    [bot.id, sourceId, STALE_SYNC_MS / 1000],
+    [botId, sourceId, STALE_SYNC_MS / 1000],
   )
   if (running.rows[0].n >= KNOWLEDGE_LIMITS.concurrentSyncs) {
     throw new KnowledgeError("busy", "Other websites are still being read. Try again when they're done")
@@ -281,15 +371,15 @@ export async function startSync(db: Db, who: BotScope, sourceId: string): Promis
       where id = $1 and bot_id = $2 and kind = 'website'
         and (status <> 'syncing' or updated_at < now() - make_interval(secs => $3))
       returning ${COLUMNS}`,
-    [sourceId, bot.id, STALE_SYNC_MS / 1000],
+    [sourceId, botId, STALE_SYNC_MS / 1000],
   )
   if (!rows[0]) {
-    const exists = await db.query("select 1 from app.knowledge_sources where id = $1 and bot_id = $2 and kind = 'website'", [sourceId, bot.id])
+    const exists = await db.query("select 1 from app.knowledge_sources where id = $1 and bot_id = $2 and kind = 'website'", [sourceId, botId])
     throw exists.rows.length
       ? new KnowledgeError("busy", "This website is already being read")
       : new KnowledgeError("not_found", "That source doesn't exist")
   }
-  return { ...toSource(rows[0]), botId: bot.id, url: rows[0].url! }
+  return { ...toSource(rows[0]), botId: botId, url: rows[0].url! }
 }
 
 /** Replaces a website source's chunks with a fresh crawl. No-op if the source was deleted meanwhile. */
@@ -374,12 +464,15 @@ export async function updateSource(
   db: Db,
   who: BotScope,
   sourceId: string,
-  input: { title?: unknown; content?: unknown },
+  input: { title?: unknown; content?: unknown; refresh?: unknown },
   chunk: (title: string, content: string) => ChunkRecord[],
 ): Promise<KnowledgeSource> {
   const bot = await editableBot(db, who)
   if (!UUID.test(sourceId)) throw new KnowledgeError("not_found", "That source doesn't exist")
-  if (input.title === undefined && input.content === undefined) throw new KnowledgeError("invalid_input", "Nothing to update")
+  if (input.title === undefined && input.content === undefined && input.refresh === undefined) throw new KnowledgeError("invalid_input", "Nothing to update")
+  if (input.refresh !== undefined && !SOURCE_REFRESH.includes(input.refresh as SourceRefresh)) {
+    throw new KnowledgeError("invalid_input", "Choose how often to read the website again")
+  }
   return db.transaction(async (tx) => {
     const found = await tx.query<SourceRow & { content: string | null }>(
       `select ${COLUMNS}, content from app.knowledge_sources where id = $1 and bot_id = $2 for update`,
@@ -391,15 +484,16 @@ export async function updateSource(
 
     if (existing.kind === "website") {
       if (input.content !== undefined) throw new KnowledgeError("invalid_input", "A website's content comes from the site. Sync it to update")
-      const { rows } = await tx.query<SourceRow>(`update app.knowledge_sources set title = $2 where id = $1 returning ${COLUMNS}`, [sourceId, title])
+      const { rows } = await tx.query<SourceRow>(`update app.knowledge_sources set title = $2, refresh = $3 where id = $1 returning ${COLUMNS}`, [
+        sourceId,
+        title,
+        input.refresh ?? existing.refresh,
+      ])
       return toSource(rows[0])
     }
+    if (input.refresh !== undefined) throw new KnowledgeError("invalid_input", "Only websites are read again on their own")
 
-    const content = input.content === undefined ? (existing.content ?? "") : typeof input.content === "string" ? input.content.trim() : ""
-    if (content.length < 20) throw new KnowledgeError("invalid_input", "Add at least a sentence or two of text")
-    if (content.length > KNOWLEDGE_LIMITS.textChars) {
-      throw new KnowledgeError("invalid_input", `Keep each text under ${KNOWLEDGE_LIMITS.textChars.toLocaleString("en")} characters, or split it in two`)
-    }
+    const content = cleanContent(existing.kind, input.content === undefined ? (existing.content ?? "") : input.content)
     const chunks = chunk(title, content)
     if (chunks.length > (await chunkRoom(tx, bot.id, sourceId))) throw new KnowledgeError("limit", "Your knowledge base is full. Remove a source to add more")
     await tx.query("delete from app.knowledge_chunks where source_id = $1", [sourceId])

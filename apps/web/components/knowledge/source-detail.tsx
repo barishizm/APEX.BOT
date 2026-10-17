@@ -4,7 +4,7 @@ import { ExternalLink, LoaderCircle, RefreshCw, Search, X } from "lucide-react"
 import Link from "next/link"
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useAppI18n } from "@/components/i18n/app-provider"
-import { TextArea, TextInput } from "@/components/widget-studio/fields"
+import { Select, TextArea, TextInput } from "@/components/widget-studio/fields"
 import { format } from "@/lib/i18n"
 import { formatDate, plural, timeAgo } from "@/lib/i18n/format"
 import type { SourceJson } from "@/lib/knowledge"
@@ -144,6 +144,8 @@ export function SourceDetail({
   const [saveError, setSaveError] = useState<string | undefined>()
   const [saved, setSaved] = useState(false)
   const [confirmClose, setConfirmClose] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [refreshError, setRefreshError] = useState<string | undefined>()
   const closeRef = useRef<HTMLButtonElement>(null)
 
   const load = useCallback(async () => {
@@ -200,6 +202,16 @@ export function SourceDetail({
     await load()
   }
 
+  // saved as soon as it's picked; it doesn't touch the name or content being edited
+  const changeRefresh = async (refresh: SourceJson["refresh"]) => {
+    setRefreshing(true)
+    setRefreshError(undefined)
+    const { ok, data } = await send(`/api/knowledge/${source.id}`, "PATCH", { refresh })
+    setRefreshing(false)
+    if (!ok) return setRefreshError(data.message ?? t.saveFailed)
+    onChange(data.source)
+  }
+
   const undo = () => {
     setTitle(source.title)
     setContent(detail?.content ?? "")
@@ -231,7 +243,7 @@ export function SourceDetail({
                 <h2 id="source-detail-title" className="min-w-0 truncate text-lg font-semibold">
                   {source.title}
                 </h2>
-                <Badge>{isWebsite ? k.badge.website : k.badge.text}</Badge>
+                <Badge>{isWebsite ? k.badge.website : source.kind === "file" ? k.badge.file : k.badge.text}</Badge>
                 {source.managed && <Badge tone="accent">{k.badge.managed}</Badge>}
               </div>
               {source.url && (
@@ -343,6 +355,22 @@ export function SourceDetail({
                 </p>
               )}
               {isWebsite && <p className="rounded-lg bg-[var(--color-bubble)] p-3 text-sm text-[var(--color-muted)]">{t.websiteNote}</p>}
+              {source.kind === "file" && <p className="rounded-lg bg-[var(--color-bubble)] p-3 text-sm text-[var(--color-muted)]">{t.fileNote}</p>}
+              {isWebsite && (
+                <Select
+                  label={t.refresh.label}
+                  value={source.refresh}
+                  onChange={changeRefresh}
+                  disabled={!canEdit || refreshing}
+                  options={[
+                    { value: "weekly", label: t.refresh.weekly },
+                    { value: "daily", label: t.refresh.daily },
+                    { value: "off", label: t.refresh.off },
+                  ]}
+                  hint={source.refresh === "off" ? t.refresh.offHint : t.refresh.hint}
+                  error={refreshError}
+                />
+              )}
               {canEdit ? (
                 <>
                   <TextInput
@@ -364,7 +392,7 @@ export function SourceDetail({
                         setContent(v)
                         setSaved(false)
                       }}
-                      max={limits.textChars}
+                      max={source.kind === "file" ? limits.fileChars : limits.textChars}
                       error={saveError}
                     />
                   )}

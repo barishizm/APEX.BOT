@@ -10,8 +10,10 @@ import { insertConversation, insertMessage } from "../src/conversations.ts"
 import {
   KNOWLEDGE_LIMITS,
   KnowledgeError,
+  addFileSource,
   addTextSource,
   addWebsiteSource,
+  dueRefreshes,
   deleteSource,
   failSync,
   finishSync,
@@ -22,6 +24,7 @@ import {
   pruneEmbeddings,
   saveEmbeddings,
   sourceUsage,
+  startScheduledSync,
   startSync,
   updateSource,
   type ChunkRecord,
@@ -315,6 +318,105 @@ describe("source detail and editing", () => {
 
     assert.deepEqual(await sourceUsage(db, user.id), { [site.id]: 2, [text.id]: 1 })
     assert.deepEqual(await sourceUsage(db, user.id, 60), { [site.id]: 2, [text.id]: 2 })
+  })
+})
+
+describe("uploaded files", () => {
+  test("are stored as their text, searchable right away, with a larger limit than pasted text", async () => {
+    const user = await newUser()
+    const bot = await getBotForUser(db, user.id)
+    const long = "Unopened bags can be returned within 14 days. ".repeat(1500)
+    assert.ok(long.length > KNOWLEDGE_LIMITS.textChars && long.length < KNOWLEDGE_LIMITS.fileChars)
+    await assert.rejects(addTextSource(db, user.id, { title: "Too long", content: long }, chunker), code("invalid_input"))
+    const file = await addFileSource(db, user.id, { title: "Terms", content: long }, chunker)
+    assert.equal(file.kind, "file")
+    assert.equal(file.status, "ready")
+    assert.equal(file.url, null)
+    assert.equal((await listKnowledgeChunks(db, bot.id)).length, 1)
+    // edited like text, under the file limit
+    const edited = await updateSource(db, user.id, file.id, { title: "Store terms", content: `${long}\n\nGround coffee can't be returned.` }, chunker)
+    assert.equal(edited.chunks, 2)
+    await assert.rejects(updateSource(db, user.id, file.id, { refresh: "daily" }, chunker), code("invalid_input"))
+    await assert.rejects(addFileSource(db, user.id, { title: "Empty scan", content: "   " }, chunker), /No readable text was found in this file/)
+  })
+
+  test("the schema rejects a file without content", async () => {
+    const user = await newUser()
+    const bot = await getBotForUser(db, user.id)
+    await assert.rejects(db.query("insert into app.knowledge_sources (bot_id, kind, title) values ($1, 'file', 'x')", [bot.id]))
+    await assert.rejects(db.query("insert into app.knowledge_sources (bot_id, kind, title, content) values ($1, 'pdf', 'x', 'y')", [bot.id]))
+  })
+})
+
+describe("scheduled website refresh", () => {
+  // updated_at is set by a trigger; tests move time back by hand
+  const age = async (id: string, columns: Record<string, string>) => {
+    await db.query("alter table app.knowledge_sources disable trigger knowledge_sources_set_updated_at")
+    try {
+      for (const [column, ago] of Object.entries(columns)) await db.query(`update app.knowledge_sources set ${column} = now() - $2::interval where id = $1`, [id, ago])
+    } finally {
+      await db.query("alter table app.knowledge_sources enable trigger knowledge_sources_set_updated_at")
+    }
+  }
+
+  test("websites refresh weekly unless changed, and only websites can be set", async () => {
+    const user = await newUser()
+    const site = await addWebsiteSource(db, user.id, "https://kahve.example/")
+    assert.equal(site.refresh, "weekly")
+    assert.equal((await updateSource(db, user.id, site.id, { refresh: "daily" }, chunker)).refresh, "daily")
+    await assert.rejects(updateSource(db, user.id, site.id, { refresh: "hourly" }, chunker), code("invalid_input"))
+  })
+
+  test("picks websites whose last read is older than their setting, oldest first", async () => {
+    const user = await newUser()
+    const ids = []
+    for (const host of ["daily", "weekly", "fresh", "off", "never"]) ids.push((await addWebsiteSource(db, user.id, `https://${host}.example/`)).id)
+    const [daily, weekly, fresh, off, never] = ids
+    await updateSource(db, user.id, daily, { refresh: "daily" }, chunker)
+    await updateSource(db, user.id, off, { refresh: "off" }, chunker)
+    for (const id of [daily, weekly, fresh, off]) {
+      await startSync(db, user.id, id)
+      await finishSync(db, id, { pages: 1, chunks: [] })
+    }
+    await age(daily, { synced_at: "1 day" })
+    await age(weekly, { synced_at: "8 days" })
+    await age(fresh, { synced_at: "2 days" })
+    await age(off, { synced_at: "30 days" })
+    await age(never, { created_at: "1 day" })
+    // a website added just now is read by the add itself, not by the job
+    await addWebsiteSource(db, user.id, "https://new.example/")
+
+    assert.deepEqual((await dueRefreshes(db, 10)).map((r) => r.id), [never, weekly, daily])
+    assert.deepEqual((await dueRefreshes(db, 1)).map((r) => r.id), [never])
+  })
+
+  test("a failed refresh waits a full interval before it is tried again", async () => {
+    const user = await newUser()
+    const site = await addWebsiteSource(db, user.id, "https://down.example/")
+    await startSync(db, user.id, site.id)
+    await failSync(db, site.id, "Couldn't connect to the site")
+    await age(site.id, { created_at: "10 days" })
+    assert.deepEqual(await dueRefreshes(db, 10), [])
+    await age(site.id, { updated_at: "8 days" })
+    assert.deepEqual((await dueRefreshes(db, 10)).map((r) => r.id), [site.id])
+  })
+
+  test("the scheduled sync claims a source like a manual one, without a user", async () => {
+    const user = await newUser()
+    const bot = await getBotForUser(db, user.id)
+    const site = await addWebsiteSource(db, user.id, "https://kahve.example/")
+    const claimed = await startScheduledSync(db, site.id)
+    assert.equal(claimed.botId, bot.id)
+    assert.equal(claimed.url, "https://kahve.example/")
+    await assert.rejects(startScheduledSync(db, site.id), code("busy"))
+    await assert.rejects(startSync(db, user.id, site.id), code("busy"))
+    await finishSync(db, site.id, { pages: 1, chunks: [] })
+
+    await updateSource(db, user.id, site.id, { refresh: "off" }, chunker)
+    await assert.rejects(startScheduledSync(db, site.id), code("not_found"))
+    const text = await addTextSource(db, user.id, { title: "Text", content: "Some text that is long enough." }, chunker)
+    await assert.rejects(startScheduledSync(db, text.id), code("not_found"))
+    await assert.rejects(startScheduledSync(db, "nope"), code("not_found"))
   })
 })
 

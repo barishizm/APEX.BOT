@@ -1,12 +1,16 @@
-// Reads a customer's website: the start page, its sitemap and the same-site pages they link
-// to, breadth first, within a page and time budget. robots.txt is respected.
+// Reads a customer's website: the start page, its sitemap and the same-site pages and documents
+// (PDF, .docx) they link to, breadth first, within a page and time budget. robots.txt is respected.
 import { createHash } from "node:crypto";
+import { DOCUMENT_TYPES, documentKind, extractDocument, titleFromName } from "./documents.ts";
 import { extractPage, type ExtractedPage } from "./extract.ts";
 import { FetchError, checkUrl, safeFetch, type Fetcher } from "./net.ts";
 import { allowAll, parseRobots, parseSitemap, type Robots } from "./robots.ts";
 
 export interface CrawlOptions {
+  /** Web pages and documents together. */
   maxPages?: number;
+  /** Linked PDF and .docx files read, within maxPages. */
+  maxDocuments?: number;
   /** Stop starting new requests after this long. */
   timeBudgetMs?: number;
   concurrency?: number;
@@ -24,7 +28,8 @@ export interface CrawlResult {
 
 export class CrawlError extends Error {}
 
-const SKIP_EXT = /\.(pdf|jpe?g|png|gif|webp|avif|svg|ico|bmp|tiff?|zip|rar|7z|gz|tar|dmg|exe|msi|apk|mp[34]|m4a|wav|ogg|webm|mov|avi|css|js|mjs|json|xml|rss|atom|txt|csv|docx?|xlsx?|pptx?|woff2?|ttf|eot)$/i;
+const DOC_EXT = /\.(pdf|docx)$/i;
+const SKIP_EXT = /\.(jpe?g|png|gif|webp|avif|svg|ico|bmp|tiff?|zip|rar|7z|gz|tar|dmg|exe|msi|apk|mp[34]|m4a|wav|ogg|webm|mov|avi|css|js|mjs|json|xml|rss|atom|txt|csv|doc|xlsx?|pptx?|woff2?|ttf|eot)$/i;
 const TRACKING = /^(utm_\w+|gclid|fbclid|msclkid|yclid|mc_cid|mc_eid|ref|_ga)$/i;
 const MAX_QUEUE = 2000;
 
@@ -86,9 +91,10 @@ async function loadSitemaps(urls: string[], fetcher: Fetcher, allowPrivate: bool
 }
 
 export async function crawlSite(start: string, options: CrawlOptions = {}): Promise<CrawlResult> {
-  const maxPages = options.maxPages ?? 50;
-  const deadline = Date.now() + (options.timeBudgetMs ?? 90_000);
-  const concurrency = options.concurrency ?? 4;
+  const maxPages = options.maxPages ?? 200;
+  const maxDocuments = options.maxDocuments ?? 20;
+  const deadline = Date.now() + (options.timeBudgetMs ?? 200_000);
+  const concurrency = options.concurrency ?? 6;
   const fetcher = options.fetch ?? safeFetch;
   const allowPrivate = options.allowPrivate ?? false;
 
@@ -122,10 +128,14 @@ export async function crawlSite(start: string, options: CrawlOptions = {}): Prom
 
   const seen = new Set<string>();
   const queue: string[] = [];
+  let documents = 0;
   const enqueue = (raw: string) => {
     const url = canonical(raw);
     if (!url || seen.has(url) || !sameSite(url) || queue.length >= MAX_QUEUE) return;
     if (!robots.isAllowed(new URL(url).pathname + new URL(url).search)) return;
+    const isDocument = DOC_EXT.test(new URL(url).pathname);
+    if (isDocument && documents >= maxDocuments) return;
+    if (isDocument) documents++;
     seen.add(url);
     queue.push(url);
   };
@@ -134,9 +144,7 @@ export async function crawlSite(start: string, options: CrawlOptions = {}): Prom
   const digests = new Set<string>();
   let failed = 0;
 
-  const accept = (url: string, html: string) => {
-    const page = extractPage(html, url);
-    for (const link of page.links) enqueue(link);
+  const keep = (page: ExtractedPage) => {
     const text = page.sections.map((s) => s.text).join("\n");
     if (page.noindex || text.length < 40) return false;
     // the same content under two URLs (/, /index.html, ?lang=) is read once
@@ -146,6 +154,25 @@ export async function crawlSite(start: string, options: CrawlOptions = {}): Prom
     pages.push(page);
     options.onProgress?.(pages.length);
     return true;
+  };
+  const accept = (url: string, html: string) => {
+    const page = extractPage(html, url);
+    for (const link of page.links) enqueue(link);
+    return keep(page);
+  };
+  const readDocument = async (url: string) => {
+    const res = await fetcher(url, {
+      accept: [...DOCUMENT_TYPES, "application/octet-stream", "binary/octet-stream", "text/html"],
+      binary: true,
+      maxBytes: 15_000_000,
+      timeoutMs: 30_000,
+      allowPrivate,
+    });
+    // a document may redirect to the site's file storage on another host; every hop is SSRF-checked
+    const bytes = res.bytes ?? new TextEncoder().encode(res.body);
+    const kind = documentKind(bytes, new URL(res.url).pathname);
+    if (!kind) return false;
+    return keep(await extractDocument(bytes, kind, res.url, titleFromName(new URL(res.url).pathname)));
   };
 
   seen.add(canonical(startUrl) ?? startUrl);
@@ -160,6 +187,10 @@ export async function crawlSite(start: string, options: CrawlOptions = {}): Prom
       const url = queue.shift();
       if (!url) return;
       try {
+        if (DOC_EXT.test(new URL(url).pathname)) {
+          if (!(await readDocument(url))) failed++;
+          continue;
+        }
         const res = await fetcher(url, { allowPrivate });
         if (!sameSite(res.url)) continue; // redirected off-site
         if (!accept(res.url, res.body)) failed++;

@@ -1,6 +1,6 @@
 "use client"
 
-import { CircleAlert, CircleCheck, FileText, Globe, LoaderCircle, MessageSquareQuote } from "lucide-react"
+import { CircleAlert, CircleCheck, FileText, Globe, LoaderCircle, MessageSquareQuote, Paperclip } from "lucide-react"
 import { useCallback } from "react"
 import { useAppI18n } from "@/components/i18n/app-provider"
 import { format } from "@/lib/i18n"
@@ -8,7 +8,16 @@ import { plural, timeAgo } from "@/lib/i18n/format"
 import type { SourceJson } from "@/lib/knowledge"
 import { cn } from "@/lib/utils"
 
-export type Limits = { sources: number; websitePages: number; textChars: number; title: number; chunksPerBot: number }
+export type Limits = {
+  sources: number
+  websitePages: number
+  websiteDocuments: number
+  textChars: number
+  fileChars: number
+  fileBytes: number
+  title: number
+  chunksPerBot: number
+}
 /** Replies in the last 30 days that cited each source, by source id. */
 export type Usage = Record<string, number>
 
@@ -35,7 +44,7 @@ export function useSend() {
 export const needsAttention = (s: SourceJson) => s.status === "failed" || s.status === "pending"
 
 export function SourceIcon({ source, size = "md" }: { source: SourceJson; size?: "md" | "lg" }) {
-  const Icon = source.managed ? MessageSquareQuote : source.kind === "website" ? Globe : FileText
+  const Icon = source.managed ? MessageSquareQuote : source.kind === "website" ? Globe : source.kind === "file" ? Paperclip : FileText
   return (
     <span
       className={cn("grid shrink-0 place-items-center rounded-lg bg-[var(--color-bubble)]", size === "lg" ? "h-11 w-11 rounded-xl" : "h-9 w-9")}

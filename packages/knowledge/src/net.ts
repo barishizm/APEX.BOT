@@ -70,6 +70,8 @@ export interface FetchOptions {
   accept?: string[];
   /** Tests and local development only: allow private addresses and any port. */
   allowPrivate?: boolean;
+  /** Keep the body as bytes (`bytes`) instead of decoding it to text. */
+  binary?: boolean;
 }
 
 export interface FetchedPage {
@@ -77,6 +79,8 @@ export interface FetchedPage {
   status: number;
   contentType: string;
   body: string;
+  /** Only with `binary`. */
+  bytes?: Uint8Array;
 }
 
 export type Fetcher = (url: string, options?: FetchOptions) => Promise<FetchedPage>;
@@ -191,6 +195,7 @@ export const safeFetch: Fetcher = async (raw, opts = {}) => {
     maxBytes: opts.maxBytes ?? 3_000_000,
     accept: opts.accept ?? ["text/html", "application/xhtml+xml"],
     allowPrivate: opts.allowPrivate ?? false,
+    binary: opts.binary ?? false,
   };
   const signal = AbortSignal.timeout(options.timeoutMs);
   let url = checkUrl(raw, options.allowPrivate);
@@ -216,6 +221,7 @@ export const safeFetch: Fetcher = async (raw, opts = {}) => {
     if (contentType && !options.accept.some((a) => contentType.startsWith(a))) {
       throw new FetchError("bad_type", `Not a web page (${contentType.split(";")[0]})`);
     }
+    if (options.binary) return { url: url.href, status: res.status, contentType, body: "", bytes: new Uint8Array(res.body) };
     const body = new TextDecoder(charsetOf(contentType, res.body.subarray(0, 2048))).decode(res.body);
     return { url: url.href, status: res.status, contentType, body };
   }

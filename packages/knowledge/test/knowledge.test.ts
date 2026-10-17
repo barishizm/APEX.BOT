@@ -221,7 +221,7 @@ describe("crawlSite", () => {
     assert.equal(result.startUrl, "https://www.kahve.example/");
     const urls = result.pages.map((p) => p.url).sort();
     assert.deepEqual(urls, ["https://kahve.example/hakkimizda", "https://www.kahve.example/", "https://www.kahve.example/kargo"]);
-    assert.ok(!fetched.some((u) => u.includes("/admin") || u.endsWith(".pdf") || u.includes("elsewhere")));
+    assert.ok(!fetched.some((u) => u.includes("/admin") || u.includes("elsewhere")));
     assert.ok(!fetched.some((u) => u.includes("utm_source")));
   });
 

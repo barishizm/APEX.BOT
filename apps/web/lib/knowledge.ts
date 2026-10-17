@@ -1,5 +1,6 @@
+import { timingSafeEqual } from "node:crypto"
 import { KNOWLEDGE_LIMITS, KnowledgeError, failSync, finishSync, loadEmbeddings, type ChunkRecord, type KnowledgeSource } from "@apex/db"
-import { CrawlError, chunkPage, crawlSite, type KnowledgeBase, type SemanticQuery } from "@apex/knowledge"
+import { CrawlError, DocumentError, chunkPage, crawlSite, documentKind, extractDocument, titleFromName, type KnowledgeBase, type SemanticQuery } from "@apex/knowledge"
 import { chunkHash, createEmbedder, embedderDims, vectorFromBytes } from "@apex/knowledge/embed"
 import { errorJson } from "@/lib/auth"
 import { botErrorResponse } from "@/lib/bot"
@@ -51,6 +52,9 @@ export async function crawlInto(sourceId: string, url: string) {
   try {
     const result = await crawlSite(url, {
       maxPages: KNOWLEDGE_LIMITS.websitePages,
+      maxDocuments: KNOWLEDGE_LIMITS.websiteDocuments,
+      // leaves room under the route's maxDuration to store what was read
+      timeBudgetMs: 200_000,
       // local development only: lets you point the crawler at a site on your own machine
       allowPrivate: process.env.APEX_CRAWL_ALLOW_PRIVATE === "1",
     })
@@ -60,6 +64,38 @@ export async function crawlInto(sourceId: string, url: string) {
     await failSync(db(), sourceId, err instanceof CrawlError ? err.message : "Something went wrong while reading the site. Try again").catch(
       (e) => console.error("[knowledge] couldn't record the failure", e),
     )
+  }
+}
+
+/** The scheduled jobs' calls: Vercel Cron sends `Authorization: Bearer $CRON_SECRET`. Off without the secret. */
+export function cronAuthorized(request: Request): boolean {
+  const secret = process.env.CRON_SECRET
+  if (!secret || secret.length < 16) return false
+  const given = Buffer.from(request.headers.get("authorization") ?? "")
+  const expected = Buffer.from(`Bearer ${secret}`)
+  return given.length === expected.length && timingSafeEqual(given, expected)
+}
+
+const PLAIN_TEXT = /\.(txt|md|markdown|csv)$/i
+
+/** An uploaded file's title and text. Throws KnowledgeError with a message for the person uploading. */
+export async function readUpload(file: File): Promise<{ title: string; content: string }> {
+  if (file.size > KNOWLEDGE_LIMITS.fileBytes) {
+    throw new KnowledgeError("invalid_input", `Files can be up to ${KNOWLEDGE_LIMITS.fileBytes / 1_000_000} MB`)
+  }
+  const bytes = new Uint8Array(await file.arrayBuffer())
+  const title = titleFromName(file.name).slice(0, KNOWLEDGE_LIMITS.title)
+  if (PLAIN_TEXT.test(file.name)) return { title, content: new TextDecoder().decode(bytes).replace(/^\uFEFF/, "") }
+  const kind = documentKind(bytes, file.name)
+  if (!kind) throw new KnowledgeError("invalid_input", "Choose a PDF, Word (.docx), .txt, .md or .csv file")
+  try {
+    const page = await extractDocument(bytes, kind, "", title)
+    // headings stay on their own line, so the excerpts keep them
+    const content = page.sections.map((s) => (s.heading ? `${s.heading}\n${s.text}` : s.text)).join("\n\n")
+    return { title: page.title.slice(0, KNOWLEDGE_LIMITS.title) || title, content }
+  } catch (err) {
+    if (err instanceof DocumentError) throw new KnowledgeError("invalid_input", err.message)
+    throw err
   }
 }
 
