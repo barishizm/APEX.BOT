@@ -59,7 +59,7 @@ describe("POST /v1/chat", () => {
     assert.match(res.headers.get("content-type") ?? "", /text\/event-stream/);
     const events = await readSSE(res);
     assert.deepEqual(events.map((e) => e.event), ["meta", "delta", "delta", "delta", "done"]);
-    assert.equal(events.slice(1, 4).map((e) => e.data.text).join(""), "İade 14 gün içinde yapılır. ");
+    assert.equal(events.slice(1, 4).map((e) => e.data.text).join(""), "İade 14 gün içinde yapılır.");
     const done = events.at(-1)!.data;
     assert.equal(done.handoff, false);
     assert.deepEqual(done.sources, [{ url: "https://alpha.example/iade", title: "İade politikası" }]);

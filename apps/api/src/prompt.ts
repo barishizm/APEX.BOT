@@ -45,7 +45,7 @@ Examples (tone and shape only; the facts come from <documents>)
 /** Ends a reply that the documents could not answer; stripped before the visitor sees it. */
 export const NO_ANSWER = "[[no-answer]]";
 
-const USED = /\[\[used:\s*(\d{1,2}(?:\s*,\s*\d{1,2})*)\s*\]\]/g;
+const MARKER = /\s*(?:\[\[no-answer\]\]|\[\[used:\s*(\d{1,2}(?:\s*,\s*\d{1,2})*)\s*\]\])/g;
 const USED_PREFIX = "[[used:";
 const MAX_MARKER = 64;
 
@@ -59,7 +59,7 @@ function couldBeMarker(tail: string): boolean {
  * Strips the reply markers from a streamed answer and records them: NO_ANSWER (the documents
  * didn't answer) and [[used: 1, 3]] (the documents the answer took facts from, 1-based). A marker
  * can arrive split across deltas, so any tail that could still become one is held back until the
- * next delta (or flush) settles it.
+ * next delta (or flush) settles it; so is trailing whitespace, which goes with a marker after it.
  */
 export class ReplyMarkerFilter {
   noAnswer = false;
@@ -68,13 +68,9 @@ export class ReplyMarkerFilter {
   private held = "";
 
   push(text: string): string {
-    let s = this.held + text;
-    if (s.includes(NO_ANSWER)) {
-      this.noAnswer = true;
-      s = s.split(NO_ANSWER).join("");
-    }
-    s = s.replace(USED, (_, list: string) => {
-      for (const n of list.split(",").map(Number)) if (!this.used.includes(n)) this.used.push(n);
+    let s = (this.held + text).replace(MARKER, (_, list: string | undefined) => {
+      if (list === undefined) this.noAnswer = true;
+      else for (const n of list.split(",").map(Number)) if (!this.used.includes(n)) this.used.push(n);
       return "";
     });
     let keep = 0;
@@ -84,13 +80,15 @@ export class ReplyMarkerFilter {
         break;
       }
     }
+    // with the whitespace before it
+    keep = s.length - s.slice(0, s.length - keep).trimEnd().length;
     this.held = s.slice(s.length - keep);
     return s.slice(0, s.length - keep);
   }
 
-  /** What is still held back once the stream has ended (a lone "[" is just text). */
+  /** What is still held back once the stream has ended (a lone "[" is just text; trailing whitespace isn't). */
   flush(): string {
-    const rest = this.held;
+    const rest = this.held.trimEnd();
     this.held = "";
     return rest;
   }
