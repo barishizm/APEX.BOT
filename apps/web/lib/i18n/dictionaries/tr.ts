@@ -119,6 +119,7 @@ export const tr: Dictionary = {
       oauth_denied: "Giriş iptal edildi. Tekrar deneyin veya e-posta adresinizi kullanın",
       oauth_email_unverified: "Sağlayıcınızda bu hesap için doğrulanmış bir e-posta yok. Orada doğrulayıp tekrar deneyin",
       oauth_failed: "Bu sağlayıcıyla giriş yapılamadı. Tekrar deneyin veya e-posta adresinizi kullanın",
+      account_suspended: "Bu hesap askıya alındı. Destek ekibiyle iletişime geçin",
       generic: "Bir şeyler ters gitti. Tekrar deneyin",
       network: "Sunucuya ulaşılamadı. Bağlantınızı kontrol edip tekrar deneyin",
     },

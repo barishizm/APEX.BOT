@@ -132,13 +132,13 @@ describe("platform roles", () => {
 })
 
 describe("session user", () => {
-  test("carries the platform role, hidden while the account is suspended", async () => {
+  test("carries the platform role; a suspended account has no session at all", async () => {
     const { user, session } = await register(db, { email: "boss@example.com", username: "boss", password: "correct horse", accountType: "personal", acceptTerms: true })
     assert.equal(user.platformRole, null)
     await bootstrapSuperadmin(db, "boss@example.com")
     assert.equal((await getSession(db, session!.token))?.user.platformRole, "superadmin")
     await db.query("update app.users set suspended_at = now() where id = $1", [user.id])
-    assert.equal((await getSession(db, session!.token))?.user.platformRole, null)
+    assert.equal(await getSession(db, session!.token), null)
   })
 })
 

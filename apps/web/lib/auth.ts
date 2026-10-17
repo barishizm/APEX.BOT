@@ -1,8 +1,18 @@
 import { cache } from "react"
 import { cookies, headers } from "next/headers"
-import { redirect } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
 import { isIP } from "node:net"
-import { AuthError, getSession, type NewSession, type RequestMeta } from "@apex/db"
+import {
+  AuthError,
+  getSession,
+  hasRecentStepUp,
+  hitRateLimit,
+  type NewSession,
+  type PlatformRole,
+  type RateLimit,
+  type RequestMeta,
+  type Session,
+} from "@apex/db"
 import { db, schemaMissing } from "@/lib/db"
 import { translateMessage } from "@/lib/i18n/messages"
 import { requestLocale } from "@/lib/i18n/server"
@@ -94,6 +104,65 @@ export async function requireSession() {
   return session
 }
 
+// --- Platform admin (/admin and /api/admin) ---
+
+const ROLE_RANK: Record<PlatformRole, number> = { support: 1, superadmin: 2 }
+const hasRole = (actual: PlatformRole | null, min: PlatformRole) => actual !== null && ROLE_RANK[actual] >= ROLE_RANK[min]
+
+export type AdminSession = Session & { user: Session["user"] & { platformRole: PlatformRole } }
+
+// Settings shows a "turn on two-step sign-in" warning for this notice
+export const ADMIN_TWO_FACTOR_NOTICE = "admin-2fa"
+
+/**
+ * For /admin pages. Staff only, with a verified email and two-step sign-in on; everyone else
+ * gets a plain 404 so the area doesn't advertise itself. Staff without two-step sign-in are sent
+ * to settings to turn it on.
+ */
+export async function requirePlatformAdmin(minRole: PlatformRole = "support"): Promise<AdminSession> {
+  await requireVerifiedUser()
+  const session = (await currentSession())!
+  const role = session.user.platformRole
+  if (!role) notFound()
+  if (!session.user.twoFactor) redirect(`/dashboard/settings?notice=${ADMIN_TWO_FACTOR_NOTICE}`)
+  // staff, just not senior enough for this page
+  if (!hasRole(role, minRole)) redirect("/admin")
+  return session as AdminSession
+}
+
+// Per staff member, and per address before the session is even looked up; writes count twice
+const ADMIN_LIMITS = {
+  ip: { max: 120, windowSeconds: 60 },
+  user: { max: 60, windowSeconds: 60 },
+  write: { max: 10, windowSeconds: 60 },
+} satisfies Record<string, RateLimit>
+
+async function adminRateLimit(key: string, limit: RateLimit) {
+  const over = await hitRateLimit(db(), `admin:${key}`, limit)
+  if (over) throw new AuthError("too_many_attempts", "Too many requests. Try again later", over.retryAfterSeconds)
+}
+
+/**
+ * For /api/admin routes: the staff session, or an AuthError the route turns into 401/403/429.
+ * Same rules as requirePlatformAdmin, plus a strict rate limit of its own.
+ */
+export async function requireAdminSession(minRole: PlatformRole = "support", options: { write?: boolean } = {}): Promise<AdminSession> {
+  const { ip } = await requestMeta()
+  if (ip) await adminRateLimit(`ip:${ip}`, ADMIN_LIMITS.ip)
+  const session = await requireSession()
+  const { user } = session
+  if (!user.emailVerified || !hasRole(user.platformRole, minRole)) throw new AuthError("forbidden", "You don't have access to this")
+  if (!user.twoFactor) throw new AuthError("two_factor_required", "Turn on two-step sign-in to use the admin area")
+  await adminRateLimit(`user:${user.id}`, ADMIN_LIMITS.user)
+  if (options.write) await adminRateLimit(`write:${user.id}`, ADMIN_LIMITS.write)
+  return session as AdminSession
+}
+
+/** Destructive admin actions need an authenticator code confirmed in the last 10 minutes (POST /api/admin/step-up). */
+export function requireStepUp(session: Session) {
+  if (!hasRecentStepUp(session)) throw new AuthError("step_up_required", "Confirm this action with a code from your authenticator app")
+}
+
 export async function clearSessionCookie() {
   const jar = await cookies()
   jar.delete(SESSION_COOKIE)
@@ -134,6 +203,9 @@ const STATUS: Record<AuthError["code"], number> = {
   forbidden: 403,
   not_found: 404,
   conflict: 409,
+  account_suspended: 403,
+  two_factor_required: 403,
+  step_up_required: 403,
 }
 
 // A JSON error in the requester's language; `error` stays a stable code for the client

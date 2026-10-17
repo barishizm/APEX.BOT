@@ -23,6 +23,8 @@ export const CODE_RESEND_SECONDS = 30
 // Time to type the authenticator code after the password (or Google/GitHub) check passed
 export const CHALLENGE_TTL_MS = 10 * 60 * 1000
 export const RECOVERY_CODE_COUNT = 10
+// How long a confirmed authenticator code ("step-up") covers destructive admin actions
+export const STEP_UP_TTL_MS = 10 * 60 * 1000
 // Wrong codes allowed per account across ALL codes in the window. The per-code
 // limit alone is reset by every resend, so this caps total guessing.
 export const CODE_FAIL_LIMIT = { max: 10, windowMinutes: 60 }
@@ -51,6 +53,9 @@ export type AuthErrorCode =
   | "forbidden"
   | "not_found"
   | "conflict"
+  | "account_suspended"
+  | "two_factor_required"
+  | "step_up_required"
 
 export class AuthError extends Error {
   constructor(
@@ -215,12 +220,13 @@ function rethrowTaken(err: unknown): never {
   throw err
 }
 
-async function createSession(q: Queryable, userId: string, persistent: boolean, meta: RequestMeta): Promise<NewSession> {
+async function createSession(q: Queryable, userId: string, persistent: boolean, meta: RequestMeta, steppedUp = false): Promise<NewSession> {
   const token = newSessionToken()
   const expiresAt = new Date(Date.now() + (persistent ? SESSION_TTL_MS.persistent : SESSION_TTL_MS.browser))
   await q.query(
-    "insert into app.sessions (user_id, token_hash, persistent, expires_at, ip, user_agent) values ($1, $2, $3, $4, $5, $6)",
-    [userId, sha256(token), persistent, expiresAt, cleanIp(meta.ip), cleanAgent(meta.userAgent)],
+    `insert into app.sessions (user_id, token_hash, persistent, expires_at, ip, user_agent, step_up_at)
+     values ($1, $2, $3, $4, $5, $6, case when $7::boolean then now() end)`,
+    [userId, sha256(token), persistent, expiresAt, cleanIp(meta.ip), cleanAgent(meta.userAgent), steppedUp],
   )
   return { token, expiresAt, persistent }
 }
@@ -231,7 +237,14 @@ async function createSession(q: Queryable, userId: string, persistent: boolean, 
  */
 export type SignIn = { user: User; session: NewSession; challenge?: undefined } | { user: User; session?: undefined; challenge: NewSession }
 
+// Only after the password (or provider) checked out, so it tells a stranger nothing
+async function assertNotSuspended(q: Queryable, userId: string) {
+  const { rows } = await q.query<{ suspended: boolean }>("select suspended_at is not null as suspended from app.users where id = $1", [userId])
+  if (rows[0]?.suspended) throw new AuthError("account_suspended", "This account is suspended. Contact support")
+}
+
 async function signIn(tx: Queryable, user: User, persistent: boolean, meta: RequestMeta): Promise<SignIn> {
+  await assertNotSuspended(tx, user.id)
   if (user.twoFactor) {
     await tx.query("delete from app.login_challenges where user_id = $1 and expires_at <= now()", [user.id])
     const token = newSessionToken()
@@ -379,23 +392,40 @@ export async function login(
   })
 }
 
-// Resolves a cookie token to its user; null when unknown or expired.
-export async function getSession(
-  db: Db,
-  token: string | undefined | null,
-): Promise<{ user: User; sessionId: string; expiresAt: Date; persistent: boolean } | null> {
+export interface Session {
+  user: User
+  sessionId: string
+  expiresAt: Date
+  persistent: boolean
+  /** When this session last confirmed an authenticator code; see stepUpSession. */
+  stepUpAt: Date | null
+}
+
+// Resolves a cookie token to its user; null when unknown, expired or the account is suspended.
+export async function getSession(db: Db, token: string | undefined | null): Promise<Session | null> {
   if (!token) return null
-  const { rows } = await db.query<UserRow & { session_id: string; expires_at: Date; persistent: boolean; stale: boolean }>(
-    `select ${USER_COLUMNS}, s.id as session_id, s.expires_at, s.persistent,
+  const { rows } = await db.query<UserRow & { session_id: string; expires_at: Date; persistent: boolean; step_up_at: Date | null; stale: boolean }>(
+    `select ${USER_COLUMNS}, s.id as session_id, s.expires_at, s.persistent, s.step_up_at,
             s.last_seen_at < now() - interval '5 minutes' as stale
        from app.sessions s join app.users u on u.id = s.user_id
-      where s.token_hash = $1 and s.expires_at > now()`,
+      where s.token_hash = $1 and s.expires_at > now() and u.suspended_at is null`,
     [sha256(token)],
   )
   const row = rows[0]
   if (!row) return null
   if (row.stale) await db.query("update app.sessions set last_seen_at = now() where id = $1", [row.session_id])
-  return { user: toUser(row), sessionId: row.session_id, expiresAt: row.expires_at, persistent: row.persistent }
+  return {
+    user: toUser(row),
+    sessionId: row.session_id,
+    expiresAt: row.expires_at,
+    persistent: row.persistent,
+    stepUpAt: row.step_up_at,
+  }
+}
+
+/** Whether the session confirmed an authenticator code within STEP_UP_TTL_MS. */
+export function hasRecentStepUp(session: Pick<Session, "stepUpAt">, now = Date.now()): boolean {
+  return session.stepUpAt !== null && now - session.stepUpAt.getTime() < STEP_UP_TTL_MS
 }
 
 export async function logout(db: Db, token: string | undefined | null, meta: RequestMeta = {}): Promise<void> {
@@ -986,7 +1016,14 @@ export async function completeTwoFactorLogin(
       return { error: new AuthError("invalid_code", "Incorrect code. Try again") }
     }
     await tx.query("delete from app.login_challenges where id = $1", [challenge.id])
-    const session = await createSession(tx, challenge.user_id, challenge.persistent, meta)
+    // suspended while typing the code; the error is returned so the spent challenge stays deleted
+    try {
+      await assertNotSuspended(tx, challenge.user_id)
+    } catch (error) {
+      return { error: error as AuthError }
+    }
+    // the code just typed also counts as a step-up for admin actions
+    const session = await createSession(tx, challenge.user_id, challenge.persistent, meta, true)
     const updated = await tx.query<UserRow>(`update app.users u set last_login_at = now() where u.id = $1 returning ${USER_COLUMNS}`, [
       challenge.user_id,
     ])
@@ -1076,4 +1113,21 @@ export async function disableTwoFactor(db: Db, userId: string, code: unknown, me
 /** Replaces the recovery codes (the old ones stop working). Needs an authenticator or recovery code. */
 export async function regenerateRecoveryCodes(db: Db, userId: string, code: unknown, meta: RequestMeta = {}): Promise<{ recoveryCodes: string[] }> {
   return withSecondFactor(db, userId, code, meta, async (tx) => ({ recoveryCodes: await replaceRecoveryCodes(tx, userId, meta) }))
+}
+
+/**
+ * Confirms an authenticator code for this session ("step-up"), which destructive admin actions
+ * need within STEP_UP_TTL_MS. Recovery codes don't count: they are for a lost phone, not routine use.
+ */
+export async function stepUpSession(db: Db, userId: string, sessionId: string, rawCode: unknown, meta: RequestMeta = {}): Promise<Date> {
+  const code = typeof rawCode === "string" ? rawCode.replace(/\s/g, "") : ""
+  if (!/^\d{6}$/.test(code)) throw new AuthError("invalid_input", "Enter the 6-digit code from your authenticator app")
+  return withSecondFactor(db, userId, code, meta, async (tx) => {
+    const { rows } = await tx.query<{ step_up_at: Date }>(
+      "update app.sessions set step_up_at = now() where id = $1 and user_id = $2 and expires_at > now() returning step_up_at",
+      [sessionId, userId],
+    )
+    if (!rows[0]) throw new AuthError("unauthorized", "Your session has ended. Log in again")
+    return rows[0].step_up_at
+  })
 }

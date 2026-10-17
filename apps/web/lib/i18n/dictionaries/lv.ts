@@ -119,6 +119,7 @@ export const lv: Dictionary = {
       oauth_denied: "Pieteikšanās tika atcelta. Mēģiniet vēlreiz vai izmantojiet e-pasta adresi",
       oauth_email_unverified: "Jūsu pakalpojuma sniedzējam nav apstiprinātas šī konta e-pasta adreses. Apstipriniet to tur un mēģiniet vēlreiz",
       oauth_failed: "Neizdevās pieteikties ar šo pakalpojuma sniedzēju. Mēģiniet vēlreiz vai izmantojiet e-pasta adresi",
+      account_suspended: "Šis konts ir apturēts. Sazinieties ar atbalsta dienestu",
       generic: "Radās kļūda. Mēģiniet vēlreiz",
       network: "Neizdevās sazināties ar serveri. Pārbaudiet savienojumu un mēģiniet vēlreiz",
     },
