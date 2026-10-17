@@ -74,3 +74,16 @@ export async function checkServices(): Promise<ServiceCheck[]> {
     { id: "widget", ...widget },
   ]
 }
+
+// Each check costs a DB query and two API round-trips (~1s). Visitors within this
+// window share one result, and concurrent visits wait on the same run.
+const CACHE_MS = 30_000
+let cached: { at: number; result: Promise<{ checks: ServiceCheck[]; checkedAt: Date }> } | null = null
+
+export function cachedCheckServices() {
+  const now = Date.now()
+  if (!cached || now - cached.at > CACHE_MS) {
+    cached = { at: now, result: checkServices().then((checks) => ({ checks, checkedAt: new Date() })) }
+  }
+  return cached.result
+}
