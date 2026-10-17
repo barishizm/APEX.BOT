@@ -11,12 +11,12 @@ export async function GET() {
   }
 }
 
-// Body: { username?, allowTraining? }
+// Body: { username?, displayName?, allowTraining? }
 export async function PATCH(request: Request) {
   try {
     const session = await requireSession()
     const b = await readJson(request)
-    const user = await updateProfile(db(), session.user.id, { username: b.username, allowTraining: b.allowTraining }, await requestMeta())
+    const user = await updateProfile(db(), session.user.id, { username: b.username, displayName: b.displayName, allowTraining: b.allowTraining }, await requestMeta())
     return Response.json({ user })
   } catch (err) {
     return authErrorResponse(err)

@@ -11,6 +11,7 @@ import { formatDate, plural } from "@/lib/i18n/format"
 
 type Account = {
   username: string
+  displayName: string
   email: string
   accountType: "personal" | "business"
   createdAt: string
@@ -63,6 +64,7 @@ export function AccountSettings({ initial }: { initial: Account }) {
   const router = useRouter()
   const [account, setAccount] = useState(initial)
   const [username, setUsername] = useState(initial.username)
+  const [displayName, setDisplayName] = useState(initial.displayName)
   const [profile, setProfile] = useState<Status>({ kind: "idle" })
 
   const [current, setCurrent] = useState("")
@@ -80,9 +82,14 @@ export function AccountSettings({ initial }: { initial: Account }) {
   const saveProfile = async (e: React.FormEvent) => {
     e.preventDefault()
     setProfile({ kind: "busy" })
-    const { ok, data } = await send("/api/account", "PATCH", { username })
+    const changes = {
+      ...(username.trim() !== account.username && { username }),
+      ...(displayName.trim() !== account.displayName && { displayName }),
+    }
+    const { ok, data } = await send("/api/account", "PATCH", changes)
     if (!ok) return setProfile({ kind: "error", message: data.message ?? t.couldntSave })
-    setAccount((a) => ({ ...a, username: data.user.username }))
+    setAccount((a) => ({ ...a, username: data.user.username, displayName: data.user.displayName ?? "" }))
+    setDisplayName(data.user.displayName ?? "")
     setProfile({ kind: "ok", message: t.saved })
     router.refresh()
   }
@@ -143,10 +150,11 @@ export function AccountSettings({ initial }: { initial: Account }) {
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 p-4 sm:p-6">
         <Group title={t.profile}>
           <form onSubmit={saveProfile} className="flex flex-col gap-4">
+            <TextInput label={t.displayName} value={displayName} onChange={setDisplayName} hint={t.displayNameHint} />
             <TextInput label={t.username} value={username} onChange={setUsername} hint={t.usernameHint} />
             <TextInput label={t.email} value={account.email} onChange={() => {}} disabled hint={t.emailHint} />
             <div className="flex items-center gap-3">
-              <button type="submit" className={primary} disabled={profile.kind === "busy" || username.trim() === account.username}>
+              <button type="submit" className={primary} disabled={profile.kind === "busy" || (username.trim() === account.username && displayName.trim() === account.displayName)}>
                 {profile.kind === "busy" && <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />}
                 {t.save}
               </button>

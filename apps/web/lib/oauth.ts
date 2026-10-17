@@ -77,6 +77,7 @@ export async function fetchProfile(
       email: me.email,
       emailVerified: me.email_verified === true,
       username: typeof me.name === "string" ? me.name : undefined,
+      displayName: typeof me.name === "string" ? me.name : undefined,
     }
   }
 
@@ -102,5 +103,6 @@ export async function fetchProfile(
     email: primary?.email,
     emailVerified: Boolean(primary),
     username: typeof me.login === "string" ? me.login : undefined,
+    displayName: typeof me.name === "string" ? me.name : undefined,
   }
 }

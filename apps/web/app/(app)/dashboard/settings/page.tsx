@@ -20,6 +20,7 @@ export default async function SettingsPage() {
       <AccountSettings
         initial={{
           username: account.user.username,
+          displayName: account.user.displayName ?? "",
           email: account.user.email,
           accountType: account.user.accountType,
           createdAt: account.user.createdAt.toISOString(),
