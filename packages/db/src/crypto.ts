@@ -1,4 +1,4 @@
-import { createHash, createHmac, randomBytes, randomInt, scrypt, timingSafeEqual } from "node:crypto"
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, randomInt, scrypt, timingSafeEqual } from "node:crypto"
 
 // scrypt from node:crypto: no native addon, and the parameters are stored in the
 // hash so they can be raised later without invalidating existing passwords.
@@ -107,6 +107,44 @@ export function matchTotp(secret: string, code: string, lastStep: number | null,
     if (timingSafeEqual(expected, Buffer.from(code.padEnd(6).slice(0, 6)))) return step
   }
   return null
+}
+
+// Authenticator secrets are stored sealed with AES-256-GCM under TOTP_ENCRYPTION_KEY, so a
+// database dump alone can't produce codes. The user id is bound in as associated data, so a
+// sealed secret copied onto another account doesn't open there.
+const SEALED = /^v1\.([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]+)$/
+const PLAIN_SECRET = /^[A-Z2-7]{32}$/
+
+function totpKey(): Buffer {
+  const raw = process.env.TOTP_ENCRYPTION_KEY
+  if (!raw) throw new Error("TOTP_ENCRYPTION_KEY is not set, so two-step sign-in secrets can't be encrypted")
+  const key = Buffer.from(raw, "base64")
+  if (key.length !== 32) throw new Error("TOTP_ENCRYPTION_KEY must be 32 random bytes, base64-encoded (openssl rand -base64 32)")
+  return key
+}
+
+/** Encrypts an authenticator secret for storage: "v1.<iv>.<tag>.<ciphertext>". */
+export function sealTotpSecret(secret: string, userId: string): string {
+  const iv = randomBytes(12)
+  const cipher = createCipheriv("aes-256-gcm", totpKey(), iv)
+  cipher.setAAD(Buffer.from(userId))
+  const data = Buffer.concat([cipher.update(secret, "utf8"), cipher.final()])
+  return ["v1", iv, cipher.getAuthTag(), data].map((p) => (typeof p === "string" ? p : p.toString("base64url"))).join(".")
+}
+
+/**
+ * The secret from a stored value. `legacy` marks one saved unencrypted before sealing existed;
+ * callers re-seal it. Throws when the value was tampered with or sealed under another key.
+ */
+export function openTotpSecret(stored: string, userId: string): { secret: string; legacy: boolean } {
+  if (PLAIN_SECRET.test(stored)) return { secret: stored, legacy: true }
+  const m = SEALED.exec(stored)
+  if (!m) throw new Error("Unreadable two-step sign-in secret")
+  const decipher = createDecipheriv("aes-256-gcm", totpKey(), Buffer.from(m[1], "base64url"))
+  decipher.setAAD(Buffer.from(userId))
+  decipher.setAuthTag(Buffer.from(m[2], "base64url"))
+  const secret = Buffer.concat([decipher.update(Buffer.from(m[3], "base64url")), decipher.final()]).toString("utf8")
+  return { secret, legacy: false }
 }
 
 /** A backup code like "k3m9p-x2c7w": 50 bits from an alphabet without look-alikes. */
