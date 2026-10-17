@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
 import { PGlite } from "@electric-sql/pglite";
-import { addTextSource, addWebsiteSource, deleteSource, finishSync, getBotForUser, register, saveBotSettings, startSync, type Db } from "@apex/db";
+import { addTextSource, addWebsiteSource, createBot, deleteBot, deleteSource, finishSync, getBotForUser, register, saveBotSettings, startSync, type Db } from "@apex/db";
 import { migrate } from "@apex/db/migrate";
 import { startBotSync } from "../src/bot-sync.ts";
 import { createApp } from "../src/app.ts";
@@ -79,6 +79,29 @@ describe("bot sync", () => {
     await sync.tick();
     assert.equal(knowledge.search(bot.id, [{ text: "iade kaç gün", weight: 1 }], 3).length, 0);
     assert.equal(await sync.tick(), 0);
+    sync.stop();
+  });
+
+  it("serves each website of a workspace on its own, and drops a removed one", async () => {
+    const { user } = await register(db, { email: "o@iki.example", username: "iki", password: "correct horse", accountType: "business", company: "Iki", acceptTerms: true });
+    await db.query("update app.users set email_verified_at = now() where id = $1", [user.id]);
+    const first = await getBotForUser(db, user.id);
+    const second = await createBot(db, user.id, "Second site");
+    const allow = (bot: typeof first, origin: string) =>
+      saveBotSettings(db, { userId: user.id, botId: bot.id }, { ...bot.settings, security: { ...bot.settings.security, allowedOrigins: [origin] } }, bot.version);
+    await allow(first, "https://one.iki.example");
+    await allow(second, "https://two.iki.example");
+
+    const tenants = new TenantRegistry([]);
+    const sync = startBotSync(db, tenants, new KnowledgeBase(), 3_600_000);
+    await sync.tick();
+    assert.deepEqual(tenants.findById(first.id)?.allowedOrigins, ["https://one.iki.example"]);
+    assert.deepEqual(tenants.findById(second.id)?.allowedOrigins, ["https://two.iki.example"]);
+
+    await deleteBot(db, { userId: user.id, botId: second.id });
+    await sync.tick();
+    assert.equal(tenants.findById(second.id), undefined);
+    assert.ok(tenants.findById(first.id));
     sync.stop();
   });
 });

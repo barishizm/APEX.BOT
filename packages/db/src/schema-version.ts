@@ -15,6 +15,7 @@ export const MIGRATION_NAMES = [
   "0010_waitlist.sql",
   "0011_analytics.sql",
   "0012_knowledge_embeddings.sql",
+  "0013_multi_site.sql",
 ] as const
 
 /** Migrations this code expects that the database hasn't applied (run `npm run db:migrate`). */

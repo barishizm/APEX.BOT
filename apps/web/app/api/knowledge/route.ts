@@ -7,11 +7,12 @@ import { db } from "@/lib/db"
 import { translateMessage } from "@/lib/i18n/messages"
 import { requestLocale } from "@/lib/i18n/server"
 import { crawlInto, knowledgeErrorResponse, sourceJson } from "@/lib/knowledge"
+import { siteScope } from "@/lib/current-site"
 
 export async function GET() {
   try {
     const user = await requireApiUser()
-    const [sources, locale] = await Promise.all([listSources(db(), user.id), requestLocale()])
+    const [sources, locale] = await Promise.all([listSources(db(), await siteScope(user.id)), requestLocale()])
     return Response.json({ sources: sources.map((s) => sourceJson(s, locale)), limits: KNOWLEDGE_LIMITS })
   } catch (err) {
     return knowledgeErrorResponse(err)
@@ -25,18 +26,18 @@ export async function POST(request: Request) {
     const locale = await requestLocale()
     const body = await readJson(request)
     if (body.kind === "text") {
-      const source = await addTextSource(db(), user.id, { title: body.title, content: body.content }, (title, content) => chunkText(title, content))
+      const source = await addTextSource(db(), await siteScope(user.id), { title: body.title, content: body.content }, (title, content) => chunkText(title, content))
       return Response.json({ source: sourceJson(source, locale) }, { status: 201 })
     }
     if (body.kind !== "website") return errorJson("invalid_input", "Choose a website or a text", { status: 400 })
 
     const url = normalizeStartUrl(typeof body.url === "string" ? body.url : "")
-    const added = await addWebsiteSource(db(), user.id, url)
+    const added = await addWebsiteSource(db(), await siteScope(user.id), url)
     // onboarding: the site the customer gave us is where the widget will run
-    if (body.allowOrigin === true) await addAllowedOrigin(db(), user.id, new URL(url).origin)
+    if (body.allowOrigin === true) await addAllowedOrigin(db(), await siteScope(user.id), new URL(url).origin)
     if (added.status === "syncing") return Response.json({ source: sourceJson(added, locale) }, { status: 200 })
     try {
-      const source = await startSync(db(), user.id, added.id)
+      const source = await startSync(db(), await siteScope(user.id), added.id)
       after(() => crawlInto(source.id, source.url))
       return Response.json({ source: sourceJson(source, locale) }, { status: 201 })
     } catch (err) {

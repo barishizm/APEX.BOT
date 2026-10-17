@@ -6,6 +6,7 @@ import { db } from "@/lib/db"
 import { getAppDictionary } from "@/lib/i18n/app"
 import { requestLocale } from "@/lib/i18n/server"
 import { knowledgeErrorResponse, sourceJson } from "@/lib/knowledge"
+import { siteScope } from "@/lib/current-site"
 
 // Each entry (question line + answer lines, no blank line inside) is its own chunk, so retrieval
 // finds the answer under the exact question; a long answer is packed like any text.
@@ -18,12 +19,12 @@ export async function POST(request: Request) {
     const locale = await requestLocale()
     const body = await readJson(request)
     if (body.action === "dismiss") {
-      return Response.json({ resolved: await dismissUnansweredForUser(db(), user.id, body.replyIds) })
+      return Response.json({ resolved: await dismissUnansweredForUser(db(), await siteScope(user.id), body.replyIds) })
     }
     if (body.action !== "answer") return errorJson("invalid_input", "Choose what to do with the question", { status: 400 })
     const { source, resolved } = await addAnswerToKnowledge(
       db(),
-      user.id,
+      await siteScope(user.id),
       // the source is named once, in the language of whoever adds the first answer
       { question: body.question, answer: body.answer, replyIds: body.replyIds, title: getAppDictionary(locale).analytics.answersSource },
       chunkAnswers,

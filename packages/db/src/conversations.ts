@@ -1,5 +1,5 @@
 import type { Db, Queryable } from "./db.ts"
-import { BotError, canEditBot, getBotForUser } from "./bots.ts"
+import { BotError, canEditBot, getBotForUser, type BotScope } from "./bots.ts"
 
 // ---------- Written by the chat API (scoped by bot id, which it resolved from the site key) ----------
 
@@ -195,10 +195,10 @@ const FILTERS: Record<ConversationFilter, string> = {
 
 export async function listConversations(
   db: Db,
-  userId: string,
+  who: BotScope,
   options: { filter?: ConversationFilter; before?: Date | null; limit?: number } = {},
 ): Promise<{ conversations: ConversationSummary[]; hasMore: boolean }> {
-  const bot = await getBotForUser(db, userId)
+  const bot = await getBotForUser(db, who)
   // own keys only: an inherited one ("constructor") would put a function's source into the SQL
   const filter = options.filter && Object.hasOwn(FILTERS, options.filter) ? FILTERS[options.filter] : FILTERS.all
   const limit = Math.min(Math.max(options.limit ?? 30, 1), 100)
@@ -240,13 +240,13 @@ export async function listConversations(
   }
 }
 
-export async function getConversationForUser(db: Db, userId: string, id: string): Promise<StoredConversation | null> {
-  const bot = await getBotForUser(db, userId)
+export async function getConversationForUser(db: Db, who: BotScope, id: string): Promise<StoredConversation | null> {
+  const bot = await getBotForUser(db, who)
   return loadConversation(db, bot.id, id)
 }
 
-export async function deleteConversationForUser(db: Db, userId: string, id: string): Promise<boolean> {
-  const bot = await getBotForUser(db, userId)
+export async function deleteConversationForUser(db: Db, who: BotScope, id: string): Promise<boolean> {
+  const bot = await getBotForUser(db, who)
   if (!canEditBot(bot.role)) return false
   return deleteConversation(db, bot.id, id)
 }
@@ -262,8 +262,8 @@ export interface ConversationStats {
 }
 
 /** Totals over the last `days` days, for the overview. */
-export async function conversationStats(db: Db, userId: string, days = 7): Promise<ConversationStats> {
-  const bot = await getBotForUser(db, userId)
+export async function conversationStats(db: Db, who: BotScope, days = 7): Promise<ConversationStats> {
+  const bot = await getBotForUser(db, who)
   const { rows } = await db.query<ConversationStats>(
     `select count(*) filter (where c.message_count > 0)::int as conversations,
             coalesce(sum(c.message_count), 0)::int as messages,
@@ -304,8 +304,8 @@ export async function resolveReplies(db: Queryable, botId: string, ids: string[]
 }
 
 /** "Dismiss": the question needs no answer in the knowledge base. */
-export async function dismissUnansweredForUser(db: Db, userId: string, rawIds: unknown): Promise<number> {
-  const bot = await getBotForUser(db, userId)
+export async function dismissUnansweredForUser(db: Db, who: BotScope, rawIds: unknown): Promise<number> {
+  const bot = await getBotForUser(db, who)
   if (!canEditBot(bot.role)) throw new BotError("forbidden", "Only workspace owners and admins can change the knowledge base")
   return resolveReplies(db, bot.id, replyIdList(rawIds))
 }
