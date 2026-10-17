@@ -9,6 +9,7 @@ import { getBotForUser } from "../src/bots.ts"
 import { analyticsData, parseRange, safeTimeZone } from "../src/analytics.ts"
 import { dismissUnansweredForUser, insertConversation, insertMessage, markConversationHandoff, setConversationVisitor, setMessageFeedback } from "../src/conversations.ts"
 import { addAnswerToKnowledge, listKnowledgeChunks, listSources } from "../src/knowledge.ts"
+import { saveTopics, topicVocabulary, unlabeledQuestions } from "../src/topics.ts"
 
 let pg: PGlite
 let db: Db
@@ -193,5 +194,51 @@ describe("unanswered questions", () => {
       addAnswerToKnowledge(db, user.id, { question: "Soru?", answer: "Yeterince uzun bir yanıt.", replyIds: [q.replyId], title: "Yanıtlar" }, chunker),
       /owners and admins/,
     )
+  })
+})
+
+describe("topic labels", () => {
+  const questionId = async (botId: string, content: string) =>
+    (await db.query<{ id: string }>("select id from app.messages where bot_id = $1 and role = 'user' and content = $2", [botId, content])).rows[0].id
+
+  test("the queue holds recent unlabeled visitor messages, in the bot's language", async () => {
+    const { bot } = await owner()
+    await db.query(`update app.bots set settings = jsonb_set(settings, '{general,defaultLang}', '"tr"') where id = $1`, [bot.id])
+    await chat(bot.id, "Kargo ne kadar?")
+    await chat(bot.id, "Eski soru", { at: new Date(Date.now() - 100 * DAY) })
+    const queue = await unlabeledQuestions(db, 10)
+    assert.deepEqual(
+      queue.map((q) => [q.content, q.lang, q.botId]),
+      [["Kargo ne kadar?", "tr", bot.id]],
+    )
+
+    assert.equal(await saveTopics(db, bot.id, [{ id: queue[0].id, topic: "  Kargo   ücreti " }]), 1)
+    assert.deepEqual(await unlabeledQuestions(db, 10), [])
+    const data = await analyticsData(db, (await owner("o2@kahve.example", "owner2")).user.id)
+    assert.deepEqual(data.questions, [])
+  })
+
+  test("labels reach the analytics questions, and the vocabulary ranks a bot's own labels", async () => {
+    const { user, bot } = await owner()
+    for (const q of ["a", "b", "c", "hi"]) await chat(bot.id, q)
+    await saveTopics(db, bot.id, [
+      { id: await questionId(bot.id, "a"), topic: "Returns" },
+      { id: await questionId(bot.id, "b"), topic: "Shipping" },
+      { id: await questionId(bot.id, "c"), topic: "Shipping" },
+      { id: await questionId(bot.id, "hi"), topic: "" },
+    ])
+    assert.deepEqual(await topicVocabulary(db, bot.id), ["Shipping", "Returns"])
+    const data = await analyticsData(db, user.id)
+    assert.deepEqual(data.questions.map((q) => q.topic).sort(), ["", "Returns", "Shipping", "Shipping"])
+  })
+
+  test("a bot can't label, or read the labels of, another bot's messages", async () => {
+    const a = await owner()
+    const b = await owner("o2@kahve.example", "owner2")
+    await chat(a.bot.id, "Kargo?")
+    const id = await questionId(a.bot.id, "Kargo?")
+    assert.equal(await saveTopics(db, b.bot.id, [{ id, topic: "Hacked" }]), 0)
+    assert.equal(await saveTopics(db, a.bot.id, [{ id, topic: "Kargo" }]), 1)
+    assert.deepEqual(await topicVocabulary(db, b.bot.id), [])
   })
 })

@@ -21,6 +21,7 @@ import { postgresPersistence } from "./persistence.ts";
 import type { TokenUsageStore } from "./limits.ts";
 import { ConversationStore } from "./store.ts";
 import { TenantRegistry, type Tenant } from "./tenants.ts";
+import { ClaudeTopicLabeler, startTopicLabeler } from "./topics.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const config = loadConfig();
@@ -67,10 +68,10 @@ let onWidgetSeen: ((tenant: Tenant, origin: string) => void) | undefined;
 let tokenUsage: TokenUsageStore | undefined;
 let store = new ConversationStore();
 if (process.env.DATABASE_URL) {
-  const { addTokenUsage, createDbFromEnv, loadEmbeddings, missingMigrations, pruneEmbeddings, saveEmbeddings, tokensUsedOn, recordWidgetSeen, sweepConversations } =
+  const { addTokenUsage, createDbFromEnv, loadEmbeddings, missingMigrations, pruneEmbeddings, saveEmbeddings, tokensUsedOn, recordWidgetSeen, saveTopics, sweepConversations, topicVocabulary, unlabeledQuestions } =
     await import("@apex/db");
   const db = createDbFromEnv();
-  const missing = await missingMigrations(db).catch((error) => {
+  const missing: string[] = await missingMigrations(db).catch((error) => {
     log("error", "database not reachable at startup", { error });
     return [];
   });
@@ -98,6 +99,15 @@ if (process.env.DATABASE_URL) {
       .then((n) => n && log("info", "expired conversations deleted", { count: n }))
       .catch((error) => log("error", "conversation sweep failed", { error }));
   }, 3_600_000).unref();
+
+  // "Top topics" on the analytics page
+  if (config.topicModel && !missing.includes("0015_message_topics.sql")) {
+    startTopicLabeler(
+      { unlabeled: (limit) => unlabeledQuestions(db, limit), vocabulary: (id) => topicVocabulary(db, id), save: (id, labels) => saveTopics(db, id, labels) },
+      new ClaudeTopicLabeler(config.topicModel),
+    );
+    log("info", "topic labeling on", { model: config.topicModel });
+  }
 
   // "Live on your site" in the dashboard; at most one write per bot every few minutes
   const lastWrite = new Map<string, number>();

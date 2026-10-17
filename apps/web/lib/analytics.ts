@@ -71,12 +71,68 @@ export interface Topic {
   examples: string[]
 }
 
+function examplesOf(rows: QuestionRow[]): string[] {
+  const seen = new Set<string>()
+  const examples: string[] = []
+  for (const r of rows) {
+    const key = fold(r.content).replace(/\W+/g, " ").trim()
+    if (seen.has(key)) continue
+    seen.add(key)
+    examples.push(r.content.length > 160 ? `${r.content.slice(0, 159)}…` : r.content)
+    if (examples.length === TOPIC_EXAMPLES) break
+  }
+  return examples
+}
+
+function topic(rows: QuestionRow[], total: number, names: Pick<Topic, "label" | "title" | "keywords">): Topic {
+  return {
+    ...names,
+    questions: rows.length,
+    share: total ? rows.length / total : 0,
+    sourced: rows.filter((r) => r.sourced).length,
+    unanswered: rows.filter((r) => r.unanswered).length,
+    replied: rows.filter((r) => r.sourced !== null).length,
+    examples: examplesOf(rows),
+  }
+}
+
 /**
- * Groups questions into the most asked topics. Greedy and deterministic: take the word that
- * appears in the most not-yet-grouped questions, make those questions a topic, repeat. A
- * question belongs to one topic only, so shares add up to at most 100%.
+ * The most asked topics. Uses the labels the chat API's background labeler stores on each
+ * question once they cover most of the range; until then (or with labeling off), groups by
+ * the most frequent words.
  */
 export function topTopics(questions: QuestionRow[], count = TOPIC_COUNT): Topic[] {
+  const labeled = questions.filter((q) => q.topic !== null && q.topic !== undefined)
+  if (labeled.length && labeled.length >= questions.length / 2) return labeledTopics(labeled, count)
+  return wordTopics(questions, count)
+}
+
+/** Groups by stored label; questions labeled "no topic" (greetings, names) only count towards the total. */
+function labeledTopics(questions: QuestionRow[], count: number): Topic[] {
+  const groups = new Map<string, { rows: QuestionRow[]; spellings: Map<string, number> }>()
+  for (const q of questions) {
+    const name = q.topic!.replace(/\s+/g, " ").trim()
+    if (!name) continue
+    const key = fold(name)
+    const g = groups.get(key) ?? { rows: [], spellings: new Map<string, number>() }
+    g.rows.push(q)
+    g.spellings.set(name, (g.spellings.get(name) ?? 0) + 1)
+    groups.set(key, g)
+  }
+  return [...groups.values()]
+    .filter((g) => g.rows.length >= 2)
+    .map((g) => ({ ...g, name: [...g.spellings].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0][0] }))
+    .sort((a, b) => b.rows.length - a.rows.length || a.name.localeCompare(b.name))
+    .slice(0, count)
+    .map((g) => topic(g.rows, questions.length, { label: g.name, title: g.name, keywords: [g.name] }))
+}
+
+/**
+ * Greedy and deterministic: take the word that appears in the most not-yet-grouped questions,
+ * make those questions a topic, repeat. A question belongs to one topic only, so shares add
+ * up to at most 100%.
+ */
+function wordTopics(questions: QuestionRow[], count: number): Topic[] {
   const batch = wordsOf(questions.map((q) => q.content))
   const docs = questions.map((q, i) => ({ q, words: batch[i] }))
   const spellings = new Map<string, Map<string, number>>()
@@ -110,27 +166,17 @@ export function topTopics(questions: QuestionRow[], count = TOPIC_COUNT): Topic[
       .slice(0, 2)
       .map(([s]) => s)
 
-    const rows = members.map((i) => docs[i].q)
-    const seen = new Set<string>()
-    const examples: string[] = []
-    for (const r of rows) {
-      const key = fold(r.content).replace(/\W+/g, " ").trim()
-      if (seen.has(key)) continue
-      seen.add(key)
-      examples.push(r.content.length > 160 ? `${r.content.slice(0, 159)}…` : r.content)
-      if (examples.length === TOPIC_EXAMPLES) break
-    }
-    topics.push({
-      label: [spell(main), ...companions.slice(0, 1).map(spell)].join(" · "),
-      title: capitalize(spell(main)),
-      keywords: [main, ...companions].map(spell),
-      questions: members.length,
-      share: questions.length ? members.length / questions.length : 0,
-      sourced: rows.filter((r) => r.sourced).length,
-      unanswered: rows.filter((r) => r.unanswered).length,
-      replied: rows.filter((r) => r.sourced !== null).length,
-      examples,
-    })
+    topics.push(
+      topic(
+        members.map((i) => docs[i].q),
+        questions.length,
+        {
+          label: [spell(main), ...companions.slice(0, 1).map(spell)].join(" · "),
+          title: capitalize(spell(main)),
+          keywords: [main, ...companions].map(spell),
+        },
+      ),
+    )
     const taken = new Set(members)
     open = open.filter((i) => !taken.has(i))
   }

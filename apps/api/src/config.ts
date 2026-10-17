@@ -35,6 +35,11 @@ export interface Config {
   embeddings: string | null;
   /** How long a visitor message waits for its embedding before searching lexically. */
   embeddingTimeoutMs: number;
+  /**
+   * Claude model that labels visitor questions with topics for the analytics page, in the
+   * background (APEX_TOPIC_MODEL; "off" disables it, and so does APEX_MODEL=echo).
+   */
+  topicModel: string | null;
   limits: Limits;
 }
 
@@ -98,6 +103,7 @@ export function loadConfig(): Config {
     fallbacks: process.env.APEX_FALLBACKS === "on",
     embeddings: embeddingsSpec(process.env.APEX_EMBEDDINGS),
     embeddingTimeoutMs: num("APEX_EMBEDDING_TIMEOUT_MS", 2500),
+    topicModel: process.env.APEX_TOPIC_MODEL === "off" || process.env.APEX_MODEL === "echo" ? null : process.env.APEX_TOPIC_MODEL || "claude-haiku-5-5",
     limits: {
       ...defaultLimits,
       minRetrievalScore: num("APEX_MIN_RETRIEVAL_SCORE", defaultLimits.minRetrievalScore),
