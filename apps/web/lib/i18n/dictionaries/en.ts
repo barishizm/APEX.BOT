@@ -127,16 +127,16 @@ export const en = {
       title: "Be first in line",
       text: "Join the waitlist and we'll tell you the day Apex opens for sign-ups",
       items: [
-        { title: "Always On, 24/7", text: "Answer customer questions instantly, any time of day, without growing your team." },
+        { title: "Always on, 24/7", text: "Answer customer questions instantly, any time of day, without growing your team." },
         {
-          title: "Speaks Your Customers' Language",
+          title: "Speaks your customers' language",
           text: "Replies in Turkish, English, Lithuanian, Latvian or Estonian, whichever your visitor writes in, using only your own content.",
         },
-        { title: "Hands Off to Your Team", text: "When it can't answer, visitors reach you by email with the whole conversation attached." },
+        { title: "Hands off to your team", text: "When it can't answer, visitors reach you by email with the whole conversation attached." },
       ],
       quote:
         "We built Apex so every customer gets an instant, accurate answer at any hour, and support teams can finally focus on the hard cases.",
-      quoteRole: "CEO of APEX BOT",
+      quoteRole: "CEO of Apex Bot",
     },
     success: {
       welcomeBack: "Welcome back!",

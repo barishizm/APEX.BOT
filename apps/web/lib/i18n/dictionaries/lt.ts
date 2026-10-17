@@ -136,7 +136,7 @@ export const lt: Dictionary = {
       ],
       quote:
         "Sukūrėme Apex tam, kad kiekvienas klientas bet kuriuo paros metu akimirksniu gautų tikslų atsakymą, o klientų aptarnavimo komandos pagaliau galėtų susitelkti į sudėtingus atvejus.",
-      quoteRole: "APEX BOT generalinis direktorius",
+      quoteRole: "Apex Bot generalinis direktorius",
     },
     success: {
       welcomeBack: "Sveiki sugrįžę!",

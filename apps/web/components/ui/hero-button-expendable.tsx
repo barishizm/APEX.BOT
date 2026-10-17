@@ -653,8 +653,8 @@ export default function Hero({
                     ) : authMode === "login" ? (
                       <form onSubmit={handleSubmit} className="space-y-4">
                         <div className="space-y-1 pb-1 text-center text-zinc-900 dark:text-white">
-                          <h2 className="text-4xl font-normal tracking-tight" style={{ fontFamily: "var(--font-serif), Georgia, serif" }}>{t.auth.login.title}</h2>
-                          <p className="text-lg italic text-zinc-600 dark:text-zinc-300" style={{ fontFamily: "var(--font-serif), Georgia, serif" }}>{t.auth.login.subtitle}</p>
+                          <h2 className="text-3xl font-bold tracking-tight">{t.auth.login.title}</h2>
+                          <p className="text-lg text-zinc-600 dark:text-zinc-300">{t.auth.login.subtitle}</p>
                         </div>
 
                         <div className="space-y-4">
@@ -745,8 +745,8 @@ export default function Hero({
                       ) : (
                         <form onSubmit={handleWaitlist} className="space-y-4">
                           <div className="space-y-1 pb-1 text-center text-zinc-900 dark:text-white">
-                            <h2 className="text-4xl font-normal tracking-tight" style={{ fontFamily: "var(--font-serif), Georgia, serif" }}>{t.auth.waitlist.title}</h2>
-                            <p className="text-lg italic text-zinc-600 dark:text-zinc-300" style={{ fontFamily: "var(--font-serif), Georgia, serif" }}>
+                            <h2 className="text-3xl font-bold tracking-tight">{t.auth.waitlist.title}</h2>
+                            <p className="text-lg text-zinc-600 dark:text-zinc-300">
                               {t.auth.waitlist.subtitle}
                             </p>
                           </div>
@@ -799,8 +799,8 @@ export default function Hero({
                     ) : (
                       <form onSubmit={handleSubmit} className="space-y-4">
                         <div className="space-y-1 pb-1 text-center text-zinc-900 dark:text-white">
-                          <h2 className="text-4xl font-normal tracking-tight" style={{ fontFamily: "var(--font-serif), Georgia, serif" }}>{t.auth.register.title}</h2>
-                          <p className="text-lg italic text-zinc-600 dark:text-zinc-300" style={{ fontFamily: "var(--font-serif), Georgia, serif" }}>
+                          <h2 className="text-3xl font-bold tracking-tight">{t.auth.register.title}</h2>
+                          <p className="text-lg text-zinc-600 dark:text-zinc-300">
                             {t.auth.register.subtitle}
                           </p>
                         </div>

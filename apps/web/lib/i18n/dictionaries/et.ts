@@ -136,7 +136,7 @@ export const et: Dictionary = {
       ],
       quote:
         "Lõime Apexi selleks, et iga klient saaks igal kellaajal kohe täpse vastuse ja klienditoe meeskonnad saaksid lõpuks keskenduda keerulistele juhtumitele.",
-      quoteRole: "APEX BOTi tegevjuht",
+      quoteRole: "Apex Boti tegevjuht",
     },
     success: {
       welcomeBack: "Tere tulemast tagasi!",
