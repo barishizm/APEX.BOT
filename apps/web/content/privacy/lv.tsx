@@ -152,6 +152,11 @@ function Body() {
             <td>Apmeklētāja ziņa, sarunas jaunākās ziņas un būtiskās klienta satura daļas</td>
           </tr>
           <tr>
+            <td>Google (Gemini API)</td>
+            <td>Meklēšana: klienta satura un apmeklētāju jautājumu pārvēršana vektoros, lai asistents atrastu pareizās lapas</td>
+            <td>Klienta lapu un pievienotā satura teksts un apmeklētāja ziņa (papildjautājumiem kopā ar iepriekšējo). Iegūtos vektorus glabājam savā datubāzē. Kamēr izmantojam Google bezmaksas līmeni, Google noteikumi ļauj tam izmantot šos datus savu produktu uzlabošanai</td>
+          </tr>
+          <tr>
             <td>Supabase (pārvaldīta PostgreSQL)</td>
             <td>Datubāze</td>
             <td>Viss, ko glabājam: konti, iestatījumi, zināšanas, sarunas</td>
