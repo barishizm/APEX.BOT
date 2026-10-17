@@ -50,12 +50,12 @@ export interface SectionProps {
 }
 
 // Sample text in each widget language, shown as input placeholders
-const EXAMPLES: Record<Lang, { subtitle: string; buttonLabel: string; suggestion: string; teaser: string }> = {
-  tr: { subtitle: "Genelde birkaç saniyede yanıtlar", buttonLabel: "Bize sorun", suggestion: "Kargo ne kadar sürer?", teaser: "Sorunuz mu var? Hemen yanıtlayalım 👋" },
-  en: { subtitle: "Usually replies in seconds", buttonLabel: "Ask us", suggestion: "How long does shipping take?", teaser: "Questions? We answer in seconds 👋" },
-  lt: { subtitle: "Paprastai atsako per kelias sekundes", buttonLabel: "Klauskite mūsų", suggestion: "Kiek laiko trunka pristatymas?", teaser: "Turite klausimų? Atsakysime per kelias sekundes 👋" },
-  lv: { subtitle: "Parasti atbild dažu sekunžu laikā", buttonLabel: "Jautājiet mums", suggestion: "Cik ilgi notiek piegāde?", teaser: "Ir jautājumi? Atbildēsim dažu sekunžu laikā 👋" },
-  et: { subtitle: "Vastab tavaliselt mõne sekundiga", buttonLabel: "Küsige meilt", suggestion: "Kui kaua tarne aega võtab?", teaser: "Küsimusi? Vastame mõne sekundiga 👋" },
+const EXAMPLES: Record<Lang, { buttonLabel: string; suggestion: string; teaser: string }> = {
+  tr: { buttonLabel: "Bize sorun", suggestion: "Kargo ne kadar sürer?", teaser: "Sorunuz mu var? Hemen yanıtlayalım 👋" },
+  en: { buttonLabel: "Ask us", suggestion: "How long does shipping take?", teaser: "Questions? We answer in seconds 👋" },
+  lt: { buttonLabel: "Klauskite mūsų", suggestion: "Kiek laiko trunka pristatymas?", teaser: "Turite klausimų? Atsakysime per kelias sekundes 👋" },
+  lv: { buttonLabel: "Jautājiet mums", suggestion: "Cik ilgi notiek piegāde?", teaser: "Ir jautājumi? Atbildēsim dažu sekunžu laikā 👋" },
+  et: { buttonLabel: "Küsige meilt", suggestion: "Kui kaua tarne aega võtab?", teaser: "Küsimusi? Vastame mõne sekundiga 👋" },
 }
 
 function LangTag({ lang }: { lang: Lang }) {
@@ -137,16 +137,6 @@ export function GeneralSection({ s, set, lang, err }: SectionProps) {
             hint={t.companyHint}
           />
         </div>
-        <LocalizedInput
-          label={t.subtitle}
-          value={g.subtitle}
-          lang={lang}
-          onChange={(subtitle) => set("general", { subtitle })}
-          max={LIMITS.subtitle}
-          error={err(`general.subtitle.${lang}`)}
-          placeholder={EXAMPLES[lang].subtitle}
-          hint={t.subtitleHint}
-        />
       </Group>
       <Group title={t.language} description={t.languageHint}>
         <Segmented
@@ -291,15 +281,13 @@ export function AppearanceSection({ s, set, lang, err }: SectionProps) {
           />
         </div>
         {a.avatar === "image" && (
-          <TextInput
+          <ImageField
             label={t.avatarUrl}
-            type="url"
             value={a.avatarUrl}
             onChange={(avatarUrl) => set("appearance", { avatarUrl })}
             error={err("appearance.avatarUrl")}
-            placeholder="https://example.com/logo.png"
+            background={a.primaryColor}
             hint={t.avatarUrlHint}
-            mono
           />
         )}
         <Slider label={t.radius} value={a.radius} onChange={(radius) => set("appearance", { radius })} min={LIMITS.radius.min} max={LIMITS.radius.max} unit="px" error={err("appearance.radius")} />

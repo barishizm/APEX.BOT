@@ -74,7 +74,9 @@ describe("widget", () => {
   it("opens with the AI disclosure, greeting and suggestions", async () => {
     $("button.launcher")!.click();
     assert.equal($("section.panel")!.hidden, false);
-    assert.match($(".title span")!.textContent!, /Yapay zekâ asistanı/);
+    assert.equal($(".head .title")!.textContent, "Apex");
+    assert.match($("section.panel")!.getAttribute("aria-label")!, /Yapay zekâ asistanı/);
+    assert.match($(".foot")!.textContent!, /Yanıtlar yapay zekâ ile üretilir/);
     await until(() => $(".msg.bot"), "greeting");
     assert.equal($(".msg.bot")!.textContent, "Merhaba");
   });

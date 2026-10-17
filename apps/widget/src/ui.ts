@@ -307,9 +307,9 @@ export class Widget {
       h("div", { class: "lw" }, this.log, this.jump),
       this.suggest,
       this.dock,
-      // the AI disclaimer sits with the branding, small, under the composer
-      (t.disclaimer || (a?.showBranding !== false && ui)) &&
-        h("div", { class: "foot" }, t.disclaimer && h("span", {}, t.disclaimer), a?.showBranding !== false && ui && h("span", {}, t.powered)),
+      // The AI disclaimer sits with the branding, small, under the composer. With the disclaimer
+      // turned off the visitor is still told it's an AI (EU AI Act, art. 50).
+      h("div", { class: "foot" }, h("span", {}, t.disclaimer || t.ai), a?.showBranding !== false && ui && h("span", {}, t.powered)),
     );
     this.view = this.chatView;
     this.updateSend();
@@ -339,10 +339,16 @@ export class Widget {
       });
     }
 
+    // The logo at the left of the header; an initial or the bot icon on a tile otherwise
+    const initial = cfg.botName.slice(0, 1).toUpperCase();
     const avatar = h("div", { class: "avatar", "aria-hidden": "true" });
-    if (a?.avatar === "image" && a.avatarUrl) avatar.append(h("img", { src: a.avatarUrl, alt: "" }));
-    else if (a?.avatar === "icon") avatar.append(icon("bot"));
-    else avatar.append(cfg.botName.slice(0, 1).toUpperCase());
+    if (a?.avatar === "image" && a.avatarUrl) {
+      const logo = h("img", { src: a.avatarUrl, alt: "" });
+      avatar.classList.add("logo");
+      // blocked by the host page's CSP, or gone: the initial stands in
+      logo.addEventListener("error", () => (avatar.classList.remove("logo"), avatar.replaceChildren(initial)), { once: true });
+      avatar.append(logo);
+    } else avatar.append(a?.avatar === "icon" ? icon("bot") : initial);
 
     // "More options": a menu button (WAI-ARIA APG pattern) next to close
     const item = (label: string, glyph: keyof typeof ICONS, action: () => void, ...extra: Kid[]) =>
@@ -396,7 +402,7 @@ export class Widget {
       "div",
       { class: "head" },
       avatar,
-      h("div", { class: "title" }, h("strong", {}, cfg.botName), h("span", {}, ui?.general.subtitle[this.lang] || `${t.ai} · ${cfg.siteName}`)),
+      h("strong", { class: "title" }, cfg.botName),
       this.menuWrap,
       h("button", { class: "icon", type: "button", "aria-label": t.close, title: t.close, onclick: () => this.close(true) }, icon("close")),
     );
@@ -416,7 +422,10 @@ export class Widget {
     });
     const style = this.root.style;
     style.setProperty("--p", primary);
-    style.setProperty("--on-p", readableOn(primary));
+    const onP = readableOn(primary);
+    style.setProperty("--on-p", onP);
+    // hover and tile shade on the brand-colored header
+    style.setProperty("--p-tint", onP === "#ffffff" ? "rgba(255,255,255,.16)" : "rgba(12,12,9,.08)");
     if (a) {
       style.setProperty("--cx", `${a.offsetX}px`);
       style.setProperty("--cy", `${a.offsetY}px`);
