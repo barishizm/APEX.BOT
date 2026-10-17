@@ -1,9 +1,8 @@
 import type { Metadata } from "next"
-import { redirect } from "next/navigation"
 import { getAccount } from "@apex/db"
 import { DashboardFrame } from "@/components/dashboard/frame"
 import { AccountSettings } from "@/components/settings/account-settings"
-import { currentSession } from "@/lib/auth"
+import { currentSession, redirectLoggedOut } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { getAppDictionary } from "@/lib/i18n/app"
 import { requestLocale } from "@/lib/i18n/server"
@@ -14,7 +13,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function SettingsPage() {
   const session = await currentSession()
-  if (!session) redirect("/login")
+  if (!session) return redirectLoggedOut()
   const account = await getAccount(db(), session.user.id, session.sessionId)
   return (
     <DashboardFrame active="Settings">

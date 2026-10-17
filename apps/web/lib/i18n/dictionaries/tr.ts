@@ -325,6 +325,7 @@ export const tr: Dictionary = {
     closing: {
       title: "Ziyaretçilerinize bu gece yanıt verin.",
       lede: "Kurulum birkaç dakika sürer. Apex beta süresince ücretsiz.",
+      ledeWaitlist: "Apex kapalı beta aşamasında ve bu süre boyunca ücretsiz. Bekleme listesine katılın, kayıtlar açıldığı gün size e-posta gönderelim.",
       ctaSignedIn: "Panelinize gidin",
       cta: "Bekleme listesine katılın",
       docs: "Dokümantasyonu okuyun",

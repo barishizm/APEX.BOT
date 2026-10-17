@@ -50,9 +50,14 @@ export async function requireVerifiedUser() {
   // a database behind the code would fail on every dashboard query; say so instead
   if ((await schemaMissing()).length) redirect("/database-update")
   const session = await currentSession()
-  if (!session) redirect("/login")
+  if (!session) return redirectLoggedOut()
   if (!session.user.emailVerified) redirect("/verify-email")
   return session.user
+}
+
+// To log-in, clearing a leftover session cookie on the way (see app/api/auth/expired)
+export async function redirectLoggedOut(): Promise<never> {
+  redirect((await sessionToken()) ? "/api/auth/expired" : "/login")
 }
 
 // API routes: the signed-in session, or a 401 the client can act on
