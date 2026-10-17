@@ -724,6 +724,8 @@ export function PersonaSection({ s, set, err, listErr }: SectionProps) {
 
 /** What the handoff section needs to know about confirmation, beyond the settings themselves. */
 export interface HandoffVerification {
+  /** The website being edited; the confirmation is for its bot. */
+  botId: string
   /** The address saved on the bot is confirmed. */
   savedVerified: boolean
   savedEmail: string
@@ -753,7 +755,7 @@ function ConfirmAddress({ email, verification }: { email: string; verification: 
     setBusy(true)
     setMessage(null)
     try {
-      const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) })
+      const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...body, botId: verification.botId }) })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) setMessage(data.issues?.[0]?.message ?? data.message ?? app.studio.generic)
       return res.ok ? data : null

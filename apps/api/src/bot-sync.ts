@@ -4,7 +4,7 @@
 // knowledge_version moves, not on every settings save.
 // shortcut: polling; switch to LISTEN/NOTIFY once the API keeps a dedicated connection.
 import type { Db } from "@apex/db";
-import { listBotsChangedSince, listKnowledgeChunks } from "@apex/db";
+import { listBotIds, listBotsChangedSince, listKnowledgeChunks } from "@apex/db";
 import { publicWidgetSettings } from "@apex/db/bot-settings";
 import { log } from "./log.ts";
 import type { ChunkIndexer } from "./embeddings.ts";
@@ -61,6 +61,16 @@ export function startBotSync(db: Db, tenants: TenantRegistry, knowledge: Knowled
           continue;
         }
         if (!newest || bot.updatedAt > newest) newest = bot.updatedAt;
+      }
+      // A deleted website (or account) must stop answering: drop bots that are gone
+      const live = new Set(await listBotIds(db));
+      for (const id of [...applied.keys()]) {
+        if (live.has(id)) continue;
+        tenants.remove(id);
+        knowledge.load(id, []);
+        applied.delete(id);
+        loaded.delete(id);
+        log("info", "bot removed", { tenant: id });
       }
       // A failed bot is fetched again next pass (re-applying the others is harmless)
       since = firstFailure ? new Date(firstFailure.getTime() - 1) : newest;

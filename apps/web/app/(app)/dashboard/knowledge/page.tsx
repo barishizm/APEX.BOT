@@ -3,7 +3,7 @@ import { KNOWLEDGE_LIMITS, canEditBot, sourceUsage } from "@apex/db"
 import { DashboardFrame } from "@/components/dashboard/frame"
 import { KnowledgeManager } from "@/components/knowledge/manager"
 import { requireVerifiedUser } from "@/lib/auth"
-import { currentBot, currentSources } from "@/lib/dashboard"
+import { currentBot, currentSources, shownSite } from "@/lib/dashboard"
 import { db } from "@/lib/db"
 import { getAppDictionary } from "@/lib/i18n/app"
 import { requestLocale } from "@/lib/i18n/server"
@@ -20,7 +20,7 @@ export default async function KnowledgePage({ searchParams }: { searchParams: Pr
     currentBot(user.id),
     currentSources(user.id),
     // a nice-to-have: the page still works if counting citations fails
-    sourceUsage(db(), user.id).catch((err) => {
+    sourceUsage(db(), await shownSite(user.id)).catch((err) => {
       console.error("[knowledge] couldn't count citations", err)
       return {}
     }),

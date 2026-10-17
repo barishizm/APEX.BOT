@@ -4,7 +4,22 @@ import { PGlite } from "@electric-sql/pglite"
 import type { Db } from "../src/db.ts"
 import { migrate } from "../src/migrate.ts"
 import { register } from "../src/auth.ts"
-import { BotError, confirmHandoffEmail, getBotForUser, listBotsChangedSince, rotateSiteKey, saveBotSettings, startHandoffVerification } from "../src/bots.ts"
+import {
+  BOTS_PER_WORKSPACE,
+  BotError,
+  confirmHandoffEmail,
+  createBot,
+  deleteBot,
+  getBotForUser,
+  listBotIds,
+  listBotsChangedSince,
+  listBotsForUser,
+  renameBot,
+  rotateSiteKey,
+  saveBotSettings,
+  startHandoffVerification,
+} from "../src/bots.ts"
+import { addTextSource, listSources } from "../src/knowledge.ts"
 import {
   BotSettingsError,
   DEFAULT_SETTINGS,
@@ -285,5 +300,90 @@ describe("bots", () => {
     assert.deepEqual(all.map((b) => b.siteKey), [bot.siteKey])
     assert.equal(all[0].organizationName, "Crest Cycles")
     assert.deepEqual(await listBotsChangedSince(db, all[0].updatedAt), [])
+  })
+})
+
+describe("several websites per workspace", () => {
+  const code = (c: string) => (err: unknown) => err instanceof BotError && err.code === c
+
+  test("a workspace adds websites, each with its own key and settings", async () => {
+    const user = await newUser()
+    const first = await getBotForUser(db, user.id)
+    assert.equal(first.name, "Crest Cycles")
+    const shop = await createBot(db, user.id, "  shop.crest.example ")
+    assert.equal(shop.name, "shop.crest.example")
+    assert.notEqual(shop.siteKey, first.siteKey)
+    assert.equal(shop.settings.handoff.email, "owner@example.com")
+
+    // a bare user id still means the first website
+    assert.equal((await getBotForUser(db, user.id)).id, first.id)
+    assert.equal((await getBotForUser(db, { userId: user.id, botId: shop.id })).id, shop.id)
+
+    const saved = await saveBotSettings(db, { userId: user.id, botId: shop.id }, { ...shop.settings, general: { ...shop.settings.general, botName: "Shop helper" } }, shop.version)
+    assert.equal(saved.id, shop.id)
+    assert.equal((await getBotForUser(db, user.id)).settings.general.botName, first.settings.general.botName)
+
+    const list = await listBotsForUser(db, user.id)
+    assert.deepEqual(list.bots.map((b) => b.id), [first.id, shop.id])
+    assert.equal(list.canEdit, true)
+    assert.deepEqual((await listBotIds(db)).sort(), [first.id, shop.id].sort())
+  })
+
+  test("knowledge stays with its website", async () => {
+    const user = await newUser()
+    await getBotForUser(db, user.id)
+    const shop = await createBot(db, user.id, "Shop")
+    const chunker = (title: string, content: string) => [{ url: "", title, text: content }]
+    await addTextSource(db, { userId: user.id, botId: shop.id }, { title: "Returns", content: "Returns are free within 30 days of delivery." }, chunker)
+    assert.equal((await listSources(db, { userId: user.id, botId: shop.id })).length, 1)
+    assert.equal((await listSources(db, user.id)).length, 0)
+  })
+
+  test("another workspace's website can't be read or changed by id", async () => {
+    const a = await newUser("a@example.com", "usera", "A")
+    const b = await newUser("b@example.com", "userb", "B")
+    const aBot = await getBotForUser(db, a.id)
+    const bBot = await getBotForUser(db, b.id)
+    // reads fall back to the user's own first website
+    assert.equal((await getBotForUser(db, { userId: b.id, botId: aBot.id })).id, bBot.id)
+    await assert.rejects(saveBotSettings(db, { userId: b.id, botId: aBot.id }, aBot.settings, aBot.version), code("not_found"))
+    await assert.rejects(rotateSiteKey(db, { userId: b.id, botId: aBot.id }), code("not_found"))
+    await assert.rejects(deleteBot(db, { userId: b.id, botId: aBot.id }), code("not_found"))
+    assert.equal((await getBotForUser(db, a.id)).siteKey, aBot.siteKey)
+  })
+
+  test("renames, removes, and keeps the last website", async () => {
+    const user = await newUser()
+    const first = await getBotForUser(db, user.id)
+    const shop = await createBot(db, user.id, "Shop")
+    const renamed = await renameBot(db, { userId: user.id, botId: shop.id }, "Webshop")
+    assert.equal(renamed.name, "Webshop")
+    assert.equal(renamed.version, shop.version)
+    await assert.rejects(renameBot(db, { userId: user.id, botId: shop.id }, "   "), BotSettingsError)
+
+    await deleteBot(db, { userId: user.id, botId: first.id })
+    assert.equal((await getBotForUser(db, user.id)).id, shop.id)
+    await assert.rejects(deleteBot(db, { userId: user.id, botId: shop.id }), code("conflict"))
+  })
+
+  test("only owners and admins add websites, up to the limit", async () => {
+    const owner = await newUser()
+    const bot = await getBotForUser(db, owner.id)
+    const member = await newUser("member@example.com", "member", "Other Co")
+    await db.query("delete from app.organization_members where user_id = $1", [member.id])
+    await db.query("insert into app.organization_members (organization_id, user_id, role) values ($1, $2, 'member')", [bot.organizationId, member.id])
+    await assert.rejects(createBot(db, member.id, "Mine"), code("forbidden"))
+    assert.equal((await listBotsForUser(db, member.id)).canEdit, false)
+
+    await Promise.all(Array.from({ length: BOTS_PER_WORKSPACE }, (_, i) => createBot(db, owner.id, `Site ${i}`).catch((e) => e)))
+    assert.equal((await listBotsForUser(db, owner.id)).bots.length, BOTS_PER_WORKSPACE)
+    await assert.rejects(createBot(db, owner.id, "One more"), code("conflict"))
+  })
+
+  test("two first visits at once create one website", async () => {
+    const user = await newUser()
+    const [a, b] = await Promise.all([getBotForUser(db, user.id), getBotForUser(db, user.id)])
+    assert.equal(a.id, b.id)
+    assert.equal((await listBotsForUser(db, user.id)).bots.length, 1)
   })
 })
