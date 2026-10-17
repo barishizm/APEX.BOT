@@ -1,5 +1,5 @@
 import type { Metadata } from "next"
-import { KNOWLEDGE_LIMITS, canEditBot, sourceUsage } from "@apex/db"
+import { canEditBot, knowledgeLimits, sourceUsage } from "@apex/db"
 import { DashboardFrame } from "@/components/dashboard/frame"
 import { KnowledgeManager } from "@/components/knowledge/manager"
 import { requireVerifiedUser } from "@/lib/auth"
@@ -16,7 +16,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function KnowledgePage({ searchParams }: { searchParams: Promise<{ title?: string; source?: string }> }) {
   const { title, source } = await searchParams
   const user = await requireVerifiedUser()
-  const [bot, sources, usage, locale] = await Promise.all([
+  const [bot, sources, usage, limits, locale] = await Promise.all([
     currentBot(user.id),
     currentSources(user.id),
     // a nice-to-have: the page still works if counting citations fails
@@ -24,6 +24,7 @@ export default async function KnowledgePage({ searchParams }: { searchParams: Pr
       console.error("[knowledge] couldn't count citations", err)
       return {}
     }),
+    knowledgeLimits(db(), await shownSite(user.id)),
     requestLocale(),
   ])
   return (
@@ -31,7 +32,7 @@ export default async function KnowledgePage({ searchParams }: { searchParams: Pr
       <KnowledgeManager
         initial={sources.map((s) => sourceJson(s, locale))}
         usage={usage}
-        limits={KNOWLEDGE_LIMITS}
+        limits={limits}
         canEdit={canEditBot(bot.role)}
         prefillTitle={title?.slice(0, 200)}
         openSource={source}

@@ -1,12 +1,12 @@
 import type { Db, Queryable } from "./db.ts"
 import { canEditBot, getBotForUser, scopeUser, type BotScope } from "./bots.ts"
 import { replyIdList, resolveReplies } from "./conversations.ts"
+import { botPlan, websitePageLimit, type Plan } from "./plans.ts"
 
 export const KNOWLEDGE_LIMITS = {
   sources: 20,
-  /** Web pages and linked documents read from one website. */
-  websitePages: 200,
-  /** Linked PDF and Word files read from one website, within websitePages. */
+  // pages read from one website depend on the plan: see knowledgeLimits
+  /** Linked PDF and Word files read from one website, within its page limit. */
   websiteDocuments: 20,
   textChars: 50_000,
   /** Text extracted from one uploaded file. */
@@ -19,6 +19,16 @@ export const KNOWLEDGE_LIMITS = {
   /** Websites of one bot being read at the same time. */
   concurrentSyncs: 2,
 } as const
+
+/** KNOWLEDGE_LIMITS plus the ones the workspace's plan sets. */
+export async function knowledgeLimits(db: Db, who: BotScope) {
+  const plan = await botPlan(db, (await getBotForUser(db, who)).id)
+  return { ...KNOWLEDGE_LIMITS, plan, websitePages: websitePageLimit(plan) }
+}
+export type KnowledgeLimits = Awaited<ReturnType<typeof knowledgeLimits>>
+
+/** A claimed sync: the source, its bot, where to start and how many pages the plan allows. */
+export type ClaimedSync = KnowledgeSource & { botId: string; url: string; plan: Plan; pageLimit: number }
 
 // A sync left in "syncing" this long (the server restarted mid-crawl) can be started again
 export const STALE_SYNC_MS = 10 * 60_000
@@ -315,7 +325,7 @@ export async function addAnswerToKnowledge(
  * Marks a website source as syncing and returns it; "busy" if a sync is already running.
  * The caller crawls, then calls finishSync or failSync with the returned id.
  */
-export async function startSync(db: Db, who: BotScope, sourceId: string): Promise<KnowledgeSource & { botId: string; url: string }> {
+export async function startSync(db: Db, who: BotScope, sourceId: string): Promise<ClaimedSync> {
   const bot = await editableBot(db, who)
   if (!UUID.test(sourceId)) throw new KnowledgeError("not_found", "That source doesn't exist")
   return claimSync(db, bot.id, sourceId)
@@ -325,7 +335,7 @@ export async function startSync(db: Db, who: BotScope, sourceId: string): Promis
  * startSync for the scheduled refresh, which acts for no user: the source must still be a website
  * set to refresh. Same "busy" and "not_found" errors.
  */
-export async function startScheduledSync(db: Db, sourceId: string): Promise<KnowledgeSource & { botId: string; url: string }> {
+export async function startScheduledSync(db: Db, sourceId: string): Promise<ClaimedSync> {
   if (!UUID.test(sourceId)) throw new KnowledgeError("not_found", "That source doesn't exist")
   const { rows } = await db.query<{ bot_id: string }>(
     "select bot_id from app.knowledge_sources where id = $1 and kind = 'website' and refresh <> 'off'",
@@ -357,7 +367,7 @@ export async function dueRefreshes(db: Queryable, limit: number): Promise<{ id: 
   return rows.map((r) => ({ id: r.id, botId: r.bot_id }))
 }
 
-async function claimSync(db: Db, botId: string, sourceId: string): Promise<KnowledgeSource & { botId: string; url: string }> {
+async function claimSync(db: Db, botId: string, sourceId: string): Promise<ClaimedSync> {
   const running = await db.query<{ n: number }>(
     `select count(*)::int as n from app.knowledge_sources
       where bot_id = $1 and id <> $2 and status = 'syncing' and updated_at >= now() - make_interval(secs => $3)`,
@@ -379,7 +389,8 @@ async function claimSync(db: Db, botId: string, sourceId: string): Promise<Knowl
       ? new KnowledgeError("busy", "This website is already being read")
       : new KnowledgeError("not_found", "That source doesn't exist")
   }
-  return { ...toSource(rows[0]), botId: botId, url: rows[0].url! }
+  const plan = await botPlan(db, botId)
+  return { ...toSource(rows[0]), botId, url: rows[0].url!, plan, pageLimit: websitePageLimit(plan) }
 }
 
 /** Replaces a website source's chunks with a fresh crawl. No-op if the source was deleted meanwhile. */
