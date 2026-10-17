@@ -72,7 +72,7 @@ export function DashboardShell({
 }: {
   children?: ReactNode
   intro?: boolean
-  user: { name: string; email: string }
+  user: { name: string; email: string; platformRole?: "superadmin" | "support" | null }
   sites: SitesJson
   setup: { done: number; total: number }
   /** Label of the rail item to highlight. */
@@ -162,7 +162,7 @@ export function DashboardShell({
             <RailLink label={t.nav.help} href={href("/docs")} external>
               <CircleHelp className="h-5 w-5" aria-hidden />
             </RailLink>
-            <ProfileMenu name={user.name} email={user.email} />
+            <ProfileMenu name={user.name} email={user.email} platformRole={user.platformRole} />
           </div>
         </nav>
 

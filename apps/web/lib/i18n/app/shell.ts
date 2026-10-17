@@ -30,6 +30,8 @@ const en = {
     settings: "Account settings",
     help: "Help & docs",
     logOut: "Log out",
+    superadmin: "Superadmin",
+    support: "Support",
   },
   palette: {
     dialog: "Search or go to",
@@ -93,6 +95,8 @@ export const shell: Messages<typeof en> = {
       settings: "Hesap ayarları",
       help: "Yardım ve dokümantasyon",
       logOut: "Çıkış yap",
+      superadmin: "Süper admin",
+      support: "Destek",
     },
     palette: {
       dialog: "Ara veya git",
@@ -153,6 +157,8 @@ export const shell: Messages<typeof en> = {
       settings: "Paskyros nustatymai",
       help: "Pagalba ir dokumentacija",
       logOut: "Atsijungti",
+      superadmin: "Superadministratorius",
+      support: "Pagalba",
     },
     palette: {
       dialog: "Ieškoti arba pereiti",
@@ -213,6 +219,8 @@ export const shell: Messages<typeof en> = {
       settings: "Konta iestatījumi",
       help: "Palīdzība un dokumentācija",
       logOut: "Izrakstīties",
+      superadmin: "Superadministrators",
+      support: "Atbalsts",
     },
     palette: {
       dialog: "Meklēt vai pāriet",
@@ -273,6 +281,8 @@ export const shell: Messages<typeof en> = {
       settings: "Konto seaded",
       help: "Abi ja dokumentatsioon",
       logOut: "Logi välja",
+      superadmin: "Superadministraator",
+      support: "Tugi",
     },
     palette: {
       dialog: "Otsi või mine",
