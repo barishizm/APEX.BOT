@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import { AppI18nProvider } from "@/components/i18n/app-provider"
 import { I18nProvider } from "@/components/i18n/provider"
 import { RootDocument } from "@/components/root-document"
+import { currentSession } from "@/lib/auth"
 import { getAppDictionary } from "@/lib/i18n/app"
 import { getDictionary, requestLocale } from "@/lib/i18n/server"
 import { siteUrl } from "@/lib/site"
@@ -19,12 +20,21 @@ export const metadata: Metadata = {
 
 export const viewport = sharedViewport
 
+// Platform staff also get the admin area's strings; a database hiccup just leaves them out
+async function isStaff() {
+  try {
+    return !!(await currentSession())?.user.platformRole
+  } catch {
+    return false
+  }
+}
+
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const locale = await requestLocale()
+  const [locale, staff] = await Promise.all([requestLocale(), isStaff()])
   return (
     <RootDocument locale={locale}>
       <I18nProvider locale={locale} dict={getDictionary(locale)}>
-        <AppI18nProvider dict={getAppDictionary(locale)}>{children}</AppI18nProvider>
+        <AppI18nProvider dict={getAppDictionary(locale, { admin: staff })}>{children}</AppI18nProvider>
       </I18nProvider>
     </RootDocument>
   )

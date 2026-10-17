@@ -1,6 +1,7 @@
 import { isIP } from "node:net"
 import type { Db, Queryable } from "./db.ts"
 import { normalizeEmail } from "./auth.ts"
+import type { ListSpec } from "./admin-list.ts"
 
 // Staff of the platform itself (app.users.platform_role), separate from workspace roles.
 export type PlatformRole = "superadmin" | "support"
@@ -137,3 +138,41 @@ export async function bootstrapSuperadmin(db: Db, rawEmail: unknown): Promise<{ 
     return { userId: id, created: true }
   })
 }
+
+// --- Lists (see admin-list.ts) ---
+
+export interface AdminUserRow {
+  id: string
+  email: string
+  username: string
+  display_name: string | null
+  platform_role: PlatformRole | null
+  email_verified: boolean
+  two_factor: boolean
+  workspaces: number
+  suspended_at: Date | null
+  last_login_at: Date | null
+  created_at: Date
+}
+
+/** Every account on the platform, for /admin/users. */
+export const ADMIN_USERS_LIST = {
+  select: `u.id, u.email, u.username, u.display_name, u.platform_role,
+    u.email_verified_at is not null as email_verified, u.totp_enabled_at is not null as two_factor,
+    (select count(*)::int from app.organization_members m where m.user_id = u.id) as workspaces,
+    u.suspended_at, u.last_login_at, u.created_at`,
+  from: "app.users u",
+  id: { sql: "u.id", type: "uuid" },
+  sorts: {
+    created: { sql: "u.created_at", type: "timestamptz" },
+    email: { sql: "u.email", type: "text" },
+    lastLogin: { sql: "coalesce(u.last_login_at, '-infinity')", type: "timestamptz" },
+  },
+  defaultSort: { key: "created", dir: "desc" },
+  search: ["u.email", "u.username", "u.display_name", "u.id::text"],
+  filters: {
+    role: { staff: "u.platform_role is not null", superadmin: "u.platform_role = 'superadmin'", support: "u.platform_role = 'support'", none: "u.platform_role is null" },
+    status: { active: "u.suspended_at is null and u.email_verified_at is not null", unverified: "u.email_verified_at is null", suspended: "u.suspended_at is not null" },
+    twoFactor: { on: "u.totp_enabled_at is not null", off: "u.totp_enabled_at is null" },
+  },
+} satisfies ListSpec

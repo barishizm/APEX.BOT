@@ -174,7 +174,7 @@ export function DashboardShell({
         </main>
       </div>
 
-      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} platformRole={user.platformRole} />
     </div>
   )
 }
