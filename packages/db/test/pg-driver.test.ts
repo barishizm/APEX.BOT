@@ -5,6 +5,8 @@ import { PGLiteSocketServer } from "@electric-sql/pglite-socket"
 import { createDb, sslModeFor, type Db } from "../src/db.ts"
 import { migrate } from "../src/migrate.ts"
 import { AuthError, getSession, login, register, verifyEmail } from "../src/auth.ts"
+import { getBotForUser } from "../src/bots.ts"
+import { loadEmbeddings, saveEmbeddings } from "../src/knowledge.ts"
 
 // The production path: node-postgres over TCP, against a Postgres wire-protocol server.
 let server: PGLiteSocketServer
@@ -27,7 +29,7 @@ after(async () => {
 })
 
 test("migrations and the auth flow work through pg", async () => {
-  assert.deepEqual(await migrate(db), ["0001_auth.sql", "0002_function_search_path.sql", "0003_bots.sql", "0004_knowledge.sql", "0005_bot_activity.sql", "0006_account.sql", "0007_conversations.sql", "0008_handoff_verification.sql", "0009_token_usage.sql", "0010_waitlist.sql", "0011_analytics.sql"])
+  assert.deepEqual(await migrate(db), ["0001_auth.sql", "0002_function_search_path.sql", "0003_bots.sql", "0004_knowledge.sql", "0005_bot_activity.sql", "0006_account.sql", "0007_conversations.sql", "0008_handoff_verification.sql", "0009_token_usage.sql", "0010_waitlist.sql", "0011_analytics.sql", "0012_knowledge_embeddings.sql"])
   assert.deepEqual(await migrate(db), [])
 
   const input = { email: "a@example.com", username: "alice", password: "password1", accountType: "personal", acceptTerms: true }
@@ -37,6 +39,14 @@ test("migrations and the auth flow work through pg", async () => {
 
   const { session } = await login(db, { email: "a@example.com", password: "password1" })
   assert.equal((await getSession(db, session.token))?.user.emailVerified, true)
+
+  // bytea comes back from pg as a Buffer, which may share a pooled ArrayBuffer at any offset
+  const bot = await getBotForUser(db, user.id)
+  const hash = new Uint8Array(32).fill(7)
+  await saveEmbeddings(db, bot.id, "gemini:test@3", [{ hash, vector: new Uint8Array(Float32Array.from([0.6, 0, 0.8]).buffer) }])
+  const [row] = await loadEmbeddings(db, bot.id, "gemini:test@3", [hash])
+  const v = new Float32Array(row.vector.buffer.slice(row.vector.byteOffset, row.vector.byteOffset + row.vector.byteLength))
+  assert.deepEqual([...v].map((x) => Math.round(x * 10) / 10), [0.6, 0, 0.8])
 })
 
 test("ssl defaults: off for localhost, on for anything else", () => {

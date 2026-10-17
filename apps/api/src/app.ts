@@ -10,8 +10,9 @@ import { RateLimiter, TokenBudget, type TokenUsageStore } from "./limits.ts";
 import { log } from "./log.ts";
 import type { Mailer } from "./mailer.ts";
 import type { ChatModel } from "./model.ts";
-import { NoAnswerFilter, buildMessages, buildSystem } from "./prompt.ts";
-import { relevantHits, type Hit, type KnowledgeBase } from "./retrieval.ts";
+import type { QueryEmbedder } from "./embeddings.ts";
+import { ReplyMarkerFilter, buildMessages, buildSystem } from "./prompt.ts";
+import { DEFAULT_RETRIEVAL, retrieve, semanticQueryTexts, type Hit, type KnowledgeBase } from "./retrieval.ts";
 import type { Conversation, ConversationStore, Source } from "./store.ts";
 import { normalizeOrigin, publicSettings, type Tenant, type TenantRegistry } from "./tenants.ts";
 import type { Lang } from "./text.ts";
@@ -19,6 +20,8 @@ import type { Lang } from "./text.ts";
 export interface AppDeps {
   tenants: TenantRegistry;
   knowledge: KnowledgeBase;
+  /** Embeds visitor messages for semantic search; without it (APEX_EMBEDDINGS=off) search is lexical. */
+  embedder?: QueryEmbedder;
   store: ConversationStore;
   model: ChatModel;
   mailer: Mailer;
@@ -204,10 +207,18 @@ export function createApp(deps: AppDeps) {
     const historyCount = tenant.limits?.historyMessages ?? limits.historyMessages;
     const history = historyCount > 0 ? conversation.messages.slice(-historyCount) : [];
     const previousQuestion = [...conversation.messages].reverse().find((m) => m.role === "user")?.content;
-    const query = [{ text: message || attachments.map((a) => a.name).join(" "), weight: 1 }];
-    if (previousQuestion) query.push({ text: previousQuestion, weight: 0.5 });
-    const ranked = knowledge.search(tenant.id, query, limits.retrievalTopK);
-    const hits = relevantHits(ranked, limits.minRetrievalScore, tenant.settings.confidence);
+    const queryText = message || attachments.map((a) => a.name).join(" ");
+    // only tenants whose chunks are embedded pay for a query embedding
+    const semantic =
+      deps.embedder && knowledge.coverage(tenant.id).embedder === deps.embedder.id
+        ? await deps.embedder.embed(tenant.id, semanticQueryTexts(queryText, previousQuestion))
+        : null;
+    const { hits } = retrieve(
+      knowledge,
+      tenant.id,
+      { message: queryText, previous: previousQuestion, semantic },
+      { ...DEFAULT_RETRIEVAL, topK: limits.retrievalTopK, minScore: limits.minRetrievalScore, confidence: tenant.settings.confidence ?? "balanced" },
+    );
 
     const request = { system: buildSystem(tenant), messages: buildMessages(history, message, hits, attachments), model: tenant.settings.model };
     // the transcript keeps which files were sent, not the files
@@ -220,7 +231,7 @@ export function createApp(deps: AppDeps) {
       await stream.writeSSE({ event: "meta", data: JSON.stringify({ conversationId: conv.id, messageId: userMessage.id }) });
 
       let answer = "";
-      const noAnswer = new NoAnswerFilter();
+      const markers = new ReplyMarkerFilter();
       const emit = async (text: string) => {
         if (!text) return;
         answer += text;
@@ -229,7 +240,7 @@ export function createApp(deps: AppDeps) {
       try {
         for await (const event of model.stream({ ...request, signal: abort.signal })) {
           if (event.type === "text") {
-            await emit(noAnswer.push(event.text));
+            await emit(markers.push(event.text));
             continue;
           }
           budget.record(tenant.id, event.inputTokens + event.outputTokens);
@@ -247,11 +258,12 @@ export function createApp(deps: AppDeps) {
         return;
       }
 
-      await emit(noAnswer.flush());
-      // Retrieval can pass content that shares words with the question without answering it;
-      // the model's marker catches those, so the gap is reported and no unrelated sources show.
-      const unanswered = hits.length === 0 || noAnswer.found;
-      const sources = noAnswer.found ? [] : uniqueSources(hits);
+      await emit(markers.flush());
+      // Retrieval passes whatever is close to the message; only the model knows whether it answered,
+      // and from which excerpts. So the gap is reported by its marker, and the sources are the pages
+      // it cited (none for a greeting, even though excerpts were retrieved).
+      const unanswered = markers.noAnswer;
+      const sources = unanswered ? [] : uniqueSources(markers.used.flatMap((n) => (hits[n - 1] ? [hits[n - 1]] : [])));
       const reply = store.append(conv, { role: "assistant", content: answer.trimEnd(), sources, unanswered });
       if (unanswered) log("info", "unanswered question", { tenant: tenant.id, question: message });
       const offerHandoff = unanswered && tenant.settings.handoffEnabled !== false && tenant.settings.offerHandoffWhenUnsure !== false;

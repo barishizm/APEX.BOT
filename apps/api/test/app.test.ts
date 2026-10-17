@@ -51,17 +51,31 @@ describe("site key and origin", () => {
 });
 
 describe("POST /v1/chat", () => {
-  it("streams meta, deltas and done with sources", async () => {
+  it("streams meta, deltas and done with the sources the model cited", async () => {
     const { app, model } = setup();
+    model.reply = ["İade ", "14 gün içinde", " yapılır. [[used: 1]]"];
     const res = await chat(app, { message: "İade nasıl yapılır?" });
     assert.equal(res.status, 200);
     assert.match(res.headers.get("content-type") ?? "", /text\/event-stream/);
     const events = await readSSE(res);
     assert.deepEqual(events.map((e) => e.event), ["meta", "delta", "delta", "delta", "done"]);
-    assert.equal(events.slice(1, 4).map((e) => e.data.text).join(""), model.reply.join(""));
+    assert.equal(events.slice(1, 4).map((e) => e.data.text).join(""), "İade 14 gün içinde yapılır.");
     const done = events.at(-1)!.data;
     assert.equal(done.handoff, false);
-    assert.equal(done.sources[0].url, "https://alpha.example/iade");
+    assert.deepEqual(done.sources, [{ url: "https://alpha.example/iade", title: "İade politikası" }]);
+  });
+
+  it("shows only the cited documents as sources, and none when nothing was cited", async () => {
+    const { app, model } = setup();
+    // both chunks are retrieved; the answer only used the second one
+    model.reply = ["14 gün içinde iade edebilirsiniz. [[used: 2, 9]]"];
+    const cited = (await readSSE(await chat(app, { message: "iade ve kargo" }))).at(-1)!.data;
+    assert.match(model.requests[0].messages.at(-1)!.content as string, /index="2" title="İade politikası"/);
+    assert.deepEqual(cited.sources, [{ url: "https://alpha.example/iade", title: "İade politikası" }], "an index that wasn't sent is ignored");
+
+    model.reply = ["Merhaba! Size nasıl yardımcı olabilirim?"];
+    const greeting = (await readSSE(await chat(app, { message: "iade ve kargo" }))).at(-1)!.data;
+    assert.deepEqual(greeting.sources, []);
   });
 
   it("puts retrieved content and the message in delimited data blocks", async () => {
@@ -80,13 +94,23 @@ describe("POST /v1/chat", () => {
     assert.equal(content.includes("Toptan"), false);
   });
 
-  it("takes the handoff path when nothing relevant is found", async () => {
+  it("takes the handoff path when nothing relevant is found and the model says so", async () => {
     const { app, model } = setup();
+    model.reply = ["Bu bilgiye sahip değilim. [[no-answer]]"];
     const events = await readSSE(await chat(app, { message: "Bitcoin fiyatı ne?" }));
     const done = events.at(-1)!.data;
     assert.equal(done.handoff, true);
     assert.deepEqual(done.sources, []);
     assert.match(model.requests[0].messages.at(-1)!.content as string, /No website content matched/);
+  });
+
+  it("doesn't count small talk that matches nothing as an unanswered question", async () => {
+    const { app, model, store } = setup();
+    model.reply = ["Merhaba! Size nasıl yardımcı olabilirim?"];
+    const events = await readSSE(await chat(app, { message: "selam" }));
+    const done = events.at(-1)!.data;
+    assert.equal(done.handoff, false);
+    assert.equal(store.get("tn_a", events[0].data.conversationId)!.messages.at(-1)!.unanswered, false);
   });
 
   it("takes the handoff path when the model finds the retrieved content doesn't answer", async () => {

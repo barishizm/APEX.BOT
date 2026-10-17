@@ -5,7 +5,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { GATED, lowerIsBetter, type Summary } from "./metrics.ts";
-import { DATA_DIR, loadSuites, runSuite, type SuiteResult } from "./suite.ts";
+import { DATA_DIR, PRODUCTION_SETTINGS, loadSuites, runSuite, type SuiteResult } from "./suite.ts";
 
 const BASELINE = resolve(DATA_DIR, "../baseline.json");
 
@@ -14,7 +14,8 @@ interface Baseline {
 }
 
 const args = new Set(process.argv.slice(2));
-const results = loadSuites().map((s) => runSuite(s));
+// --lexical runs retrieval without embeddings (production with APEX_EMBEDDINGS=off)
+const results = await Promise.all(loadSuites().map((s) => runSuite(s, args.has("--lexical") ? { ...PRODUCTION_SETTINGS, embedder: null } : PRODUCTION_SETTINGS)));
 
 const pct = (x: number) => `${(x * 100).toFixed(1)}%`.padStart(6);
 const fmt = (metric: string, x: number) => (metric === "mrr" ? x.toFixed(3).padStart(6) : pct(x));

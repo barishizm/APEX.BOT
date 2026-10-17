@@ -64,6 +64,6 @@
     { "id": "en-unknown-gantt", "q": "Does Taskline support Gantt charts?", "expect": null, "tags": ["en", "unknown"] },
     { "id": "tr-unknown-office", "q": "İstanbul'da ofisiniz var mı?", "expect": null, "tags": ["tr", "unknown"] },
     { "id": "tr-unknown-zapier", "q": "Zapier entegrasyonunuz var mı?", "expect": null, "tags": ["tr", "unknown", "hard-negative"] },
-    { "id": "tr-unknown-thanks", "q": "Teşekkürler, iyi günler", "expect": null, "tags": ["tr", "unknown"] }
+    { "id": "tr-unknown-thanks", "q": "Teşekkürler, iyi günler", "expect": null, "tags": ["tr", "smalltalk"] }
   ]
 }

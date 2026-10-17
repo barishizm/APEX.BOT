@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { geminiContent, openAIInput } from "../src/model.ts";
 import { maskPII } from "../src/pii.ts";
-import { NO_ANSWER, NoAnswerFilter, buildMessages, buildSystem, neutralizeTags } from "../src/prompt.ts";
+import { NO_ANSWER, ReplyMarkerFilter, buildMessages, buildSystem, neutralizeTags } from "../src/prompt.ts";
 import { KnowledgeBase } from "../src/retrieval.ts";
 import { ConversationStore } from "../src/store.ts";
 import { detectLang, tokenize } from "../src/text.ts";
@@ -63,6 +63,16 @@ describe("text", () => {
     assert.equal(detectLang("kargo ne kadar"), "tr");
     assert.equal(detectLang("How long is shipping?"), "en");
     assert.equal(detectLang("ok"), null);
+  });
+
+  it("doesn't take a name's letters for the visitor's language", () => {
+    assert.equal(detectLang("Who is Barış?"), "en");
+    assert.equal(detectLang("What does Barış Akıntı do for a living?"), "en");
+    assert.equal(detectLang("Barış kimdir?"), "tr");
+    assert.equal(detectLang("Şu an kargoda mı?"), "tr");
+    assert.equal(detectLang("Thanks. Şimdi kargo ne zaman gelir?"), "tr");
+    assert.equal(detectLang("KARGO NE ZAMAN GELİR?"), "tr");
+    assert.equal(detectLang("Can I talk to Jūratė?"), "en");
   });
 
   it("detects Lithuanian, Latvian and Estonian", () => {
@@ -174,33 +184,54 @@ describe("ResendMailer", () => {
   });
 });
 
-describe("NoAnswerFilter", () => {
+describe("ReplyMarkerFilter", () => {
   const run = (deltas: string[]) => {
-    const filter = new NoAnswerFilter();
+    const filter = new ReplyMarkerFilter();
     const out = deltas.map((d) => filter.push(d)).join("") + filter.flush();
-    return { out, found: filter.found };
+    return { out, noAnswer: filter.noAnswer, used: filter.used };
+  };
+  const everySplit = (reply: string, check: (r: ReturnType<typeof run>, at: string) => void) => {
+    for (let i = 0; i <= reply.length; i++) {
+      for (let j = i; j <= reply.length; j++) check(run([reply.slice(0, i), reply.slice(i, j), reply.slice(j)]), `split at ${i},${j}`);
+    }
   };
 
-  it("strips the marker wherever the stream splits it", () => {
-    const reply = `Bilmiyorum. ${NO_ANSWER}`;
-    for (let i = 0; i <= reply.length; i++) {
-      for (let j = i; j <= reply.length; j++) {
-        const { out, found } = run([reply.slice(0, i), reply.slice(i, j), reply.slice(j)]);
-        assert.equal(out, "Bilmiyorum. ", `split at ${i},${j}`);
-        assert.equal(found, true);
-      }
-    }
+  it("strips the no-answer marker wherever the stream splits it", () => {
+    everySplit(`Bilmiyorum. ${NO_ANSWER}`, (r, at) => {
+      assert.equal(r.out, "Bilmiyorum.", at);
+      assert.equal(r.noAnswer, true);
+      assert.deepEqual(r.used, []);
+    });
+  });
+
+  it("strips the used marker wherever the stream splits it and records the documents", () => {
+    everySplit("Kargo 3 gün sürer.\n\n[[used: 2, 1]]", (r, at) => {
+      assert.equal(r.out, "Kargo 3 gün sürer.", at);
+      assert.deepEqual(r.used, [2, 1], at);
+      assert.equal(r.noAnswer, false);
+    });
+  });
+
+  it("accepts spacing variants and ignores repeats", () => {
+    assert.deepEqual(run(["A [[used:3]] B [[used: 3 ,4 ]]"]), { out: "A B", noAnswer: false, used: [3, 4] });
   });
 
   it("passes look-alike text through untouched", () => {
-    assert.deepEqual(run(["Bkz. [[1]] ve [[no-", "ans"]), { out: "Bkz. [[1]] ve [[no-ans", found: false });
-    assert.deepEqual(run(["dizi[", "0]"]), { out: "dizi[0]", found: false });
+    assert.deepEqual(run(["Bkz. [[1]] ve [[no-", "ans"]), { out: "Bkz. [[1]] ve [[no-ans", noAnswer: false, used: [] });
+    assert.deepEqual(run(["dizi[", "0]"]), { out: "dizi[0]", noAnswer: false, used: [] });
+    assert.deepEqual(run(["[[used: x]] ve [[used]]"]), { out: "[[used: x]] ve [[used]]", noAnswer: false, used: [] });
+    assert.deepEqual(run(["[[used: 1, 2"]), { out: "[[used: 1, 2", noAnswer: false, used: [] });
   });
 
-  it("only holds back what could still become the marker", () => {
-    const filter = new NoAnswerFilter();
-    assert.equal(filter.push("Kargo 3 gün ["), "Kargo 3 gün ");
-    assert.equal(filter.push("x"), "[x");
+  it("only holds back what could still become a marker", () => {
+    const filter = new ReplyMarkerFilter();
+    assert.equal(filter.push("Kargo 3 gün ["), "Kargo 3 gün");
+    assert.equal(filter.push("x"), " [x");
+    assert.equal(filter.push(" [[us"), "");
+    assert.equal(filter.push("ed: 1"), "");
+    assert.equal(filter.push("]] tamam "), " tamam");
+    assert.equal(filter.flush(), "");
+    assert.deepEqual(filter.used, [1]);
   });
 });
 
