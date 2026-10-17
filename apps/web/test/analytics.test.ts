@@ -3,7 +3,12 @@ import assert from "node:assert/strict"
 import type { QuestionRow } from "@apex/db"
 import { groupUnanswered, languageMix, topTopics } from "../lib/analytics.ts"
 
-const q = (content: string, sourced: boolean | null = true, unanswered: boolean | null = false): QuestionRow => ({ content, sourced, unanswered })
+const q = (content: string, sourced: boolean | null = true, unanswered: boolean | null = false, topic: string | null = null): QuestionRow => ({
+  content,
+  sourced,
+  unanswered,
+  topic,
+})
 
 describe("topTopics", () => {
   test("groups inflected forms of the same word and ranks by questions", () => {
@@ -33,6 +38,37 @@ describe("topTopics", () => {
       [2, 2],
     )
     assert.deepEqual(topTopics([q("hello"), q("ok")]), [])
+  })
+
+  test("uses stored labels once they cover most questions, leaving out names and greetings", () => {
+    const topics = topTopics([
+      q("Merhaba Barış", null, null, ""),
+      q("Barış bey merhaba", null, null, ""),
+      q("Kargo ne kadar?", true, false, "Kargo ücreti"),
+      q("Ücretsiz kargo var mı?", false, true, "kargo ücreti"),
+      q("Kargo ücreti?", true, false, "Kargo ücreti"),
+      q("İade nasıl yapılır?", true, false, "İade"),
+      q("İade süresi?", true, false, "İade"),
+      q("Tek soru", true, false, "Tek konu"),
+      q("Henüz etiketlenmedi"),
+    ])
+    assert.deepEqual(
+      topics.map((t) => [t.title, t.questions]),
+      [
+        ["Kargo ücreti", 3],
+        ["İade", 2],
+      ],
+    )
+    assert.equal(topics[0].unanswered, 1)
+    assert.deepEqual(topics[0].keywords, ["Kargo ücreti"])
+    // shares are of the labeled questions, greetings included
+    assert.equal(topics[0].share, 3 / 8)
+  })
+
+  test("groups by words while most questions are still unlabeled", () => {
+    const topics = topTopics([q("Kargo ne kadar?", true, false, "Kargo ücreti"), q("Kargo nerede?"), q("Kargo süresi?")])
+    assert.equal(topics[0].questions, 3)
+    assert.equal(topics[0].title, "Kargo")
   })
 
   test("examples skip repeats", () => {

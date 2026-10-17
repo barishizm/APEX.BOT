@@ -51,6 +51,8 @@ export interface QuestionRow {
   /** The reply cited a source / was flagged as unanswered; null when no reply was stored. */
   sourced: boolean | null
   unanswered: boolean | null
+  /** From the background labeler: null until labeled, '' when the message names no topic. */
+  topic: string | null
 }
 
 export interface UnansweredRow {
@@ -206,7 +208,7 @@ export async function analyticsData(db: Db, who: BotScope, options: { days?: unk
     // each visitor message with the first reply after it in the same conversation
     db.query<QuestionRow>(
       `with ${BOUNDS}
-       select u.content, jsonb_array_length(r.sources) > 0 as sourced, r.unanswered
+       select u.content, jsonb_array_length(r.sources) > 0 as sourced, r.unanswered, u.topic
          from app.messages u cross join bounds b
          left join lateral (
            select r.sources, r.unanswered from app.messages r
