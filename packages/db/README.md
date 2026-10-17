@@ -26,6 +26,17 @@ Kayıt / giriş için veritabanı şeması, migration çalıştırıcısı ve au
 
 Tüm tablolarda RLS açık ve hiç politika yok: Supabase'in `anon` / `authenticated` rolleri (REST API) hiçbir şeye erişemez; sunucu tablo sahibi olarak bağlandığı için etkilenmez. `app` şeması Supabase'in REST API'sinde zaten açık değil.
 
+## Canlı veritabanı nerede?
+
+**Canlı (production) veritabanı Neon'da.** Vercel'deki (web) ve Render'daki (`apex-api`) `DATABASE_URL` ona bağlı; ikisinde de gizli değişken olarak duruyor, panellerden geri okunamaz. Bağlantı adresinin tek kopyası Neon konsolu (ve şifre yöneticin).
+
+`apps/web/.env.local` ise eski Supabase projesine (`JJ.bot`) bağlı bir **geliştirme** veritabanıdır. Yerelden çalıştırılan `npm run db:migrate` ve `npm run admin:bootstrap` oraya gider, canlıya değil. Canlıda bir şey yapmak için:
+
+- Neon konsolu → projen → **SQL Editor**, ya da
+- komutu canlı adresle çalıştır: `DATABASE_URL='<Neon adresi>' npm run admin:bootstrap -- sen@ornek.com`
+
+Migration'ları canlıya Render'daki `apex-api` her deploy'da kendisi uygular (`render.yaml` build komutu).
+
 ## Supabase kurulumu (bir kerelik)
 
 1. <https://supabase.com/dashboard> → **New project**. Bölge olarak kullanıcılara yakın birini seç (ör. `eu-central-1` Frankfurt). Veritabanı şifresini güçlü seç ve bir şifre yöneticisine kaydet.
