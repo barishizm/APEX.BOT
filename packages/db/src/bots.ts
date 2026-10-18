@@ -299,6 +299,9 @@ export async function rotateSiteKey(db: Db, who: BotScope): Promise<Bot> {
   return getBotForUser(db, { userId, botId: bot.id })
 }
 
+// Bots the widget serves: not disabled by staff, in a workspace that isn't suspended (b, o aliases)
+const SERVING = "b.disabled_at is null and o.suspended_at is null"
+
 export interface BotRecord {
   id: string
   organizationName: string
@@ -319,7 +322,8 @@ export async function listBotsChangedSince(db: Queryable, since: Date | null): P
        from app.bots b join app.organizations o on o.id = b.organization_id
       -- JS dates carry milliseconds, Postgres microseconds: compare at JS precision so the
       -- newest bot isn't returned again on every poll
-      where $1::timestamptz is null or date_trunc('milliseconds', b.updated_at) > $1::timestamptz
+      where ${SERVING}
+        and ($1::timestamptz is null or date_trunc('milliseconds', b.updated_at) > $1::timestamptz)
       order by b.updated_at`,
     [since],
   )
@@ -334,10 +338,22 @@ export async function listBotsChangedSince(db: Queryable, since: Date | null): P
   }))
 }
 
-/** Ids of every bot, so the chat API's sync can drop the ones that were deleted. */
+/**
+ * Ids of every bot that should answer, so the chat API's sync can drop the ones that were deleted,
+ * disabled or whose workspace was suspended.
+ */
 export async function listBotIds(db: Queryable): Promise<string[]> {
-  const { rows } = await db.query<{ id: string }>("select id from app.bots")
+  const { rows } = await db.query<{ id: string }>(`select b.id from app.bots b join app.organizations o on o.id = b.organization_id where ${SERVING}`)
   return rows.map((r) => r.id)
+}
+
+/**
+ * Marks every bot of a workspace changed, so the chat API's sync picks it up again (after a
+ * suspension is lifted) on its next pass.
+ */
+export async function touchWorkspaceBots(q: Queryable, organizationId: string): Promise<number> {
+  const { rows } = await q.query("update app.bots set updated_at = now() where organization_id = $1 returning id", [organizationId])
+  return rows.length
 }
 
 /** Called by the chat API when the widget loads on an allowed site (throttled there). */

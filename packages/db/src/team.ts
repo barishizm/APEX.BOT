@@ -44,42 +44,76 @@ export interface Team {
 
 const nameOf = (r: { display_name: string | null; username: string }) => r.display_name || r.username
 
-/** The members and open invitations of the user's current workspace. */
-export async function getTeam(db: Db, userId: string): Promise<Team> {
-  const me = await membership(db, userId)
-  const members = await db.query<{ user_id: string; email: string; username: string; display_name: string | null; role: MemberRole; created_at: Date }>(
+/** Members of a workspace, owners first. */
+export async function teamMembers(q: Queryable, organizationId: string): Promise<TeamMember[]> {
+  const { rows } = await q.query<{ user_id: string; email: string; username: string; display_name: string | null; role: MemberRole; created_at: Date }>(
     `select m.user_id, u.email, u.username, u.display_name, m.role, m.created_at
        from app.organization_members m join app.users u on u.id = m.user_id
       where m.organization_id = $1
       order by array_position(array['owner', 'admin', 'member'], m.role), m.created_at`,
-    [me.organization_id],
+    [organizationId],
   )
-  const invites = await db.query<{ id: string; email: string; role: InviteRole; created_at: Date; expires_at: Date; username: string | null; display_name: string | null }>(
+  return rows.map((r) => ({ userId: r.user_id, email: r.email, name: nameOf(r), role: r.role, joinedAt: r.created_at }))
+}
+
+/** Open invitations of a workspace, newest first, expired ones included so they can be sent again. */
+export async function teamInvites(q: Queryable, organizationId: string): Promise<TeamInvite[]> {
+  const { rows } = await q.query<{ id: string; email: string; role: InviteRole; created_at: Date; expires_at: Date; username: string | null; display_name: string | null }>(
     `select i.id, i.email, i.role, i.created_at, i.expires_at, u.username, u.display_name
        from app.organization_invitations i left join app.users u on u.id = i.invited_by
       where i.organization_id = $1 and i.accepted_at is null
       order by i.created_at desc`,
-    [me.organization_id],
+    [organizationId],
   )
-  const workspaces = await db.query<{ id: string; name: string; role: MemberRole }>(
-    `select o.id, o.name, m.role from app.organization_members m join app.organizations o on o.id = m.organization_id
-      where m.user_id = $1 order by o.name, o.id`,
-    [userId],
-  )
-  return {
-    workspace: { id: me.organization_id, name: me.name },
-    role: me.role,
-    members: members.rows.map((r) => ({ userId: r.user_id, email: r.email, name: nameOf(r), role: r.role, joinedAt: r.created_at })),
-    invites: invites.rows.map((r) => ({
-      id: r.id,
-      email: r.email,
-      role: r.role,
-      invitedBy: r.username ? nameOf({ username: r.username, display_name: r.display_name }) : null,
-      createdAt: r.created_at,
-      expiresAt: r.expires_at,
-    })),
-    workspaces: workspaces.rows,
-  }
+  return rows.map((r) => ({
+    id: r.id,
+    email: r.email,
+    role: r.role,
+    invitedBy: r.username ? nameOf({ username: r.username, display_name: r.display_name }) : null,
+    createdAt: r.created_at,
+    expiresAt: r.expires_at,
+  }))
+}
+
+/** The members and open invitations of the user's current workspace. */
+export async function getTeam(db: Db, userId: string): Promise<Team> {
+  const me = await membership(db, userId)
+  const [members, invites, workspaces] = await Promise.all([
+    teamMembers(db, me.organization_id),
+    teamInvites(db, me.organization_id),
+    db.query<{ id: string; name: string; role: MemberRole }>(
+      `select o.id, o.name, m.role from app.organization_members m join app.organizations o on o.id = m.organization_id
+        where m.user_id = $1 order by o.name, o.id`,
+      [userId],
+    ),
+  ])
+  return { workspace: { id: me.organization_id, name: me.name }, role: me.role, members, invites, workspaces: workspaces.rows }
+}
+
+// ---------- Whose authority a change runs with ----------
+
+/**
+ * The workspace a team change applies to and the role it is made with: a member's own role, or
+ * for platform staff (the admin area) an owner's, without being a member (`userId` null).
+ */
+export interface TeamActor {
+  organizationId: string
+  workspaceName: string
+  role: MemberRole
+  userId: string | null
+}
+
+async function memberActor(q: Queryable, userId: string): Promise<TeamActor> {
+  const me = await membership(q, userId)
+  return { organizationId: me.organization_id, workspaceName: me.name, role: me.role, userId }
+}
+
+/** Platform staff acting on a workspace. Staff only: check the caller's platform role first. */
+async function staffActor(q: Queryable, organizationId: unknown): Promise<TeamActor> {
+  if (typeof organizationId !== "string" || !UUID.test(organizationId)) throw new AuthError("not_found", "Workspace not found")
+  const { rows } = await q.query<{ name: string }>("select name from app.organizations where id = $1", [organizationId])
+  if (!rows[0]) throw new AuthError("not_found", "Workspace not found")
+  return { organizationId, workspaceName: rows[0].name, role: "owner", userId: null }
 }
 
 /**
@@ -95,13 +129,23 @@ export async function inviteMember(
   const email = normalizeEmail(input.email)
   if (typeof input.role !== "string" || !INVITE_ROLES.includes(input.role)) throw new AuthError("invalid_input", "Choose a role")
   const role = input.role as InviteRole
-  const me = await membership(db, userId)
+  const me = await memberActor(db, userId)
   if (!canEditBot(me.role)) throw new AuthError("forbidden", "Only workspace owners and admins can invite people")
   if (role === "admin" && me.role !== "owner") throw new AuthError("forbidden", "Only owners can invite admins")
+  return issueInvite(db, me, email, role, userId)
+}
 
+/** Writes a new invitation link (replacing any open one for the address) within the workspace's limits. */
+async function issueInvite(
+  db: Db,
+  actor: TeamActor,
+  email: string,
+  role: InviteRole,
+  invitedBy: string | null,
+): Promise<{ invite: TeamInvite; token: string; workspaceName: string }> {
   return db.transaction(async (tx) => {
     // serializes invitations so the limits hold
-    await tx.query("select 1 from app.organizations where id = $1 for update", [me.organization_id])
+    await tx.query("select 1 from app.organizations where id = $1 for update", [actor.organizationId])
     const { rows } = await tx.query<{ member: boolean; people: number; today: number }>(
       `select exists (select 1 from app.organization_members m join app.users u on u.id = m.user_id
                        where m.organization_id = $1 and u.email = $2) as member,
@@ -110,7 +154,7 @@ export async function inviteMember(
                     where organization_id = $1 and accepted_at is null and expires_at > now() and email <> $2) as people,
               (select count(*)::int from app.organization_invitations
                 where organization_id = $1 and created_at > now() - interval '24 hours') as today`,
-      [me.organization_id, email],
+      [actor.organizationId, email],
     )
     if (rows[0].member) throw new AuthError("conflict", "This person is already in the workspace")
     if (rows[0].people >= TEAM_LIMIT) throw new AuthError("conflict", `A workspace can have up to ${TEAM_LIMIT} people`)
@@ -118,36 +162,63 @@ export async function inviteMember(
 
     const token = newSessionToken()
     await tx.query("delete from app.organization_invitations where organization_id = $1 and email = $2 and accepted_at is null", [
-      me.organization_id,
+      actor.organizationId,
       email,
     ])
     const inserted = await tx.query<{ id: string; created_at: Date; expires_at: Date }>(
       `insert into app.organization_invitations (organization_id, email, role, token_hash, invited_by, expires_at)
        values ($1, $2, $3, $4, $5, $6) returning id, created_at, expires_at`,
-      [me.organization_id, email, role, sha256(token), userId, new Date(Date.now() + INVITE_TTL_MS)],
+      [actor.organizationId, email, role, sha256(token), invitedBy, new Date(Date.now() + INVITE_TTL_MS)],
     )
-    const inviter = await tx.query<{ username: string; display_name: string | null }>("select username, display_name from app.users where id = $1", [userId])
+    const inviter = await tx.query<{ username: string; display_name: string | null }>("select username, display_name from app.users where id = $1", [invitedBy])
     const r = inserted.rows[0]
     return {
-      invite: { id: r.id, email, role, invitedBy: nameOf(inviter.rows[0]), createdAt: r.created_at, expiresAt: r.expires_at },
+      invite: { id: r.id, email, role, invitedBy: inviter.rows[0] ? nameOf(inviter.rows[0]) : null, createdAt: r.created_at, expiresAt: r.expires_at },
       token,
-      workspaceName: me.name,
+      workspaceName: actor.workspaceName,
     }
   })
 }
 
-/** Withdraws an open invitation; its link stops working. */
-export async function revokeInvite(db: Db, userId: string, inviteId: unknown): Promise<void> {
-  const me = await membership(db, userId)
-  if (!canEditBot(me.role)) throw new AuthError("forbidden", "Only workspace owners and admins can manage invitations")
+const findInvite = async (q: Queryable, actor: TeamActor, inviteId: unknown) => {
   if (typeof inviteId !== "string" || !UUID.test(inviteId)) throw new AuthError("not_found", "This invitation no longer exists")
   // like sending, admins handle member invitations only
-  const { rows } = await db.query(
-    `delete from app.organization_invitations
-      where id = $1 and organization_id = $2 and accepted_at is null and ($3 = 'owner' or role = 'member') returning id`,
-    [inviteId, me.organization_id, me.role],
+  const { rows } = await q.query<{ id: string; email: string; role: InviteRole; invited_by: string | null }>(
+    `select id, email, role, invited_by from app.organization_invitations
+      where id = $1 and organization_id = $2 and accepted_at is null and ($3 = 'owner' or role = 'member')`,
+    [inviteId, actor.organizationId, actor.role],
   )
-  if (!rows.length) throw new AuthError("not_found", "This invitation no longer exists")
+  if (!rows[0]) throw new AuthError("not_found", "This invitation no longer exists")
+  return rows[0]
+}
+
+/**
+ * A fresh link for an open (or expired) invitation, same address and role, from the same inviter.
+ * The old link stops working. The caller emails `token`.
+ */
+async function resendInviteAs(db: Db, actor: TeamActor, inviteId: unknown) {
+  if (!canEditBot(actor.role)) throw new AuthError("forbidden", "Only workspace owners and admins can manage invitations")
+  const old = await findInvite(db, actor, inviteId)
+  const sent = await issueInvite(db, actor, old.email, old.role, old.invited_by)
+  return { ...sent, previousId: old.id }
+}
+
+/** Withdraws an open invitation; its link stops working. */
+export async function revokeInvite(db: Db, userId: string, inviteId: unknown): Promise<void> {
+  await revokeInviteAs(db, await memberActor(db, userId), inviteId)
+}
+
+async function revokeInviteAs(db: Db, actor: TeamActor, inviteId: unknown): Promise<{ email: string; role: InviteRole }> {
+  if (!canEditBot(actor.role)) throw new AuthError("forbidden", "Only workspace owners and admins can manage invitations")
+  if (typeof inviteId !== "string" || !UUID.test(inviteId)) throw new AuthError("not_found", "This invitation no longer exists")
+  // like sending, admins handle member invitations only
+  const { rows } = await db.query<{ email: string; role: InviteRole }>(
+    `delete from app.organization_invitations
+      where id = $1 and organization_id = $2 and accepted_at is null and ($3 = 'owner' or role = 'member') returning email, role`,
+    [inviteId, actor.organizationId, actor.role],
+  )
+  if (!rows[0]) throw new AuthError("not_found", "This invitation no longer exists")
+  return rows[0]
 }
 
 export interface Invitation {
@@ -258,18 +329,22 @@ const otherOwners = async (db: Queryable, organizationId: string, userId: string
 
 /** Changes someone's role. Only owners can, and a workspace always keeps at least one owner. */
 export async function changeMemberRole(db: Db, userId: string, targetUserId: unknown, rawRole: unknown): Promise<void> {
+  await changeMemberRoleAs(db, await memberActor(db, userId), targetUserId, rawRole)
+}
+
+async function changeMemberRoleAs(db: Db, actor: TeamActor, targetUserId: unknown, rawRole: unknown): Promise<{ before: MemberRole; after: MemberRole }> {
   if (typeof rawRole !== "string" || !MEMBER_ROLES.includes(rawRole)) throw new AuthError("invalid_input", "Choose a role")
   const role = rawRole as MemberRole
-  const me = await membership(db, userId)
-  if (me.role !== "owner") throw new AuthError("forbidden", "Only owners can change roles")
-  await db.transaction(async (tx) => {
-    await tx.query("select 1 from app.organizations where id = $1 for update", [me.organization_id])
-    const current = await memberRole(tx, me.organization_id, targetUserId)
-    if (current === role) return
-    if (targetUserId === userId && role !== "owner" && (await otherOwners(tx, me.organization_id, userId)) === 0) {
+  if (actor.role !== "owner") throw new AuthError("forbidden", "Only owners can change roles")
+  return db.transaction(async (tx) => {
+    await tx.query("select 1 from app.organizations where id = $1 for update", [actor.organizationId])
+    const current = await memberRole(tx, actor.organizationId, targetUserId)
+    if (current === role) return { before: current, after: role }
+    if (current === "owner" && (await otherOwners(tx, actor.organizationId, targetUserId as string)) === 0) {
       throw new AuthError("conflict", "A workspace needs an owner. Make someone else an owner first")
     }
-    await tx.query("update app.organization_members set role = $3 where organization_id = $1 and user_id = $2", [me.organization_id, targetUserId, role])
+    await tx.query("update app.organization_members set role = $3 where organization_id = $1 and user_id = $2", [actor.organizationId, targetUserId, role])
+    return { before: current, after: role }
   })
 }
 
@@ -278,28 +353,75 @@ export async function changeMemberRole(db: Db, userId: string, targetUserId: unk
  * admins remove members. The last owner can't leave, and nobody can leave their only workspace.
  */
 export async function removeMember(db: Db, userId: string, targetUserId: unknown): Promise<{ left: boolean }> {
-  const me = await membership(db, userId)
-  const left = targetUserId === userId
-  await db.transaction(async (tx) => {
-    await tx.query("select 1 from app.organizations where id = $1 for update", [me.organization_id])
-    const target = await memberRole(tx, me.organization_id, targetUserId)
-    if (left) {
-      if (target === "owner" && (await otherOwners(tx, me.organization_id, userId)) === 0) {
-        throw new AuthError("conflict", "A workspace needs an owner. Make someone else an owner first")
-      }
-      const elsewhere = await tx.query("select 1 from app.organization_members where user_id = $1 and organization_id <> $2 limit 1", [
-        userId,
-        me.organization_id,
-      ])
-      if (!elsewhere.rows.length) throw new AuthError("conflict", "This is your only workspace, so you can't leave it")
-    } else if (!(me.role === "owner" || (me.role === "admin" && target === "member"))) {
-      throw new AuthError("forbidden", me.role === "admin" ? "Admins can only remove members" : "Only workspace owners and admins can remove people")
-    }
-    await tx.query("delete from app.organization_members where organization_id = $1 and user_id = $2", [me.organization_id, targetUserId])
-    await tx.query("update app.users set active_organization_id = null where id = $1 and active_organization_id = $2", [targetUserId, me.organization_id])
-  })
+  const { left } = await removeMemberAs(db, await memberActor(db, userId), targetUserId)
   return { left }
 }
+
+async function removeMemberAs(db: Db, actor: TeamActor, targetUserId: unknown): Promise<{ left: boolean; role: MemberRole }> {
+  const left = actor.userId !== null && targetUserId === actor.userId
+  return db.transaction(async (tx) => {
+    await tx.query("select 1 from app.organizations where id = $1 for update", [actor.organizationId])
+    const target = await memberRole(tx, actor.organizationId, targetUserId)
+    const id = targetUserId as string
+    if (!left && !(actor.role === "owner" || (actor.role === "admin" && target === "member"))) {
+      throw new AuthError("forbidden", actor.role === "admin" ? "Admins can only remove members" : "Only workspace owners and admins can remove people")
+    }
+    if (target === "owner" && (await otherOwners(tx, actor.organizationId, id)) === 0) {
+      throw new AuthError("conflict", "A workspace needs an owner. Make someone else an owner first")
+    }
+    if (left) {
+      const elsewhere = await tx.query("select 1 from app.organization_members where user_id = $1 and organization_id <> $2 limit 1", [
+        id,
+        actor.organizationId,
+      ])
+      if (!elsewhere.rows.length) throw new AuthError("conflict", "This is your only workspace, so you can't leave it")
+    }
+    await tx.query("delete from app.organization_members where organization_id = $1 and user_id = $2", [actor.organizationId, id])
+    await tx.query("update app.users set active_organization_id = null where id = $1 and active_organization_id = $2", [id, actor.organizationId])
+    return { left, role: target }
+  })
+}
+
+/** Makes a member the workspace's only owner; the owners before them become admins. Owners only. */
+async function transferOwnershipAs(db: Db, actor: TeamActor, targetUserId: unknown): Promise<{ previousOwners: string[]; owner: string; before: MemberRole }> {
+  if (actor.role !== "owner") throw new AuthError("forbidden", "Only owners can hand over the workspace")
+  return db.transaction(async (tx) => {
+    await tx.query("select 1 from app.organizations where id = $1 for update", [actor.organizationId])
+    const before = await memberRole(tx, actor.organizationId, targetUserId)
+    const id = targetUserId as string
+    const owners = await tx.query<{ user_id: string }>(
+      "select user_id from app.organization_members where organization_id = $1 and role = 'owner' and user_id <> $2 order by created_at",
+      [actor.organizationId, id],
+    )
+    if (before === "owner" && !owners.rows.length) throw new AuthError("conflict", "This person already owns the workspace")
+    await tx.query("update app.organization_members set role = 'owner' where organization_id = $1 and user_id = $2", [actor.organizationId, id])
+    await tx.query("update app.organization_members set role = 'admin' where organization_id = $1 and role = 'owner' and user_id <> $2", [
+      actor.organizationId,
+      id,
+    ])
+    return { previousOwners: owners.rows.map((r) => r.user_id), owner: id, before }
+  })
+}
+
+// ---------- Platform staff (the admin area) ----------
+// The same changes with an owner's powers on any workspace; the rules that protect the workspace
+// itself (it keeps an owner, the team and invitation limits) still hold. Staff only: the caller checks
+// the platform role, and passes its transaction as a Db (inTransaction) to audit in it.
+
+export const staffChangeMemberRole = async (db: Db, organizationId: unknown, targetUserId: unknown, role: unknown) =>
+  changeMemberRoleAs(db, await staffActor(db, organizationId), targetUserId, role)
+
+export const staffRemoveMember = async (db: Db, organizationId: unknown, targetUserId: unknown) =>
+  removeMemberAs(db, await staffActor(db, organizationId), targetUserId)
+
+export const staffTransferOwnership = async (db: Db, organizationId: unknown, targetUserId: unknown) =>
+  transferOwnershipAs(db, await staffActor(db, organizationId), targetUserId)
+
+export const staffRevokeInvite = async (db: Db, organizationId: unknown, inviteId: unknown) =>
+  revokeInviteAs(db, await staffActor(db, organizationId), inviteId)
+
+export const staffResendInvite = async (db: Db, organizationId: unknown, inviteId: unknown) =>
+  resendInviteAs(db, await staffActor(db, organizationId), inviteId)
 
 /** Switches the workspace the dashboard shows. */
 export async function setActiveWorkspace(db: Db, userId: string, organizationId: unknown): Promise<void> {
