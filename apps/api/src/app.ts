@@ -257,7 +257,7 @@ export function createApp(deps: AppDeps) {
             await emit(markers.push(event.text));
             continue;
           }
-          budget.record(tenant.id, event.inputTokens + event.outputTokens);
+          budget.record(tenant.id, { input: event.inputTokens, output: event.outputTokens });
           if (event.refused) {
             log("warn", "model refused", { tenant: tenant.id, conversation: conv.id });
             await stream.writeSSE({ event: "error", data: JSON.stringify({ code: "refused" satisfies ErrorCode }) });

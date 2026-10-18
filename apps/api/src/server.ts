@@ -69,19 +69,48 @@ let onWidgetSeen: ((tenant: Tenant, origin: string) => void) | undefined;
 let tokenUsage: TokenUsageStore | undefined;
 let store = new ConversationStore();
 if (process.env.DATABASE_URL) {
-  const { addTokenUsage, createDbFromEnv, loadEmbeddings, missingMigrations, pruneEmbeddings, saveEmbeddings, tokensUsedOn, recordWidgetSeen, saveTopics, sweepConversations, topicVocabulary, unlabeledQuestions } =
-    await import("@apex/db");
+  const {
+    addTokenUsage,
+    createDbFromEnv,
+    loadEmbeddings,
+    missingMigrations,
+    pruneEmbeddings,
+    reportApiRuntime,
+    saveEmbeddings,
+    tokensUsedOn,
+    recordWidgetSeen,
+    saveTopics,
+    sweepConversations,
+    topicVocabulary,
+    unlabeledQuestions,
+  } = await import("@apex/db");
   const db = createDbFromEnv();
   const missing: string[] = await missingMigrations(db).catch((error) => {
     log("error", "database not reachable at startup", { error });
     return [];
   });
   if (missing.length) log("error", "the database needs an update: run npm run db:migrate", { missing });
-  // only dashboard bots have a row to count against; the local demo tenant stays in memory
+  // only dashboard bots have a row to count against; the local demo tenant stays in memory.
+  // Input and output are stored apart from migration 0028 on, for the admin cost estimate.
+  const split = !missing.includes("0028_token_usage_split.sql");
   tokenUsage = {
     load: (id, day) => (tenants.findById(id)?.managed ? tokensUsedOn(db, id, day) : Promise.resolve(0)),
-    add: (id, day, tokens) => (tenants.findById(id)?.managed ? addTokenUsage(db, id, day, tokens) : Promise.resolve()),
+    add: (id, day, usage) => (tenants.findById(id)?.managed ? addTokenUsage(db, id, day, split ? usage : usage.input + usage.output) : Promise.resolve()),
   };
+  // What this API runs with, for /admin/usage: whether each key is set (never its value) and the token ceiling
+  reportApiRuntime(db, {
+    keys: {
+      ANTHROPIC_API_KEY: !!process.env.ANTHROPIC_API_KEY,
+      OPENAI_API_KEY: !!process.env.OPENAI_API_KEY,
+      GEMINI_API_KEY: !!(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY),
+      RESEND_API_KEY: !!process.env.RESEND_API_KEY,
+    },
+    embeddings: queryEmbedder ? config.embeddings : null,
+    geminiTier: config.geminiTier,
+    maxDailyTokensPerTenant: config.limits.maxDailyTokensPerTenant,
+    defaultModel: config.model,
+    topicModel: config.topicModel,
+  }).catch((error) => log("warn", "couldn't report the API's runtime settings", { error }));
   const vectors: VectorStore = {
     load: (id, model, hashes) => loadEmbeddings(db, id, model, hashes),
     save: (id, model, rows) => saveEmbeddings(db, id, model, rows),

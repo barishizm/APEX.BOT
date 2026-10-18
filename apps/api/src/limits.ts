@@ -29,10 +29,16 @@ export class RateLimiter {
   }
 }
 
+/** One model call's tokens; the budget counts both, the admin usage page prices them separately. */
+export interface TokenCount {
+  input: number;
+  output: number;
+}
+
 /** Where daily token counts are kept across restarts (Postgres); optional, memory alone is the fallback. */
 export interface TokenUsageStore {
   load(tenantId: string, day: string): Promise<number>;
-  add(tenantId: string, day: string, tokens: number): Promise<void>;
+  add(tenantId: string, day: string, usage: TokenCount): Promise<void>;
 }
 
 export class TokenBudget {
@@ -71,8 +77,8 @@ export class TokenBudget {
     return entry && entry.day === this.today() ? entry.tokens : 0;
   }
 
-  record(tenantId: string, tokens: number): void {
-    this.used.set(tenantId, { day: this.today(), tokens: this.usedToday(tenantId) + tokens });
-    this.store?.add(tenantId, this.today(), tokens).catch(this.onError);
+  record(tenantId: string, usage: TokenCount): void {
+    this.used.set(tenantId, { day: this.today(), tokens: this.usedToday(tenantId) + usage.input + usage.output });
+    this.store?.add(tenantId, this.today(), usage).catch(this.onError);
   }
 }

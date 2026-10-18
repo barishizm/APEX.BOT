@@ -393,11 +393,28 @@ export async function tokensUsedOn(db: Queryable, botId: string, day: string): P
   return rows[0] ? Number(rows[0].tokens) : 0
 }
 
-export async function addTokenUsage(db: Queryable, botId: string, day: string, tokens: number): Promise<void> {
+/**
+ * Adds a model call's tokens to the bot's day. Pass input and output apart where known (needs
+ * migration 0028); a bare number counts toward the budget only, and is priced as an estimate.
+ */
+export async function addTokenUsage(db: Queryable, botId: string, day: string, usage: number | { input: number; output: number }): Promise<void> {
+  const clean = (n: number) => Math.max(0, Math.round(n))
+  if (typeof usage === "number") {
+    await db.query(
+      `insert into app.token_usage (bot_id, day, tokens) values ($1, $2::date, $3)
+       on conflict (bot_id, day) do update set tokens = app.token_usage.tokens + excluded.tokens`,
+      [botId, day, clean(usage)],
+    )
+    return
+  }
+  const input = clean(usage.input)
+  const output = clean(usage.output)
   await db.query(
-    `insert into app.token_usage (bot_id, day, tokens) values ($1, $2::date, $3)
-     on conflict (bot_id, day) do update set tokens = app.token_usage.tokens + excluded.tokens`,
-    [botId, day, Math.max(0, Math.round(tokens))],
+    `insert into app.token_usage (bot_id, day, tokens, input_tokens, output_tokens) values ($1, $2::date, $3, $4, $5)
+     on conflict (bot_id, day) do update set tokens = app.token_usage.tokens + excluded.tokens,
+       input_tokens = app.token_usage.input_tokens + excluded.input_tokens,
+       output_tokens = app.token_usage.output_tokens + excluded.output_tokens`,
+    [botId, day, input + output, input, output],
   )
 }
 

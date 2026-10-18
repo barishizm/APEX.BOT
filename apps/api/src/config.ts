@@ -40,6 +40,11 @@ export interface Config {
    * background (APEX_TOPIC_MODEL; "off" disables it, and so does APEX_MODEL=echo).
    */
   topicModel: string | null;
+  /**
+   * APEX_GEMINI_TIER: "paid" once billing is on for the Gemini key, "free" otherwise. It can't be
+   * read from the key itself; /admin/usage warns about embedding quota until it says "paid".
+   */
+  geminiTier: "free" | "paid" | null;
   limits: Limits;
 }
 
@@ -104,6 +109,7 @@ export function loadConfig(): Config {
     embeddings: embeddingsSpec(process.env.APEX_EMBEDDINGS),
     embeddingTimeoutMs: num("APEX_EMBEDDING_TIMEOUT_MS", 2500),
     topicModel: process.env.APEX_TOPIC_MODEL === "off" || process.env.APEX_MODEL === "echo" ? null : process.env.APEX_TOPIC_MODEL || "claude-haiku-5-5",
+    geminiTier: process.env.APEX_GEMINI_TIER === "paid" ? "paid" : process.env.APEX_GEMINI_TIER === "free" ? "free" : null,
     limits: {
       ...defaultLimits,
       minRetrievalScore: num("APEX_MIN_RETRIEVAL_SCORE", defaultLimits.minRetrievalScore),
