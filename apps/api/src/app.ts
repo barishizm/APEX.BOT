@@ -31,6 +31,8 @@ export interface AppDeps {
   now?: () => number;
   /** Persists daily token counts so the budget survives restarts. */
   tokenUsage?: TokenUsageStore;
+  /** Whether a feature flag (/admin/settings) is on for the tenant's workspace; without it every flag has its default. */
+  featureEnabled?: (flag: "hybrid_search", tenant: Tenant) => Promise<boolean>;
   /** Called when the widget loads its config on an allowed site. */
   onWidgetSeen?: (tenant: Tenant, origin: string) => void;
   /** Extra fields for /health (no secrets: the status page shows them publicly). */
@@ -224,7 +226,7 @@ export function createApp(deps: AppDeps) {
     const queryText = message || attachments.map((a) => a.name).join(" ");
     // only tenants whose chunks are embedded pay for a query embedding
     const semantic =
-      deps.embedder && knowledge.coverage(tenant.id).embedder === deps.embedder.id
+      deps.embedder && knowledge.coverage(tenant.id).embedder === deps.embedder.id && (await (deps.featureEnabled?.("hybrid_search", tenant) ?? true))
         ? await deps.embedder.embed(tenant.id, semanticQueryTexts(queryText, previousQuestion))
         : null;
     const { hits } = retrieve(

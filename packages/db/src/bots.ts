@@ -304,6 +304,7 @@ export const BOT_SERVING_SQL = "(b.disabled_at is null and o.suspended_at is nul
 
 export interface BotRecord {
   id: string
+  organizationId: string
   organizationName: string
   siteKey: string
   settings: BotSettings
@@ -337,6 +338,7 @@ export async function listBotsChangedSince(db: Queryable, since: Date | null): P
   )
   return rows.map((r) => ({
     id: r.id,
+    organizationId: r.organization_id,
     organizationName: r.organization_name,
     siteKey: r.site_key,
     settings: repairSettings(typeof r.settings === "string" ? JSON.parse(r.settings) : r.settings),

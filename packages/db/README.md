@@ -22,6 +22,9 @@ Kayıt / giriş için veritabanı şeması, migration çalıştırıcısı ve au
 | `app.knowledge_embeddings` | Parçaların embedding vektörleri (`bytea`, float32), `bot_id` + model + metin hash'iyle; sohbet API'si yazar ve bellekte arar. pgvector gerekmez ([ADR 0002](../../docs/adr/0002-hybrid-retrieval.md)) |
 | `app.bot_activity` | Widget'ın en son hangi sitede ve ne zaman yüklendiği (sohbet API'si yazar) |
 | `app.conversations` / `app.messages` | Panel botlarının konuşmaları; botun saklama süresi dolunca saatlik temizlikle silinir |
+| `app.waitlist` | Kayıtlar herkese açık değilken bırakılan e-postalar; personelin davet zamanı ve sayısı (`/admin/waitlist`) |
+| `app.announcements` | Duyuru/bakım bantları: 5 dilde metin, seviye, zaman aralığı, hedef (herkes / plan / çalışma alanı), pazarlama sitesinde gösterim |
+| `app.platform_settings` | Çalışma zamanı ayarları: `signups_mode` ve `flags.<ad>` özellik bayrakları (genel + çalışma alanı bazında). Okumalar süreç başına 30 sn cache'lenir |
 | `app.schema_migrations` | Hangi migration'ların uygulandığı |
 
 Tüm tablolarda RLS açık ve hiç politika yok: Supabase'in `anon` / `authenticated` rolleri (REST API) hiçbir şeye erişemez; sunucu tablo sahibi olarak bağlandığı için etkilenmez. `app` şeması Supabase'in REST API'sinde zaten açık değil.

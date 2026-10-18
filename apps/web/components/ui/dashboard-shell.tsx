@@ -4,6 +4,7 @@ import { ChartColumn, BookOpen, Globe, LayoutDashboard, ListChecks, MessageSquar
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useEffect, useState, type ReactNode } from "react"
+import { AnnouncementBanners, type AnnouncementJson } from "@/components/announcement-banner"
 import { useAppI18n } from "@/components/i18n/app-provider"
 import { SiteSwitcher } from "@/components/sites/site-switcher"
 import { HelpMenu } from "@/components/support/help-menu"
@@ -68,6 +69,7 @@ export function DashboardShell({
   user,
   sites,
   setup,
+  announcements = [],
   active = "Overview",
 }: {
   children?: ReactNode
@@ -75,6 +77,8 @@ export function DashboardShell({
   user: { name: string; email: string; platformRole?: "superadmin" | "support" | null }
   sites: SitesJson
   setup: { done: number; total: number }
+  /** Banners from /admin/announcements for this workspace, above everything else. */
+  announcements?: AnnouncementJson[]
   /** Label of the rail item to highlight. */
   active?: NavLabel
 }) {
@@ -116,6 +120,7 @@ export function DashboardShell({
           <PrismFluxLoader />
         </div>
       )}
+      <AnnouncementBanners items={announcements} />
       <header className="flex h-14 shrink-0 items-center gap-3 pr-3">
         <Link href="/dashboard" aria-label={t.home} className="-mr-3 flex h-14 w-16 shrink-0 items-center justify-center">
           <img src="/brand/mini-logo.png" alt="" className="block h-11 w-11 rounded-xl" />

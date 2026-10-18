@@ -119,6 +119,7 @@ export const en = {
       oauth_denied: "Sign-in was cancelled. Try again or use your email",
       oauth_email_unverified: "Your provider has no verified email for this account. Verify it there and try again",
       oauth_failed: "Couldn't sign you in with that provider. Try again or use your email",
+      oauth_signups_closed: "We're not accepting new sign-ups yet. Join the waitlist and we'll email you when we open",
       account_suspended: "This account is suspended. Contact support",
       generic: "Something went wrong. Try again",
       network: "Couldn't reach the server. Check your connection and try again",
@@ -186,6 +187,27 @@ export const en = {
       haveAccount: "Already have an account?",
       logIn: "Log in",
     },
+    waitlist: {
+      title: "Join the waitlist",
+      subtitle: "We're not open for sign-ups yet. Leave your email and we'll let you know the day we open.",
+      email: "Email",
+      emailPlaceholder: "jane@company.com",
+      submitting: "Joining...",
+      submit: "Join the waitlist",
+      doneTitle: "You're on the list",
+      doneText: "We'll email you once, the day sign-ups open.",
+      close: "Close",
+      inviteOnly: "Sign-ups are invite-only for now. Leave your email and we'll send you an invitation when a place opens.",
+      doneInvite: "We'll email you once, when we can invite you.",
+      haveInvite: "Got an invitation?",
+      haveInviteLink: "Sign up",
+    },
+  },
+
+  // the announcement banner (admin area → Announcements) on the site and in the dashboard
+  announcement: {
+    label: "Announcement",
+    dismiss: "Dismiss",
   },
 
   landing: {

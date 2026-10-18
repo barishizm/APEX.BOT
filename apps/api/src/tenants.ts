@@ -42,6 +42,8 @@ export interface TenantLimits {
 
 export interface Tenant {
   id: string;
+  /** The workspace a dashboard-managed bot belongs to; feature flags can be set per workspace. */
+  organizationId?: string;
   siteKey: string;
   name: string;
   allowedOrigins: string[];
@@ -64,13 +66,14 @@ export function publicSettings(tenant: Tenant) {
 
 /** Maps a dashboard-managed bot to a tenant. */
 export function tenantFromBot(
-  bot: { id: string; organizationName: string; siteKey: string; settings: BotSettings; handoffVerified: boolean; budgetOverride?: { tokens: number; until: Date } | null },
+  bot: { id: string; organizationId?: string; organizationName: string; siteKey: string; settings: BotSettings; handoffVerified: boolean; budgetOverride?: { tokens: number; until: Date } | null },
   ui: PublicWidgetSettings,
 ): Tenant {
   const s = bot.settings;
   const handoffEnabled = s.handoff.enabled && bot.handoffVerified && !!s.handoff.email;
   return {
     id: bot.id,
+    ...(bot.organizationId ? { organizationId: bot.organizationId } : {}),
     managed: true,
     siteKey: bot.siteKey,
     name: s.general.companyName || bot.organizationName,

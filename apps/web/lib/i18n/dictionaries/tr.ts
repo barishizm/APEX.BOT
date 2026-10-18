@@ -119,6 +119,7 @@ export const tr: Dictionary = {
       oauth_denied: "Giriş iptal edildi. Tekrar deneyin veya e-posta adresinizi kullanın",
       oauth_email_unverified: "Sağlayıcınızda bu hesap için doğrulanmış bir e-posta yok. Orada doğrulayıp tekrar deneyin",
       oauth_failed: "Bu sağlayıcıyla giriş yapılamadı. Tekrar deneyin veya e-posta adresinizi kullanın",
+      oauth_signups_closed: "Henüz yeni kayıt almıyoruz. Bekleme listesine katılın, açıldığında size e-posta gönderelim",
       account_suspended: "Bu hesap askıya alındı. Destek ekibiyle iletişime geçin",
       generic: "Bir şeyler ters gitti. Tekrar deneyin",
       network: "Sunucuya ulaşılamadı. Bağlantınızı kontrol edip tekrar deneyin",
@@ -186,6 +187,27 @@ export const tr: Dictionary = {
       haveAccount: "Zaten hesabınız var mı?",
       logIn: "Giriş yapın",
     },
+    waitlist: {
+      title: "Bekleme listesine katılın",
+      subtitle: "Henüz kayıtlara açık değiliz. E-posta adresinizi bırakın, açıldığımız gün size haber verelim.",
+      email: "E-posta",
+      emailPlaceholder: "ayse@sirket.com",
+      submitting: "Katılınıyor...",
+      submit: "Bekleme listesine katıl",
+      doneTitle: "Listeye eklendiniz",
+      doneText: "Kayıtlar açıldığı gün size bir kez e-posta göndereceğiz.",
+      close: "Kapat",
+      inviteOnly: "Kayıtlar şimdilik yalnızca davetle. E-posta adresinizi bırakın, yer açıldığında size bir davet gönderelim.",
+      doneInvite: "Sizi davet edebildiğimizde bir kez e-posta göndereceğiz.",
+      haveInvite: "Davet mi aldınız?",
+      haveInviteLink: "Kaydolun",
+    },
+  },
+
+  // the announcement banner (admin area → Announcements) on the site and in the dashboard
+  announcement: {
+    label: "Duyuru",
+    dismiss: "Kapat",
   },
 
   landing: {
