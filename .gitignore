@@ -39,3 +39,4 @@ skills-lock.json
 # Eval output (live runs vary; only baseline.json is committed)
 packages/evals/results/
 packages/evals/data/embeddings/
+packages/db/.pglite/
