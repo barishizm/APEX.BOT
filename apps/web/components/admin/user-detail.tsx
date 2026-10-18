@@ -4,18 +4,18 @@ import type { AdminUserDetail, PlatformRole } from "@apex/db"
 import { ArrowLeft, LoaderCircle, Lock } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useEffect, useId, useState, type FormEvent, type ReactNode } from "react"
+import { useEffect, useId, useState, type FormEvent } from "react"
 import { useAppI18n } from "@/components/i18n/app-provider"
 import { LOCALE_META, LOCALES, type Locale } from "@/lib/i18n/config"
-import { formatDate, formatNumber, timeAgo } from "@/lib/i18n/format"
+import { formatDate, formatNumber } from "@/lib/i18n/format"
 import { cn } from "@/lib/utils"
+import { button, dangerButton, Empty, field, fill, postJson, primaryButton, Section, Table, tag, td, When, type Jsonify } from "./detail-ui"
 
 // /admin/users/[id]: one account, and what staff can do to it. Every action goes through
 // POST /api/admin/users/<id>/<action> with a reason; the destructive ones first confirm a code from
 // the staff member's authenticator app (POST /api/admin/step-up). The page re-renders from the
 // server after each change, so what it shows is always what the database holds.
 
-type Jsonify<T> = T extends Date ? string : T extends (infer U)[] ? Jsonify<U>[] : T extends object ? { [K in keyof T]: Jsonify<T[K]> } : T
 export type UserDetailJson = Jsonify<AdminUserDetail>
 
 type ActionKey =
@@ -53,67 +53,6 @@ const ACTIONS: Record<ActionKey, ActionSpec> = {
   grantSupport: { path: "role", stepUp: true, body: { role: "support" } },
   revokeSupport: { path: "role", stepUp: true, body: { role: null }, danger: true },
 }
-
-const card = "flex flex-col gap-4 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] p-4 sm:p-5"
-const field =
-  "rounded-lg border border-[var(--color-line)] bg-[var(--color-raised)] px-3 text-sm font-normal text-[var(--color-text)] outline-none focus:border-amber-500"
-const button =
-  "inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-[var(--color-line)] bg-[var(--color-raised)] px-3 text-sm font-medium text-[var(--color-text)] transition-colors hover:border-[var(--color-muted)]/60 disabled:cursor-not-allowed disabled:opacity-50"
-const dangerButton = "border-red-500/40 text-red-700 hover:border-red-500 hover:bg-red-500/5 dark:text-red-300"
-const primaryButton = "border-amber-600 bg-amber-500 text-black hover:bg-amber-400"
-const tag = "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold"
-const th = "whitespace-nowrap px-3 py-2 font-semibold"
-const td = "px-3 py-2.5 align-top"
-
-async function postJson(url: string, body: object): Promise<{ ok: true; data: unknown } | { ok: false; code: string; message: string }> {
-  const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), cache: "no-store" })
-  if (res.ok) return { ok: true, data: res.status === 204 ? null : await res.json().catch(() => null) }
-  const err = (await res.json().catch(() => null)) as { error?: string; message?: string } | null
-  return { ok: false, code: err?.error ?? "server_error", message: err?.message ?? "" }
-}
-
-const fill = (template: string, values: Record<string, string>) => template.replace(/\{(\w+)\}/g, (m, k: string) => values[k] ?? m)
-
-function Section({ title, children, count }: { title: string; children: ReactNode; count?: number }) {
-  return (
-    <section className={card}>
-      <h2 className="m-0 flex items-center gap-2 text-base font-semibold">
-        {title}
-        {count !== undefined && <span className="text-sm font-normal text-[var(--color-muted)]">({count})</span>}
-      </h2>
-      {children}
-    </section>
-  )
-}
-
-function When({ at, locale }: { at: string; locale: Locale }) {
-  return (
-    <time dateTime={at} title={formatDate(at, locale, { dateStyle: "medium", timeStyle: "short" })} className="whitespace-nowrap">
-      {timeAgo(at, locale)}
-    </time>
-  )
-}
-
-function Table({ head, children }: { head: string[]; children: ReactNode }) {
-  return (
-    <div className="overflow-x-auto rounded-lg border border-[var(--color-line)]">
-      <table className="w-full border-collapse text-sm">
-        <thead className="bg-[var(--color-raised)] text-left text-xs uppercase tracking-wide text-[var(--color-muted)]">
-          <tr>
-            {head.map((h) => (
-              <th key={h} scope="col" className={th}>
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>{children}</tbody>
-      </table>
-    </div>
-  )
-}
-
-const Empty = ({ children }: { children: ReactNode }) => <p className="m-0 text-sm text-[var(--color-muted)]">{children}</p>
 
 export function UserDetail({ detail, viewer }: { detail: UserDetailJson; viewer: { id: string; role: PlatformRole } }) {
   const { t: app, locale } = useAppI18n()
@@ -218,7 +157,9 @@ export function UserDetail({ detail, viewer }: { detail: UserDetailJson; viewer:
                 {detail.memberships.map((m) => (
                   <tr key={m.organizationId} className="border-t border-[var(--color-line)]">
                     <td className={td}>
-                      <span className="font-medium">{m.name}</span>
+                      <Link href={`/admin/workspaces/${m.organizationId}`} className="font-medium">
+                        {m.name}
+                      </Link>
                       {m.suspendedAt && <span className={`${tag} ml-2 bg-red-500/15 text-red-700 dark:text-red-300`}>{t.workspaceSuspended}</span>}
                     </td>
                     <td className={`${td} capitalize`}>{m.plan}</td>

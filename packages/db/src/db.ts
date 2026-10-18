@@ -11,6 +11,13 @@ export interface Db extends Queryable {
   close(): Promise<void>
 }
 
+/** A Db whose queries and transactions all run in `tx`, for functions that take a Db but must join the caller's transaction. */
+export const inTransaction = (tx: Queryable): Db => ({
+  query: (text, params) => tx.query(text, params),
+  transaction: (fn) => fn(tx),
+  close: async () => {},
+})
+
 export interface DbOptions {
   // "require": encrypt without verifying the server certificate (Supabase poolers
   // present a chain Node doesn't trust by default); "verify": also verify, against

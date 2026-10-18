@@ -1,4 +1,4 @@
-import type { Db, Queryable } from "./db.ts"
+import { inTransaction, type Queryable } from "./db.ts"
 import { AdminError, type PlatformRole } from "./admin.ts"
 import { deleteAccount, issueEmailCode, requestPasswordReset, type AccountType, type OAuthProvider, type RequestMeta } from "./auth.ts"
 import type { Plan } from "./plans.ts"
@@ -252,13 +252,6 @@ async function logEvent(tx: Queryable, event: string, userId: string | null, ema
     meta.userAgent ? meta.userAgent.slice(0, 512) : null,
   ])
 }
-
-// The auth functions take a Db; this one runs everything they do in the caller's transaction.
-const inTransaction = (tx: Queryable): Db => ({
-  query: (text, params) => tx.query(text, params),
-  transaction: (fn) => fn(tx),
-  close: async () => {},
-})
 
 /** What an action changed, for the audit entry. */
 export interface ActionChange<Extra = object> {
