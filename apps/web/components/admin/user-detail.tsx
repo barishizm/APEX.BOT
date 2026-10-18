@@ -29,6 +29,7 @@ type ActionKey =
   | "delete"
   | "grantSupport"
   | "revokeSupport"
+  | "impersonate"
 
 interface ActionSpec {
   path: string
@@ -52,6 +53,7 @@ const ACTIONS: Record<ActionKey, ActionSpec> = {
   delete: { path: "delete", stepUp: true, mail: true, danger: true },
   grantSupport: { path: "role", stepUp: true, body: { role: "support" } },
   revokeSupport: { path: "role", stepUp: true, body: { role: null }, danger: true },
+  impersonate: { path: "impersonate", stepUp: true },
 }
 
 export function UserDetail({ detail, viewer }: { detail: UserDetailJson; viewer: { id: string; role: PlatformRole } }) {
@@ -76,6 +78,8 @@ export function UserDetail({ detail, viewer }: { detail: UserDetailJson; viewer:
         detail.sessions.length > 0 && "revokeSessions",
         p.suspendedAt ? "unsuspend" : "suspend",
         viewer.role === "superadmin" && (p.platformRole === "support" ? "revokeSupport" : "grantSupport"),
+        // the server refuses staff and suspended accounts too (startImpersonation)
+        viewer.role === "superadmin" && !p.platformRole && !p.suspendedAt && "impersonate",
         "delete",
       ].filter(Boolean) as ActionKey[])
 
@@ -85,7 +89,7 @@ export function UserDetail({ detail, viewer }: { detail: UserDetailJson; viewer:
       router.push("/admin/users")
       return
     }
-    setNotice(t.done[action as Exclude<ActionKey, "delete">])
+    setNotice(t.done[action as Exclude<ActionKey, "delete" | "impersonate">])
     router.refresh()
   }
 
@@ -372,6 +376,7 @@ function ActionDialog({ action, detail, onClose, onDone }: { action: ActionKey; 
   const [mailLocale, setMailLocale] = useState<Locale>(locale)
   const [notify, setNotify] = useState(true)
   const [confirmEmail, setConfirmEmail] = useState("")
+  const [minutes, setMinutes] = useState("30")
   const [code, setCode] = useState("")
   // null until the step-up check answers; true when a code must be typed first
   const [needCode, setNeedCode] = useState<boolean | null>(spec.stepUp ? null : false)
@@ -415,7 +420,10 @@ function ActionDialog({ action, detail, onClose, onDone }: { action: ActionKey; 
       if (spec.mail) body.locale = mailLocale
       if (spec.notify) body.notify = notify
       if (action === "delete") body.confirmEmail = confirmEmail
+      if (action === "impersonate") body.minutes = Number(minutes)
       const res = await postJson(`/api/admin/users/${p.id}/${spec.path}`, body)
+      // a full load into the app as the user, under the view's own cookie
+      if (res.ok && action === "impersonate") return window.location.assign((res.data as { next?: string } | null)?.next ?? "/dashboard")
       if (res.ok) return onDone()
       // the confirmation ran out between opening the dialog and confirming
       if (res.code === "step_up_required") setNeedCode(true)
@@ -492,6 +500,19 @@ function ActionDialog({ action, detail, onClose, onDone }: { action: ActionKey; 
               {LOCALES.map((l) => (
                 <option key={l} value={l}>
                   {LOCALE_META[l].name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        {action === "impersonate" && (
+          <label className={label}>
+            {t.dialog.minutes}
+            <select value={minutes} onChange={(e) => setMinutes(e.target.value)} className={`${field} h-10 cursor-pointer`}>
+              {["5", "15", "30"].map((m) => (
+                <option key={m} value={m}>
+                  {t.dialog.minutesOptions[m]}
                 </option>
               ))}
             </select>

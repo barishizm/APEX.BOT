@@ -4,6 +4,14 @@
 import type { Locale } from "@/lib/i18n"
 import type { Messages } from "@/lib/i18n/app/types"
 
+export interface SupportAccessMail {
+  site: string
+  workspace: string
+  reason: string
+  ticket: string | null
+  minutes: number
+}
+
 interface Mail {
   to: string
   subject: string
@@ -48,6 +56,8 @@ const EMAILS: Messages<{
   accountSuspended: { subject: string; text: string }
   accountReinstated: { subject: string; text: string }
   accountDeleted: { subject: string; text: string }
+  // to the workspace owners when staff open support access to a site's conversations
+  supportAccess: (a: SupportAccessMail) => { subject: string; text: string }
 }> = {
   en: {
     footer: "\n\nIf you didn't ask for this, you can ignore this email.\n\nApex Bot",
@@ -92,6 +102,10 @@ const EMAILS: Messages<{
       subject: "Your Apex Bot account was deleted",
       text: "Your Apex Bot account was deleted by our support team, together with the workspaces only you belonged to. Workspaces you shared with others were passed to another member.\n\nIf you didn't expect this, reply to this email.",
     },
+    supportAccess: ({ site, workspace, reason, ticket, minutes }) => ({
+      subject: `Our support team opened temporary access to ${site}'s conversations`,
+      text: `To help with ${ticket ? `support request ${ticket}` : "a support request"}, a member of our support team opened read-only access to the chatbot conversations of ${site} in your ${workspace} workspace.\n\nReason given: ${reason}\n\nThe access ends by itself after ${minutes} minutes. Your visitors' contact details stay hidden unless they are needed, and every conversation opened is recorded. Nothing can be changed or deleted through this access.\n\nIf you didn't ask us for help, reply to this email right away.`,
+    }),
     accountExists: {
       subject: "You already have an Apex Bot account",
       text: `Someone tried to sign up for Apex Bot with this email address, but an account already exists.\n\nIf it was you, just log in. If you forgot your password, use "Forgot password" on the login page. No changes were made to your account.`,
@@ -140,6 +154,10 @@ const EMAILS: Messages<{
       subject: "Apex Bot hesabınız silindi",
       text: "Apex Bot hesabınız, yalnızca sizin üyesi olduğunuz çalışma alanlarıyla birlikte destek ekibimiz tarafından silindi. Başkalarıyla paylaştığınız çalışma alanları başka bir üyeye devredildi.\n\nBunu beklemiyorsanız bu e-postayı yanıtlayın.",
     },
+    supportAccess: ({ site, workspace, reason, ticket, minutes }) => ({
+      subject: `Destek ekibimiz ${site} konuşmalarına geçici erişim açtı`,
+      text: `${ticket ? `${ticket} numaralı destek talebinize` : "Destek talebinize"} yardımcı olmak için destek ekibimizden bir kişi, ${workspace} çalışma alanınızdaki ${site} sitesinin chatbot konuşmalarına salt okunur erişim açtı.\n\nBelirtilen gerekçe: ${reason}\n\nErişim ${minutes} dakika sonra kendiliğinden kapanır. Ziyaretçilerinizin iletişim bilgileri gerekmedikçe gizli kalır ve açılan her konuşma kayda geçer. Bu erişimle hiçbir şey değiştirilemez veya silinemez.\n\nBizden yardım istemediyseniz hemen bu e-postayı yanıtlayın.`,
+    }),
     accountExists: {
       subject: "Zaten bir Apex Bot hesabınız var",
       text: `Bu e-posta adresiyle Apex Bot'a kaydolmaya çalışıldı, ancak bu adrese ait bir hesap zaten var.\n\nBu sizseniz giriş yapmanız yeterli. Şifrenizi unuttuysanız giriş sayfasındaki "Şifrenizi mi unuttunuz?" bağlantısını kullanın. Hesabınızda hiçbir değişiklik yapılmadı.`,
@@ -188,6 +206,10 @@ const EMAILS: Messages<{
       subject: "Jūsų Apex Bot paskyra ištrinta",
       text: "Mūsų pagalbos komanda ištrynė jūsų Apex Bot paskyrą kartu su darbo sritimis, kurioms priklausėte tik jūs. Darbo sritys, kuriomis dalijotės su kitais, perduotos kitam nariui.\n\nJei to nesitikėjote, atsakykite į šį laišką.",
     },
+    supportAccess: ({ site, workspace, reason, ticket, minutes }) => ({
+      subject: `Mūsų pagalbos komanda laikinai atvėrė prieigą prie ${site} pokalbių`,
+      text: `Kad padėtų išspręsti ${ticket ? `pagalbos užklausą ${ticket}` : "pagalbos užklausą"}, mūsų pagalbos komandos narys atvėrė tik skaitymo prieigą prie ${site} pokalbių roboto pokalbių jūsų ${workspace} darbo srityje.\n\nNurodyta priežastis: ${reason}\n\nPrieiga savaime baigsis po ${minutes} minučių. Jūsų lankytojų kontaktiniai duomenys lieka paslėpti, nebent jų prireiktų, o kiekvienas atvertas pokalbis užregistruojamas. Per šią prieigą nieko negalima pakeisti ar ištrinti.\n\nJei pagalbos neprašėte, nedelsdami atsakykite į šį laišką.`,
+    }),
     accountExists: {
       subject: "Jūs jau turite Apex Bot paskyrą",
       text: `Kažkas bandė užsiregistruoti Apex Bot naudodamas šį el. pašto adresą, tačiau paskyra su juo jau yra.\n\nJei tai buvote jūs, tiesiog prisijunkite. Jei pamiršote slaptažodį, prisijungimo puslapyje spustelėkite „Pamiršote slaptažodį?“. Jūsų paskyroje niekas nepakeista.`,
@@ -236,6 +258,10 @@ const EMAILS: Messages<{
       subject: "Jūsu Apex Bot konts ir dzēsts",
       text: "Mūsu atbalsta komanda dzēsa jūsu Apex Bot kontu kopā ar darbvietām, kurās bijāt tikai jūs. Darbvietas, kuras kopīgojāt ar citiem, nodotas citam dalībniekam.\n\nJa to negaidījāt, atbildiet uz šo e-pastu.",
     },
+    supportAccess: ({ site, workspace, reason, ticket, minutes }) => ({
+      subject: `Mūsu atbalsta komanda atvēra pagaidu piekļuvi ${site} sarunām`,
+      text: `Lai palīdzētu ar ${ticket ? `atbalsta pieprasījumu ${ticket}` : "atbalsta pieprasījumu"}, mūsu atbalsta komandas dalībnieks atvēra tikai lasīšanas piekļuvi ${site} tērzēšanas robota sarunām jūsu darbvietā ${workspace}.\n\nNorādītais iemesls: ${reason}\n\nPiekļuve beigsies pati pēc ${minutes} minūtēm. Jūsu apmeklētāju kontaktinformācija paliek paslēpta, ja vien tā nav nepieciešama, un katra atvērtā saruna tiek reģistrēta. Ar šo piekļuvi neko nevar mainīt vai dzēst.\n\nJa jūs nelūdzāt palīdzību, nekavējoties atbildiet uz šo e-pastu.`,
+    }),
     accountExists: {
       subject: "Jums jau ir Apex Bot konts",
       text: `Kāds mēģināja reģistrēties Apex Bot ar šo e-pasta adresi, taču konts ar to jau pastāv.\n\nJa tas bijāt jūs, vienkārši piesakieties. Ja aizmirsāt paroli, pieteikšanās lapā izmantojiet saiti “Aizmirsāt paroli?”. Jūsu kontā nekas netika mainīts.`,
@@ -284,6 +310,10 @@ const EMAILS: Messages<{
       subject: "Teie Apex Boti konto kustutati",
       text: "Meie tugimeeskond kustutas teie Apex Boti konto koos tööruumidega, kuhu kuulusite ainult teie. Teistega jagatud tööruumid anti üle teisele liikmele.\n\nKui te seda ei oodanud, vastake sellele e-kirjale.",
     },
+    supportAccess: ({ site, workspace, reason, ticket, minutes }) => ({
+      subject: `Meie tugimeeskond avas ajutise juurdepääsu ${site} vestlustele`,
+      text: `Et aidata ${ticket ? `tugipäringuga ${ticket}` : "teie tugipäringuga"}, avas meie tugimeeskonna liige ainult lugemiseks juurdepääsu teie tööruumi ${workspace} saidi ${site} vestlusroboti vestlustele.\n\nToodud põhjus: ${reason}\n\nJuurdepääs lõpeb iseenesest ${minutes} minuti pärast. Teie külastajate kontaktandmed jäävad peidetuks, kui neid pole vaja, ja iga avatud vestlus salvestatakse. Selle juurdepääsuga ei saa midagi muuta ega kustutada.\n\nKui te abi ei palunud, vastake kohe sellele e-kirjale.`,
+    }),
     accountExists: {
       subject: "Teil on juba Apex Boti konto",
       text: `Keegi proovis selle e-posti aadressiga Apex Botis registreeruda, kuid sellega seotud konto on juba olemas.\n\nKui see olite teie, logige lihtsalt sisse. Kui olete parooli unustanud, kasutage sisselogimislehel linki „Unustasite parooli?“. Teie kontol ei muudetud midagi.`,
@@ -333,3 +363,8 @@ export function sendStaffNotice(email: string, notice: StaffNotice, locale: Loca
 }
 
 const withSignature = (mail: { subject: string; text: string }, locale: Locale) => ({ subject: mail.subject, text: mail.text + EMAILS[locale].signature })
+
+/** Tells a workspace owner that staff opened support access to one of their sites' conversations. */
+export function sendSupportAccessNotice(email: string, access: SupportAccessMail, locale: Locale) {
+  return send({ to: email, ...withSignature(EMAILS[locale].supportAccess(access), locale) })
+}

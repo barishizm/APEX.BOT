@@ -10,10 +10,11 @@ import {
   adminVerifyEmail,
   AuthError,
   changePlatformRole,
+  startImpersonation,
   type AdminActor,
 } from "@apex/db"
 import { withAdminAction, type AdminActionContext } from "@/lib/admin"
-import { errorJson, type AdminSession } from "@/lib/auth"
+import { errorJson, setImpersonationCookie, type AdminSession } from "@/lib/auth"
 import { isLocale, type Locale } from "@/lib/i18n/config"
 import { requestLocale } from "@/lib/i18n/server"
 import { sendStaffNotice, sendStaffPasswordReset, sendVerificationCode } from "@/lib/mail"
@@ -104,6 +105,22 @@ const ACTIONS: Record<string, ReturnType<typeof withAdminAction<Params>>> = {
     const c = await changePlatformRole(tx, admin.user.id, params.id, body.role)
     return { targetId: params.id, before: { platformRole: c.before }, after: { platformRole: c.after } }
   }),
+
+  // "View as user", read-only, body.minutes (up to 30). Superadmin only, with a step-up; the view gets
+  // a cookie of its own, so the staff session stays as it is (lib/impersonation.ts)
+  impersonate: withAdminAction<Params>(
+    { action: "user.impersonate.start", targetType: "user", minRole: "superadmin" },
+    async ({ tx, admin, params, body, reason }: Ctx) => {
+      const started = await startImpersonation(tx, { id: admin.user.id, sessionId: admin.sessionId }, params.id, reason, body.minutes)
+      return {
+        targetId: params.id,
+        before: null,
+        after: { impersonationId: started.id, expiresAt: started.expiresAt.toISOString() },
+        result: { next: "/dashboard", expiresAt: started.expiresAt.toISOString() },
+        afterCommit: () => setImpersonationCookie(started.token, started.expiresAt),
+      }
+    },
+  ),
 
   // an internal note: the body is the reason, so none is asked for and no step-up either
   note: withAdminAction<Params>({ action: "user.note", targetType: "user", stepUp: false, reason: false }, async ({ tx, admin, params, body }: Ctx) => {

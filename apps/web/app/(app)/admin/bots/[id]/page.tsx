@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import { notFound } from "next/navigation"
-import { getAdminBotDetail } from "@apex/db"
+import { activeSupportAccess, getAdminBotDetail } from "@apex/db"
 import { BotDetail, type BotDetailJson } from "@/components/admin/bot-detail"
 import { requirePlatformAdmin } from "@/lib/auth"
 import { db } from "@/lib/db"
@@ -12,10 +12,11 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function AdminBotPage({ params }: PageProps<"/admin/bots/[id]">) {
-  await requirePlatformAdmin()
-  const detail = await getAdminBotDetail(db(), (await params).id)
+  const admin = await requirePlatformAdmin()
+  const { id } = await params
+  const [detail, grant] = await Promise.all([getAdminBotDetail(db(), id), activeSupportAccess(db(), admin.user.id, id)])
   if (!detail) notFound()
   // Dates become ISO strings, as the client would get them from an API
   const json = JSON.parse(JSON.stringify(detail)) as BotDetailJson
-  return <BotDetail detail={json} />
+  return <BotDetail detail={json} support={grant && { expiresAt: grant.expiresAt.toISOString(), ticketRef: grant.ticketRef }} />
 }

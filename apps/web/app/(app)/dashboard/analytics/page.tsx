@@ -3,7 +3,7 @@ import { cookies } from "next/headers"
 import { ANSWER_LIMITS, analyticsData, canEditBot } from "@apex/db"
 import { AnalyticsDashboard } from "@/components/analytics/dashboard"
 import { DashboardFrame } from "@/components/dashboard/frame"
-import { requireVerifiedUser } from "@/lib/auth"
+import { isImpersonating, requireVerifiedUser } from "@/lib/auth"
 import { analyticsJson } from "@/lib/analytics"
 import { currentBot, shownSite } from "@/lib/dashboard"
 import { db } from "@/lib/db"
@@ -23,7 +23,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
   const [bot, data] = await Promise.all([currentBot(user.id), analyticsData(db(), await shownSite(user.id), { days, timeZone: timeZone && decodeURIComponent(timeZone) })])
   return (
     <DashboardFrame active="Analytics">
-      <AnalyticsDashboard initial={analyticsJson(data)} canEdit={canEditBot(bot.role)} limits={ANSWER_LIMITS} />
+      <AnalyticsDashboard initial={analyticsJson(data, { masked: await isImpersonating() })} canEdit={canEditBot(bot.role)} limits={ANSWER_LIMITS} />
     </DashboardFrame>
   )
 }

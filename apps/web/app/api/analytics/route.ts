@@ -1,4 +1,5 @@
 import { analyticsData } from "@apex/db"
+import { isImpersonating } from "@/lib/auth"
 import { botErrorResponse, requireApiUser } from "@/lib/bot"
 import { analyticsJson } from "@/lib/analytics"
 import { db } from "@/lib/db"
@@ -10,7 +11,7 @@ export async function GET(request: Request) {
     const user = await requireApiUser()
     const params = new URL(request.url).searchParams
     const data = await analyticsData(db(), await siteScope(user.id), { days: params.get("days"), timeZone: params.get("tz") })
-    return Response.json(analyticsJson(data), { headers: { "cache-control": "private, no-store" } })
+    return Response.json(analyticsJson(data, { masked: await isImpersonating() }), { headers: { "cache-control": "private, no-store" } })
   } catch (err) {
     return botErrorResponse(err)
   }

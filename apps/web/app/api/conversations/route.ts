@@ -1,4 +1,5 @@
-import { listConversations } from "@apex/db"
+import { listConversations, maskConversationSummary } from "@apex/db"
+import { isImpersonating } from "@/lib/auth"
 import { botErrorResponse, requireApiUser } from "@/lib/bot"
 import { parseDays, parseFilter, parseSearch, summaryJson } from "@/lib/conversations"
 import { db } from "@/lib/db"
@@ -17,7 +18,9 @@ export async function GET(request: Request) {
       search: parseSearch(params.get("q")),
       before: beforeDate,
     })
-    return Response.json({ conversations: page.conversations.map(summaryJson), hasMore: page.hasMore })
+    // a superadmin viewing as the user sees the visitors' details masked
+    const masked = await isImpersonating()
+    return Response.json({ conversations: page.conversations.map((c) => summaryJson(masked ? maskConversationSummary(c) : c)), hasMore: page.hasMore })
   } catch (err) {
     return botErrorResponse(err)
   }

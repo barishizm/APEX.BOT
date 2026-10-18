@@ -15,14 +15,17 @@ export const parseDays = (raw: string | null | undefined): number | null => {
 // ?q= from the inbox search box
 export const parseSearch = (raw: string | null | undefined): string | null => raw?.trim().slice(0, 200) || null
 
-/** Inbox link that keeps a filter, period and search; parts left out are dropped from the address. */
-export function conversationsHref(filter: ConversationFilter, days?: number | null, search?: string | null) {
+/**
+ * Inbox link that keeps a filter, period and search; parts left out are dropped from the address.
+ * `base` is the inbox page: the dashboard's, or a bot's under support access in the admin area.
+ */
+export function conversationsHref(filter: ConversationFilter, days?: number | null, search?: string | null, base = "/dashboard/conversations") {
   const params = new URLSearchParams()
   if (filter !== "all") params.set("filter", filter)
   if (days) params.set("days", String(days))
   if (search) params.set("q", search)
   const query = params.toString()
-  return query ? `/dashboard/conversations?${query}` : "/dashboard/conversations"
+  return query ? `${base}?${query}` : base
 }
 
 export function summaryJson(c: ConversationSummary) {
@@ -42,4 +45,5 @@ export function conversationJson(c: StoredConversation) {
     messages: c.messages.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() })),
   }
 }
-export type ConversationJson = ReturnType<typeof conversationJson>
+/** `masked`: the visitor's details are hidden (support access, viewing as a user). */
+export type ConversationJson = ReturnType<typeof conversationJson> & { masked?: boolean }

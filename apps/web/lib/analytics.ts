@@ -1,3 +1,4 @@
+import { maskPII } from "@apex/db/pii"
 import { MAX_RESOLVE, QUESTION_SAMPLE, type AnalyticsData, type QuestionRow, type UnansweredRow } from "@apex/db"
 import { LANGS, LOOSE, detectLang, fold, tokenize, type Lang } from "@apex/knowledge"
 
@@ -230,7 +231,18 @@ export function groupUnanswered(rows: UnansweredRow[]): UnansweredGroup[] {
   return [...groups.values()].sort((a, b) => b.count - a.count || b.lastAskedAt.localeCompare(a.lastAskedAt)).slice(0, UNANSWERED_GROUPS)
 }
 
-export function analyticsJson(d: AnalyticsData) {
+/** `masked`: personal data in question texts hidden, for a superadmin viewing the app as a user. */
+export function analyticsJson(d: AnalyticsData, options: { masked?: boolean } = {}) {
+  const json = analyticsView(d)
+  if (!options.masked) return json
+  return {
+    ...json,
+    topics: json.topics.map((t) => ({ ...t, examples: t.examples.map(maskPII) })),
+    unanswered: json.unanswered.map((u) => ({ ...u, question: maskPII(u.question) })),
+  }
+}
+
+function analyticsView(d: AnalyticsData) {
   return {
     days: d.days,
     timeZone: d.timeZone,
@@ -249,4 +261,4 @@ export function analyticsJson(d: AnalyticsData) {
     unansweredOpen: d.unansweredOpen,
   }
 }
-export type AnalyticsJson = ReturnType<typeof analyticsJson>
+export type AnalyticsJson = ReturnType<typeof analyticsView>
