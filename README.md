@@ -4,7 +4,7 @@ Apex Bot, web sitelerine eklenen bir AI asistanıdır. Ziyaretçilerin soruları
 
 Apex Bot **kapalı kaynaklı, ticari bir SaaS** ürünüdür: birçok müşteri sitesine abonelikle sunulur, tamamı bizim tarafımızda barındırılır. Yapay zekâ modelleri kendi altyapımızda değil, **bulut API'leri üzerinden** çalışır.
 
-> **Durum:** Kapalı beta / MVP çalışıyor: kayıt ve giriş, site tarama ile bilgi tabanı, widget stüdyosu, konuşma kaydı, insana devir ve lead e-postaları. Hibrit arama (BM25 + embedding) ve eval seti var; faturalama henüz yok (aşağıdaki yol haritası). Bu doküman hedefleri ve mimariyi de tanımlar.
+> **Durum:** Kapalı beta / MVP çalışıyor: kayıt ve giriş, site tarama ile bilgi tabanı, widget stüdyosu, konuşma kaydı, insana devir ve lead e-postaları, platform yönetim paneli (`/admin`, [runbook](docs/admin-runbook.md)). Hibrit arama (BM25 + embedding) ve eval seti var; faturalama henüz yok (aşağıdaki yol haritası). Bu doküman hedefleri ve mimariyi de tanımlar.
 
 ## Verilen kararlar
 
@@ -209,6 +209,7 @@ Halka açık bir chatbot saldırı yüzeyidir; bunlar baştan tasarıma dahildir
 - **KVKK / GDPR:** Aydınlatma metni linki widget'ta gösterilir, ziyaretçinin verisini silme talebi için uç nokta, veri işleme sözleşmesi şablonu.
 - **Yanıt güvenliği:** Tıbbi/hukuki/finansal konularda kesin tavsiye vermeme; site sahibinin tanımladığı yasak konular.
 - **Şeffaflık:** Ziyaretçi bir yapay zekâyla konuştuğunu açıkça görür.
+- **Platform yönetimi:** `/admin` yalnızca 2FA'lı personele açılır. Her yazma işlemi gerekçe ve JSON gövde ister, yıkıcı olanlar son 10 dakikalık bir doğrulama kodu (step-up) ister. Her işlem değişiklikle aynı transaction'da, değiştirilemeyen bir audit kaydına yazılır. "Kullanıcı olarak görüntüle" salt okunurdur. Her `/api/admin` route'unun bu korumaları kullandığını bir test denetler. Roller, ilk admin ve 2FA kaybı: [docs/admin-runbook.md](docs/admin-runbook.md).
 
 ## Kalite ve değerlendirme
 
@@ -257,7 +258,10 @@ npm run db:migrate                             # şemayı kurar / günceller (te
 npm run build:widget                           # API'nin servis ettiği widget.js
 npm run dev:api                                # sohbet API'si, http://localhost:8787
 npm run dev:web                                # site + yönetim paneli, http://localhost:3000
+npm run admin:bootstrap -- sen@ornek.com       # bir kerelik: doğrulanmış hesabını superadmin yapar (/admin)
 ```
+
+PostgreSQL kurmadan denemek için `npm run db:local`, 127.0.0.1:5433'te gömülü bir PGlite sunucusu açar (ayarlar: [admin runbook'u](docs/admin-runbook.md#yerelde-uçtan-uca-deneme)).
 
 Kontroller: `npm run typecheck`, `npm test` (veritabanı testleri gömülü PostgreSQL ile, ağ gerektirmez) ve `npm run eval` (retrieval kalite kapısı; `baseline.json`a göre geriye gidişte başarısız olur). Hepsi her PR'da CI'da çalışır.
 
@@ -265,7 +269,7 @@ Uygulamalar:
 
 | Paket | Görev |
 |---|---|
-| `apps/web` | Pazarlama sitesi, kayıt/giriş, yönetim paneli (genel bakış, bilgi tabanı, konuşmalar, widget stüdyosu, kurulum listesi, hesap ayarları) |
+| `apps/web` | Pazarlama sitesi, kayıt/giriş, müşteri paneli (genel bakış, bilgi tabanı, konuşmalar, widget stüdyosu, kurulum listesi, destek, hesap ayarları) ve platform yönetimi (`/admin`) |
 | `apps/api` | Widget'ın konuştuğu sohbet API'si; panel botlarını, bilgilerini ve ayarlarını 30 sn'de bir veritabanından senkronlar, konuşmaları kaydeder |
 | `apps/widget` | Shadow DOM'lu gömülebilir widget (`widget.js`) |
 | `packages/db` | Şema, migration'lar ve tüm veritabanı erişimi (tenant izolasyonu burada) |
@@ -277,6 +281,12 @@ Ortam değişkenleri:
 | Değişken | Nerede | Açıklama |
 |---|---|---|
 | `DATABASE_URL`, `DATABASE_SSL` | web, api | PostgreSQL bağlantısı (ikisinde de aynı) |
+| `DATABASE_POOL_MAX` | web, api | Bağlantı havuzu (varsayılan 5); yerel PGlite (`npm run db:local`) için `1` |
+| `TRUST_PROXY` | web, api | Önündeki proxy sayısı (Vercel/Render: `1`); IP bazlı sınırlar buna dayanır |
+| `TOTP_ENCRYPTION_KEY` | web | İki adımlı giriş sırlarını şifreler; admin paneli 2FA'sız açılmadığı için zorunlu. Bir kez ayarlandıktan sonra değiştirilmez |
+| `APEX_HEALTH_TOKEN` | web, api | `/admin/system`'in API'nin `/health/details`'ini okuması için ortak sır |
+| `SIGNUPS_MODE` | web | Kayıt modu (`open`, `invite_only`, `closed`) için varsayılan; `/admin/settings`'teki ayar önceliklidir |
+| `ADMIN_BOOTSTRAP_EMAIL` | yalnızca `npm run admin:bootstrap` | İlk superadmin'in e-postası (komuta argüman olarak da verilebilir); uygulamalar okumaz |
 | `NEXT_PUBLIC_SITE_URL` | web | Sitenin genel adresi (OAuth dönüşleri; canonical, hreflang, sitemap ve Open Graph adresleri) |
 | `NEXT_PUBLIC_APEX_API_URL` | web | Sohbet API'sinin genel adresi; gömme kodu ve durum sayfası bunu kullanır |
 | `RESEND_API_KEY`, `MAIL_FROM` | web, api | E-posta (doğrulama/şifre sıfırlama kodları, devir ve lead bildirimleri). Yoksa geliştirmede loga yazılır |
@@ -333,7 +343,9 @@ Sitenin tamamı İngilizce ve Türkçedir: herkese açık sayfalar, giriş/kayı
 - [x] Geri bildirim ve yanıtlanamayan soru filtresi, 7 günlük özet
 - [ ] Ayrıntılı analitik
 - [x] İnsana devretme (e-posta formu), lead toplama
-- [ ] Hesaplar, planlar, kullanım kotaları ve faturalama (satış için gerekli)
+- [x] Hesaplar, çalışma alanları, ekip davetleri, planlar ve plan bazlı limitler
+- [x] Platform yönetim paneli: kullanıcılar, çalışma alanları, botlar, bilgi kaynakları, kullanım/maliyet, güvenlik (engeller, kilit sıfırlama), destek talepleri, bekleme listesi, duyurular, özellik bayrakları, sistem durumu; rol + 2FA + step-up korumaları, değiştirilemez audit kaydı, salt okunur "kullanıcı olarak görüntüle" ([runbook](docs/admin-runbook.md))
+- [ ] Kullanım kotalarının faturalaması ve ödeme (satış için gerekli)
 - [x] KVKK araçları (silme, saklama süresi)
 
 **Faz 3 – Büyüme**
