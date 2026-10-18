@@ -558,6 +558,17 @@ export async function liftAuthBlock(tx: Queryable, actorId: string, id: unknown)
 export async function resetThrottle(tx: Queryable, actorId: string, kind: unknown, raw: unknown): Promise<{ kind: "ip" | "email"; value: string; cleared: number }> {
   const subject = parseBlockSubject(kind, raw)
   if (subject.kind === "ip" && subject.value.includes("/")) throw new AdminError("invalid_input", "Enter a single IP address")
+  // a reset lifts the limits on password and code guesses, so never for staff: it would let an insider,
+  // or a stolen staff cookie, guess a superadmin's password or this account's own step-up codes
+  const staff =
+    subject.kind === "email"
+      ? await tx.query("select 1 from app.users where email = $1 and platform_role is not null", [subject.value])
+      : await tx.query(
+          `select 1 from app.auth_events e join app.users u on u.id = e.user_id
+            where e.ip = $1::inet and u.platform_role is not null and e.created_at > now() - interval '30 days' limit 1`,
+          [subject.value],
+        )
+  if (staff.rows.length) throw new AdminError("forbidden", "Staff accounts' limits can't be reset. They run out on their own")
   const { rows } =
     subject.kind === "ip"
       ? await tx.query<{ cleared: number }>(

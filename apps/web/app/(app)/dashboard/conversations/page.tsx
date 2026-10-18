@@ -18,10 +18,13 @@ export default async function ConversationsPage({ searchParams }: { searchParams
   const params = await searchParams
   const filter = parseFilter(params.filter)
   const days = parseDays(params.days)
-  const search = parseSearch(params.q)
+  // a superadmin viewing as the user sees the visitors' details masked, and can't search: matching
+  // on them would reveal them one guess at a time (as under support access)
+  const masked = await isImpersonating()
+  const search = masked ? null : parseSearch(params.q)
   // only a well-formed id; the transcript loads through the API, which checks it belongs to this bot
   const open = params.open && /^[0-9a-f-]{36}$/i.test(params.open) ? params.open : null
-  const [bot, page, masked] = await Promise.all([currentBot(user.id), listConversations(db(), await shownSite(user.id), { filter, days, search }), isImpersonating()])
+  const [bot, page] = await Promise.all([currentBot(user.id), listConversations(db(), await shownSite(user.id), { filter, days, search })])
   const rows = masked ? page.conversations.map(maskConversationSummary) : page.conversations
   return (
     <DashboardFrame active="Conversations">

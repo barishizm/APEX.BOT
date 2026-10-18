@@ -118,6 +118,18 @@ describe("step-up", () => {
     await assert.rejects(stepUpSession(db, user.id, sessionId, appCode(secret)), code("unauthorized"))
   })
 
+  test("signing in with a recovery code doesn't count as one", async () => {
+    const { user, secret } = await verifiedUser().then(async ({ user }) => {
+      const { secret } = await beginTwoFactorSetup(db, user.id)
+      return { user, secret }
+    })
+    const { recoveryCodes } = await enableTwoFactor(db, user.id, appCode(secret, -1))
+    const { challenge } = await login(db, { email: "jane@example.com", password: PASSWORD })
+    const { session, usedRecoveryCode } = await completeTwoFactorLogin(db, challenge!.token, recoveryCodes[0])
+    assert.equal(usedRecoveryCode, true)
+    assert.equal(hasRecentStepUp((await getSession(db, session.token))!), false)
+  })
+
   test("signing in with an authenticator code counts as one", async () => {
     const { secret } = await withTwoFactor()
     const { challenge } = await login(db, { email: "jane@example.com", password: PASSWORD })

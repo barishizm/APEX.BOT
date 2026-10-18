@@ -1,12 +1,15 @@
-import { createAuthBlock, liftAuthBlock, resetThrottle } from "@apex/db"
+import { createAuthBlock, liftAuthBlock, maskEmail, resetThrottle } from "@apex/db"
 import { withAdminAction, type AdminActionContext } from "@/lib/admin"
 import { errorJson } from "@/lib/auth"
 
-// POST /api/admin/security/<action>, body { reason, … }. Audited like every admin action (lib/admin.ts).
+// POST /api/admin/security/<action>, body { reason, … }. Audited like every admin action (lib/admin.ts);
+// an email address is kept masked there, since the audit log can't be erased.
 // Ending a user's sessions is /api/admin/users/<id>/revoke-sessions.
 
 type Params = { action: string }
 type Ctx = AdminActionContext<Params>
+
+const shown = (s: { kind: string; value: string }) => (s.kind === "email" ? maskEmail(s.value) : s.value)
 
 const ACTIONS: Record<string, ReturnType<typeof withAdminAction<Params>>> = {
   // body { kind: "ip" | "email", value, minutes }; locks someone out, so it needs a step-up
@@ -15,7 +18,7 @@ const ACTIONS: Record<string, ReturnType<typeof withAdminAction<Params>>> = {
     return {
       targetId: block.id,
       before: null,
-      after: { kind: block.kind, value: block.value, expiresAt: block.expiresAt.toISOString() },
+      after: { kind: block.kind, value: shown(block), expiresAt: block.expiresAt.toISOString() },
       result: { block },
     }
   }),
@@ -23,15 +26,15 @@ const ACTIONS: Record<string, ReturnType<typeof withAdminAction<Params>>> = {
   // body { id }
   unblock: withAdminAction<Params>({ action: "security.unblock", targetType: "auth_block", stepUp: false }, async ({ tx, admin, body }: Ctx) => {
     const { block } = await liftAuthBlock(tx, admin.user.id, body.id)
-    return { targetId: String(body.id), before: { ...block, expiresAt: block.expiresAt.toISOString() }, after: { lifted: true } }
+    return { targetId: String(body.id), before: { ...block, value: shown(block), expiresAt: block.expiresAt.toISOString() }, after: { lifted: true } }
   }),
 
-  // body { kind: "ip" | "email", value }; only helps someone back in, so no step-up
+  // body { kind: "ip" | "email", value }; it lifts the limits on password and code guesses, so it needs a step-up
   "reset-throttle": withAdminAction<Params>(
-    { action: "security.reset_throttle", targetType: "throttle", stepUp: false },
+    { action: "security.reset_throttle", targetType: "throttle" },
     async ({ tx, admin, body }: Ctx) => {
       const reset = await resetThrottle(tx, admin.user.id, body.kind, body.value)
-      return { targetId: reset.value, before: { failures: reset.cleared }, after: { failures: 0 }, result: reset }
+      return { targetId: shown(reset), before: { failures: reset.cleared }, after: { failures: 0 }, result: reset }
     },
   ),
 }

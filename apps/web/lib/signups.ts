@@ -1,4 +1,4 @@
-import { isSignupsMode, platformSettings, readPlatformSettings, signupAllowed, type Queryable, type SignupsMode } from "@apex/db"
+import { AuthError, isSignupsMode, platformSettings, readPlatformSettings, signupAllowed, type Queryable, type SignupsMode, type User } from "@apex/db"
 import { db } from "@/lib/db"
 
 // Who may create an account is set at runtime in /admin/settings (platform_settings.signups_mode):
@@ -31,4 +31,25 @@ export async function signupsModeIn(tx: Queryable): Promise<SignupsMode> {
 /** Whether a new account may be created for this email now. */
 export async function mayCreateAccount(input: { email: unknown; inviteToken?: unknown }): Promise<boolean> {
   return signupAllowed(db(), await currentSignupsMode(), input)
+}
+
+async function refuseSignup(): Promise<never> {
+  throw (await currentSignupsMode()) === "invite_only"
+    ? new AuthError("signups_closed", "Sign-ups are invite-only for now. Join the waitlist and we'll email you an invitation")
+    : new AuthError("signups_closed", "Sign-ups are closed for now. Join the waitlist")
+}
+
+/** For the register route: refuses an address the sign-up mode doesn't let in. */
+export async function assertMayCreateAccount(input: { email: unknown; inviteToken?: unknown }) {
+  if (!(await mayCreateAccount(input))) await refuseSignup()
+}
+
+/**
+ * An account that hasn't verified its address yet may only move to one that could sign up itself:
+ * otherwise registering with an invited address and changing it would open invite-only or closed
+ * sign-ups to anyone, again and again. A verified account was let in already and may change freely.
+ */
+export async function assertMayTakeAddress(user: Pick<User, "email" | "emailVerified">, email: unknown) {
+  if (user.emailVerified || typeof email !== "string" || !email.trim() || email.trim().toLowerCase() === user.email) return
+  await assertMayCreateAccount({ email })
 }

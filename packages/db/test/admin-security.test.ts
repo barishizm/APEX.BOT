@@ -137,6 +137,18 @@ describe("throttle resets", () => {
     await login(db, { email: "jane@example.com", password: PASSWORD }, { ip: "192.0.2.9" })
     await assert.rejects(resetThrottle(db, boss, "ip", "192.0.2.0/24"), adminCode("invalid_input"))
   })
+
+  // a reset lifts the limits on password and code guesses: never for a staff account
+  test("refuses staff emails, and addresses staff signed in from lately", async () => {
+    const boss = await newUser("boss@example.com", "boss", "superadmin")
+    await newUser("help@example.com", "help", "support")
+    for (const email of ["boss@example.com", "help@example.com"]) {
+      await assert.rejects(resetThrottle(db, boss, "email", email), adminCode("forbidden"), email)
+    }
+    await login(db, { email: "help@example.com", password: PASSWORD }, { ip: "192.0.2.20" })
+    await assert.rejects(resetThrottle(db, boss, "ip", "192.0.2.20"), adminCode("forbidden"))
+    assert.equal((await resetThrottle(db, boss, "ip", "192.0.2.21")).cleared, 0, "other addresses still can")
+  })
 })
 
 describe("overview", () => {

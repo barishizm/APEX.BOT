@@ -42,6 +42,7 @@ async function newUser(email: string, username: string) {
 }
 async function staff() {
   const boss = await newUser("boss@example.com", "boss")
+  await db.query("update app.users set email_verified_at = now() where id = $1", [boss.id])
   await bootstrapSuperadmin(db, "boss@example.com")
   const help = await newUser("help@example.com", "help")
   await db.transaction((tx) => changePlatformRole(tx, boss.id, help.id, "support"))
@@ -101,7 +102,9 @@ describe("actions", () => {
 
     const reset = await run((tx) => adminSendPasswordReset(tx, support, jane.id))
     assert.match(reset.extra.code, /^\d{6}$/)
-    assert.deepEqual(reset.after, { email: "jane@example.com" })
+    // the audit log can't be erased, so it keeps the address masked
+    assert.deepEqual(resent.after, { email: "j***@example.com" })
+    assert.deepEqual(reset.after, { email: "j***@example.com" })
     // a second one within 30 seconds is refused, as on the forgot-password page
     await assert.rejects(run((tx) => adminSendPasswordReset(tx, support, jane.id)), code("too_many_attempts"))
   })
@@ -209,13 +212,14 @@ describe("list filters", () => {
     const emails = async (filters: Record<string, string>) =>
       (await listPage<{ email: string }>(db, ADMIN_USERS_LIST, { filters, sort: "email" })).rows.map((r) => r.email)
 
-    assert.deepEqual(await emails({ verified: "yes" }), ["jane@example.com"])
+    // staff() verified the superadmin before bootstrapping it
+    assert.deepEqual(await emails({ verified: "yes" }), ["boss@example.com", "jane@example.com"])
     assert.deepEqual(await emails({ suspended: "yes" }), ["old@example.com"])
     assert.deepEqual(await emails({ provider: "google" }), ["jane@example.com"])
     assert.deepEqual(await emails({ provider: "github" }), [])
     assert.deepEqual(await emails({ accountType: "business" }), ["jane@example.com"])
     assert.deepEqual(await emails({ created: "older" }), ["old@example.com"])
-    assert.deepEqual(await emails({ created: "7d", provider: "none", verified: "no" }), ["boss@example.com", "help@example.com"])
+    assert.deepEqual(await emails({ created: "7d", provider: "none", verified: "no" }), ["help@example.com"])
     await assert.rejects(listPage(db, ADMIN_USERS_LIST, { filters: { created: "1 day" } }), code("invalid_input"))
   })
 })

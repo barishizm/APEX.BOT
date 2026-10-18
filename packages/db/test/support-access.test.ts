@@ -239,4 +239,18 @@ describe("impersonation", () => {
     ])
     assert.deepEqual(entries.map((e) => e.after), [{ expired: false }, { expired: true }])
   })
+
+  test("starting another view ends the open one, and that end is audited too", async () => {
+    const { owner, admin, adminSession } = await setup()
+    const other = await account("cay")
+    const first = await run((tx) => startImpersonation(tx, { id: admin.id, sessionId: adminSession.sessionId }, owner.id, "reason"))
+    const second = await run((tx) => startImpersonation(tx, { id: admin.id, sessionId: adminSession.sessionId }, other.id, "reason", 5, { ip: "203.0.113.9" }))
+    assert.equal(await getImpersonatedSession(db, first.token, admin.session.token), null)
+    assert.equal(await endImpersonation(db, first.token), null, "already ended, so not ended twice")
+
+    const entries = (await db.query<{ action: string; actor_id: string; target_id: string; after: unknown; ip: string | null }>(
+      "select action, actor_id, target_id, after, host(ip) as ip from app.admin_audit_log order by id",
+    )).rows
+    assert.deepEqual(entries, [{ action: "user.impersonate.end", actor_id: admin.id, target_id: owner.id, after: { expired: false, replacedBy: second.id }, ip: "203.0.113.9" }])
+  })
 })

@@ -3,6 +3,7 @@ import { AuthError, issueEmailCode } from "@apex/db"
 import { db } from "@/lib/db"
 import { authErrorResponse, currentSession, readJson, requestMeta } from "@/lib/auth"
 import { sendVerificationCode } from "@/lib/mail"
+import { assertMayTakeAddress } from "@/lib/signups"
 
 // Body: {} to resend, or { email } to send to a corrected address
 export async function POST(request: Request) {
@@ -10,6 +11,8 @@ export async function POST(request: Request) {
     const session = await currentSession()
     if (!session) throw new AuthError("unauthorized", "Your session has ended. Log in again")
     const { email } = await readJson(request)
+    // an unverified account takes the corrected address at once
+    await assertMayTakeAddress(session.user, email)
     const sent = await issueEmailCode(db(), session.user.id, { email }, await requestMeta())
     await sendVerificationCode(sent.email, sent.code, await requestLocale())
     return Response.json({ email: sent.email })

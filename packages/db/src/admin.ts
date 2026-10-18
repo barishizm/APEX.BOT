@@ -144,14 +144,19 @@ export async function bootstrapSuperadmin(db: Db, rawEmail: unknown): Promise<{ 
   return db.transaction(async (tx) => {
     // serialize concurrent runs so two can't both see "no superadmin yet"
     await tx.query("select pg_advisory_xact_lock(hashtext('apex.admin_bootstrap'))")
-    const user = await tx.query<{ id: string; platform_role: string | null }>("select id, platform_role from app.users where email = $1", [email])
+    const user = await tx.query<{ id: string; platform_role: string | null; verified: boolean }>(
+      "select id, platform_role, email_verified_at is not null as verified from app.users where email = $1",
+      [email],
+    )
     if (!user.rows.length) throw new AdminError("not_found", `No account with the email ${email}; sign up first`)
-    const { id, platform_role } = user.rows[0]!
+    const { id, platform_role, verified } = user.rows[0]!
     const existing = await tx.query<{ id: string }>("select id from app.users where platform_role = 'superadmin' limit 1")
     if (existing.rows.length) {
       if (existing.rows[0]!.id === id) return { userId: id, created: false }
       throw new AdminError("already_bootstrapped", "A superadmin already exists")
     }
+    // whoever registered an address first owns the row until the address is proven; promote only a proven one
+    if (!verified) throw new AdminError("forbidden", `${email} isn't verified yet; sign in and confirm the emailed code first`)
     await tx.query("update app.users set platform_role = 'superadmin' where id = $1", [id])
     await writeAudit(tx, {
       actorId: null,
