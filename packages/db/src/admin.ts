@@ -57,12 +57,15 @@ export interface AuditEntry {
 const cleanIp = (ip?: string | null) => (ip && isIP(ip) ? ip : null)
 const json = (v: unknown) => (v === undefined || v === null ? null : JSON.stringify(v))
 
-/** Appends one entry to app.admin_audit_log. Pass the transaction the change itself runs in. */
+/**
+ * Appends one entry to app.admin_audit_log. Pass the transaction the change itself runs in. Entries
+ * can't be changed or deleted afterwards (a trigger refuses it); the actor's email is kept with them.
+ */
 export async function writeAudit(q: Queryable, entry: AuditEntry): Promise<string> {
   if (!entry.action || !entry.targetType) throw new AdminError("invalid_input", "An audit entry needs an action and a target type")
   const { rows } = await q.query<{ id: string }>(
-    `insert into app.admin_audit_log (actor_id, action, target_type, target_id, reason, before, after, ip, user_agent)
-     values ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9) returning id::text`,
+    `insert into app.admin_audit_log (actor_id, actor_email, action, target_type, target_id, reason, before, after, ip, user_agent)
+     values ($1, (select email from app.users where id = $1::uuid), $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9) returning id::text`,
     [
       entry.actorId,
       entry.action.slice(0, 100),

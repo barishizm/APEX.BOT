@@ -184,7 +184,7 @@ export async function getAdminUserDetail(q: Queryable, userId: string): Promise<
       [userId],
     ),
     q.query<AdminUserAuditEntry>(
-      `select l.id::text, l.action, l.reason, l.actor_id as "actorId", coalesce(a.display_name, a.username) as "actorName",
+      `select l.id::text, l.action, l.reason, l.actor_id as "actorId", coalesce(a.display_name, a.username, l.actor_email) as "actorName",
               l.before, l.after, l.created_at as "createdAt"
          from app.admin_audit_log l left join app.users a on a.id = l.actor_id
         where l.target_type = 'user' and l.target_id = $1

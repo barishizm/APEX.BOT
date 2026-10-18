@@ -39,7 +39,7 @@ before(async () => {
   await migrate(db)
 })
 after(() => db.close())
-beforeEach(() => db.query("truncate app.users, app.organizations, app.admin_audit_log cascade").then(() => {}))
+beforeEach(() => db.query("alter table app.admin_audit_log disable trigger user; truncate app.users, app.organizations, app.admin_audit_log cascade; alter table app.admin_audit_log enable trigger user").then(() => {}))
 
 async function newUser(email: string, username: string) {
   const r = await register(db, { email, username, password: "correct horse", accountType: "personal", acceptTerms: true })

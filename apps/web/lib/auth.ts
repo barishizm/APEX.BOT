@@ -218,7 +218,9 @@ export async function requestMeta(): Promise<RequestMeta> {
   const trusted = Number(process.env.TRUST_PROXY === "true" ? 1 : process.env.TRUST_PROXY ?? 0)
   const hops = (h.get("x-forwarded-for") ?? "").split(",").map((v) => v.trim()).filter(Boolean)
   const forwarded = Number.isInteger(trusted) && trusted > 0 ? hops[hops.length - trusted] : undefined
-  return { ip: forwarded && isIP(forwarded) ? forwarded : null, userAgent: h.get("user-agent") }
+  // Vercel's edge sets this header itself (a client's copy is replaced); elsewhere it would be client-supplied
+  const country = process.env.VERCEL ? h.get("x-vercel-ip-country") : null
+  return { ip: forwarded && isIP(forwarded) ? forwarded : null, userAgent: h.get("user-agent"), country }
 }
 
 // JSON only: a cross-site <form> can't send application/json without a CORS preflight

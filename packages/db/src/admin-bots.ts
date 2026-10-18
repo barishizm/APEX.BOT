@@ -187,7 +187,7 @@ export async function getAdminBotDetail(q: Queryable, botId: string): Promise<Ad
       [botId],
     ),
     q.query<AdminBotAuditEntry>(
-      `select l.id::text, l.action, l.reason, l.actor_id as "actorId", coalesce(a.display_name, a.username) as "actorName", l.created_at as "createdAt"
+      `select l.id::text, l.action, l.reason, l.actor_id as "actorId", coalesce(a.display_name, a.username, l.actor_email) as "actorName", l.created_at as "createdAt"
          from app.admin_audit_log l left join app.users a on a.id = l.actor_id
         where l.target_type = 'bot' and l.target_id = $1
         order by l.id desc limit $2`,

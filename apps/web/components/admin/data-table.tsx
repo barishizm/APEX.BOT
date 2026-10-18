@@ -29,6 +29,14 @@ export interface DataTableFilter {
   options: { value: string; label: string }[]
 }
 
+/** A filter that takes a typed value (the spec's valueFilters): a day, or text such as an IP address. */
+export interface DataTableInput {
+  key: string
+  label: string
+  type: "date" | "text"
+  placeholder?: string
+}
+
 interface PageJson<T> {
   rows: T[]
   nextCursor: string | null
@@ -52,6 +60,7 @@ export function DataTable<T>({
   rowKey,
   rowHref,
   filters = [],
+  inputs = [],
   defaultSort,
   initialQuery,
   searchPlaceholder,
@@ -66,6 +75,7 @@ export function DataTable<T>({
   /** Makes each row's first cell a link, e.g. to a detail page. */
   rowHref?: (row: T) => string
   filters?: DataTableFilter[]
+  inputs?: DataTableInput[]
   /** Must match the spec's defaultSort, so the header shows the right arrow before any click. */
   defaultSort: { key: string; dir: SortDir }
   /** The state the page was opened with (readTableQuery on the server). */
@@ -215,6 +225,16 @@ export function DataTable<T>({
           </label>
         ))}
 
+        {inputs.map((f) => (
+          <FilterInput
+            // a cleared or changed filter starts the field afresh
+            key={`${f.key}:${query.filters[f.key] ?? ""}`}
+            input={f}
+            value={query.filters[f.key] ?? ""}
+            onCommit={(value) => update({ filters: { ...query.filters, [f.key]: value } })}
+          />
+        ))}
+
         {exportable && (
           <button type="button" onClick={exportCsv} disabled={exporting} className={`${button} ml-auto`}>
             <Download className="h-4 w-4" aria-hidden />
@@ -353,5 +373,30 @@ export function DataTable<T>({
         </div>
       </div>
     </div>
+  )
+}
+
+// Dates apply as soon as they're picked; text when the field loses focus or on Enter, so a half-typed
+// address isn't sent (and refused) on every keystroke
+function FilterInput({ input, value, onCommit }: { input: DataTableInput; value: string; onCommit: (value: string) => void }) {
+  const [draft, setDraft] = useState(value)
+  const commit = (next: string) => next.trim() !== value && onCommit(next.trim())
+  return (
+    <label className="flex items-center gap-2 text-sm text-[var(--color-muted)]">
+      <span>{input.label}</span>
+      <input
+        type={input.type === "date" ? "date" : "search"}
+        value={draft}
+        maxLength={200}
+        placeholder={input.placeholder}
+        onChange={(e) => {
+          setDraft(e.target.value)
+          if (input.type === "date") commit(e.target.value)
+        }}
+        onBlur={() => input.type === "text" && commit(draft)}
+        onKeyDown={(e) => e.key === "Enter" && input.type === "text" && commit(draft)}
+        className={cn(control, "px-2 outline-none placeholder:text-[var(--color-muted)]", input.type === "text" && "w-40")}
+      />
+    </label>
   )
 }

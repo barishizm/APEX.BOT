@@ -1,3 +1,4 @@
+import { isIP } from "node:net"
 import type { Queryable } from "./db.ts"
 import { AdminError } from "./admin.ts"
 
@@ -25,6 +26,22 @@ export interface ListSpec {
   search?: string[]
   /** Filter key → allowed value → SQL condition. Only these exact values are accepted. */
   filters?: Record<string, Record<string, string>>
+  /**
+   * Filters that take any value of a type, e.g. an actor's id or a day: key → condition with `{}`
+   * where the value goes (bound as a parameter, cast to the type). Values that don't parse as the
+   * type are refused before they reach the database.
+   */
+  valueFilters?: Record<string, { sql: string; type: ValueFilterType }>
+}
+
+export type ValueFilterType = "uuid" | "date" | "inet" | "text"
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const VALUE_CHECKS: Record<ValueFilterType, (v: string) => boolean> = {
+  uuid: (v) => UUID_RE.test(v),
+  date: (v) => /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(`${v}T00:00:00Z`)),
+  inet: (v) => isIP(v) !== 0,
+  text: (v) => v.length <= MAX_QUERY,
 }
 
 export interface ListParams {
@@ -98,6 +115,13 @@ function resolve(spec: ListSpec, input: ListParams): Resolved {
 
   for (const [key, value] of Object.entries(input.filters ?? {})) {
     if (value === undefined || value === null || value === "") continue
+    const byValue = spec.valueFilters?.[key]
+    if (byValue) {
+      if (!VALUE_CHECKS[byValue.type](value)) throw invalid("Unknown filter")
+      params.push(value)
+      where.push(`(${byValue.sql.replaceAll("{}", `$${params.length}::${byValue.type}`)})`)
+      continue
+    }
     const condition = spec.filters?.[key]?.[value]
     if (!condition) throw invalid("Unknown filter")
     where.push(`(${condition})`)

@@ -270,7 +270,7 @@ export async function getAdminKnowledgeDetail(q: Queryable, sourceId: string): P
   const r = rows[0]
   if (!r) return null
   const audit = await q.query<AdminKnowledgeAuditEntry>(
-    `select l.id::text, l.action, l.reason, coalesce(a.display_name, a.username) as "actorName", l.created_at as "createdAt"
+    `select l.id::text, l.action, l.reason, coalesce(a.display_name, a.username, l.actor_email) as "actorName", l.created_at as "createdAt"
        from app.admin_audit_log l left join app.users a on a.id = l.actor_id
       where l.target_type = 'knowledge_source' and l.target_id = $1
       order by l.id desc limit $2`,

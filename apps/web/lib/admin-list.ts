@@ -27,9 +27,12 @@ export interface AdminListOptions<Row> {
 
 const RESERVED = new Set(["q", "sort", "dir", "cursor", "limit", "format"])
 
+/** Every query-string key the spec filters on, fixed-choice and by-value alike. */
+export const listFilterKeys = (spec: ListSpec) => [...Object.keys(spec.filters ?? {}), ...Object.keys(spec.valueFilters ?? {})]
+
 export function listParams(search: URLSearchParams, spec: ListSpec): ListParams {
   const filters: Record<string, string> = {}
-  for (const key of Object.keys(spec.filters ?? {})) {
+  for (const key of listFilterKeys(spec)) {
     if (RESERVED.has(key)) continue
     const value = search.get(key)
     if (value) filters[key] = value
