@@ -143,7 +143,8 @@ describe("suspension", () => {
     const s = await run((tx) => adminSuspendWorkspace(tx, org, "unpaid"))
     assert.equal(s.extra.sites, 2)
     assert.deepEqual(await listBotIds(db), [])
-    assert.deepEqual(await listBotsChangedSince(db, null), [])
+    // still returned, as paused: the chat API keeps their keys to answer "out of service"
+    assert.deepEqual((await listBotsChangedSince(db, null)).map((b) => b.serving), [false, false])
     await assert.rejects(run((tx) => adminSuspendWorkspace(tx, org, "again")), code("invalid_input"))
 
     await new Promise((r) => setTimeout(r, 5))

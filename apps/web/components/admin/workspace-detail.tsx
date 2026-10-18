@@ -246,7 +246,9 @@ export function WorkspaceDetail({ detail }: { detail: WorkspaceDetailJson }) {
                   return (
                     <tr key={s.id} className="border-t border-[var(--color-line)]">
                       <td className={`${td} max-w-xs`}>
-                        <span className="font-medium">{s.name}</span>
+                        <Link href={`/admin/bots/${s.id}`} className="font-medium">
+                          {s.name}
+                        </Link>
                         <span className="block break-all text-xs text-[var(--color-muted)]">
                           {s.allowedOrigins[0] ?? t.noOrigins}
                           {s.allowedOrigins.length > 1 && ` +${s.allowedOrigins.length - 1}`}

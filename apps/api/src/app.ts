@@ -14,7 +14,7 @@ import type { QueryEmbedder } from "./embeddings.ts";
 import { ReplyMarkerFilter, buildMessages, buildSystem } from "./prompt.ts";
 import { DEFAULT_RETRIEVAL, retrieve, semanticQueryTexts, type Hit, type KnowledgeBase } from "./retrieval.ts";
 import type { Conversation, ConversationStore, Source } from "./store.ts";
-import { normalizeOrigin, publicSettings, type Tenant, type TenantRegistry } from "./tenants.ts";
+import { dailyBudget, normalizeOrigin, publicSettings, type Tenant, type TenantRegistry } from "./tenants.ts";
 import type { Lang } from "./text.ts";
 import { visitorContext } from "./visitor-context.ts";
 
@@ -37,13 +37,15 @@ export interface AppDeps {
   health?: () => Record<string, unknown>;
 }
 
-type Env = { Variables: { tenant: Tenant; origin: string } };
+// `siteId` is set for paused sites too; `tenant` only for sites that answer
+type Env = { Variables: { tenant: Tenant; siteId: string; origin: string } };
 
 /** Error codes the widget maps to localized text. */
 type ErrorCode =
   | "bad_request"
   | "unknown_site"
   | "origin_not_allowed"
+  | "out_of_service"
   | "rate_limited"
   | "budget_exhausted"
   | "message_too_long"
@@ -63,6 +65,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // C0 controls (except tab and newline), DEL and C1 controls (NEL is a line break to some mail
 // software): Postgres rejects NUL in text, and none belong in a message or a mail.
 const CONTROL = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g;
+// Sent with "out_of_service"; the widget shows its own text in the visitor's language
+const OUT_OF_SERVICE = "This assistant is out of service for now. Please contact the site directly.";
 // Ticket references skip look-alike characters (0/O, 1/I) so they can be read out loud.
 const REF_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
@@ -142,20 +146,29 @@ export function createApp(deps: AppDeps) {
   app.use("/v1/*", (c, next) => (c.req.path === "/v1/chat" ? chatBody(c, next) : smallBody(c, next)));
 
   app.use("/v1/*", async (c, next) => {
-    const tenant = tenants.findBySiteKey(c.req.header("x-apex-site-key") ?? c.req.query("site_key"));
-    if (!tenant) return c.json({ error: "unknown_site" satisfies ErrorCode }, 401);
+    const siteKey = c.req.header("x-apex-site-key") ?? c.req.query("site_key");
+    const tenant = tenants.findBySiteKey(siteKey);
+    // disabled by staff, or its workspace suspended: answered politely, on its own origins only
+    const site = tenant ?? tenants.findPaused(siteKey);
+    if (!site) return c.json({ error: "unknown_site" satisfies ErrorCode }, 401);
     const origin = requestOrigin(c);
-    if (!origin || !tenant.allowedOrigins.includes(origin)) {
-      log("warn", "origin rejected", { tenant: tenant.id, origin });
+    if (!origin || !site.allowedOrigins.includes(origin)) {
+      log("warn", "origin rejected", { tenant: site.id, origin });
       return c.json({ error: "origin_not_allowed" satisfies ErrorCode }, 403);
     }
-    c.set("tenant", tenant);
+    c.set("siteId", site.id);
     c.set("origin", origin);
     c.header("Access-Control-Allow-Origin", origin);
     c.header("Access-Control-Expose-Headers", "Retry-After");
     c.header("Vary", "Origin");
     c.header("X-Content-Type-Options", "nosniff");
     c.header("Cache-Control", "no-store");
+    if (!tenant) {
+      // a visitor may still erase their conversation (KVKK/GDPR); nothing else runs
+      if (c.req.method === "DELETE" && c.req.path.startsWith("/v1/conversations/")) return next();
+      return c.json({ error: "out_of_service" satisfies ErrorCode, message: OUT_OF_SERVICE }, 503);
+    }
+    c.set("tenant", tenant);
     await next();
   });
 
@@ -195,7 +208,7 @@ export function createApp(deps: AppDeps) {
       if (!check.ok) return fail(c, "rate_limited", 429, check.retryAfter);
     }
     await budget.load(tenant.id);
-    if (budget.usedToday(tenant.id) >= Math.min(tenant.dailyTokenBudget, limits.maxDailyTokensPerTenant)) {
+    if (budget.usedToday(tenant.id) >= Math.min(dailyBudget(tenant, now()), limits.maxDailyTokensPerTenant)) {
       log("warn", "daily token budget exhausted", { tenant: tenant.id });
       return fail(c, "budget_exhausted", 429);
     }
@@ -371,7 +384,7 @@ export function createApp(deps: AppDeps) {
     const limited = lookup(c);
     if (limited) return limited;
     const id = idOf(c.req.param("id"));
-    if (!id || !(await store.delete(c.get("tenant").id, id))) return fail(c, "not_found", 404);
+    if (!id || !(await store.delete(c.get("siteId"), id))) return fail(c, "not_found", 404);
     return c.body(null, 204);
   });
 

@@ -49,7 +49,9 @@ if (!siteKey) {
         void widget.send("Hello");
       }
     } catch (error) {
-      console.warn("[Apex] Widget disabled:", error instanceof ApiError ? error.code : error);
+      // switched off in the Apex Bot admin: the site shows no widget at all, so nothing looks broken
+      if (error instanceof ApiError && error.code === "out_of_service") console.info("[Apex] This assistant is out of service.");
+      else console.warn("[Apex] Widget disabled:", error instanceof ApiError ? error.code : error);
     }
   };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start, { once: true });

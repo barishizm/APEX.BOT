@@ -201,6 +201,8 @@ export class Widget {
   private busy = false;
   /** "End chat" was chosen: the panel shows the closing pane until a new chat starts. */
   private ended = false;
+  /** The API said the site's assistant is out of service: the composer stays locked until the page reloads. */
+  private outOfService = false;
   /** Following the newest message; false once the visitor scrolls up to read. */
   private pinned = true;
   private lastTop = 0;
@@ -578,7 +580,7 @@ export class Widget {
 
   async send(raw: string, files: Prepared[] = [], speak = false): Promise<void> {
     const text = String(raw ?? "").trim();
-    if ((!text && !files.length) || this.busy) return;
+    if ((!text && !files.length) || this.busy || this.outOfService) return;
     this.open();
     if (this.ended) this.reset();
     await this.ready;
@@ -976,6 +978,7 @@ export class Widget {
   // ----- files -----
 
   private pickFiles(): void {
+    if (this.outOfService) return;
     if (!this.fileInput) {
       const input = (this.fileInput = h("input", { type: "file", multiple: true, accept: ACCEPT, hidden: true, tabindex: -1 }));
       input.addEventListener("change", () => {
@@ -1202,6 +1205,7 @@ export class Widget {
     const t = this.t;
     bubble.className = "msg bot error";
     bubble.replaceChildren(h("p", {}, t.errors[code as keyof Strings["errors"]] ?? t.errors.generic));
+    if (code === "out_of_service") return this.stopService();
     let action: HTMLButtonElement | null = null;
     if ((code === "budget_exhausted" || code === "refused") && this.handoffOn) {
       action = h("button", { class: "chip", type: "button", onclick: () => this.showHandoff() }, t.human);
@@ -1211,6 +1215,19 @@ export class Widget {
       action = h("button", { class: "chip", type: "button", onclick: retry }, t.retry);
     }
     if (action) bubble.after(h("div", { class: "meta in" }, h("div", {}, action)));
+    this.scroll();
+  }
+
+  /** No retry and no hand-off: nothing on this site answers until staff turn it back on. */
+  private stopService(): void {
+    this.outOfService = true;
+    this.stopListening(true);
+    this.clearFiles();
+    this.suggest.replaceChildren();
+    this.input.value = "";
+    this.input.disabled = true;
+    this.input.placeholder = this.t.errors.out_of_service;
+    this.updateSend();
     this.scroll();
   }
 
@@ -1359,7 +1376,7 @@ export class Widget {
     const t = this.t;
     const hasInput = !!this.input.value.trim() || this.files.length > 0;
     const mode = this.speaking ? "stop" : this.voice && (this.voiceListening || (!hasInput && !this.busy)) ? "voice" : "send";
-    this.sendBtn.disabled = mode === "send" && (this.busy || !hasInput || this.files.some((f) => !f.prepared));
+    this.sendBtn.disabled = this.outOfService || (mode === "send" && (this.busy || !hasInput || this.files.some((f) => !f.prepared)));
     this.sendBtn.classList.toggle("live", this.voiceListening);
     if (mode === this.sendMode) return;
     this.sendMode = mode;

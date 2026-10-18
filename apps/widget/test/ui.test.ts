@@ -5,7 +5,7 @@ import { before, describe, it } from "node:test";
 import { JSDOM } from "jsdom";
 import { A, setup } from "../../api/test/helpers.ts";
 
-const { app, store, mailer, model } = setup();
+const { app, store, mailer, model, tenants } = setup();
 // the model cites the excerpt it used, so the widget shows it as a source
 model.reply = ["**Kargo** ", "750 TL üzeri ", "ücretsizdir. [[used: 1]]"];
 
@@ -297,5 +297,22 @@ model.reply = ["**Kargo** ", "750 TL üzeri ", "ücretsizdir. [[used: 1]]"];
     await new Promise((r) => setTimeout(r, 300));
     assert.equal($("section.panel")!.hidden, false);
     assert.ok($(".root")!.hasAttribute("data-open"));
+  });
+
+  // last: it locks the composer for the rest of the page
+  it("says the assistant is out of service when staff switch it off mid-visit, and locks the composer", async () => {
+    tenants.pause(tenants.findById("tn_a")!);
+    const asked = model.requests.length;
+    apex().send("Hâlâ orada mısınız?");
+    const error = await until(() => [...shadow.querySelectorAll(".msg.bot.error")].at(-1), "out-of-service bubble");
+    assert.match(error.textContent!, /hizmet dışı/);
+    // no retry or hand-off: nothing on the site answers now
+    assert.ok(!error.nextElementSibling?.classList.contains("meta"));
+    assert.equal($<HTMLTextAreaElement>("textarea")!.disabled, true);
+    assert.match($<HTMLTextAreaElement>("textarea")!.placeholder, /hizmet dışı/);
+    assert.equal($<HTMLButtonElement>("button.send")!.disabled, true);
+    apex().send("Bir daha");
+    await new Promise((r) => setTimeout(r, 50));
+    assert.equal(model.requests.length, asked, "the model is never called");
   });
 });

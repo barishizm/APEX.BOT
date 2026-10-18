@@ -45,7 +45,7 @@ let db: Db
 before(async () => {
   pg = new PGlite()
   db = pgliteDb(pg)
-  assert.deepEqual(await migrate(db), ["0001_auth.sql", "0002_function_search_path.sql", "0003_bots.sql", "0004_knowledge.sql", "0005_bot_activity.sql", "0006_account.sql", "0007_conversations.sql", "0008_handoff_verification.sql", "0009_token_usage.sql", "0010_waitlist.sql", "0011_analytics.sql", "0012_knowledge_embeddings.sql", "0013_multi_site.sql", "0014_display_name.sql", "0015_message_topics.sql", "0016_conversation_context.sql", "0017_account_security.sql", "0018_totp_secret_sealed.sql", "0019_knowledge_files_refresh.sql", "0020_workspace_plan.sql", "0021_platform_admin.sql", "0022_admin_guards.sql", "0023_admin_overview.sql", "0024_admin_users.sql"])
+  assert.deepEqual(await migrate(db), ["0001_auth.sql", "0002_function_search_path.sql", "0003_bots.sql", "0004_knowledge.sql", "0005_bot_activity.sql", "0006_account.sql", "0007_conversations.sql", "0008_handoff_verification.sql", "0009_token_usage.sql", "0010_waitlist.sql", "0011_analytics.sql", "0012_knowledge_embeddings.sql", "0013_multi_site.sql", "0014_display_name.sql", "0015_message_topics.sql", "0016_conversation_context.sql", "0017_account_security.sql", "0018_totp_secret_sealed.sql", "0019_knowledge_files_refresh.sql", "0020_workspace_plan.sql", "0021_platform_admin.sql", "0022_admin_guards.sql", "0023_admin_overview.sql", "0024_admin_users.sql", "0025_admin_bots.sql"])
 })
 after(() => db.close())
 beforeEach(async () => {

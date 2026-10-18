@@ -24,12 +24,15 @@ Conversation and message ids must be server-made UUIDs: anything else starts a n
 Conversation reads, erasures and ratings are rate limited per IP (`lookupsPerMinute`). `test/security.test.ts` (here) and
 `packages/db/test/injection.test.ts` hold the hostile-input suites: SQL/NoSQL payloads, tenant isolation, prototype
 pollution, mail header injection, control characters, and a static check that every query stays parameterized.
-Error codes the widget localizes: `unknown_site`, `origin_not_allowed`, `rate_limited`, `budget_exhausted`, `message_too_long`, `conversation_full`, `not_found`, `upstream`, `refused`.
+Error codes the widget localizes: `unknown_site`, `origin_not_allowed`, `rate_limited`, `budget_exhausted`, `out_of_service`, `message_too_long`, `conversation_full`, `not_found`, `upstream`, `refused`.
 
 The demo tenant lives in `data/tenants.json` (only loaded when `NODE_ENV` is not `production`, or `APEX_DEMO_TENANT=1`) and its content in `data/knowledge/<tenant id>.json`.
 With `DATABASE_URL` set, bots configured in the dashboard (`/dashboard/widget`, table `app.bots`) are synced
 every 30 s as well: their model (Anthropic, OpenAI or Google, with an optional fallback), persona, limits and
 widget look all come from there. Each provider needs its key (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`).
+A bot staff disabled in `/admin/bots`, or one in a suspended workspace, is paused on the next pass: it gets no
+model calls and its knowledge is unloaded, but its key and origins are kept so every `/v1` route answers its own
+origins with `503 out_of_service` (erasing a conversation still works) and the widget stays hidden or locks its composer.
 
 Not production-ready yet (each marked `shortcut:` in the code): conversations, rate limits and token budgets are in memory;
 retrieval is lexical BM25 rather than pgvector hybrid search; handoff emails go to an in-memory outbox until an email provider is chosen.
