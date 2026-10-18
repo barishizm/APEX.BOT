@@ -144,8 +144,8 @@ const MESSAGE_COLUMNS = `m.id, m.body, m.from_staff as "fromStaff", m.internal, 
 async function loadMessages(q: Queryable, ticketId: string, withInternal: boolean): Promise<TicketMessage[]> {
   const { rows } = await q.query<TicketMessage>(
     `select ${MESSAGE_COLUMNS} from app.support_messages m left join app.users u on u.id = m.author_id
-      where m.ticket_id = $1 ${withInternal ? "" : "and not m.internal"} order by m.created_at, m.id`,
-    [ticketId],
+      where m.ticket_id = $1 and ($2::boolean or not m.internal) order by m.created_at, m.id`,
+    [ticketId, withInternal],
   )
   return rows
 }
@@ -423,7 +423,8 @@ export async function supportQueueCounts(q: Queryable): Promise<{ active: number
     `select count(*)::int as active,
             count(*) filter (where ${OVERDUE})::int as overdue,
             count(*) filter (where t.assignee_id is null)::int as unassigned
-       from app.support_tickets t where t.status in (${ACTIVE_TICKET_STATUSES.map((s) => `'${s}'`).join(", ")})`,
+       from app.support_tickets t where t.status = any($1::text[])`,
+    [ACTIVE_TICKET_STATUSES],
   )
   return rows[0]!
 }
@@ -515,9 +516,6 @@ async function requireTicket(tx: Queryable, ticketId: string) {
 
 const snapshot = (t: SupportTicket) => ({ status: t.status, priority: t.priority, assigneeId: t.assigneeId, slaDueAt: t.slaDueAt?.toISOString() ?? null })
 
-/** The deadline for a status: none while the ticket waits on the customer or is done. */
-const slaFor = (status: TicketStatus, current: string) => (status === "open" || status === "in_progress" ? current : "null::timestamptz")
-
 export interface StaffReplyResult {
   messageId: string
   /** Set for a public reply: who to email. */
@@ -545,11 +543,10 @@ export async function staffReply(
     "insert into app.support_messages (ticket_id, author_id, from_staff, body, internal) values ($1, $2, true, $3, $4) returning id",
     [ticket.id, adminId, body, internal],
   )
-  const deadline = internal ? "sla_due_at" : "null::timestamptz"
   const { rows: after } = await tx.query<SupportTicket>(
     `update app.support_tickets t set status = $2,
-            sla_due_at = case when $2 in ('open', 'in_progress') then ${deadline} else null end,
-            assignee_id = coalesce(assignee_id, case when $3 then $4::uuid end),
+            sla_due_at = case when $2 in ('open', 'in_progress') and not $3::boolean then sla_due_at end,
+            assignee_id = coalesce(assignee_id, case when $3::boolean then $4::uuid end),
             updated_at = now()
       where id = $1 returning ${TICKET_COLUMNS}`,
     [ticket.id, status, !internal, adminId],
@@ -583,13 +580,14 @@ export async function staffSetTicketStatus(tx: Queryable, ticketId: string, rawS
   if (!includes(TICKET_STATUSES, rawStatus)) throw new AdminError("invalid_input", "Choose a status")
   const ticket = await requireTicket(tx, ticketId)
   if (ticket.status === rawStatus) throw new AdminError("invalid_input", "The ticket already has that status")
-  // back to work from waiting or done: the clock starts again
+  // back to work from waiting or done: the clock starts again. No deadline while the ticket waits
+  // on the customer or is done.
   const reopened = (rawStatus === "open" || rawStatus === "in_progress") && !ticket.slaDueAt
   const { rows } = await tx.query<SupportTicket>(
     `update app.support_tickets t set status = $2,
-            sla_due_at = ${slaFor(rawStatus, reopened ? "now() + $3::interval" : "sla_due_at")}
+            sla_due_at = case when $2 in ('open', 'in_progress') then (case when $3::boolean then now() + $4::interval else sla_due_at end) end
       where id = $1 returning ${TICKET_COLUMNS}`,
-    reopened ? [ticket.id, rawStatus, slaInterval(ticket.priority)] : [ticket.id, rawStatus],
+    [ticket.id, rawStatus, reopened, slaInterval(ticket.priority)],
   )
   return { before: snapshot(ticket), after: snapshot(parseContext(rows[0]!)), extra: {} }
 }
