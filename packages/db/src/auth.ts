@@ -623,7 +623,7 @@ export async function verifyEmail(db: Db, userId: string, rawCode: unknown, meta
       }
       await tx.query("update app.verification_codes set consumed_at = now() where id = $1", [live.id])
       const updated = await tx.query<UserRow>(
-        `update app.users u set email = $2, email_verified_at = now() where u.id = $1 returning ${USER_COLUMNS}`,
+        `update app.users u set email = $2, email_verified_at = now(), email_verified_by_staff_at = null where u.id = $1 returning ${USER_COLUMNS}`,
         [userId, live.email],
       )
       await logEvent(tx, "email_verified", meta, userId, live.email)
@@ -698,7 +698,7 @@ export async function oauthLogin(
       const existing = await tx.query<UserRow>(`select ${USER_COLUMNS} from app.users u where u.email = $1 for update`, [email])
       if (existing.rows[0]) {
         let row = existing.rows[0]
-        if (row.email_verified_at === null) {
+        if (await unproven(tx, row.id)) {
           // Someone may have registered this address with a password they chose, without
           // proving they own it. The verified owner takes over: drop that password and its sessions.
           const taken = await tx.query<UserRow>(
@@ -706,15 +706,11 @@ export async function oauthLogin(
             [row.id],
           )
           row = taken.rows[0]
-          await tx.query("delete from app.sessions where user_id = $1", [row.id])
           await tx.query(
             "update app.verification_codes set consumed_at = now() where user_id = $1 and consumed_at is null",
             [row.id],
           )
-          // nor may an authenticator they set up lock the owner out
-          await tx.query("update app.users set totp_secret = null, totp_enabled_at = null, totp_last_step = null where id = $1", [row.id])
-          await tx.query("delete from app.recovery_codes where user_id = $1", [row.id])
-          await tx.query("delete from app.login_challenges where user_id = $1", [row.id])
+          await dropRegistrantAccess(tx, row.id)
           row = { ...row, two_factor: false }
         }
         await tx.query(
@@ -790,6 +786,29 @@ export async function requestPasswordReset(db: Db, rawEmail: unknown, meta: Requ
  * Sets a new password with an emailed code, signs out every device and starts a new session
  * (or, with two-step sign-in on, a challenge: the inbox alone doesn't skip the authenticator).
  */
+/**
+ * Whether nobody has proven they own the account's address: it was never verified, or staff marked
+ * it verified on someone's word (adminVerifyEmail). Whoever registered it may not be its owner.
+ */
+async function unproven(tx: Queryable, userId: string): Promise<boolean> {
+  const { rows } = await tx.query<{ unproven: boolean }>(
+    "select email_verified_at is null or email_verified_by_staff_at is not null as unproven from app.users where id = $1",
+    [userId],
+  )
+  return rows[0]?.unproven ?? false
+}
+
+/** The owner just proved the address: drop the registrant's sessions and authenticator, so they can't lock the owner out. */
+async function dropRegistrantAccess(tx: Queryable, userId: string) {
+  await tx.query(
+    "update app.users set email_verified_by_staff_at = null, totp_secret = null, totp_enabled_at = null, totp_last_step = null where id = $1",
+    [userId],
+  )
+  await tx.query("delete from app.sessions where user_id = $1", [userId])
+  await tx.query("delete from app.recovery_codes where user_id = $1", [userId])
+  await tx.query("delete from app.login_challenges where user_id = $1", [userId])
+}
+
 export async function resetPassword(
   db: Db,
   input: { email: unknown; code: unknown; password: unknown },
@@ -824,7 +843,9 @@ export async function resetPassword(
       return { error: new AuthError("invalid_code", "Incorrect code. Check your email and try again") }
     }
     await tx.query("update app.verification_codes set consumed_at = now() where id = $1", [live.id])
-    // receiving the code proves the inbox, so the address counts as verified too
+    // receiving the code proves the inbox, so the address counts as verified too; whoever registered
+    // it without proving it loses what they set up (sessions go for everyone, below)
+    if (await unproven(tx, live.user_id)) await dropRegistrantAccess(tx, live.user_id)
     const updated = await tx.query<UserRow>(
       `update app.users u set password_hash = $2, email_verified_at = coalesce(email_verified_at, now()), last_login_at = now()
         where u.id = $1 returning ${USER_COLUMNS}`,
@@ -1142,8 +1163,8 @@ export async function completeTwoFactorLogin(
     } catch (error) {
       return { error: error as AuthError }
     }
-    // the code just typed also counts as a step-up for admin actions
-    const session = await createSession(tx, challenge.user_id, challenge.persistent, meta, true)
+    // an authenticator code just typed also counts as a step-up for admin actions; a recovery code doesn't (stepUpSession)
+    const session = await createSession(tx, challenge.user_id, challenge.persistent, meta, factor === "totp")
     const updated = await tx.query<UserRow>(`update app.users u set last_login_at = now() where u.id = $1 returning ${USER_COLUMNS}`, [
       challenge.user_id,
     ])

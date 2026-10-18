@@ -3,6 +3,7 @@ import { AdminError } from "./admin.ts"
 import type { ActionChange } from "./admin-users.ts"
 import type { ListSpec } from "./admin-list.ts"
 import { touchWorkspaceBots, type MemberRole } from "./bots.ts"
+import { maskEmail } from "./admin-bots.ts"
 import { CRAWL_PAGE_CEILING, PLAN_LIMITS, PLANS, type Plan } from "./plans.ts"
 import {
   staffChangeMemberRole,
@@ -449,7 +450,7 @@ export async function adminTransferOwnership(tx: Queryable, organizationId: stri
 
 export async function adminRevokeInvite(tx: Queryable, organizationId: string, inviteId: string): Promise<ActionChange> {
   const c = await staffRevokeInvite(inTransaction(tx), organizationId, inviteId)
-  return { before: { inviteId, email: c.email, role: c.role }, after: null, extra: {} }
+  return { before: { inviteId, email: maskEmail(c.email), role: c.role }, after: null, extra: {} }
 }
 
 /** A fresh link for the invitation; the caller emails `token` once this commits. */
@@ -461,7 +462,7 @@ export async function adminResendInvite(
   const c = await staffResendInvite(inTransaction(tx), organizationId, inviteId)
   return {
     before: { inviteId: c.previousId },
-    after: { inviteId: c.invite.id, email: c.invite.email, role: c.invite.role, expiresAt: c.invite.expiresAt },
+    after: { inviteId: c.invite.id, email: maskEmail(c.invite.email), role: c.invite.role, expiresAt: c.invite.expiresAt },
     extra: { email: c.invite.email, role: c.invite.role, token: c.token, workspaceName: c.workspaceName, inviter: c.invite.invitedBy },
   }
 }

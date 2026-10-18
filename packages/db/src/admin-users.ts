@@ -2,6 +2,7 @@ import { inTransaction, type Queryable } from "./db.ts"
 import { AdminError, type PlatformRole } from "./admin.ts"
 import { deleteAccount, issueEmailCode, requestPasswordReset, type AccountType, type OAuthProvider, type RequestMeta } from "./auth.ts"
 import type { Plan } from "./plans.ts"
+import { maskEmail } from "./admin-bots.ts"
 
 // One account in the admin area (/admin/users/[id]): everything staff see about it, and the actions
 // they can take on it. Each action runs in the caller's transaction (withAdminAction) and returns the
@@ -261,14 +262,17 @@ export interface ActionChange<Extra = object> {
   extra: Extra
 }
 
-/** Marks the email verified without a code, and voids any code still out. */
+/**
+ * Marks the email verified without a code, and voids any code still out. The address still counts
+ * as unproven (email_verified_by_staff_at): if its real owner proves it later, they take the account over.
+ */
 export async function adminVerifyEmail(tx: Queryable, actor: AdminActor, userId: string, meta: RequestMeta = {}): Promise<ActionChange> {
   const target = await lockTarget(tx, actor, userId)
   if (target.email_verified_at) throw new AdminError("invalid_input", "This email is already verified")
-  await tx.query("update app.users set email_verified_at = now() where id = $1", [userId])
+  await tx.query("update app.users set email_verified_at = now(), email_verified_by_staff_at = now() where id = $1", [userId])
   await tx.query("update app.verification_codes set consumed_at = now() where user_id = $1 and purpose = 'email_verify' and consumed_at is null", [userId])
   await logEvent(tx, "email_verified", userId, target.email, meta)
-  return { before: { emailVerified: false }, after: { emailVerified: true, email: target.email }, extra: {} }
+  return { before: { emailVerified: false }, after: { emailVerified: true }, extra: {} }
 }
 
 /** A new verification code for the account's (unverified) address. The caller emails `code`; staff never see it. */
@@ -281,7 +285,7 @@ export async function adminResendVerification(
   const target = await lockTarget(tx, actor, userId)
   if (target.email_verified_at) throw new AdminError("invalid_input", "This email is already verified")
   const sent = await issueEmailCode(inTransaction(tx), userId, {}, meta)
-  return { before: null, after: { email: sent.email }, extra: sent }
+  return { before: null, after: { email: maskEmail(sent.email) }, extra: sent }
 }
 
 /**
@@ -297,7 +301,7 @@ export async function adminSendPasswordReset(
   const target = await lockTarget(tx, actor, userId)
   const sent = await requestPasswordReset(inTransaction(tx), target.email, meta)
   if (!sent) throw new AdminError("not_found", "User not found")
-  return { before: null, after: { email: sent.email }, extra: sent }
+  return { before: null, after: { email: maskEmail(sent.email) }, extra: sent }
 }
 
 /** Turns two-step sign-in off: the authenticator secret and recovery codes are gone, open sign-ins too. */
@@ -384,7 +388,8 @@ export async function adminDeleteUser(
   await deleteAccount(inTransaction(tx), userId, target.email, meta)
   return {
     before: {
-      email: target.email,
+      // the audit log outlives the account and its erasure: keep the address masked
+      email: maskEmail(target.email),
       platformRole: target.platform_role,
       deletedWorkspaces: impact.deleted.map((w) => w.organizationId),
       transferredWorkspaces: impact.transferred.map((w) => ({ organizationId: w.organizationId, newOwnerId: w.newOwnerId })),

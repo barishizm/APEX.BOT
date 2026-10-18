@@ -110,8 +110,8 @@ const ACTIONS: Record<string, ReturnType<typeof withAdminAction<Params>>> = {
   // a cookie of its own, so the staff session stays as it is (lib/impersonation.ts)
   impersonate: withAdminAction<Params>(
     { action: "user.impersonate.start", targetType: "user", minRole: "superadmin" },
-    async ({ tx, admin, params, body, reason }: Ctx) => {
-      const started = await startImpersonation(tx, { id: admin.user.id, sessionId: admin.sessionId }, params.id, reason, body.minutes)
+    async ({ tx, admin, params, body, reason, meta }: Ctx) => {
+      const started = await startImpersonation(tx, { id: admin.user.id, sessionId: admin.sessionId }, params.id, reason, body.minutes, meta)
       return {
         targetId: params.id,
         before: null,

@@ -407,7 +407,7 @@ export function SecurityOverviewPanels({
         <ConfirmDialog
           title={`${t.actions.reset.label}: ${dialog.subject.value}`}
           text={fill(t.actions.reset.text, { value: dialog.subject.value })}
-          stepUp={false}
+          stepUp
           submit={(reason) => postJson("/api/admin/security/reset-throttle", { reason, ...dialog.subject })}
           onClose={() => setDialog(null)}
           onDone={(res) => done(fill(t.done.reset, { n: n((res as { cleared?: number } | null)?.cleared ?? 0) }))}

@@ -390,7 +390,7 @@ export function ConversationInbox({
    * details masked until shown, no search, and no prefetching, since every transcript read is audited.
    */
   support?: { botId: string }
-  /** Viewing the app as a user: read-only, the visitor's details masked. */
+  /** Viewing the app as a user: read-only, the visitor's details masked, and no search. */
   readOnly?: boolean
 }) {
   const { t: app, locale } = useAppI18n()
@@ -404,7 +404,9 @@ export function ConversationInbox({
   const cache = useRef(new Map<string, Cached>()).current
   const apiBase = support ? `/api/admin/bots/${support.botId}/conversations` : "/api/conversations"
   const pageBase = support ? `/admin/bots/${support.botId}/conversations` : "/dashboard/conversations"
-  const href = (f: ConversationFilter, d?: number | null, q?: string | null) => conversationsHref(f, d, support ? null : q, pageBase)
+  // no search under support access or while viewing as a user: it would match the masked details
+  const searchable = !support && !readOnly
+  const href = (f: ConversationFilter, d?: number | null, q?: string | null) => conversationsHref(f, d, searchable ? q : null, pageBase)
   const prefetch = (id: string) => void (!support && fetchTranscript(cache, apiBase, id, t.loadFailed).catch(() => {}))
 
   // the search runs on the server: typing updates the address after a short pause
@@ -447,7 +449,7 @@ export function ConversationInbox({
           <h1 className="text-lg font-semibold">{t.title}</h1>
           <p className="truncate text-xs text-[var(--color-muted)]">{t.lede}</p>
         </div>
-        {!support && <form
+        {searchable && <form
           role="search"
           onSubmit={(e) => {
             e.preventDefault()

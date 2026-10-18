@@ -32,6 +32,7 @@ async function newUser(email: string, username: string) {
   const { user } = await register(db, { email, username, password: "correct horse", accountType: "personal", acceptTerms: true })
   return user.id
 }
+const verify = (id: string) => db.query("update app.users set email_verified_at = now() where id = $1", [id])
 const code = (c: AdminError["code"]) => (err: unknown) => err instanceof AdminError && err.code === c
 const audit = () =>
   db.query<{ actor_id: string | null; action: string; target_type: string; target_id: string; before: unknown; after: unknown }>(
@@ -95,6 +96,7 @@ describe("platform roles", () => {
   test("a superadmin can grant and take back support, and each change is audited", async () => {
     const boss = await newUser("boss@example.com", "boss")
     const jane = await newUser("jane@example.com", "jane")
+    await verify(boss)
     await bootstrapSuperadmin(db, "boss@example.com")
     await setPlatformRole(db, { id: boss, ip: "203.0.113.5", userAgent: "test" }, jane, "support", "on-call")
     assert.equal(await getPlatformRole(db, jane), "support")
@@ -118,6 +120,7 @@ describe("platform roles", () => {
   test("superadmin can't be granted or changed from the UI path, and only a superadmin may assign", async () => {
     const boss = await newUser("boss@example.com", "boss")
     const jane = await newUser("jane@example.com", "jane")
+    await verify(boss)
     await bootstrapSuperadmin(db, "boss@example.com")
     await assert.rejects(setPlatformRole(db, { id: boss }, jane, "superadmin" as never), code("forbidden"))
     await assert.rejects(setPlatformRole(db, { id: boss }, boss, null), code("forbidden"))
@@ -135,6 +138,7 @@ describe("session user", () => {
   test("carries the platform role; a suspended account has no session at all", async () => {
     const { user, session } = await register(db, { email: "boss@example.com", username: "boss", password: "correct horse", accountType: "personal", acceptTerms: true })
     assert.equal(user.platformRole, null)
+    await verify(user.id)
     await bootstrapSuperadmin(db, "boss@example.com")
     assert.equal((await getSession(db, session!.token))?.user.platformRole, "superadmin")
     await db.query("update app.users set suspended_at = now() where id = $1", [user.id])
@@ -147,6 +151,9 @@ describe("bootstrap", () => {
     const boss = await newUser("boss@example.com", "boss")
     await newUser("jane@example.com", "jane")
     await assert.rejects(bootstrapSuperadmin(db, "nobody@example.com"), code("not_found"))
+    // whoever registered the address first isn't its owner until they prove it
+    await assert.rejects(bootstrapSuperadmin(db, "boss@example.com"), code("forbidden"))
+    await verify(boss)
     assert.deepEqual(await bootstrapSuperadmin(db, "  BOSS@example.com "), { userId: boss, created: true })
     assert.deepEqual(await bootstrapSuperadmin(db, "boss@example.com"), { userId: boss, created: false })
     await assert.rejects(bootstrapSuperadmin(db, "jane@example.com"), code("already_bootstrapped"))
