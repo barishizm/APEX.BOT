@@ -40,6 +40,12 @@ Tüm tablolarda RLS açık ve hiç politika yok: Supabase'in `anon` / `authentic
 
 Migration'ları canlıya Render'daki `apex-api` her deploy'da kendisi uygular (`render.yaml` build komutu).
 
+İlk superadmin, roller, 2FA kaybı ve elle SQL gereken admin işleri: [docs/admin-runbook.md](../../docs/admin-runbook.md).
+
+## Yerel veritabanı (PGlite)
+
+PostgreSQL kurmadan: `npm run db:local` 127.0.0.1:5433'te gömülü bir PGlite sunucusu açar, veriyi `packages/db/.pglite`'ta tutar (git'e girmez). `DATABASE_URL=postgresql://postgres@127.0.0.1:5433/postgres`, `DATABASE_SSL=off` ve `DATABASE_POOL_MAX=1` ile kullanılır: PGlite tek oturumdur, birden fazla bağlantı transaction'ları birbirine karıştırır. Sıfırlamak için klasörü sil.
+
 ## Supabase kurulumu (bir kerelik)
 
 1. <https://supabase.com/dashboard> → **New project**. Bölge olarak kullanıcılara yakın birini seç (ör. `eu-central-1` Frankfurt). Veritabanı şifresini güçlü seç ve bir şifre yöneticisine kaydet.
