@@ -125,8 +125,15 @@ const SELECT_BOT = `select b.id, b.name, b.organization_id, o.name as organizati
                       join app.organization_members m on m.organization_id = b.organization_id and m.user_id = $1
                       left join app.bot_activity a on a.bot_id = b.id`
 
-/** The bot `who` names, else the workspace's first bot, created with defaults on first visit. */
-export async function getBotForUser(db: Db, who: BotScope): Promise<Bot> {
+/** Stands in for the bot a workspace doesn't have yet when nothing may be written ("view as user"). */
+export const UNSAVED_BOT_ID = "00000000-0000-0000-0000-000000000000"
+
+/**
+ * The bot `who` names, else the workspace's first bot, created with defaults on first visit. With
+ * `readOnly` (a superadmin viewing the app as the user) none is created: a workspace without one gets
+ * an unsaved default (UNSAVED_BOT_ID) that nothing else matches.
+ */
+export async function getBotForUser(db: Db, who: BotScope, options: { readOnly?: boolean } = {}): Promise<Bot> {
   const userId = scopeUser(who)
   const botId = scopeBot(who)
   // the membership join in SELECT_BOT keeps other workspaces' bots out
@@ -138,6 +145,22 @@ export async function getBotForUser(db: Db, who: BotScope): Promise<Bot> {
   const first = () => db.query<BotRow>(`${SELECT_BOT} where b.organization_id = $2 order by b.created_at, b.id limit 1`, [userId, member.organization_id])
   const found = await first()
   if (found.rows[0]) return toBot(found.rows[0])
+  if (options.readOnly) {
+    return {
+      id: UNSAVED_BOT_ID,
+      name: member.name,
+      organizationId: member.organization_id,
+      organizationName: member.name,
+      siteKey: "",
+      settings: defaultSettingsFor(member),
+      version: 0,
+      updatedAt: new Date(0),
+      role: member.role,
+      widgetSeenAt: null,
+      widgetSeenOrigin: null,
+      handoffVerified: false,
+    }
+  }
 
   // the row lock makes two first visits at once create one bot, not two
   await db.transaction(async (tx) => {
@@ -148,10 +171,15 @@ export async function getBotForUser(db: Db, who: BotScope): Promise<Bot> {
   return toBot((await first()).rows[0])
 }
 
-async function insertBot(q: Queryable, member: { organization_id: string; name: string; email: string }, userId: string, name: string) {
+function defaultSettingsFor(member: { name: string; email: string }): BotSettings {
   const settings: BotSettings = structuredClone(DEFAULT_SETTINGS)
   settings.general.companyName = member.name.slice(0, 80)
   settings.handoff.email = member.email
+  return settings
+}
+
+async function insertBot(q: Queryable, member: { organization_id: string; name: string; email: string }, userId: string, name: string) {
+  const settings = defaultSettingsFor(member)
   const { rows } = await q.query<{ id: string }>(
     `insert into app.bots (organization_id, name, site_key, settings, updated_by) values ($1, $2, $3, $4::jsonb, $5) returning id`,
     [member.organization_id, name, newSiteKey(), JSON.stringify(settings), userId],

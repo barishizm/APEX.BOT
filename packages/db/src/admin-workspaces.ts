@@ -1,6 +1,6 @@
 import { inTransaction, type Queryable } from "./db.ts"
 import { AdminError } from "./admin.ts"
-import type { ActionChange } from "./admin-users.ts"
+import type { ActionChange, AdminActor } from "./admin-users.ts"
 import type { ListSpec } from "./admin-list.ts"
 import { touchWorkspaceBots, type MemberRole } from "./bots.ts"
 import { maskEmail } from "./admin-bots.ts"
@@ -347,6 +347,33 @@ async function lockWorkspace(tx: Queryable, organizationId: string): Promise<Wor
   )
   if (!rows[0]) throw new AdminError("not_found", "Workspace not found")
   return rows[0]
+}
+
+/**
+ * Support may change a workspace, its sites or their knowledge here only when no staff account is a
+ * member of it: otherwise they could raise their own workspace's plan or budget, or take a superadmin's
+ * workspace from them. A superadmin may. `id` names the workspace, or the bot or source in it.
+ */
+export async function assertMayChangeWorkspace(
+  tx: Queryable,
+  actor: AdminActor,
+  id: string,
+  of: "organization" | "bot" | "knowledge_source" = "organization",
+): Promise<void> {
+  if (actor.role === "superadmin" || !isUuid(id)) return
+  const { rows } = await tx.query<{ staff: boolean }>(
+    `select exists (
+       select 1 from app.organization_members m join app.users u on u.id = m.user_id
+        where u.platform_role is not null
+          and m.organization_id = case $2
+            when 'organization' then $1::uuid
+            when 'bot' then (select organization_id from app.bots where id = $1::uuid)
+            else (select b.organization_id from app.knowledge_sources s join app.bots b on b.id = s.bot_id where s.id = $1::uuid)
+          end
+     ) as staff`,
+    [id, of],
+  )
+  if (rows[0]?.staff) throw new AdminError("forbidden", "Only a superadmin can change a workspace with staff in it")
 }
 
 /** Moves the workspace to another plan. Limits apply from the next sync of each website. */

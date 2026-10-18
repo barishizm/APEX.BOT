@@ -174,6 +174,7 @@ type AuthEvent =
   | "two_factor_failed"
   | "recovery_codes_created"
   | "access_blocked"
+  | "step_up"
 
 async function logEvent(q: Queryable, event: AuthEvent, meta: RequestMeta, userId: string | null, email: string | null) {
   await q.query(
@@ -1269,6 +1270,7 @@ export async function stepUpSession(db: Db, userId: string, sessionId: string, r
       [sessionId, userId],
     )
     if (!rows[0]) throw new AuthError("unauthorized", "Your session has ended. Log in again")
+    await logEvent(tx, "step_up", meta, userId, null)
     return rows[0].step_up_at
   })
 }

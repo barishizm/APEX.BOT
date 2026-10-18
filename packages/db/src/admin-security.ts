@@ -29,6 +29,7 @@ export const AUTH_EVENTS = [
   "two_factor_enabled",
   "two_factor_disabled",
   "recovery_codes_created",
+  "step_up",
 ] as const
 export type AuthEventName = (typeof AUTH_EVENTS)[number]
 
@@ -490,7 +491,8 @@ export function parseBlockSubject(kind: unknown, raw: unknown): BlockSubject {
 
 /**
  * Blocks an address, network or email until `minutes` from now. Refuses to block the staff
- * member's own address and the email of a staff account (take the role away instead).
+ * member's own address, one any staff account used in the last 30 days, and the email of a staff
+ * account (take the role away instead).
  */
 export async function createAuthBlock(
   tx: Queryable,
@@ -507,6 +509,13 @@ export async function createAuthBlock(
       const { rows } = await tx.query<{ own: boolean }>("select $1::inet >>= $2::inet as own", [subject.value, actor.ip])
       if (rows[0]?.own) throw new AdminError("forbidden", "That would block your own address")
     }
+    // nor a network staff sign in from: a block refuses log-in and two-step codes, so it could lock a superadmin out
+    const staff = await tx.query(
+      `select 1 from app.auth_events e join app.users u on u.id = e.user_id
+        where $1::inet >>= e.ip and u.platform_role is not null and e.created_at > now() - interval '30 days' limit 1`,
+      [subject.value],
+    )
+    if (staff.rows.length) throw new AdminError("forbidden", "Staff signed in from that address in the last 30 days, so it can't be blocked")
   } else {
     const { rows } = await tx.query<{ staff: boolean }>("select platform_role is not null as staff from app.users where email = $1", [subject.value])
     if (rows[0]?.staff) throw new AdminError("forbidden", "A staff account can't be blocked. Take its role away first")

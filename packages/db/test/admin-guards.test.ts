@@ -96,7 +96,10 @@ describe("step-up", () => {
     assert.equal(s.stepUpAt, null)
     assert.equal(hasRecentStepUp(s), false)
 
-    await stepUpSession(db, user.id, s.sessionId, appCode(secret))
+    await stepUpSession(db, user.id, s.sessionId, appCode(secret), { ip: "198.51.100.4" })
+    // the security log shows who unlocked destructive actions, and from where
+    const logged = await db.query<{ ip: string }>("select host(ip) as ip from app.auth_events where event = 'step_up' and user_id = $1", [user.id])
+    assert.deepEqual(logged.rows, [{ ip: "198.51.100.4" }])
     const after = (await getSession(db, session.token))!
     assert.ok(hasRecentStepUp(after))
     assert.equal(hasRecentStepUp(after, after.stepUpAt!.getTime() + STEP_UP_TTL_MS + 1), false)

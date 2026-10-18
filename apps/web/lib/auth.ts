@@ -192,7 +192,14 @@ async function adminRateLimit(key: string, limit: RateLimit) {
  * For /api/admin routes: the staff session, or an AuthError the route turns into 401/403/429.
  * Same rules as requirePlatformAdmin, plus a strict rate limit of its own.
  */
+// what browsers send for a request from our own pages or a typed address/bookmark; not sent by other clients
+const OWN_FETCH_SITES = new Set(["same-origin", "none"])
+
 export async function requireAdminSession(minRole: PlatformRole = "support", options: { write?: boolean } = {}): Promise<AdminSession> {
+  // a link on another site opens a GET with the (SameSite=Lax) session cookie: refuse it before it can
+  // start an export or a transcript view in the staff member's name and use up their limits
+  const site = (await headers()).get("sec-fetch-site")
+  if (site && !OWN_FETCH_SITES.has(site)) throw new AuthError("forbidden", "Open this from the admin area")
   const { ip } = await requestMeta()
   if (ip) await adminRateLimit(`ip:${ip}`, ADMIN_LIMITS.ip)
   const session = await requireSession()

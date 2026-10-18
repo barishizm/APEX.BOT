@@ -21,6 +21,7 @@ import {
   adminSuspendWorkspace,
   adminTransferOwnership,
   adminUnsuspendWorkspace,
+  assertMayChangeWorkspace,
   getAdminWorkspaceDetail,
   planLimitChanges,
   type AdminWorkspaceRow,
@@ -253,5 +254,37 @@ describe("detail, note and deletion", () => {
     assert.equal(fresh.name, "owner")
     // the admin still has their own
     assert.equal((await membership(db, admin)).name, "admin")
+  })
+})
+
+describe("workspaces with staff in them", () => {
+  test("only a superadmin may change a workspace, site or source that has a staff member", async () => {
+    const { owner, member, org } = await team()
+    const helper = await newUser("help@apex.example", "help")
+    const boss = await newUser("boss@apex.example", "boss")
+    await db.query("update app.users set platform_role = 'support' where id = $1", [helper])
+    await db.query("update app.users set platform_role = 'superadmin' where id = $1", [boss])
+    const support = { id: helper, role: "support" as const }
+    const superadmin = { id: boss, role: "superadmin" as const }
+    const bot = await createBot(db, owner, "Shop")
+    const source = (
+      await db.query<{ id: string }>("insert into app.knowledge_sources (bot_id, kind, title, content) values ($1, 'text', 'FAQ', 'x') returning id", [bot.id])
+    ).rows[0]!.id
+
+    // a customer workspace: support may
+    for (const [id, of] of [[org, "organization"], [bot.id, "bot"], [source, "knowledge_source"]] as const) {
+      await run((tx) => assertMayChangeWorkspace(tx, support, id, of))
+    }
+
+    // support's own workspace (raising its plan or budget) and one a superadmin is in: refused
+    const own = (await membership(db, helper)).organization_id
+    await assert.rejects(run((tx) => assertMayChangeWorkspace(tx, support, own)), code("forbidden"))
+    await db.query("update app.users set platform_role = 'support' where id = $1", [member])
+    for (const [id, of] of [[org, "organization"], [bot.id, "bot"], [source, "knowledge_source"]] as const) {
+      await assert.rejects(run((tx) => assertMayChangeWorkspace(tx, support, id, of)), code("forbidden"), of)
+      await run((tx) => assertMayChangeWorkspace(tx, superadmin, id, of))
+    }
+    // an id that isn't one is left for the action to answer "not found"
+    await run((tx) => assertMayChangeWorkspace(tx, support, "nope", "bot"))
   })
 })

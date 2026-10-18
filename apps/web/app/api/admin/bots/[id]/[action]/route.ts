@@ -9,9 +9,10 @@ import {
   closeSupportAccess,
   openSupportAccess,
   SUPPORT_ACCESS_MINUTES,
+  assertMayChangeWorkspace,
 } from "@apex/db"
 import { withAdminAction, type AdminActionContext } from "@/lib/admin"
-import { errorJson } from "@/lib/auth"
+import { errorJson, type AdminSession } from "@/lib/auth"
 import { isLocale } from "@/lib/i18n/config"
 import { requestLocale } from "@/lib/i18n/server"
 import { sendSupportAccessNotice } from "@/lib/mail"
@@ -23,41 +24,51 @@ import { sendSupportAccessNotice } from "@/lib/mail"
 
 type Params = { id: string; action: string }
 type Ctx = AdminActionContext<Params>
+// a workspace with staff in it is a superadmin's to change (assertMayChangeWorkspace)
+const mayChange = (tx: Ctx["tx"], admin: AdminSession, id: string) =>
+  assertMayChangeWorkspace(tx, { id: admin.user.id, role: admin.user.platformRole }, id, "bot")
 
 const ACTIONS: Record<string, ReturnType<typeof withAdminAction<Params>>> = {
   // body.version: the settings version whose problems the page showed
-  repair: withAdminAction<Params>({ action: "bot.repair_settings", targetType: "bot" }, async ({ tx, params, body }: Ctx) => {
+  repair: withAdminAction<Params>({ action: "bot.repair_settings", targetType: "bot" }, async ({ tx, params, body, admin }: Ctx) => {
+    await mayChange(tx, admin, params.id)
     const c = await adminRepairBotSettings(tx, params.id, body.version)
     return { targetId: params.id, before: c.before, after: c.after, result: c.extra }
   }),
 
-  "rotate-key": withAdminAction<Params>({ action: "bot.rotate_site_key", targetType: "bot" }, async ({ tx, params }: Ctx) => {
+  "rotate-key": withAdminAction<Params>({ action: "bot.rotate_site_key", targetType: "bot" }, async ({ tx, params, admin }: Ctx) => {
+    await mayChange(tx, admin, params.id)
     const c = await adminRotateBotSiteKey(tx, params.id)
     return { targetId: params.id, before: c.before, after: c.after, result: c.extra }
   }),
 
-  disable: withAdminAction<Params>({ action: "bot.disable", targetType: "bot" }, async ({ tx, params, reason }: Ctx) => {
+  disable: withAdminAction<Params>({ action: "bot.disable", targetType: "bot" }, async ({ tx, params, reason, admin }: Ctx) => {
+    await mayChange(tx, admin, params.id)
     const c = await adminDisableBot(tx, params.id, reason)
     return { targetId: params.id, before: c.before, after: c.after }
   }),
 
-  enable: withAdminAction<Params>({ action: "bot.enable", targetType: "bot" }, async ({ tx, params }: Ctx) => {
+  enable: withAdminAction<Params>({ action: "bot.enable", targetType: "bot" }, async ({ tx, params, admin }: Ctx) => {
+    await mayChange(tx, admin, params.id)
     const c = await adminEnableBot(tx, params.id)
     return { targetId: params.id, before: c.before, after: c.after }
   }),
 
   // body { tokens, hours }
-  "budget-override": withAdminAction<Params>({ action: "bot.budget_override", targetType: "bot" }, async ({ tx, params, body }: Ctx) => {
+  "budget-override": withAdminAction<Params>({ action: "bot.budget_override", targetType: "bot" }, async ({ tx, params, body, admin }: Ctx) => {
+    await mayChange(tx, admin, params.id)
     const c = await adminSetTokenBudgetOverride(tx, params.id, body.tokens, body.hours)
     return { targetId: params.id, before: c.before, after: c.after, result: c.extra }
   }),
 
-  "budget-clear": withAdminAction<Params>({ action: "bot.budget_override_clear", targetType: "bot" }, async ({ tx, params }: Ctx) => {
+  "budget-clear": withAdminAction<Params>({ action: "bot.budget_override_clear", targetType: "bot" }, async ({ tx, params, admin }: Ctx) => {
+    await mayChange(tx, admin, params.id)
     const c = await adminClearTokenBudgetOverride(tx, params.id)
     return { targetId: params.id, before: c.before, after: c.after }
   }),
 
-  "handoff-reset": withAdminAction<Params>({ action: "bot.handoff_reset", targetType: "bot" }, async ({ tx, params }: Ctx) => {
+  "handoff-reset": withAdminAction<Params>({ action: "bot.handoff_reset", targetType: "bot" }, async ({ tx, params, admin }: Ctx) => {
+    await mayChange(tx, admin, params.id)
     const c = await adminResetHandoffEmail(tx, params.id)
     return { targetId: params.id, before: c.before, after: c.after }
   }),
@@ -66,6 +77,7 @@ const ACTIONS: Record<string, ReturnType<typeof withAdminAction<Params>>> = {
 // Support access: body { reason, ticket?, locale? }. No step-up, as it destroys nothing; the reason,
 // the audit entry and the email to every workspace owner (in `locale`) are what guard it.
 ACTIONS["support-access"] = withAdminAction<Params>({ action: "bot.support_access.open", targetType: "bot", stepUp: false }, async ({ tx, admin, params, body, reason }: Ctx) => {
+  await mayChange(tx, admin, params.id)
   const opened = await openSupportAccess(tx, admin.user.id, params.id, reason, body.ticket)
   const { grant } = opened
   const locale = isLocale(body.locale) ? body.locale : await requestLocale()

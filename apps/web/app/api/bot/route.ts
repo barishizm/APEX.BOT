@@ -1,13 +1,13 @@
 import { getBotForUser, saveBotSettings } from "@apex/db"
 import { db } from "@/lib/db"
-import { readJson } from "@/lib/auth"
+import { isImpersonating, readJson } from "@/lib/auth"
 import { botErrorResponse, botJson, requireApiUser } from "@/lib/bot"
 import { siteScope } from "@/lib/current-site"
 
 export async function GET() {
   try {
     const user = await requireApiUser()
-    return Response.json(botJson(await getBotForUser(db(), await siteScope(user.id))))
+    return Response.json(botJson(await getBotForUser(db(), await siteScope(user.id), { readOnly: await isImpersonating() })))
   } catch (err) {
     return botErrorResponse(err)
   }

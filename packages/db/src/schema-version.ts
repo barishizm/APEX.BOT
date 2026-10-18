@@ -36,6 +36,7 @@ export const MIGRATION_NAMES = [
   "0031_platform_controls.sql",
   "0032_email_failures.sql",
   "0033_staff_verified_email.sql",
+  "0034_step_up_event.sql",
 ] as const
 
 /** Migrations this code expects that the database hasn't applied (run `npm run db:migrate`). */

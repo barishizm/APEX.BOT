@@ -1,7 +1,7 @@
 import { after } from "next/server"
-import { adminDeleteSource, adminDisableRefresh, adminResetSync, adminResyncSource } from "@apex/db"
+import { adminDeleteSource, adminDisableRefresh, adminResetSync, adminResyncSource, assertMayChangeWorkspace } from "@apex/db"
 import { withAdminAction, type AdminActionContext } from "@/lib/admin"
-import { errorJson } from "@/lib/auth"
+import { errorJson, type AdminSession } from "@/lib/auth"
 import { crawlInto } from "@/lib/knowledge"
 
 // POST /api/admin/knowledge/<id>/<action>, body { reason }. Every action is audited with its reason
@@ -13,26 +13,33 @@ export const maxDuration = 300
 
 type Params = { id: string; action: string }
 type Ctx = AdminActionContext<Params>
+// a workspace with staff in it is a superadmin's to change (assertMayChangeWorkspace)
+const mayChange = (tx: Ctx["tx"], admin: AdminSession, id: string) =>
+  assertMayChangeWorkspace(tx, { id: admin.user.id, role: admin.user.platformRole }, id, "knowledge_source")
 
 const ACTIONS: Record<string, ReturnType<typeof withAdminAction<Params>>> = {
-  resync: withAdminAction<Params>({ action: "knowledge.resync", targetType: "knowledge_source" }, async ({ tx, params }: Ctx) => {
+  resync: withAdminAction<Params>({ action: "knowledge.resync", targetType: "knowledge_source" }, async ({ tx, params, admin }: Ctx) => {
+    await mayChange(tx, admin, params.id)
     const c = await adminResyncSource(tx, params.id)
     const { claimed } = c.extra
     // the claim must be committed before the crawl can finish it
     return { targetId: params.id, before: c.before, after: c.after, afterCommit: async () => after(() => crawlInto(claimed)) }
   }),
 
-  "reset-sync": withAdminAction<Params>({ action: "knowledge.reset_sync", targetType: "knowledge_source" }, async ({ tx, params }: Ctx) => {
+  "reset-sync": withAdminAction<Params>({ action: "knowledge.reset_sync", targetType: "knowledge_source" }, async ({ tx, params, admin }: Ctx) => {
+    await mayChange(tx, admin, params.id)
     const c = await adminResetSync(tx, params.id)
     return { targetId: params.id, before: c.before, after: c.after }
   }),
 
-  "refresh-off": withAdminAction<Params>({ action: "knowledge.refresh_off", targetType: "knowledge_source" }, async ({ tx, params }: Ctx) => {
+  "refresh-off": withAdminAction<Params>({ action: "knowledge.refresh_off", targetType: "knowledge_source" }, async ({ tx, params, admin }: Ctx) => {
+    await mayChange(tx, admin, params.id)
     const c = await adminDisableRefresh(tx, params.id)
     return { targetId: params.id, before: c.before, after: c.after }
   }),
 
-  delete: withAdminAction<Params>({ action: "knowledge.delete", targetType: "knowledge_source" }, async ({ tx, params }: Ctx) => {
+  delete: withAdminAction<Params>({ action: "knowledge.delete", targetType: "knowledge_source" }, async ({ tx, params, admin }: Ctx) => {
+    await mayChange(tx, admin, params.id)
     const c = await adminDeleteSource(tx, params.id)
     return { targetId: params.id, before: c.before, after: c.after, result: c.extra }
   }),
