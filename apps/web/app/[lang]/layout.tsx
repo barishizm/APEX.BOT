@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import { MarketingAnnouncements } from "@/components/announcement-banner"
 import { I18nProvider } from "@/components/i18n/provider"
 import { RootDocument } from "@/components/root-document"
 import { generateLocaleParams, getDictionary, resolveLocale } from "@/lib/i18n/server"
@@ -30,6 +31,7 @@ export default async function LocaleLayout({ children, params }: LayoutProps<"/[
     <RootDocument locale={locale}>
       <I18nProvider locale={locale} dict={getDictionary(locale)}>
         {children}
+        <MarketingAnnouncements />
       </I18nProvider>
     </RootDocument>
   )

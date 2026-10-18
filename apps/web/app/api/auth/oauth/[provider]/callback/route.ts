@@ -3,7 +3,8 @@ import { NextResponse } from "next/server"
 import { timingSafeEqual } from "node:crypto"
 import { AuthError, oauthLogin } from "@apex/db"
 import { db } from "@/lib/db"
-import { requestMeta, safeNext, setChallengeCookie, setSessionCookie } from "@/lib/auth"
+import { inviteTokenFrom, requestMeta, safeNext, setChallengeCookie, setSessionCookie } from "@/lib/auth"
+import { mayCreateAccount } from "@/lib/signups"
 import { OAUTH_COOKIE, credentials, fetchProfile, isProvider, siteOrigin } from "@/lib/oauth"
 
 const to = (path: string) => NextResponse.redirect(`${siteOrigin()}${path}`)
@@ -34,10 +35,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ prov
   try {
     const profile = await fetchProfile(provider, code, flow.verifier, creds)
     const next = safeNext(flow.next)
+    // decided up front; it only matters when no account has this email yet (existing ones always log in)
+    const allowSignup = await mayCreateAccount({ email: profile.email, inviteToken: inviteTokenFrom(next) })
     const result = await oauthLogin(
       db(),
       { ...profile, accountType: flow.type === "business" ? "business" : "personal" },
       await requestMeta(),
+      { allowSignup },
     )
     if (result.challenge) {
       await setChallengeCookie(result.challenge)
@@ -46,6 +50,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ prov
     await setSessionCookie(result.session)
     return to(next ?? (result.isNew ? "/onboarding" : "/dashboard?welcome=1"))
   } catch (err) {
+    if (err instanceof AuthError && err.code === "signups_closed") return fail("oauth_signups_closed")
     if (err instanceof AuthError && err.code === "invalid_input") return fail("oauth_email_unverified")
     if (err instanceof AuthError && err.code === "account_suspended") return fail("account_suspended")
     console.error("[oauth]", provider, err instanceof Error ? err.message : err)

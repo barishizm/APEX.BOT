@@ -114,7 +114,8 @@ export function AddPanel({
   const tabs: [Tab, string, typeof Globe][] = [
     ["website", t.website, Globe],
     ["text", t.text, Type],
-    ["file", t.file, Paperclip],
+    // staff can turn uploads off (the file_uploads flag in /admin/settings)
+    ...(limits.fileUploads ? [["file", t.file, Paperclip] as [Tab, string, typeof Globe]] : []),
   ]
 
   return (

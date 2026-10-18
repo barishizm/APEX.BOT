@@ -119,6 +119,7 @@ export const et: Dictionary = {
       oauth_denied: "Sisselogimine katkestati. Proovige uuesti või kasutage e-posti aadressi",
       oauth_email_unverified: "Teie teenusepakkujal pole selle konto jaoks kinnitatud e-posti aadressi. Kinnitage see seal ja proovige uuesti",
       oauth_failed: "Selle teenusepakkujaga sisselogimine ebaõnnestus. Proovige uuesti või kasutage e-posti aadressi",
+      oauth_signups_closed: "Uusi registreerimisi me veel vastu ei võta. Liituge ootenimekirjaga ja anname teile avamisest e-posti teel teada",
       account_suspended: "See konto on peatatud. Võtke ühendust toega",
       generic: "Midagi läks valesti. Proovige uuesti",
       network: "Serveriga ei saadud ühendust. Kontrollige internetiühendust ja proovige uuesti",
@@ -186,6 +187,27 @@ export const et: Dictionary = {
       haveAccount: "Kas teil on juba konto?",
       logIn: "Logige sisse",
     },
+    waitlist: {
+      title: "Liituge ootenimekirjaga",
+      subtitle: "Registreerimine pole veel avatud. Jätke oma e-posti aadress ja anname teile teada päeval, mil avame.",
+      email: "E-post",
+      emailPlaceholder: "mari@ettevote.ee",
+      submitting: "Liitumine...",
+      submit: "Liitu ootenimekirjaga",
+      doneTitle: "Olete nimekirjas",
+      doneText: "Kirjutame teile ühe korra – päeval, mil registreerimine avatakse.",
+      close: "Sulge",
+      inviteOnly: "Praegu saab registreeruda ainult kutsega. Jätke oma e-posti aadress ja saadame teile kutse, kui koht vabaneb.",
+      doneInvite: "Kirjutame teile ühe korra, kui saame teid kutsuda.",
+      haveInvite: "Saite kutse?",
+      haveInviteLink: "Registreeruge",
+    },
+  },
+
+  // the announcement banner (admin area → Announcements) on the site and in the dashboard
+  announcement: {
+    label: "Teadaanne",
+    dismiss: "Sulge",
   },
 
   landing: {

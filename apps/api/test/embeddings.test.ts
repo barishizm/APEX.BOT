@@ -3,6 +3,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { normalize, type EmbedKind, type Embedder } from "@apex/knowledge/embed";
+import type { AppDeps } from "../src/app.ts";
 import { ChunkIndexer, QueryEmbedder, memoryVectorStore } from "../src/embeddings.ts";
 import { KnowledgeBase, type ChunkInput } from "../src/retrieval.ts";
 import { A, headers, readSSE, setup } from "./helpers.ts";
@@ -142,9 +143,9 @@ describe("POST /v1/chat with hybrid search", () => {
   const chat = (app: ReturnType<typeof setup>["app"], message: string) =>
     app.request("/v1/chat", { method: "POST", headers: headers(A), body: JSON.stringify({ message }) });
 
-  async function hybridSetup() {
+  async function hybridSetup(deps: Partial<AppDeps> = {}) {
     const embedder = new ConceptEmbedder();
-    const ctx = setup({}, { embedder: new QueryEmbedder(embedder) });
+    const ctx = setup({}, { embedder: new QueryEmbedder(embedder), ...deps });
     const indexer = new ChunkIndexer(ctx.knowledge, embedder, memoryVectorStore());
     await indexer.index("tn_a", ctx.knowledge.load("tn_a", chunks), chunks);
     embedder.calls = [];
@@ -166,6 +167,20 @@ describe("POST /v1/chat with hybrid search", () => {
     const res = await chat(app, "İade kaç gün?");
     assert.equal(res.status, 200);
     await readSSE(res);
+    assert.match(model.requests[0].messages.at(-1)!.content as string, /title="İade"/);
+  });
+
+  it("stays lexical while staff turned the hybrid_search flag off", async () => {
+    const asked: string[] = [];
+    const { app, model, embedder } = await hybridSetup({
+      featureEnabled: async (flag, tenant) => {
+        asked.push(`${flag}:${tenant.id}`);
+        return false;
+      },
+    });
+    await readSSE(await chat(app, "İade kaç gün?"));
+    assert.deepEqual(asked, ["hybrid_search:tn_a"]);
+    assert.equal(embedder.calls.length, 0);
     assert.match(model.requests[0].messages.at(-1)!.content as string, /title="İade"/);
   });
 

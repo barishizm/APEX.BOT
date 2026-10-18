@@ -540,3 +540,31 @@ export function sendTicketStaffNotice(email: string, notice: StaffTicketNotice, 
 export function sendTicketAssigned(email: string, t: TicketMail, locale: Locale) {
   return send({ to: email, ...SUPPORT_EMAILS[locale].staffAssigned(t) })
 }
+
+// To people staff invited from the waitlist (/admin/waitlist), in the language they joined in
+const WAITLIST_EMAILS: Messages<(i: { email: string; link: string }) => { subject: string; text: string }> = {
+  en: ({ email, link }) => ({
+    subject: "Your invitation to Apex Bot",
+    text: `You joined the Apex Bot waitlist, and your place is ready.\n\nCreate your account here:\n${link}\n\nThe invitation is for ${email}: sign up with this address, or with Google or GitHub on the same email.`,
+  }),
+  tr: ({ email, link }) => ({
+    subject: "Apex Bot davetiniz",
+    text: `Apex Bot bekleme listesine katılmıştınız; yeriniz hazır.\n\nHesabınızı buradan oluşturun:\n${link}\n\nDavet ${email} adresi içindir: bu adresle ya da aynı e-postayla Google veya GitHub üzerinden kaydolun.`,
+  }),
+  lt: ({ email, link }) => ({
+    subject: "Jūsų kvietimas į Apex Bot",
+    text: `Prisijungėte prie Apex Bot laukiančiųjų sąrašo, ir jūsų vieta jau paruošta.\n\nSusikurkite paskyrą čia:\n${link}\n\nKvietimas skirtas ${email}: registruokitės šiuo adresu arba per Google ar GitHub su tuo pačiu el. paštu.`,
+  }),
+  lv: ({ email, link }) => ({
+    subject: "Jūsu ielūgums uz Apex Bot",
+    text: `Jūs pievienojāties Apex Bot gaidīšanas sarakstam, un jūsu vieta ir gatava.\n\nIzveidojiet kontu šeit:\n${link}\n\nIelūgums ir adresei ${email}: reģistrējieties ar šo adresi vai ar Google vai GitHub, izmantojot to pašu e-pastu.`,
+  }),
+  et: ({ email, link }) => ({
+    subject: "Teie kutse Apex Botti",
+    text: `Liitusite Apex Boti ootenimekirjaga ja teie koht on valmis.\n\nLooge konto siin:\n${link}\n\nKutse on aadressile ${email}: registreeruge selle aadressiga või Google'i või GitHubi kaudu sama e-postiga.`,
+  }),
+}
+
+export function sendWaitlistInvite(email: string, link: string, locale: Locale) {
+  return compose(email, locale, WAITLIST_EMAILS[locale]({ email, link }))
+}
