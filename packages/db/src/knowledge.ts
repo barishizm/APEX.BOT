@@ -367,7 +367,18 @@ export async function dueRefreshes(db: Queryable, limit: number): Promise<{ id: 
   return rows.map((r) => ({ id: r.id, botId: r.bot_id }))
 }
 
-async function claimSync(db: Db, botId: string, sourceId: string): Promise<ClaimedSync> {
+/**
+ * startSync for platform staff (/admin/knowledge): any website source, whatever its bot. Same "busy"
+ * and "not_found" errors. Runs in the caller's transaction, so the claim and its audit entry commit together.
+ */
+export async function startAdminSync(q: Queryable, sourceId: string): Promise<ClaimedSync> {
+  if (!UUID.test(sourceId)) throw new KnowledgeError("not_found", "That source doesn't exist")
+  const { rows } = await q.query<{ bot_id: string }>("select bot_id from app.knowledge_sources where id = $1 and kind = 'website'", [sourceId])
+  if (!rows[0]) throw new KnowledgeError("not_found", "That source doesn't exist")
+  return claimSync(q, rows[0].bot_id, sourceId)
+}
+
+async function claimSync(db: Queryable, botId: string, sourceId: string): Promise<ClaimedSync> {
   const running = await db.query<{ n: number }>(
     `select count(*)::int as n from app.knowledge_sources
       where bot_id = $1 and id <> $2 and status = 'syncing' and updated_at >= now() - make_interval(secs => $3)`,

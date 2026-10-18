@@ -23,6 +23,12 @@ export function previewEmbedder() {
   }
 }
 
+/** The embedder id ("provider:model@dims") APEX_EMBEDDINGS names, which stored vectors are keyed by; null when off or malformed. */
+export function activeEmbeddingModel(): string | null {
+  const match = /^(openai|gemini):([\w.-]+)@(\d+)$/.exec(process.env.APEX_EMBEDDINGS?.trim() ?? "")
+  return match ? `${match[1]}:${match[2]}@${Number(match[3])}` : null
+}
+
 /**
  * Attaches the bot's stored vectors (written by the chat API) to `index` and embeds the question,
  * for the search preview. Chunks the API hasn't embedded yet stay keyword-only, as they are in chat.

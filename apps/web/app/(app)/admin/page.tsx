@@ -105,7 +105,7 @@ export default async function AdminOverviewPage({ searchParams }: PageProps<"/ad
 
   const failedSyncs = rowsOf(a.failedSyncs, (s) => ({
     key: s.id,
-    href: q("/admin/knowledge", s.id),
+    href: `/admin/knowledge/${s.id}`,
     title: `${s.title} · ${s.botName}`,
     detail: s.error ?? o.attention.noError,
     meta: format(o.attention.failedAgo, { when: ago(s.failedAt) }),
@@ -210,7 +210,7 @@ export default async function AdminOverviewPage({ searchParams }: PageProps<"/ad
 
       <KpiGroup title={o.groups.operations}>
         <Kpi label={o.kpi.tokens} value={num(k.tokens)} help={o.help.tokens} href="/admin/usage" />
-        <Kpi label={o.kpi.failedSources} value={num(k.failedSources)} help={o.help.failedSources} href="/admin/knowledge" tone={k.failedSources ? "warn" : undefined} />
+        <Kpi label={o.kpi.failedSources} value={num(k.failedSources)} help={o.help.failedSources} href="/admin/knowledge?status=failed" tone={k.failedSources ? "warn" : undefined} />
         <Kpi label={o.kpi.openTickets} value={num(k.openTickets)} help={o.help.openTickets} href="/admin/support" />
       </KpiGroup>
 
