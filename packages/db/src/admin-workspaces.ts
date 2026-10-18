@@ -371,7 +371,7 @@ export async function adminSuspendWorkspace(tx: Queryable, organizationId: strin
     "update app.organizations set suspended_at = now(), suspended_reason = $2 where id = $1 returning suspended_at",
     [organizationId, reason.slice(0, 1000)],
   )
-  // the chat API's sync stops serving them on its next pass (listBotIds leaves them out)
+  // the chat API's sync pauses them on its next pass: their widgets say "out of service"
   const sites = await touchWorkspaceBots(tx, organizationId)
   return { before: { suspendedAt: null }, after: { suspendedAt: rows[0]!.suspended_at, sites }, extra: { sites } }
 }

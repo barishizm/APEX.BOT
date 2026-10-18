@@ -1,10 +1,12 @@
 // Keeps dashboard-managed bots (app.bots) and their knowledge in the tenant registry and the
 // retrieval index. Polls for rows changed since the last sync, so a save in the dashboard
 // reaches the widget within one interval. A bot's chunks are reloaded only when its
-// knowledge_version moves, not on every settings save.
+// knowledge_version moves, not on every settings save. A bot staff disabled, or one in a suspended
+// workspace, is paused: it stops resolving as a tenant and its knowledge is unloaded, and only its
+// site key and origins are kept so the widget can be told it is out of service.
 // shortcut: polling; switch to LISTEN/NOTIFY once the API keeps a dedicated connection.
 import type { Db } from "@apex/db";
-import { listBotIds, listBotsChangedSince, listKnowledgeChunks } from "@apex/db";
+import { listBotStates, listBotsChangedSince, listKnowledgeChunks, type BotRecord } from "@apex/db";
 import { publicWidgetSettings } from "@apex/db/bot-settings";
 import { log } from "./log.ts";
 import type { ChunkIndexer } from "./embeddings.ts";
@@ -29,6 +31,18 @@ export function startBotSync(db: Db, tenants: TenantRegistry, knowledge: Knowled
   const loaded = new Map<string, number>();
   // updatedAt of the version last applied per bot
   const applied = new Map<string, number>();
+  // set when the database and the registry disagree on whether a bot serves: the next pass reads every bot
+  let resync = false;
+
+  const unload = (id: string) => {
+    knowledge.load(id, []);
+    loaded.delete(id);
+  };
+  const pause = (bot: Pick<BotRecord, "id" | "siteKey" | "settings">) => {
+    const { allowedOrigins, retentionDays } = bot.settings.security;
+    tenants.pause({ id: bot.id, siteKey: bot.siteKey, allowedOrigins, managed: true, retentionDays });
+    unload(bot.id);
+  };
 
   // A tick while one is running waits for that one instead of starting another
   const tick = () => (inFlight ??= pass().finally(() => (inFlight = null)));
@@ -37,13 +51,22 @@ export function startBotSync(db: Db, tenants: TenantRegistry, knowledge: Knowled
     try {
       // updated_at is the writing transaction's start time, so a slow transaction can commit
       // a row older than `since`; re-reading a short overlap catches it
-      const bots = (await listBotsChangedSince(db, since && new Date(since.getTime() - OVERLAP_MS))).filter(
-        (bot) => applied.get(bot.id) !== bot.updatedAt.getTime() || loaded.get(bot.id) !== bot.knowledgeVersion,
+      const from = resync ? null : since && new Date(since.getTime() - OVERLAP_MS);
+      resync = false;
+      const bots = (await listBotsChangedSince(db, from)).filter(
+        (bot) => applied.get(bot.id) !== bot.updatedAt.getTime() || (bot.serving && loaded.get(bot.id) !== bot.knowledgeVersion),
       );
       let newest = since;
       let firstFailure: Date | null = null;
       for (const bot of bots) {
         try {
+          if (!bot.serving) {
+            if (!tenants.isPaused(bot.id)) log("info", "bot paused", { tenant: bot.id });
+            pause(bot);
+            applied.set(bot.id, bot.updatedAt.getTime());
+            if (!newest || bot.updatedAt > newest) newest = bot.updatedAt;
+            continue;
+          }
           tenants.upsert(tenantFromBot(bot, publicWidgetSettings(bot.settings)));
           if (loaded.get(bot.id) !== bot.knowledgeVersion) {
             const chunks = await listKnowledgeChunks(db, bot.id);
@@ -62,15 +85,28 @@ export function startBotSync(db: Db, tenants: TenantRegistry, knowledge: Knowled
         }
         if (!newest || bot.updatedAt > newest) newest = bot.updatedAt;
       }
-      // A deleted website (or account) must stop answering: drop bots that are gone
-      const live = new Set(await listBotIds(db));
+      // A deleted website (or account) must stop answering: drop bots that are gone. Staff changes
+      // touch the bot's row, but a suspension set some other way is caught here too.
+      const states = new Map((await listBotStates(db)).map((b) => [b.id, b.serving]));
       for (const id of [...applied.keys()]) {
-        if (live.has(id)) continue;
-        tenants.remove(id);
-        knowledge.load(id, []);
-        applied.delete(id);
-        loaded.delete(id);
-        log("info", "bot removed", { tenant: id });
+        const serving = states.get(id);
+        if (serving === undefined) {
+          tenants.remove(id);
+          unload(id);
+          applied.delete(id);
+          log("info", "bot removed", { tenant: id });
+        } else if (!serving && !tenants.isPaused(id)) {
+          const tenant = tenants.findById(id);
+          if (tenant) {
+            tenants.pause(tenant);
+            unload(id);
+            log("info", "bot paused", { tenant: id });
+          }
+        } else if (serving && tenants.isPaused(id)) {
+          // back in service without its row changing: reload it from scratch
+          applied.delete(id);
+          resync = true;
+        }
       }
       // A failed bot is fetched again next pass (re-applying the others is harmless)
       since = firstFailure ? new Date(firstFailure.getTime() - 1) : newest;

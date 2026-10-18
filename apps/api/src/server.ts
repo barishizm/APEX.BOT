@@ -93,7 +93,8 @@ if (process.env.DATABASE_URL) {
   store = new ConversationStore({
     // before migration 0016 the conversations table has no context column
     persistence: postgresPersistence(db, { context: !missing.includes("0016_conversation_context.sql") }),
-    persists: (tenantId) => tenants.findById(tenantId)?.managed === true,
+    // paused sites too: a visitor may still erase their conversation there
+    persists: (tenantId) => tenants.findSite(tenantId)?.managed === true,
     onError: (error, conversation) => log("error", "couldn't save conversation", { conversation, error }),
   });
   setInterval(() => {
@@ -119,7 +120,7 @@ if (process.env.DATABASE_URL) {
     recordWidgetSeen(db, tenant.id, origin).catch((error) => log("warn", "couldn't record widget activity", { tenant: tenant.id, error }));
   };
 }
-setInterval(() => store.sweep((id) => tenants.findById(id)?.retentionDays ?? 30), 3_600_000).unref();
+setInterval(() => store.sweep((id) => tenants.findSite(id)?.retentionDays ?? 30), 3_600_000).unref();
 
 // APEX_MODEL=echo answers every tenant locally; otherwise each tenant's own model choice is
 // routed to its provider, and tenants without one use APEX_MODEL on Claude.

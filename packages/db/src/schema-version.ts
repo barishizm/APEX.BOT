@@ -27,6 +27,7 @@ export const MIGRATION_NAMES = [
   "0022_admin_guards.sql",
   "0023_admin_overview.sql",
   "0024_admin_users.sql",
+  "0025_admin_bots.sql",
 ] as const
 
 /** Migrations this code expects that the database hasn't applied (run `npm run db:migrate`). */

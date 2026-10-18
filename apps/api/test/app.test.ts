@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { A, B, headers, readSSE, setup } from "./helpers.ts";
+import { ConversationStore, type ConversationPersistence } from "../src/store.ts";
+import { TenantRegistry } from "../src/tenants.ts";
+import { A, B, headers, readSSE, setup, tenant } from "./helpers.ts";
 
 const chat = (app: ReturnType<typeof setup>["app"], body: object, site = A, extra: Record<string, string> = {}) =>
   app.request("/v1/chat", { method: "POST", headers: headers(site, extra), body: JSON.stringify(body) });
@@ -305,5 +307,118 @@ describe("mail caps", () => {
     const { app, mailer } = setup({ mailsPerRecipientPerHour: 2 });
     for (let n = 0; n < 4; n++) await post(app, "/v1/lead", n);
     assert.equal(mailer.outbox.length, 2);
+  });
+});
+
+describe("sites taken out of service", () => {
+  const pauseA = (tenants: ReturnType<typeof setup>["tenants"]) => tenants.pause(tenants.findById("tn_a")!);
+
+  it("answers config and chat with a polite out_of_service the widget can read, and never calls the model", async () => {
+    const { app, tenants, model } = setup();
+    pauseA(tenants);
+    const config = await app.request("/v1/widget/config?site_key=" + A.key, { headers: { origin: A.origin } });
+    assert.equal(config.status, 503);
+    assert.equal(config.headers.get("access-control-allow-origin"), A.origin);
+    const body = (await config.json()) as { error: string; message: string };
+    assert.equal(body.error, "out_of_service");
+    assert.match(body.message, /out of service/);
+    // nothing of the site's settings goes out while it is paused
+    assert.deepEqual(Object.keys(body).sort(), ["error", "message"]);
+
+    const res = await chat(app, { message: "merhaba" });
+    assert.equal(res.status, 503);
+    assert.equal(((await res.json()) as { error: string }).error, "out_of_service");
+    assert.equal(model.requests.length, 0);
+    for (const path of ["/v1/feedback", "/v1/handoff", "/v1/lead"]) {
+      const r = await app.request(path, { method: "POST", headers: headers(A), body: "{}" });
+      assert.equal(r.status, 503, path);
+    }
+    // the preflight still passes, so the browser lets the widget read the answer
+    assert.equal((await app.request("/v1/chat", { method: "OPTIONS", headers: { origin: A.origin } })).status, 204);
+  });
+
+  it("keeps the origin check for a paused site and leaves other tenants alone", async () => {
+    const { app, tenants } = setup();
+    pauseA(tenants);
+    const foreign = await chat(app, { message: "merhaba" }, { key: A.key, origin: B.origin });
+    assert.equal(foreign.status, 403);
+    assert.equal(foreign.headers.get("access-control-allow-origin"), null);
+    const other = await chat(app, { message: "iade" }, B);
+    assert.equal(other.status, 200);
+    await readSSE(other);
+  });
+
+  it("still lets a visitor erase their conversation", async () => {
+    const { app, tenants, store } = setup();
+    const events = await readSSE(await chat(app, { message: "iade" }));
+    const { conversationId } = events.find((e) => e.event === "meta")!.data as { conversationId: string };
+    pauseA(tenants);
+    assert.equal((await app.request(`/v1/conversations/${conversationId}`, { headers: headers(A) })).status, 503);
+    const erased = await app.request(`/v1/conversations/${conversationId}`, { method: "DELETE", headers: headers(A) });
+    assert.equal(erased.status, 204);
+    assert.equal(await store.getOrLoad("tn_a", conversationId), undefined);
+  });
+
+  it("erases a paused dashboard bot's conversation from the database, even after a restart", async () => {
+    const deleted: string[] = [];
+    const persistence: ConversationPersistence = {
+      created: async () => {},
+      appended: async () => {},
+      visitor: async () => {},
+      handoff: async () => {},
+      feedback: async () => {},
+      deleted: async (tenantId, id) => (deleted.push(`${tenantId}:${id}`), true),
+      load: async () => undefined,
+    };
+    // wired as in server.ts; nothing is in memory, as after a restart
+    const tenants = new TenantRegistry([]);
+    const site = { ...tenant("tn_a", A.key, A.origin), managed: true };
+    tenants.upsert(site);
+    tenants.pause(site);
+    const store = new ConversationStore({ persistence, persists: (id) => tenants.findSite(id)?.managed === true });
+    const { app } = setup({}, { tenants, store });
+    const id = "6f1c2a4e-8b3d-4c5e-9f7a-1b2c3d4e5f60";
+    const res = await app.request(`/v1/conversations/${id}`, { method: "DELETE", headers: headers(A) });
+    assert.equal(res.status, 204);
+    assert.deepEqual(deleted, [`tn_a:${id}`]);
+  });
+
+  it("answers again once the site is back", async () => {
+    const { app, tenants } = setup();
+    const tenant = tenants.findById("tn_a")!;
+    tenants.pause(tenant);
+    assert.equal((await chat(app, { message: "iade" })).status, 503);
+    tenants.upsert(tenant);
+    assert.equal(tenants.isPaused("tn_a"), false);
+    const res = await chat(app, { message: "iade" });
+    assert.equal(res.status, 200);
+    await readSSE(res);
+  });
+});
+
+describe("token budget override", () => {
+  it("replaces the tenant's budget while it lasts, then the tenant's own applies again", async () => {
+    let clock = Date.parse("2026-10-18T09:00:00Z");
+    const { app, model, tenants } = setup({}, { now: () => clock });
+    model.tokens = 2_000_000; // over tn_a's own 1M budget in one reply
+    tenants.findById("tn_a")!.budgetOverride = { tokens: 3_000_000, until: clock + 3_600_000 };
+    await readSSE(await chat(app, { message: "iade" }));
+    // 2M used: over its own budget, under the override
+    const second = await chat(app, { message: "iade" });
+    assert.equal(second.status, 200);
+    await readSSE(second);
+    const third = await chat(app, { message: "iade" });
+    assert.equal(third.status, 429);
+    assert.equal(((await third.json()) as { error: string }).error, "budget_exhausted");
+
+    // an override can also stop a site: 0 tokens
+    const other = setup({}, { now: () => clock });
+    other.tenants.findById("tn_a")!.budgetOverride = { tokens: 0, until: clock + 3_600_000 };
+    assert.equal((await chat(other.app, { message: "iade" })).status, 429);
+    // past its end the tenant's own budget is back, with no sync needed
+    clock += 2 * 3_600_000;
+    const after = await chat(other.app, { message: "iade" });
+    assert.equal(after.status, 200);
+    await readSSE(after);
   });
 });

@@ -300,7 +300,7 @@ export async function rotateSiteKey(db: Db, who: BotScope): Promise<Bot> {
 }
 
 // Bots the widget serves: not disabled by staff, in a workspace that isn't suspended (b, o aliases)
-const SERVING = "b.disabled_at is null and o.suspended_at is null"
+export const BOT_SERVING_SQL = "(b.disabled_at is null and o.suspended_at is null)"
 
 export interface BotRecord {
   id: string
@@ -311,19 +311,27 @@ export interface BotRecord {
   handoffVerified: boolean
   /** Changes whenever the bot's knowledge chunks change. */
   knowledgeVersion: number
+  /**
+   * False when staff disabled the bot or suspended its workspace: the chat API then keeps only its
+   * site key and origins, to tell the widget politely that it is out of service.
+   */
+  serving: boolean
+  /** A daily token budget staff set for a while, in place of settings.security.dailyTokenBudget. */
+  budgetOverride: { tokens: number; until: Date } | null
   updatedAt: Date
 }
 
 /** Every bot changed after `since` (all of them when null), for the chat API's sync. */
 export async function listBotsChangedSince(db: Queryable, since: Date | null): Promise<BotRecord[]> {
-  const { rows } = await db.query<Omit<BotRow, "role"> & { knowledge_version: number }>(
+  const { rows } = await db.query<
+    Omit<BotRow, "role"> & { knowledge_version: number; serving: boolean; token_budget_override: string | number | null; token_budget_override_until: Date | null }
+  >(
     `select b.id, b.organization_id, o.name as organization_name, b.site_key, b.settings, b.version, b.knowledge_version, b.updated_at,
-            ${HANDOFF_VERIFIED} as handoff_verified
+            ${HANDOFF_VERIFIED} as handoff_verified, ${BOT_SERVING_SQL} as serving, b.token_budget_override, b.token_budget_override_until
        from app.bots b join app.organizations o on o.id = b.organization_id
       -- JS dates carry milliseconds, Postgres microseconds: compare at JS precision so the
       -- newest bot isn't returned again on every poll
-      where ${SERVING}
-        and ($1::timestamptz is null or date_trunc('milliseconds', b.updated_at) > $1::timestamptz)
+      where $1::timestamptz is null or date_trunc('milliseconds', b.updated_at) > $1::timestamptz
       order by b.updated_at`,
     [since],
   )
@@ -334,22 +342,32 @@ export async function listBotsChangedSince(db: Queryable, since: Date | null): P
     settings: repairSettings(typeof r.settings === "string" ? JSON.parse(r.settings) : r.settings),
     handoffVerified: r.handoff_verified,
     knowledgeVersion: r.knowledge_version,
+    serving: r.serving,
+    budgetOverride:
+      r.token_budget_override !== null && r.token_budget_override_until ? { tokens: Number(r.token_budget_override), until: r.token_budget_override_until } : null,
     updatedAt: r.updated_at,
   }))
 }
 
-/**
- * Ids of every bot that should answer, so the chat API's sync can drop the ones that were deleted,
- * disabled or whose workspace was suspended.
- */
+/** Ids of every bot that should answer: not disabled, in a workspace that isn't suspended. */
 export async function listBotIds(db: Queryable): Promise<string[]> {
-  const { rows } = await db.query<{ id: string }>(`select b.id from app.bots b join app.organizations o on o.id = b.organization_id where ${SERVING}`)
-  return rows.map((r) => r.id)
+  return (await listBotStates(db)).filter((b) => b.serving).map((b) => b.id)
 }
 
 /**
- * Marks every bot of a workspace changed, so the chat API's sync picks it up again (after a
- * suspension is lifted) on its next pass.
+ * Every bot and whether it should answer, so the chat API's sync can drop deleted ones and pause
+ * disabled or suspended ones even when nothing touched their row.
+ */
+export async function listBotStates(db: Queryable): Promise<{ id: string; serving: boolean }[]> {
+  const { rows } = await db.query<{ id: string; serving: boolean }>(
+    `select b.id, ${BOT_SERVING_SQL} as serving from app.bots b join app.organizations o on o.id = b.organization_id`,
+  )
+  return rows
+}
+
+/**
+ * Marks every bot of a workspace changed, so the chat API's sync pauses or reloads them (after a
+ * suspension or its lifting) on its next pass.
  */
 export async function touchWorkspaceBots(q: Queryable, organizationId: string): Promise<number> {
   const { rows } = await q.query("update app.bots set updated_at = now() where organization_id = $1 returning id", [organizationId])

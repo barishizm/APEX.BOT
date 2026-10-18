@@ -78,6 +78,7 @@ const tr = {
   errors: {
     rate_limited: "Çok hızlı mesaj gönderiyorsunuz. Biraz bekleyip tekrar deneyin.",
     budget_exhausted: "Asistan şu anda yanıt veremiyor. Sorunuzu ekibimize iletebilirsiniz.",
+    out_of_service: "Bu asistan şu anda hizmet dışı. Lütfen siteyle doğrudan iletişime geçin.",
     message_too_long: "Mesajınız çok uzun, lütfen kısaltın.",
     conversation_full: "Bu sohbet çok uzadı. Yeni bir sohbet başlatın.",
     refused: "Bu konuda yardımcı olamıyorum.",
@@ -167,6 +168,7 @@ const en: Strings = {
   errors: {
     rate_limited: "You're sending messages too fast. Wait a moment and try again.",
     budget_exhausted: "The assistant can't reply right now. You can send your question to the team.",
+    out_of_service: "This assistant is out of service for now. Please contact the site directly.",
     message_too_long: "Your message is too long, please shorten it.",
     conversation_full: "This chat has grown too long. Start a new chat.",
     refused: "I can't help with that.",
@@ -254,6 +256,7 @@ const lt: Strings = {
   errors: {
     rate_limited: "Siunčiate žinutes per greitai. Palaukite akimirką ir bandykite dar kartą.",
     budget_exhausted: "Asistentas šiuo metu negali atsakyti. Savo klausimą galite išsiųsti mūsų komandai.",
+    out_of_service: "Šis asistentas šiuo metu neveikia. Susisiekite su svetaine tiesiogiai.",
     message_too_long: "Jūsų žinutė per ilga. Sutrumpinkite ją.",
     conversation_full: "Šis pokalbis tapo per ilgas. Pradėkite naują pokalbį.",
     refused: "Šiuo klausimu negaliu padėti.",
@@ -341,6 +344,7 @@ const lv: Strings = {
   errors: {
     rate_limited: "Jūs sūtāt ziņas pārāk ātri. Brīdi uzgaidiet un mēģiniet vēlreiz.",
     budget_exhausted: "Asistents pašlaik nevar atbildēt. Savu jautājumu varat nosūtīt mūsu komandai.",
+    out_of_service: "Šis asistents pašlaik nav pieejams. Lūdzu, sazinieties ar vietni tieši.",
     message_too_long: "Jūsu ziņa ir pārāk gara. Lūdzu, saīsiniet to.",
     conversation_full: "Šī saruna ir kļuvusi pārāk gara. Sāciet jaunu sarunu.",
     refused: "Šajā jautājumā nevaru palīdzēt.",
@@ -428,6 +432,7 @@ const et: Strings = {
   errors: {
     rate_limited: "Saadate sõnumeid liiga kiiresti. Oodake hetk ja proovige uuesti.",
     budget_exhausted: "Assistent ei saa praegu vastata. Võite oma küsimuse saata meie meeskonnale.",
+    out_of_service: "See assistent ei ole praegu kasutusel. Võtke palun saidiga otse ühendust.",
     message_too_long: "Teie sõnum on liiga pikk. Palun lühendage seda.",
     conversation_full: "See vestlus on liiga pikaks veninud. Alustage uut vestlust.",
     refused: "Selle teemaga ma aidata ei saa.",
