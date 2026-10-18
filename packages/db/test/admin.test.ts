@@ -26,7 +26,7 @@ before(async () => {
   await migrate(db)
 })
 after(() => db.close())
-beforeEach(() => db.query("truncate app.users, app.organizations, app.auth_events, app.admin_audit_log, app.platform_settings cascade").then(() => {}))
+beforeEach(() => db.query("alter table app.admin_audit_log disable trigger user; truncate app.users, app.organizations, app.auth_events, app.admin_audit_log, app.platform_settings cascade; alter table app.admin_audit_log enable trigger user").then(() => {}))
 
 async function newUser(email: string, username: string) {
   const { user } = await register(db, { email, username, password: "correct horse", accountType: "personal", acceptTerms: true })
@@ -180,8 +180,20 @@ describe("writeAudit", () => {
       )).rows[0]!
     assert.deepEqual(await row(), { actor_id: actor, ip: null, ua: 512, after: { disabledAt: "2026-10-17" } })
 
+    // the entry keeps naming who acted, with the email they had
     await db.query("delete from app.users where id = $1", [actor])
-    assert.equal((await row()).actor_id, null)
+    assert.equal((await row()).actor_id, actor)
+    const kept = await db.query<{ actor_email: string }>("select actor_email from app.admin_audit_log where id = $1", [id])
+    assert.equal(kept.rows[0]!.actor_email, "boss@example.com")
     await assert.rejects(writeAudit(db, { actorId: null, action: "", targetType: "bot" }), code("invalid_input"))
+  })
+
+  test("entries can't be changed, deleted or truncated", async () => {
+    const id = await writeAudit(db, { actorId: null, action: "bot.disable", targetType: "bot", targetId: "b1" })
+    await assert.rejects(db.query("update app.admin_audit_log set reason = 'edited' where id = $1", [id]), /append-only/)
+    await assert.rejects(db.query("delete from app.admin_audit_log where id = $1", [id]), /append-only/)
+    await assert.rejects(db.query("truncate app.admin_audit_log"), /append-only/)
+    const { rows } = await db.query<{ n: number }>("select count(*)::int as n from app.admin_audit_log where id = $1 and reason is null", [id])
+    assert.equal(rows[0]!.n, 1)
   })
 })

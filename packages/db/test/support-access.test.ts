@@ -31,7 +31,7 @@ before(async () => {
   await migrate(db)
 })
 after(() => db.close())
-beforeEach(() => db.query("truncate app.users, app.organizations, app.admin_audit_log cascade").then(() => {}))
+beforeEach(() => db.query("alter table app.admin_audit_log disable trigger user; truncate app.users, app.organizations, app.admin_audit_log cascade; alter table app.admin_audit_log enable trigger user").then(() => {}))
 
 const run = <T>(fn: (tx: Parameters<Parameters<Db["transaction"]>[0]>[0]) => Promise<T>) => db.transaction(fn)
 const err = (c: string) => (e: unknown) => (e instanceof AdminError || e instanceof AuthError) && e.code === c

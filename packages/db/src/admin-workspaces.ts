@@ -285,14 +285,14 @@ export async function getAdminWorkspaceDetail(q: Queryable, organizationId: stri
       [organizationId],
     ),
     q.query<{ id: string; before: { plan?: unknown } | null; after: { plan?: unknown } | null; reason: string | null; actorId: string | null; actorName: string | null; createdAt: Date }>(
-      `select l.id::text, l.before, l.after, l.reason, l.actor_id as "actorId", coalesce(a.display_name, a.username) as "actorName", l.created_at as "createdAt"
+      `select l.id::text, l.before, l.after, l.reason, l.actor_id as "actorId", coalesce(a.display_name, a.username, l.actor_email) as "actorName", l.created_at as "createdAt"
          from app.admin_audit_log l left join app.users a on a.id = l.actor_id
         where l.target_type = 'organization' and l.target_id = $1 and l.action = $2
         order by l.id`,
       [organizationId, PLAN_AUDIT_ACTION],
     ),
     q.query<WorkspaceAuditEntry>(
-      `select l.id::text, l.action, l.reason, l.actor_id as "actorId", coalesce(a.display_name, a.username) as "actorName",
+      `select l.id::text, l.action, l.reason, l.actor_id as "actorId", coalesce(a.display_name, a.username, l.actor_email) as "actorName",
               l.before, l.after, l.created_at as "createdAt"
          from app.admin_audit_log l left join app.users a on a.id = l.actor_id
         where l.target_type = 'organization' and l.target_id = $1

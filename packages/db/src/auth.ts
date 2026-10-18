@@ -30,7 +30,7 @@ export const STEP_UP_TTL_MS = 10 * 60 * 1000
 export const CODE_FAIL_LIMIT = { max: 10, windowMinutes: 60 }
 // Failed log-ins counted over the last 15 minutes. The lock is per email AND address, so a stranger
 // can't lock the owner out from elsewhere; `email` is a high backstop against spread-out guessing.
-const LOGIN_FAIL_LIMIT = { emailAndIp: 10, email: 100, ip: 50 }
+export const LOGIN_FAIL_LIMIT = { emailAndIp: 10, email: 100, ip: 50 }
 // Outbound verification mail caps, so register/resend can't be used to mail arbitrary addresses
 const SIGNUP_LIMIT = { perIp: 5, windowMinutes: 60 }
 const CODE_SEND_LIMIT = { perUser: 5, perIp: 15, windowMinutes: 60 }
@@ -91,6 +91,8 @@ export interface NewSession {
 export interface RequestMeta {
   ip?: string | null
   userAgent?: string | null
+  /** ISO country code the hosting edge reports for the caller (x-vercel-ip-country); stored on auth events. */
+  country?: string | null
 }
 
 interface UserRow {
@@ -146,6 +148,11 @@ function checkPassword(raw: unknown): string {
 
 const cleanIp = (ip?: string | null) => (ip && isIP(ip) ? ip : null)
 const cleanAgent = (ua?: string | null) => (ua ? ua.slice(0, 512) : null)
+const cleanCountry = (c?: string | null) => {
+  const code = c?.trim().toUpperCase()
+  // "XX" and "T1" are what edges send for unknown and Tor
+  return code && /^[A-Z]{2}$/.test(code) && code !== "XX" ? code : null
+}
 
 type AuthEvent =
   | "register"
@@ -166,19 +173,46 @@ type AuthEvent =
   | "two_factor_disabled"
   | "two_factor_failed"
   | "recovery_codes_created"
+  | "access_blocked"
 
 async function logEvent(q: Queryable, event: AuthEvent, meta: RequestMeta, userId: string | null, email: string | null) {
   await q.query(
-    "insert into app.auth_events (event, user_id, email, ip, user_agent) values ($1, $2, $3, $4, $5)",
-    [event, userId, email, cleanIp(meta.ip), cleanAgent(meta.userAgent)],
+    "insert into app.auth_events (event, user_id, email, ip, user_agent, country) values ($1, $2, $3, $4, $5, $6)",
+    [event, userId, email, cleanIp(meta.ip), cleanAgent(meta.userAgent), cleanCountry(meta.country)],
   )
 }
+
+/**
+ * Throws when staff blocked the caller's address (or a network it is in) or this email, see
+ * app.auth_blocks. The answer reads like any rate limit, so a block doesn't advertise itself.
+ * The refused attempt is logged as 'access_blocked'.
+ */
+async function assertNotBlocked(q: Queryable, meta: RequestMeta, email: string | null) {
+  const ip = cleanIp(meta.ip)
+  if (!ip && !email) return
+  const { rows } = await q.query<{ left: number | null }>(
+    `select ceil(extract(epoch from max(expires_at) - now()))::int as left
+       from app.auth_blocks
+      where lifted_at is null and expires_at > now()
+        and ((kind = 'ip' and $1::inet is not null and ip >>= $1::inet) or (kind = 'email' and email = $2))`,
+    [ip, email],
+  )
+  const left = rows[0]?.left
+  if (!left) return
+  await logEvent(q, "access_blocked", meta, null, email)
+  throw new AuthError("too_many_attempts", "Too many requests. Try again later", Math.min(Math.max(left, 1), 60 * 60))
+}
+
+// When the counters of a user's email were last reset by staff (app.throttle_resets); $1 is the user id
+const USER_RESET = `coalesce((select max(t.created_at) from app.throttle_resets t join app.users u on u.email = t.email
+                              where t.kind = 'email' and u.id = $1::uuid), '-infinity')`
 
 // Throws once an account has had too many wrong codes recently, whichever code they were for.
 async function assertCodeGuessesLeft(q: Queryable, userId: string, event: "verify_failed" | "reset_failed" | "two_factor_failed") {
   const { rows } = await q.query<{ n: number }>(
     `select count(*)::int as n from app.auth_events
-      where user_id = $1 and event = $2 and created_at > now() - make_interval(mins => $3)`,
+      where user_id = $1 and event = $2 and created_at > now() - make_interval(mins => $3)
+        and created_at > ${USER_RESET}`,
     [userId, event, CODE_FAIL_LIMIT.windowMinutes],
   )
   if (rows[0].n >= CODE_FAIL_LIMIT.max) {
@@ -194,12 +228,18 @@ async function assertEventBudget(
   userId: string | null,
   limit: { perIp: number; perUser?: number; windowMinutes: number },
 ) {
+  // events before a staff reset of the address (or of the account's email) don't count
   const { rows } = await q.query<{ by_ip: number; by_user: number }>(
-    `select count(*) filter (where $2::inet is not null and ip = $2::inet)::int as by_ip,
-            count(*) filter (where $3::uuid is not null and user_id = $3::uuid)::int as by_user
-       from app.auth_events
-      where event = $1 and created_at > now() - make_interval(mins => $4)
-        and (ip = $2::inet or user_id = $3::uuid)`,
+    `with r as (
+       select coalesce((select max(created_at) from app.throttle_resets where kind = 'ip' and ip = $2::inet), '-infinity') as ip_reset,
+              coalesce((select max(t.created_at) from app.throttle_resets t join app.users u on u.email = t.email
+                         where t.kind = 'email' and u.id = $3::uuid), '-infinity') as user_reset
+     )
+     select count(*) filter (where $2::inet is not null and e.ip = $2::inet and e.created_at > r.ip_reset)::int as by_ip,
+            count(*) filter (where $3::uuid is not null and e.user_id = $3::uuid and e.created_at > r.user_reset)::int as by_user
+       from app.auth_events e, r
+      where e.event = $1 and e.created_at > now() - make_interval(mins => $4)
+        and (e.ip = $2::inet or e.user_id = $3::uuid)`,
     [event, ip, userId, limit.windowMinutes],
   )
   if (rows[0].by_ip >= limit.perIp || (limit.perUser !== undefined && rows[0].by_user >= limit.perUser)) {
@@ -311,6 +351,7 @@ export async function register(
     throw new AuthError("invalid_input", "Choose a company size")
   }
 
+  await assertNotBlocked(db, meta, email)
   await assertEventBudget(db, "register", cleanIp(meta.ip), null, SIGNUP_LIMIT)
   const passwordHash = await hashPassword(password)
 
@@ -358,14 +399,23 @@ export async function login(
   const email = normalizeEmail(input.email)
   const password = typeof input.password === "string" ? input.password.slice(0, 200) : ""
   const ip = cleanIp(meta.ip)
+  await assertNotBlocked(db, meta, email)
 
+  // Failures before staff reset the counters of this email or address don't count (app.throttle_resets)
   const { rows: fails } = await db.query<{ by_email: number; by_email_ip: number; by_ip: number }>(
-    `select count(*) filter (where email = $1)::int as by_email,
-            count(*) filter (where email = $1 and $2::inet is not null and ip = $2::inet)::int as by_email_ip,
-            count(*) filter (where $2::inet is not null and ip = $2::inet)::int as by_ip
-       from app.auth_events
-      where event = 'login_failed' and created_at > now() - interval '15 minutes'
-        and (email = $1 or ip = $2::inet)`,
+    `with r as (
+       select coalesce(max(created_at) filter (where kind = 'email'), '-infinity') as email_reset,
+              coalesce(max(created_at) filter (where kind = 'ip'), '-infinity') as ip_reset
+         from app.throttle_resets
+        where (kind = 'email' and email = $1) or (kind = 'ip' and ip = $2::inet)
+     )
+     select count(*) filter (where e.email = $1 and e.created_at > r.email_reset)::int as by_email,
+            count(*) filter (where e.email = $1 and $2::inet is not null and e.ip = $2::inet
+                               and e.created_at > greatest(r.email_reset, r.ip_reset))::int as by_email_ip,
+            count(*) filter (where $2::inet is not null and e.ip = $2::inet and e.created_at > r.ip_reset)::int as by_ip
+       from app.auth_events e, r
+      where e.event = 'login_failed' and e.created_at > now() - interval '15 minutes'
+        and (e.email = $1 or e.ip = $2::inet)`,
     [email, ip],
   )
   // Without a known address only the email counts, so unknown callers share the stricter limit
@@ -629,6 +679,7 @@ export async function oauthLogin(
     throw new AuthError("invalid_input", "Your provider has no verified email for this account. Verify it there and try again")
   }
   const email = normalizeEmail(profile.email)
+  await assertNotBlocked(db, meta, email)
 
   return db
     .transaction(async (tx) => {
@@ -638,6 +689,8 @@ export async function oauthLogin(
         [profile.provider, profile.providerAccountId],
       )
       if (linked.rows[0]) {
+        // the account's own address may differ from the provider's
+        if (linked.rows[0].email !== email) await assertNotBlocked(tx, meta, linked.rows[0].email)
         const user = toUser(await touchOAuthLogin(tx, linked.rows[0].id, profile))
         return { ...(await signIn(tx, user, true, meta)), isNew: false }
       }
@@ -713,6 +766,7 @@ export async function oauthLogin(
  */
 export async function requestPasswordReset(db: Db, rawEmail: unknown, meta: RequestMeta = {}): Promise<{ email: string; code: string } | null> {
   const email = normalizeEmail(rawEmail)
+  await assertNotBlocked(db, meta, email)
   const { rows } = await db.query<{ id: string; last_code_at: Date | null }>(
     `select u.id,
             (select max(created_at) from app.verification_codes c where c.user_id = u.id and c.purpose = 'password_reset') as last_code_at
@@ -1058,6 +1112,14 @@ export async function completeTwoFactorLogin(
     )
     const challenge = rows[0]
     if (!challenge || challenge.expired) return { error: expired() }
+    // blocked after the password step: the challenge is spent, so they start over once the block ends
+    try {
+      const owner = await tx.query<{ email: string }>("select email from app.users where id = $1", [challenge.user_id])
+      await assertNotBlocked(tx, meta, owner.rows[0]?.email ?? null)
+    } catch (error) {
+      await tx.query("delete from app.login_challenges where id = $1", [challenge.id])
+      return { error: error as AuthError }
+    }
     if (challenge.attempts >= CODE_MAX_ATTEMPTS) {
       await tx.query("delete from app.login_challenges where id = $1", [challenge.id])
       return { error: new AuthError("too_many_attempts", "Too many incorrect codes. Log in again") }

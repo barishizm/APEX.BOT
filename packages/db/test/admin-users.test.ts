@@ -33,7 +33,7 @@ before(async () => {
   await migrate(db)
 })
 after(() => db.close())
-beforeEach(() => db.query("truncate app.users, app.organizations, app.auth_events, app.admin_audit_log cascade").then(() => {}))
+beforeEach(() => db.query("alter table app.admin_audit_log disable trigger user; truncate app.users, app.organizations, app.auth_events, app.admin_audit_log cascade; alter table app.admin_audit_log enable trigger user").then(() => {}))
 
 const PASSWORD = "correct horse"
 async function newUser(email: string, username: string) {
