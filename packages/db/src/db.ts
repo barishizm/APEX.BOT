@@ -73,7 +73,7 @@ export function createDb(url: string, options: DbOptions = {}): Db {
   }
 }
 
-// Reads DATABASE_URL / DATABASE_SSL / DATABASE_CA_CERT (PEM text) from the environment.
+// Reads DATABASE_URL / DATABASE_SSL / DATABASE_CA_CERT (PEM text) / DATABASE_POOL_MAX from the environment.
 export function createDbFromEnv(env: NodeJS.ProcessEnv = process.env): Db {
   const url = env.DATABASE_URL
   if (!url) throw new Error("DATABASE_URL is not set")
@@ -81,5 +81,8 @@ export function createDbFromEnv(env: NodeJS.ProcessEnv = process.env): Db {
   if (ssl !== undefined && ssl !== "off" && ssl !== "require" && ssl !== "verify") {
     throw new Error(`DATABASE_SSL must be off, require or verify (got "${ssl}")`)
   }
-  return createDb(url, { ssl, caCert: env.DATABASE_CA_CERT || undefined })
+  // 1 against the local PGlite server (npm run db:local), which runs every connection in one session
+  const max = env.DATABASE_POOL_MAX ? Number(env.DATABASE_POOL_MAX) : undefined
+  if (max !== undefined && (!Number.isInteger(max) || max < 1)) throw new Error(`DATABASE_POOL_MAX must be a positive integer (got "${env.DATABASE_POOL_MAX}")`)
+  return createDb(url, { ssl, caCert: env.DATABASE_CA_CERT || undefined, max })
 }
