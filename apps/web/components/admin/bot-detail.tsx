@@ -44,7 +44,16 @@ const STATUS_TONE = {
   suspended: "bg-red-500/15 text-red-700 dark:text-red-300",
 } as const
 
-export function BotDetail({ detail, support }: { detail: BotDetailJson; support: SupportAccessJson | null }) {
+export function BotDetail({
+  detail,
+  support,
+  supportTicket = null,
+}: {
+  detail: BotDetailJson
+  support: SupportAccessJson | null
+  /** Opens the support access dialog with this ticket number filled in (from /admin/support/[id]). */
+  supportTicket?: string | null
+}) {
   const { t: app, locale } = useAppI18n()
   const t = app.admin!.bots.detail
   const bots = app.admin!.bots
@@ -52,7 +61,7 @@ export function BotDetail({ detail, support }: { detail: BotDetailJson; support:
   const { bot: b, tokens, handoff } = detail
   const [dialog, setDialog] = useState<Kind | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
-  const [supportDialog, setSupportDialog] = useState(false)
+  const [supportDialog, setSupportDialog] = useState(!!supportTicket && !support)
   const [closing, setClosing] = useState(false)
 
   async function closeSupport() {
@@ -293,6 +302,7 @@ export function BotDetail({ detail, support }: { detail: BotDetailJson; support:
       {supportDialog && (
         <SupportAccessDialog
           botId={b.id}
+          initialTicket={supportTicket ?? ""}
           onClose={() => setSupportDialog(false)}
           onDone={() => {
             setSupportDialog(false)
@@ -305,10 +315,10 @@ export function BotDetail({ detail, support }: { detail: BotDetailJson; support:
   )
 }
 
-function SupportAccessDialog({ botId, onClose, onDone }: { botId: string; onClose: () => void; onDone: () => void }) {
+function SupportAccessDialog({ botId, initialTicket, onClose, onDone }: { botId: string; initialTicket: string; onClose: () => void; onDone: () => void }) {
   const { t: app, locale } = useAppI18n()
   const t = app.admin!.bots.detail.support
-  const [ticket, setTicket] = useState("")
+  const [ticket, setTicket] = useState(initialTicket)
   const [mailLocale, setMailLocale] = useState<Locale>(locale)
   const label = "flex flex-col gap-1.5 text-sm font-medium"
   return (
