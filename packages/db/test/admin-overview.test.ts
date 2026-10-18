@@ -126,10 +126,12 @@ describe("platformOverview", () => {
     await fail("b@kahve.example", "198.51.100.1", 30, "2 days")
 
     await db.query(
-      `insert into app.support_tickets (subject, status, sla_due_at, closed_at, organization_id)
-       values ('Late', 'open', now() - interval '1 hour', null, (select organization_id from app.bots where id = $1)),
-              ('On time', 'pending', now() + interval '1 hour', null, null),
-              ('Done', 'closed', now() - interval '1 day', now(), null)`,
+      `insert into app.support_tickets (subject, category, status, sla_due_at, organization_id)
+       select subject, 'bug', status, sla_due_at::timestamptz, (select organization_id from app.bots where id = $1)
+         from (values ('Late', 'open', now() - interval '1 hour'),
+                      ('On time', 'pending_user', now() + interval '1 hour'),
+                      ('Sorted', 'resolved', now() - interval '1 day'),
+                      ('Done', 'closed', now() - interval '1 day')) v (subject, status, sla_due_at)`,
       [a.bot.id],
     )
 
@@ -170,10 +172,5 @@ describe("platformOverview", () => {
     const r = await platformOverview(db)
     assert.equal(r.attention.failedSyncs.total, ATTENTION_LIMIT + 3)
     assert.equal(r.attention.failedSyncs.rows.length, ATTENTION_LIMIT)
-  })
-
-  test("a closed ticket needs a closing time", async () => {
-    await assert.rejects(db.query("insert into app.support_tickets (subject, status) values ('x', 'closed')"))
-    await db.query("insert into app.support_tickets (subject, status, closed_at) values ('x', 'closed', now())")
   })
 })

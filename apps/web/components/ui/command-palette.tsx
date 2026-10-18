@@ -15,6 +15,7 @@ import {
   ListChecks,
   LogOut,
   MessageSquareText,
+  MessageSquareWarning,
   MousePointerClick,
   Palette,
   Search,
@@ -72,6 +73,8 @@ function buildCommands(t: Strings, locale: Locale, setLocale: (l: Locale) => voi
     { group: g.widget, label: c.install, icon: Code2, keywords: "embed snippet allowed websites site key limits kod anahtar", run: nav("/dashboard/widget?section=install") },
     { group: g.help, label: c.docs, icon: BookOpen, keywords: "help guide yardım rehber", run: () => window.open(localizePath("/docs", locale), "_blank", "noopener") },
     { group: g.help, label: c.status, icon: Activity, run: () => window.open(localizePath("/status", locale), "_blank", "noopener") },
+    { group: g.help, label: c.report, icon: MessageSquareWarning, keywords: "support bug problem ticket contact destek hata sorun talep iletişim", run: nav("/dashboard/support?new=1") },
+    { group: g.help, label: c.support, icon: LifeBuoy, keywords: "support tickets requests destek talepler", run: nav("/dashboard/support") },
     ...LOCALES.filter((l) => l !== locale).map((l) => ({
       group: g.language,
       label: LOCALE_META[l].name,

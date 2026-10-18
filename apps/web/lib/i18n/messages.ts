@@ -11,6 +11,22 @@ type Rule = readonly [match: string | RegExp, replacement: string]
 const RULES: Record<Locale, Rule[]> = {
   en: [],
   tr: [
+    // support tickets
+    ["Couldn't verify you're human. Reload the page and try again", "İnsan olduğunuz doğrulanamadı. Sayfayı yenileyip tekrar deneyin"],
+    ["Write a subject", "Bir konu yazın"],
+    ["The subject can be at most 200 characters", "Konu en fazla 200 karakter olabilir"],
+    ["Choose a category", "Bir kategori seçin"],
+    ["Write a message", "Bir mesaj yazın"],
+    ["A message can be at most 10000 characters", "Bir mesaj en fazla 10000 karakter olabilir"],
+    ["Ticket not found", "Talep bulunamadı"],
+    ["This ticket is closed. Open a new one", "Bu talep kapatıldı. Yeni bir talep açın"],
+    ["Too many support requests. Try again later", "Çok fazla destek talebi gönderildi. Daha sonra tekrar deneyin"],
+    ["Choose a status", "Bir durum seçin"],
+    ["Choose a priority", "Bir öncelik seçin"],
+    ["Choose a staff member", "Bir personel seçin"],
+    ["The ticket is already assigned that way", "Talep zaten bu şekilde atanmış"],
+    ["The ticket already has that status", "Talep zaten bu durumda"],
+    ["The ticket already has that priority", "Talep zaten bu öncelikte"],
     // platform admin
     ["This account is suspended. Contact support", "Bu hesap askıya alındı. Destek ekibiyle iletişime geçin"],
     ["You don't have access to this", "Buna erişiminiz yok"],
@@ -227,6 +243,16 @@ const RULES: Record<Locale, Rule[]> = {
     ["This image is too detailed. Try a simpler one", "Bu görsel çok ayrıntılı. Daha sade bir görsel deneyin"],
   ],
   lt: [
+    // support tickets
+    ["Couldn't verify you're human. Reload the page and try again", "Nepavyko patvirtinti, kad esate žmogus. Perkraukite puslapį ir bandykite dar kartą"],
+    ["Write a subject", "Įrašykite temą"],
+    ["The subject can be at most 200 characters", "Tema gali būti ne ilgesnė nei 200 simbolių"],
+    ["Choose a category", "Pasirinkite kategoriją"],
+    ["Write a message", "Parašykite žinutę"],
+    ["A message can be at most 10000 characters", "Žinutė gali būti ne ilgesnė nei 10000 simbolių"],
+    ["Ticket not found", "Užklausa nerasta"],
+    ["This ticket is closed. Open a new one", "Ši užklausa uždaryta. Pateikite naują"],
+    ["Too many support requests. Try again later", "Per daug pagalbos užklausų. Bandykite vėliau"],
     // platform admin
     ["This account is suspended. Contact support", "Ši paskyra sustabdyta. Susisiekite su pagalbos tarnyba"],
     ["You don't have access to this", "Neturite prieigos prie to"],
@@ -408,6 +434,16 @@ const RULES: Record<Locale, Rule[]> = {
     ["This image is too detailed. Try a simpler one", "Šis paveikslėlis per detalus. Pabandykite paprastesnį"],
   ],
   lv: [
+    // support tickets
+    ["Couldn't verify you're human. Reload the page and try again", "Neizdevās pārbaudīt, ka esat cilvēks. Pārlādējiet lapu un mēģiniet vēlreiz"],
+    ["Write a subject", "Ierakstiet tematu"],
+    ["The subject can be at most 200 characters", "Temats var būt ne garāks par 200 rakstzīmēm"],
+    ["Choose a category", "Izvēlieties kategoriju"],
+    ["Write a message", "Uzrakstiet ziņu"],
+    ["A message can be at most 10000 characters", "Ziņa var būt ne garāka par 10000 rakstzīmēm"],
+    ["Ticket not found", "Pieteikums nav atrasts"],
+    ["This ticket is closed. Open a new one", "Šis pieteikums ir slēgts. Izveidojiet jaunu"],
+    ["Too many support requests. Try again later", "Pārāk daudz atbalsta pieteikumu. Mēģiniet vēlāk"],
     // platform admin
     ["This account is suspended. Contact support", "Šis konts ir apturēts. Sazinieties ar atbalsta dienestu"],
     ["You don't have access to this", "Jums nav piekļuves tam"],
@@ -589,6 +625,16 @@ const RULES: Record<Locale, Rule[]> = {
     ["This image is too detailed. Try a simpler one", "Šis attēls ir pārāk detalizēts. Izmēģiniet vienkāršāku"],
   ],
   et: [
+    // support tickets
+    ["Couldn't verify you're human. Reload the page and try again", "Ei õnnestunud kinnitada, et olete inimene. Laadige leht uuesti ja proovige uuesti"],
+    ["Write a subject", "Kirjutage teema"],
+    ["The subject can be at most 200 characters", "Teema võib olla kuni 200 tähemärki"],
+    ["Choose a category", "Valige kategooria"],
+    ["Write a message", "Kirjutage sõnum"],
+    ["A message can be at most 10000 characters", "Sõnum võib olla kuni 10000 tähemärki"],
+    ["Ticket not found", "Pöördumist ei leitud"],
+    ["This ticket is closed. Open a new one", "See pöördumine on suletud. Looge uus"],
+    ["Too many support requests. Try again later", "Liiga palju tugipöördumisi. Proovige hiljem uuesti"],
     // platform admin
     ["This account is suspended. Contact support", "See konto on peatatud. Võtke ühendust toega"],
     ["You don't have access to this", "Teil pole sellele juurdepääsu"],

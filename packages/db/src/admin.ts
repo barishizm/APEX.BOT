@@ -305,7 +305,7 @@ export interface LoginFailureRow {
 export interface OverdueTicket {
   id: string
   subject: string
-  status: "open" | "pending"
+  status: "open" | "pending_user" | "in_progress"
   slaDueAt: Date
   organizationId: string | null
   organizationName: string | null
@@ -360,7 +360,7 @@ export async function platformOverview(db: Queryable, range?: unknown): Promise<
               (select coalesce(sum(t.tokens), 0)::float8 from app.token_usage t where t.day >= r.d0) as tokens,
               (select count(*)::int from app.knowledge_sources s where s.status = 'failed') as "failedSources",
               (select count(*)::int from app.waitlist) as waitlist,
-              (select count(*)::int from app.support_tickets t where t.status <> 'closed') as "openTickets"
+              (select count(*)::int from app.support_tickets t where t.status not in ('resolved', 'closed')) as "openTickets"
          from r, m`,
       [days],
     ),
@@ -423,7 +423,7 @@ export async function platformOverview(db: Queryable, range?: unknown): Promise<
       `select t.id, t.subject, t.status, t.sla_due_at as "slaDueAt", t.organization_id as "organizationId", o.name as "organizationName",
               count(*) over ()::int as total
          from app.support_tickets t left join app.organizations o on o.id = t.organization_id
-        where t.status <> 'closed' and t.sla_due_at < now()
+        where t.status not in ('resolved', 'closed') and t.sla_due_at < now()
         order by t.sla_due_at limit $1`,
       [ATTENTION_LIMIT],
     ),
