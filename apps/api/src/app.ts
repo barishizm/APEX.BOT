@@ -1,6 +1,6 @@
 // HTTP surface used by the widget. Every /v1 route resolves the tenant from the public
 // site key and rejects requests whose Origin is not on that tenant's allowlist.
-import { randomInt } from "node:crypto";
+import { createHash, randomInt, timingSafeEqual } from "node:crypto";
 import { Hono, type Context } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { streamSSE } from "hono/streaming";
@@ -37,6 +37,12 @@ export interface AppDeps {
   onWidgetSeen?: (tenant: Tenant, origin: string) => void;
   /** Extra fields for /health (no secrets: the status page shows them publicly). */
   health?: () => Record<string, unknown>;
+  /**
+   * The admin-only /health/details (/admin/system): served only to a request whose
+   * x-apex-health-token header matches `healthToken` (APEX_HEALTH_TOKEN); 404 otherwise.
+   */
+  healthDetails?: () => Record<string, unknown> | Promise<Record<string, unknown>>;
+  healthToken?: string;
 }
 
 // `siteId` is set for paused sites too; `tenant` only for sites that answer
@@ -127,6 +133,17 @@ export function createApp(deps: AppDeps) {
   app.get("/health", (c) =>
     c.json({ ok: true, uptimeSeconds: Math.round((now() - startedAt) / 1000), ...deps.health?.() }, 200, { "Cache-Control": "no-store" }),
   );
+
+  // No token configured, or the wrong one: the route doesn't exist as far as the caller can tell
+  const tokenDigest = deps.healthToken ? createHash("sha256").update(deps.healthToken).digest() : null;
+  app.get("/health/details", async (c) => {
+    const given = c.req.header("x-apex-health-token");
+    if (!tokenDigest || !deps.healthDetails || !given || !timingSafeEqual(createHash("sha256").update(given).digest(), tokenDigest)) {
+      return c.body(null, 404, { "Cache-Control": "no-store" });
+    }
+    const details = await deps.healthDetails();
+    return c.json({ ok: true, uptimeSeconds: Math.round((now() - startedAt) / 1000), ...deps.health?.(), ...details }, 200, { "Cache-Control": "no-store" });
+  });
 
   // Preflights carry no site key, so they pass for any origin some tenant allows;
   // the real request is then checked against its own tenant.
@@ -326,6 +343,7 @@ export function createApp(deps: AppDeps) {
     // The visitor sees the same reference in the widget, so either side can quote it
     const ref = ticketRef();
     await mailer.send({
+      kind: "handoff",
       to: tenant.handoffEmail,
       replyTo: address,
       subject: `${HANDOFF_SUBJECT[lang](tenant.name)} [#${ref}]`,
@@ -360,6 +378,7 @@ export function createApp(deps: AppDeps) {
     if (tenant.handoffEmail && mailLimit.ok) {
       const lang = tenant.settings.defaultLang;
       await mailer.send({
+        kind: "lead",
         to: tenant.handoffEmail,
         replyTo: address,
         subject: LEAD_SUBJECT[lang](tenant.name),

@@ -4,6 +4,7 @@
 // failure leaves lexical search in place: semantic search only ever adds to it.
 import { chunkHash, embeddingText, embedderDims, vectorFromBytes, vectorToBytes, type Embedder } from "@apex/knowledge/embed";
 import { log } from "./log.ts";
+import { maskPII } from "./pii.ts";
 import type { ChunkInput, KnowledgeBase, SemanticQuery } from "./retrieval.ts";
 
 export interface StoredVector {
@@ -63,8 +64,23 @@ export interface IndexerOptions {
  * Embeds tenants' chunks in the background, one tenant at a time (a restart re-reads stored
  * vectors and embeds nothing; a new site embeds once, then only what changed).
  */
+export interface IndexerStats {
+  model: string;
+  /** Jobs queued or running (one per knowledge load). */
+  pending: number;
+  /** The tenant being embedded now. */
+  active: string | null;
+  lastDoneAt: string | null;
+  /** The last failed job: it is retried later, lexical search serves meanwhile. */
+  lastError: { tenant: string; at: string; error: string } | null;
+}
+
 export class ChunkIndexer {
   private queue: Promise<void> = Promise.resolve();
+  private pending = 0;
+  private active: string | null = null;
+  private lastDoneAt: Date | null = null;
+  private lastError: IndexerStats["lastError"] = null;
   private readonly dims: number;
   private readonly batchSize: number;
   private readonly retryMs: number;
@@ -88,10 +104,24 @@ export class ChunkIndexer {
 
   /** Queues the tenant's chunks as loaded at `generation`; resolves (never rejects) once that job has run. */
   index(tenantId: string, generation: number, chunks: ChunkInput[]): Promise<void> {
+    this.pending++;
     this.queue = this.queue
-      .then(() => this.run(tenantId, generation, chunks))
-      .catch((error) => log("error", "knowledge embedding job crashed", { tenant: tenantId, error }));
+      .then(() => {
+        this.active = tenantId;
+        return this.run(tenantId, generation, chunks);
+      })
+      .catch((error) => log("error", "knowledge embedding job crashed", { tenant: tenantId, error }))
+      .finally(() => {
+        this.pending--;
+        this.active = null;
+        this.lastDoneAt = new Date();
+      });
     return this.queue;
+  }
+
+  /** The queue as the admin health details show it. */
+  stats(): IndexerStats {
+    return { model: this.embedder.id, pending: this.pending, active: this.active, lastDoneAt: this.lastDoneAt?.toISOString() ?? null, lastError: this.lastError };
   }
 
   private async run(tenantId: string, generation: number, chunks: ChunkInput[]): Promise<void> {
@@ -140,6 +170,11 @@ export class ChunkIndexer {
       log("info", "knowledge embedded", { tenant: tenantId, chunks: chunks.length, reused, embedded, pruned });
     } catch (error) {
       log("warn", "knowledge embedding failed; lexical search stays on", { tenant: tenantId, embedded, error });
+      this.lastError = {
+        tenant: tenantId,
+        at: new Date().toISOString(),
+        error: maskPII(error instanceof Error ? `${error.name}: ${error.message}` : String(error)).slice(0, 300),
+      };
       setTimeout(() => {
         if (this.knowledge.isCurrent(tenantId, generation)) void this.index(tenantId, generation, chunks);
       }, this.retryMs).unref();

@@ -117,6 +117,10 @@ describe("startTopicLabeler", () => {
     assert.deepEqual(calls[1].existing, ["İade", "Kargo"]);
     assert.equal(saved.length, TOPIC_BATCH + 2);
     assert.ok(saved.every((s) => s.id.startsWith(`${s.botId}-`)));
+    const status = job.status();
+    assert.equal(status.failing, false);
+    assert.equal(status.lastSaved, TOPIC_BATCH + 2);
+    assert.ok(status.lastOkAt && status.lastRunAt);
   });
 
   it("leaves the queue alone when the model is unavailable", async () => {
@@ -134,5 +138,7 @@ describe("startTopicLabeler", () => {
     await new Promise((r) => setTimeout(r, 10));
     assert.equal(await job.tick(), 0);
     assert.equal(saves, 0);
+    assert.equal(job.status().failing, true);
+    assert.equal(job.status().lastOkAt, null);
   });
 });

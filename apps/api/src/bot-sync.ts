@@ -9,6 +9,7 @@ import type { Db } from "@apex/db";
 import { listBotStates, listBotsChangedSince, listKnowledgeChunks, type BotRecord } from "@apex/db";
 import { publicWidgetSettings } from "@apex/db/bot-settings";
 import { log } from "./log.ts";
+import { maskPII } from "./pii.ts";
 import type { ChunkIndexer } from "./embeddings.ts";
 import type { KnowledgeBase } from "./retrieval.ts";
 import { tenantFromBot, type TenantRegistry } from "./tenants.ts";
@@ -18,7 +19,20 @@ export interface BotSync {
   tick(): Promise<number>;
   /** "ok" after a successful pass, "failing" after a failed one, "starting" before the first. */
   status(): "starting" | "ok" | "failing";
+  /** For the admin health details: when passes ran and how the last failure read (the error is PII-masked). */
+  details(): BotSyncDetails;
   stop(): void;
+}
+
+export interface BotSyncDetails {
+  status: "starting" | "ok" | "failing";
+  lastAttemptAt: string | null;
+  lastOkAt: string | null;
+  /** The last failed pass's error, kept until a pass succeeds. */
+  lastError: string | null;
+  /** Bots this API serves or holds paused. */
+  bots: number;
+  intervalMs: number;
 }
 
 const OVERLAP_MS = 10_000;
@@ -28,6 +42,9 @@ export function startBotSync(db: Db, tenants: TenantRegistry, knowledge: Knowled
   let since: Date | null = null;
   let inFlight: Promise<number> | null = null;
   let state: "starting" | "ok" | "failing" = "starting";
+  let lastAttemptAt: Date | null = null;
+  let lastOkAt: Date | null = null;
+  let lastError: string | null = null;
   const loaded = new Map<string, number>();
   // updatedAt of the version last applied per bot
   const applied = new Map<string, number>();
@@ -48,6 +65,7 @@ export function startBotSync(db: Db, tenants: TenantRegistry, knowledge: Knowled
   const tick = () => (inFlight ??= pass().finally(() => (inFlight = null)));
 
   const pass = async () => {
+    lastAttemptAt = new Date();
     try {
       // updated_at is the writing transaction's start time, so a slow transaction can commit
       // a row older than `since`; re-reading a short overlap catches it
@@ -112,10 +130,13 @@ export function startBotSync(db: Db, tenants: TenantRegistry, knowledge: Knowled
       since = firstFailure ? new Date(firstFailure.getTime() - 1) : newest;
       if (bots.length) log("info", "bots synced", { count: bots.length });
       state = "ok";
+      lastOkAt = new Date();
+      lastError = null;
       return bots.length;
     } catch (error) {
       if (state !== "failing") log("error", "bot sync failed", { error });
       state = "failing";
+      lastError = maskPII(error instanceof Error ? `${error.name}: ${error.message}` : String(error)).slice(0, 300);
       return 0;
     }
   };
@@ -123,5 +144,13 @@ export function startBotSync(db: Db, tenants: TenantRegistry, knowledge: Knowled
   const timer = setInterval(() => void tick(), intervalMs);
   timer.unref();
   void tick();
-  return { tick, status: () => state, stop: () => clearInterval(timer) };
+  const details = (): BotSyncDetails => ({
+    status: state,
+    lastAttemptAt: lastAttemptAt?.toISOString() ?? null,
+    lastOkAt: lastOkAt?.toISOString() ?? null,
+    lastError,
+    bots: applied.size,
+    intervalMs,
+  });
+  return { tick, status: () => state, details, stop: () => clearInterval(timer) };
 }

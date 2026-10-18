@@ -179,6 +179,20 @@ describe("ResendMailer", () => {
     await new ResendMailer("re_test", "x", down).send({ to: "a@b.example", replyTo: "c@d.example", subject: "s", text: "t" });
   });
 
+  it("passes refusals and outages to onFailure with the provider's reason", async () => {
+    const failures: unknown[] = [];
+    const refused = (async () => new Response('{"message":"Invalid `to` field"}', { status: 422 })) as unknown as typeof fetch;
+    await new ResendMailer("re_test", "x", refused, (f) => failures.push(f)).send({ kind: "handoff", to: "a@b.example", replyTo: "c@d.example", subject: "s", text: "t" });
+    const down = (async () => {
+      throw new Error("network down");
+    }) as unknown as typeof fetch;
+    await new ResendMailer("re_test", "x", down, (f) => failures.push(f)).send({ to: "a@b.example", replyTo: "c@d.example", subject: "s", text: "t" });
+    assert.deepEqual(failures, [
+      { kind: "handoff", to: "a@b.example", status: 422, error: '{"message":"Invalid `to` field"}' },
+      { kind: "other", to: "a@b.example", status: null, error: "Error: network down" },
+    ]);
+  });
+
   it("is chosen only when a key is configured", () => {
     assert.ok(mailerFromEnv({ RESEND_API_KEY: "re_x" }) instanceof ResendMailer);
     assert.ok(mailerFromEnv({}) instanceof OutboxMailer);

@@ -127,10 +127,11 @@ export async function isSignedIn() {
   }
 }
 
-// For pages behind log-in; unverified accounts finish verification first
-export async function requireVerifiedUser() {
+// For pages behind log-in; unverified accounts finish verification first. `outdatedSchema` lets a
+// page that copes with a database behind the code (/admin/system, which reports it) render anyway.
+export async function requireVerifiedUser({ outdatedSchema = false }: { outdatedSchema?: boolean } = {}) {
   // a database behind the code would fail on every dashboard query; say so instead
-  if ((await schemaMissing()).length) redirect("/database-update")
+  if (!outdatedSchema && (await schemaMissing()).length) redirect("/database-update")
   const session = await currentSession()
   if (!session) return redirectLoggedOut()
   if (!session.user.emailVerified) redirect("/verify-email")
@@ -164,8 +165,8 @@ export const ADMIN_TWO_FACTOR_NOTICE = "admin-2fa"
  * gets a plain 404 so the area doesn't advertise itself. Staff without two-step sign-in are sent
  * to settings to turn it on.
  */
-export async function requirePlatformAdmin(minRole: PlatformRole = "support"): Promise<AdminSession> {
-  await requireVerifiedUser()
+export async function requirePlatformAdmin(minRole: PlatformRole = "support", options: { outdatedSchema?: boolean } = {}): Promise<AdminSession> {
+  await requireVerifiedUser(options)
   const session = (await currentSession())!
   const role = session.user.platformRole
   if (!role || session.impersonation) notFound()
