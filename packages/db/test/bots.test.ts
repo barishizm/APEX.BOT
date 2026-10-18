@@ -18,6 +18,7 @@ import {
   rotateSiteKey,
   saveBotSettings,
   startHandoffVerification,
+  UNSAVED_BOT_ID,
 } from "../src/bots.ts"
 import { addTextSource, listSources } from "../src/knowledge.ts"
 import {
@@ -196,6 +197,17 @@ describe("bots", () => {
     assert.equal(bot.settings.handoff.email, "owner@example.com")
     // the second visit returns the same bot
     assert.equal((await getBotForUser(db, user.id)).id, bot.id)
+  })
+
+  test("read-only (viewing as the user) creates no bot, and shows the real one once there is one", async () => {
+    const user = await newUser()
+    const shown = await getBotForUser(db, user.id, { readOnly: true })
+    assert.equal(shown.id, UNSAVED_BOT_ID)
+    assert.equal(shown.settings.general.companyName, "Crest Cycles")
+    assert.equal(shown.siteKey, "")
+    assert.equal((await db.query<{ n: number }>("select count(*)::int as n from app.bots")).rows[0]!.n, 0)
+    const real = await getBotForUser(db, user.id)
+    assert.equal((await getBotForUser(db, user.id, { readOnly: true })).id, real.id)
   })
 
   test("saves validated settings and bumps the version", async () => {

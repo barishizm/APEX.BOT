@@ -1,11 +1,13 @@
 import { cache } from "react"
 import { DEFAULT_SETTINGS, getBotForUser, listBotsForUser, listSources, type Bot } from "@apex/db"
+import { isImpersonating } from "@/lib/auth"
 import { siteScope } from "@/lib/current-site"
 import { db } from "@/lib/db"
 
 // One lookup per request, shared by the shell and the page
 export const currentScope = cache((userId: string) => siteScope(userId))
-export const currentBot = cache(async (userId: string) => getBotForUser(db(), await currentScope(userId)))
+// viewing as the user creates nothing, not even the first bot (lib/impersonation.ts)
+export const currentBot = cache(async (userId: string) => getBotForUser(db(), await currentScope(userId), { readOnly: await isImpersonating() }))
 // by the resolved bot, so a stale cookie doesn't show one site's sources next to another's settings
 export const currentSources = cache(async (userId: string) => listSources(db(), { userId, botId: (await currentBot(userId)).id }))
 export const currentSites = cache((userId: string) => listBotsForUser(db(), userId))

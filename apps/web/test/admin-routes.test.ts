@@ -272,6 +272,52 @@ test("withAdminAction checks the session, step-up and JSON body before running a
   assert.deepEqual([...order].sort((a, b) => a - b), order, `${file}: guard, step-up, JSON body, then the change and its audit entry in one transaction`)
 })
 
+test("requireAdminSession refuses another site's request before anything else", () => {
+  const file = "lib/auth.ts"
+  const code = codeOnly(readFileSync(join(WEB, file), "utf8"), file)
+  const at = /\bexport\s+async\s+function\s+requireAdminSession\b/.exec(code)
+  assert.ok(at, `${file}: requireAdminSession not found`)
+  const body = bodyAfter(code, at.index + at[0].length, file)
+  const site = body.search(/\bsec-fetch-site\b|headers\(\)\)\.get\(/)
+  assert.ok(site >= 0, `${file}: requireAdminSession must check Sec-Fetch-Site`)
+  for (const later of ["requestMeta", "adminRateLimit", "requireSession"]) {
+    assert.ok(body.search(new RegExp(`\\b${later}\\s*\\(`)) > site, `${file}: check Sec-Fetch-Site before ${later}`)
+  }
+})
+
+// support may not change a workspace with staff in it (their own included): every action on a
+// workspace, a site or a source asks assertMayChangeWorkspace first, through the route's mayChange
+const WORKSPACE_SCOPED: Record<string, { kind: string; free: string[] }> = {
+  "workspaces/[id]/[action]/route.ts": { kind: "", free: ["note"] },
+  "bots/[id]/[action]/route.ts": { kind: "bot", free: ["support-access-close"] },
+  "knowledge/[id]/[action]/route.ts": { kind: "knowledge_source", free: [] },
+}
+
+test("workspace, site and source actions check for staff in the workspace first", () => {
+  for (const [file, { kind, free }] of Object.entries(WORKSPACE_SCOPED)) {
+    const src = readFileSync(join(API_ADMIN, file), "utf8")
+    const code = codeOnly(src, file)
+    assert.ok(importsFrom(src, "@apex/db").has("assertMayChangeWorkspace"), `${file}: import assertMayChangeWorkspace`)
+    const helper = /\bconst\s+mayChange\s*=([^]*?)\n\n/.exec(src)
+    assert.ok(helper && helper[1].includes("assertMayChangeWorkspace("), `${file}: mayChange must call assertMayChangeWorkspace`)
+    if (kind) assert.ok(helper[1].includes(`"${kind}"`), `${file}: mayChange must name the target kind "${kind}"`)
+    // name: withAdminAction(…) entries in the literal and ACTIONS["name"] = withAdminAction(…) after it
+    const entries = [...code.matchAll(/(?:^|\n)\s*(?:"([^"]*)"|([A-Za-z_$][\w$]*))\s*:\s*withAdminAction|ACTIONS\["([^"]*)"\]\s*=\s*withAdminAction/g)]
+    assert.ok(entries.length, `${file}: no actions found`)
+    for (const m of entries) {
+      const at = m.index + m[0].length
+      const name = src.slice(m.index, at).match(/"([^"]+)"|([A-Za-z_$][\w$]*)\s*:/)!.slice(1).find(Boolean)!
+      if (free.includes(name)) continue
+      const paren = code.indexOf("(", at - 1)
+      const call = code.slice(paren, closing(code, paren, file))
+      const arrow = /async\s*\([^)]*\)\s*=>\s*\{/.exec(call)
+      assert.ok(arrow, `${file} ${name}: handler not found`)
+      const inner = bodyAfter(call, arrow.index, file)
+      assert.ok(guardFirst(inner, "mayChange"), `${file} ${name}: await mayChange(tx, admin, params.id) first`)
+    }
+  }
+})
+
 test("adminListRoute checks the session on both the JSON and the CSV path", () => {
   const file = "lib/admin-list.ts"
   const code = codeOnly(readFileSync(join(WEB, file), "utf8"), file)

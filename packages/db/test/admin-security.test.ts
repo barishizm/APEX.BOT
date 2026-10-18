@@ -111,6 +111,18 @@ describe("blocks", () => {
     assert.throws(() => parseBlockSubject("ip", "not an ip"), adminCode("invalid_input"))
     assert.deepEqual(parseBlockSubject("ip", " 2001:db8::/48 "), { kind: "ip", value: "2001:db8::/48" })
   })
+
+  test("refuses an address or network staff signed in from in the last 30 days", async () => {
+    const help = await newUser("help@example.com", "help", "support")
+    await newUser("boss@example.com", "boss", "superadmin")
+    await login(db, { email: "boss@example.com", password: PASSWORD }, { ip: "198.51.100.20" })
+    await assert.rejects(block(help, "ip", "198.51.100.20"), adminCode("forbidden"))
+    await assert.rejects(block(help, "ip", "198.51.100.0/24"), adminCode("forbidden"))
+    await block(help, "ip", "198.51.101.0/24")
+    // long ago no longer counts
+    await db.query("update app.auth_events set created_at = now() - interval '31 days'")
+    await block(help, "ip", "198.51.100.20")
+  })
 })
 
 describe("throttle resets", () => {
