@@ -21,7 +21,14 @@ class ConceptEmbedder implements Embedder {
   async embed(texts: string[], kind: EmbedKind, signal?: AbortSignal): Promise<Float32Array[]> {
     this.calls.push({ texts, kind });
     if (this.hang) {
-      await new Promise((_, reject) => signal?.addEventListener("abort", () => reject(new Error("aborted"))));
+      // a real request holds a socket open; without that, AbortSignal.timeout's unref'd timer lets the test process exit first
+      const alive = setInterval(() => {}, 1000);
+      await new Promise((_, reject) =>
+        signal?.addEventListener("abort", () => {
+          clearInterval(alive);
+          reject(new Error("aborted"));
+        }),
+      );
     }
     if (this.fail || (this.failAfter !== null && this.calls.length > this.failAfter)) throw new Error("HTTP 429");
     return texts.map((t) => normalize(Float32Array.from(CONCEPTS.map((c) => (c.test(t) ? 1 : 0.05)))));
