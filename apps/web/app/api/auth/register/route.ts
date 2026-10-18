@@ -5,12 +5,19 @@ import { db } from "@/lib/db"
 import { authErrorResponse, readJson, requestMeta, setSessionCookie } from "@/lib/auth"
 import { requireHuman } from "@/lib/turnstile"
 import { sendAccountExistsNotice, sendVerificationCode } from "@/lib/mail"
+import { currentSignupsMode, mayCreateAccount } from "@/lib/signups"
 
 export async function POST(request: Request) {
   try {
     const b = await readJson(request)
     const meta = await requestMeta()
     await requireHuman(b.turnstileToken, meta.ip)
+    // while sign-ups aren't open, only invited addresses get in (a workspace invitation, or the waitlist when invite-only)
+    if (!(await mayCreateAccount({ email: b.email, inviteToken: b.inviteToken }))) {
+      throw (await currentSignupsMode()) === "invite_only"
+        ? new AuthError("signups_closed", "Sign-ups are invite-only for now. Join the waitlist and we'll email you an invitation")
+        : new AuthError("signups_closed", "Sign-ups are closed for now. Join the waitlist")
+    }
     const input = {
       email: b.email,
       username: b.username,

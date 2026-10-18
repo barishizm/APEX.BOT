@@ -18,6 +18,8 @@ export type Limits = {
   fileBytes: number
   title: number
   chunksPerBot: number
+  /** Off while staff have file uploads turned off for this workspace. */
+  fileUploads: boolean
 }
 /** Replies in the last 30 days that cited each source, by source id. */
 export type Usage = Record<string, number>

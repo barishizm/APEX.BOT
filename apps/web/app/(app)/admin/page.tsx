@@ -191,7 +191,7 @@ export default async function AdminOverviewPage({ searchParams }: PageProps<"/ad
         <Kpi label={o.kpi.users} value={num(k.users)} help={o.help.users} href="/admin/users" />
         <Kpi label={o.kpi.newUsers} value={num(k.newUsers)} help={o.help.newUsers} href="/admin/users?sort=created&dir=desc" />
         <Kpi label={o.kpi.unverifiedUsers} value={num(k.unverifiedUsers)} help={o.help.unverifiedUsers} href="/admin/users?status=unverified" />
-        <Kpi label={o.kpi.waitlist} value={num(k.waitlist)} help={o.help.waitlist} href="/admin/settings" />
+        <Kpi label={o.kpi.waitlist} value={num(k.waitlist)} help={o.help.waitlist} href="/admin/waitlist" />
       </KpiGroup>
 
       <KpiGroup title={o.groups.workspaces}>

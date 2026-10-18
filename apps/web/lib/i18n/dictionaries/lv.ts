@@ -119,6 +119,7 @@ export const lv: Dictionary = {
       oauth_denied: "Pieteikšanās tika atcelta. Mēģiniet vēlreiz vai izmantojiet e-pasta adresi",
       oauth_email_unverified: "Jūsu pakalpojuma sniedzējam nav apstiprinātas šī konta e-pasta adreses. Apstipriniet to tur un mēģiniet vēlreiz",
       oauth_failed: "Neizdevās pieteikties ar šo pakalpojuma sniedzēju. Mēģiniet vēlreiz vai izmantojiet e-pasta adresi",
+      oauth_signups_closed: "Jaunas reģistrācijas pagaidām nepieņemam. Pievienojieties gaidīšanas sarakstam, un mēs jums uzrakstīsim, kad atvērsimies",
       account_suspended: "Šis konts ir apturēts. Sazinieties ar atbalsta dienestu",
       generic: "Radās kļūda. Mēģiniet vēlreiz",
       network: "Neizdevās sazināties ar serveri. Pārbaudiet savienojumu un mēģiniet vēlreiz",
@@ -186,6 +187,27 @@ export const lv: Dictionary = {
       haveAccount: "Vai jums jau ir konts?",
       logIn: "Piesakieties",
     },
+    waitlist: {
+      title: "Pievienojieties gaidīšanas sarakstam",
+      subtitle: "Reģistrācija vēl nav atvērta. Atstājiet savu e-pasta adresi, un mēs jums paziņosim dienā, kad atvērsimies.",
+      email: "E-pasts",
+      emailPlaceholder: "anna@uznemums.lv",
+      submitting: "Notiek pievienošana...",
+      submit: "Pievienoties sarakstam",
+      doneTitle: "Jūs esat sarakstā",
+      doneText: "Mēs jums uzrakstīsim vienu reizi – dienā, kad atvērsim reģistrāciju.",
+      close: "Aizvērt",
+      inviteOnly: "Pagaidām reģistrēties var tikai ar ielūgumu. Atstājiet savu e-pastu, un mēs nosūtīsim ielūgumu, kad atbrīvosies vieta.",
+      doneInvite: "Mēs jums uzrakstīsim vienu reizi, kad varēsim jūs uzaicināt.",
+      haveInvite: "Saņēmāt ielūgumu?",
+      haveInviteLink: "Reģistrējieties",
+    },
+  },
+
+  // the announcement banner (admin area → Announcements) on the site and in the dashboard
+  announcement: {
+    label: "Paziņojums",
+    dismiss: "Aizvērt",
   },
 
   landing: {

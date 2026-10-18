@@ -65,6 +65,9 @@ export function DataTable<T>({
   initialQuery,
   searchPlaceholder,
   exportable = true,
+  selection,
+  actions,
+  reloadKey = 0,
 }: {
   /** The list's API route, e.g. "/api/admin/users". */
   endpoint: string
@@ -82,6 +85,12 @@ export function DataTable<T>({
   initialQuery?: TableQuery
   searchPlaceholder?: string
   exportable?: boolean
+  /** Adds a checkbox to each row; rows are identified by rowKey. The page's actions act on the selection. */
+  selection?: { selected: ReadonlySet<string>; onChange: (next: Set<string>) => void }
+  /** Buttons next to the export, e.g. for the selected rows. */
+  actions?: ReactNode
+  /** Bump to load the current page again, e.g. after an action changed rows. */
+  reloadKey?: number
 }) {
   const { t: app, locale } = useAppI18n()
   const t = app.admin!.table
@@ -142,7 +151,7 @@ export function DataTable<T>({
         if (!controller.signal.aborted) setLoading(false)
       })
     return () => controller.abort()
-  }, [endpoint, qs, reload, t.loadFailed])
+  }, [endpoint, qs, reload, reloadKey, t.loadFailed])
 
   function toggleSort(column: DataTableColumn<T>) {
     if (!column.sortKey) return
@@ -190,6 +199,23 @@ export function DataTable<T>({
   const filtered = !!query.q.trim() || Object.values(query.filters).some(Boolean)
   const rows = page?.rows ?? []
   const onFirstPage = !query.cursor
+  const span = columns.length + (selection ? 1 : 0)
+
+  // the header box selects or clears the rows on this page; rows picked on other pages stay picked
+  const pageKeys = rows.map(rowKey)
+  const pagePicked = selection ? pageKeys.filter((k) => selection.selected.has(k)).length : 0
+  const togglePage = () => {
+    if (!selection) return
+    const next = new Set(selection.selected)
+    for (const k of pageKeys) pagePicked === pageKeys.length ? next.delete(k) : next.add(k)
+    selection.onChange(next)
+  }
+  const toggleRow = (key: string) => {
+    if (!selection) return
+    const next = new Set(selection.selected)
+    if (!next.delete(key)) next.add(key)
+    selection.onChange(next)
+  }
 
   return (
     <div className="flex flex-col gap-3">
@@ -235,8 +261,10 @@ export function DataTable<T>({
           />
         ))}
 
+        {actions && <div className="ml-auto flex flex-wrap items-center gap-2">{actions}</div>}
+
         {exportable && (
-          <button type="button" onClick={exportCsv} disabled={exporting} className={`${button} ml-auto`}>
+          <button type="button" onClick={exportCsv} disabled={exporting} className={cn(button, !actions && "ml-auto")}>
             <Download className="h-4 w-4" aria-hidden />
             {exporting ? t.exporting : t.exportCsv}
           </button>
@@ -253,6 +281,21 @@ export function DataTable<T>({
         <table aria-label={label} aria-busy={loading} className="w-full border-collapse text-sm">
           <thead className="bg-[var(--color-surface)] text-left text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">
             <tr>
+              {selection && (
+                <th scope="col" className="w-10 px-4 py-2.5">
+                  <input
+                    type="checkbox"
+                    aria-label={t.selectPage}
+                    checked={!!pageKeys.length && pagePicked === pageKeys.length}
+                    ref={(el) => {
+                      if (el) el.indeterminate = pagePicked > 0 && pagePicked < pageKeys.length
+                    }}
+                    disabled={!pageKeys.length}
+                    onChange={togglePage}
+                    className="h-4 w-4 cursor-pointer accent-amber-500"
+                  />
+                </th>
+              )}
               {columns.map((c) => {
                 const active = c.sortKey === sort
                 const Arrow = active ? (dir === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown
@@ -288,6 +331,7 @@ export function DataTable<T>({
             {!page && loading &&
               Array.from({ length: 6 }, (_, i) => (
                 <tr key={i} className="border-t border-[var(--color-line)]">
+                  {selection && <td className="px-4 py-3" />}
                   {columns.map((c) => (
                     <td key={c.key} className="px-4 py-3">
                       <span className="block h-4 w-full max-w-[10rem] animate-pulse rounded bg-[var(--color-bubble)]" />
@@ -297,7 +341,21 @@ export function DataTable<T>({
               ))}
             {page &&
               rows.map((row) => (
-                <tr key={rowKey(row)} className="border-t border-[var(--color-line)] hover:bg-[var(--color-surface)]/60">
+                <tr
+                  key={rowKey(row)}
+                  className={cn("border-t border-[var(--color-line)] hover:bg-[var(--color-surface)]/60", selection?.selected.has(rowKey(row)) && "bg-amber-500/5")}
+                >
+                  {selection && (
+                    <td className="w-10 px-4 py-3 align-middle">
+                      <input
+                        type="checkbox"
+                        aria-label={t.selectRow}
+                        checked={selection.selected.has(rowKey(row))}
+                        onChange={() => toggleRow(rowKey(row))}
+                        className="h-4 w-4 cursor-pointer accent-amber-500"
+                      />
+                    </td>
+                  )}
                   {columns.map((c, i) => (
                     <td key={c.key} className={cn("px-4 py-3 align-middle", c.className)}>
                       {i === 0 && rowHref ? (
@@ -313,7 +371,7 @@ export function DataTable<T>({
               ))}
             {page && !rows.length && !error && (
               <tr className="border-t border-[var(--color-line)]">
-                <td colSpan={columns.length} className="px-4 py-12 text-center text-[var(--color-muted)]">
+                <td colSpan={span} className="px-4 py-12 text-center text-[var(--color-muted)]">
                   <p>{t.empty}</p>
                   {filtered && (
                     <button

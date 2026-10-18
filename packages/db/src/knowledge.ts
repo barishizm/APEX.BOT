@@ -1,6 +1,7 @@
 import type { Db, Queryable } from "./db.ts"
 import { canEditBot, getBotForUser, scopeUser, type BotScope } from "./bots.ts"
 import { replyIdList, resolveReplies } from "./conversations.ts"
+import { featureEnabled } from "./platform-settings.ts"
 import { botPlan, websitePageLimit, type Plan } from "./plans.ts"
 
 export const KNOWLEDGE_LIMITS = {
@@ -20,10 +21,11 @@ export const KNOWLEDGE_LIMITS = {
   concurrentSyncs: 2,
 } as const
 
-/** KNOWLEDGE_LIMITS plus the ones the workspace's plan sets. */
+/** KNOWLEDGE_LIMITS plus the ones the workspace's plan sets, and whether staff allow file uploads (the file_uploads flag). */
 export async function knowledgeLimits(db: Db, who: BotScope) {
-  const plan = await botPlan(db, (await getBotForUser(db, who)).id)
-  return { ...KNOWLEDGE_LIMITS, plan, websitePages: websitePageLimit(plan) }
+  const bot = await getBotForUser(db, who)
+  const [plan, fileUploads] = await Promise.all([botPlan(db, bot.id), featureEnabled(db, "file_uploads", bot.organizationId)])
+  return { ...KNOWLEDGE_LIMITS, plan, websitePages: websitePageLimit(plan), fileUploads }
 }
 export type KnowledgeLimits = Awaited<ReturnType<typeof knowledgeLimits>>
 
@@ -224,6 +226,8 @@ export async function addFileSource(
   input: { title: unknown; content: unknown },
   chunk: (title: string, content: string) => ChunkRecord[],
 ): Promise<KnowledgeSource> {
+  const bot = await getBotForUser(db, who)
+  if (!(await featureEnabled(db, "file_uploads", bot.organizationId))) throw new KnowledgeError("forbidden", "File uploads are turned off for now")
   return addContentSource(db, who, "file", input, chunk)
 }
 
