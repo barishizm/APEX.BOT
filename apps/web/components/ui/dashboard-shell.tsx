@@ -1,17 +1,18 @@
 "use client"
 
-import { ChartColumn, BookOpen, CircleHelp, Globe, LayoutDashboard, ListChecks, MessageSquareText, Palette, Search, Settings, Users, type LucideIcon } from "lucide-react"
+import { ChartColumn, BookOpen, Globe, LayoutDashboard, ListChecks, MessageSquareText, Palette, Search, Settings, Users, type LucideIcon } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useEffect, useState, type ReactNode } from "react"
 import { useAppI18n } from "@/components/i18n/app-provider"
 import { SiteSwitcher } from "@/components/sites/site-switcher"
+import { HelpMenu } from "@/components/support/help-menu"
 import type { SitesJson } from "@/lib/bot"
 import { CommandPalette } from "./command-palette"
 import { PrismFluxLoader } from "./prism-flux-loader"
 import { ProfileMenu } from "./profile-menu"
 
-export type NavLabel = "Overview" | "Analytics" | "Knowledge" | "Conversations" | "Widget" | "Setup" | "Sites" | "Team" | "Settings"
+export type NavLabel = "Overview" | "Analytics" | "Knowledge" | "Conversations" | "Widget" | "Setup" | "Sites" | "Team" | "Settings" | "Support"
 
 const NAV: { id: NavLabel; key: "overview" | "analytics" | "knowledge" | "conversations" | "widget" | "setup" | "sites" | "team"; icon: LucideIcon; href: string }[] = [
   { id: "Overview", key: "overview", icon: LayoutDashboard, href: "/dashboard" },
@@ -26,13 +27,12 @@ const NAV: { id: NavLabel; key: "overview" | "analytics" | "knowledge" | "conver
 
 const pill = "flex h-9 items-center gap-2 rounded-full border border-[var(--color-line)] bg-[var(--color-raised)] px-3 text-sm"
 
-function RailLink({ label, active, href, external, children }: { label: string; active?: boolean; href: string; external?: boolean; children: ReactNode }) {
+function RailLink({ label, active, href, children }: { label: string; active?: boolean; href: string; children: ReactNode }) {
   return (
     <Link
       href={href}
       aria-label={label}
       aria-current={active ? "page" : undefined}
-      {...(external && { target: "_blank", rel: "noopener noreferrer" })}
       className={`group relative flex h-10 w-10 items-center justify-center rounded-lg no-underline transition-colors ${
         active
           ? "bg-[var(--color-bubble)] text-[var(--color-text)]"
@@ -107,6 +107,7 @@ export function DashboardShell({
   }, [])
 
   const complete = setup.done >= setup.total
+  const currentSite = sites.sites.find((s) => s.id === sites.currentId)
 
   return (
     <div className="flex h-dvh flex-col bg-[var(--color-surface)] text-[var(--color-text)]">
@@ -159,9 +160,7 @@ export function DashboardShell({
             <RailLink label={t.nav.settings} href="/dashboard/settings" active={active === "Settings"}>
               <Settings className="h-5 w-5" aria-hidden />
             </RailLink>
-            <RailLink label={t.nav.help} href={href("/docs")} external>
-              <CircleHelp className="h-5 w-5" aria-hidden />
-            </RailLink>
+            <HelpMenu site={currentSite ? { id: currentSite.id, name: currentSite.name } : null} active={active === "Support"} />
             <ProfileMenu name={user.name} email={user.email} platformRole={user.platformRole} />
           </div>
         </nav>

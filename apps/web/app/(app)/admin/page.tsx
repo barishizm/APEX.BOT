@@ -129,7 +129,7 @@ export default async function AdminOverviewPage({ searchParams }: PageProps<"/ad
   }
   const overdueTickets = rowsOf(a.overdueTickets, (tk) => ({
     key: tk.id,
-    href: q("/admin/support", tk.id),
+    href: `/admin/support/${tk.id}`,
     title: tk.subject,
     detail: tk.organizationName ?? o.attention.noWorkspace,
     meta: format(o.attention.dueAgo, { when: ago(tk.slaDueAt) }),

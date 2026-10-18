@@ -10,10 +10,11 @@ import { setup } from "./setup"
 import { shell } from "./shell"
 import { sites } from "./sites"
 import { studio } from "./studio"
+import { support } from "./support"
 import { team } from "./team"
 
 // The signed-in app's strings, one namespace per area. Register new namespaces here.
-const NAMESPACES = { shell, setup, overview, analytics, account, settings, inbox, knowledge, studio, sites, team }
+const NAMESPACES = { shell, setup, overview, analytics, account, settings, inbox, knowledge, studio, sites, team, support }
 
 type Namespaces = typeof NAMESPACES
 export type AdminDictionary = AdminMessages

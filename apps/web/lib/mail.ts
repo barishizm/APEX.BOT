@@ -368,3 +368,175 @@ const withSignature = (mail: { subject: string; text: string }, locale: Locale) 
 export function sendSupportAccessNotice(email: string, access: SupportAccessMail, locale: Locale) {
   return send({ to: email, ...withSignature(EMAILS[locale].supportAccess(access), locale) })
 }
+
+// --- Support tickets (/dashboard/support, /admin/support) ---
+
+export interface TicketMail {
+  /** "#1042" */
+  ref: string
+  subject: string
+  link: string
+}
+
+export interface TicketMessageMail extends TicketMail {
+  body: string
+}
+
+export interface TicketStaffMail extends TicketMessageMail {
+  /** The customer's email address. */
+  from: string
+  workspace: string
+  site: string | null
+}
+
+// Quoted message bodies are capped: the full thread is one click away
+const quote = (body: string) => {
+  const cut = body.length > 2000 ? `${body.slice(0, 2000)}…` : body
+  return cut
+    .split("\n")
+    .map((line) => `> ${line}`)
+    .join("\n")
+}
+
+const SUPPORT_EMAILS: Messages<{
+  // to the customer
+  received: (t: TicketMail) => { subject: string; text: string }
+  reply: (t: TicketMessageMail) => { subject: string; text: string }
+  // to staff
+  staffNew: (t: TicketStaffMail) => { subject: string; text: string }
+  staffReply: (t: TicketStaffMail) => { subject: string; text: string }
+  staffAssigned: (t: TicketMail) => { subject: string; text: string }
+}> = {
+  en: {
+    received: ({ ref, subject, link }) => ({
+      subject: `[${ref}] We got your request: ${subject}`,
+      text: `Thanks for writing to us. Your request ${ref} is with our support team, and we'll answer as soon as we can.\n\nFollow it and add details here:\n${link}`,
+    }),
+    reply: ({ ref, subject, body, link }) => ({
+      subject: `[${ref}] New reply: ${subject}`,
+      text: `Our support team answered your request ${ref}:\n\n${quote(body)}\n\nRead the whole conversation and reply here:\n${link}\n\nReplies to this email aren't read; answer in the dashboard instead.`,
+    }),
+    staffNew: ({ ref, subject, body, link, from, workspace, site }) => ({
+      subject: `[${ref}] New ticket: ${subject}`,
+      text: `${from} (${workspace}${site ? ` · ${site}` : ""}) opened a ticket:\n\n${quote(body)}\n\n${link}`,
+    }),
+    staffReply: ({ ref, subject, body, link, from }) => ({
+      subject: `[${ref}] Customer replied: ${subject}`,
+      text: `${from} wrote on ${ref}:\n\n${quote(body)}\n\n${link}`,
+    }),
+    staffAssigned: ({ ref, subject, link }) => ({
+      subject: `[${ref}] Assigned to you: ${subject}`,
+      text: `Ticket ${ref} was assigned to you.\n\n${link}`,
+    }),
+  },
+  tr: {
+    received: ({ ref, subject, link }) => ({
+      subject: `[${ref}] Talebinizi aldık: ${subject}`,
+      text: `Bize yazdığınız için teşekkürler. ${ref} numaralı talebiniz destek ekibimize ulaştı; en kısa sürede yanıtlayacağız.\n\nTalebinizi buradan takip edebilir ve ayrıntı ekleyebilirsiniz:\n${link}`,
+    }),
+    reply: ({ ref, subject, body, link }) => ({
+      subject: `[${ref}] Yeni yanıt: ${subject}`,
+      text: `Destek ekibimiz ${ref} numaralı talebinizi yanıtladı:\n\n${quote(body)}\n\nYazışmanın tamamını okumak ve yanıtlamak için:\n${link}\n\nBu e-postaya verilen yanıtlar okunmaz; lütfen panel üzerinden yanıtlayın.`,
+    }),
+    staffNew: ({ ref, subject, body, link, from, workspace, site }) => ({
+      subject: `[${ref}] Yeni talep: ${subject}`,
+      text: `${from} (${workspace}${site ? ` · ${site}` : ""}) bir talep açtı:\n\n${quote(body)}\n\n${link}`,
+    }),
+    staffReply: ({ ref, subject, body, link, from }) => ({
+      subject: `[${ref}] Müşteri yanıtladı: ${subject}`,
+      text: `${from}, ${ref} numaralı talebe yazdı:\n\n${quote(body)}\n\n${link}`,
+    }),
+    staffAssigned: ({ ref, subject, link }) => ({
+      subject: `[${ref}] Size atandı: ${subject}`,
+      text: `${ref} numaralı talep size atandı.\n\n${link}`,
+    }),
+  },
+  lt: {
+    received: ({ ref, subject, link }) => ({
+      subject: `[${ref}] Gavome jūsų užklausą: ${subject}`,
+      text: `Ačiū, kad parašėte. Jūsų užklausa ${ref} perduota mūsų pagalbos komandai, atsakysime kuo greičiau.\n\nSekite ją ir papildykite informaciją čia:\n${link}`,
+    }),
+    reply: ({ ref, subject, body, link }) => ({
+      subject: `[${ref}] Naujas atsakymas: ${subject}`,
+      text: `Mūsų pagalbos komanda atsakė į jūsų užklausą ${ref}:\n\n${quote(body)}\n\nVisą pokalbį perskaityti ir atsakyti galite čia:\n${link}\n\nAtsakymai į šį el. laišką neskaitomi; atsakykite valdymo skydelyje.`,
+    }),
+    staffNew: ({ ref, subject, body, link, from, workspace, site }) => ({
+      subject: `[${ref}] Nauja užklausa: ${subject}`,
+      text: `${from} (${workspace}${site ? ` · ${site}` : ""}) pateikė užklausą:\n\n${quote(body)}\n\n${link}`,
+    }),
+    staffReply: ({ ref, subject, body, link, from }) => ({
+      subject: `[${ref}] Klientas atsakė: ${subject}`,
+      text: `${from} parašė užklausoje ${ref}:\n\n${quote(body)}\n\n${link}`,
+    }),
+    staffAssigned: ({ ref, subject, link }) => ({
+      subject: `[${ref}] Priskirta jums: ${subject}`,
+      text: `Užklausa ${ref} priskirta jums.\n\n${link}`,
+    }),
+  },
+  lv: {
+    received: ({ ref, subject, link }) => ({
+      subject: `[${ref}] Mēs saņēmām jūsu pieteikumu: ${subject}`,
+      text: `Paldies, ka mums rakstījāt. Jūsu pieteikums ${ref} ir nodots mūsu atbalsta komandai, un mēs atbildēsim pēc iespējas ātrāk.\n\nSekojiet tam un papildiniet informāciju šeit:\n${link}`,
+    }),
+    reply: ({ ref, subject, body, link }) => ({
+      subject: `[${ref}] Jauna atbilde: ${subject}`,
+      text: `Mūsu atbalsta komanda atbildēja uz jūsu pieteikumu ${ref}:\n\n${quote(body)}\n\nIzlasiet visu saraksti un atbildiet šeit:\n${link}\n\nAtbildes uz šo e-pastu netiek lasītas; lūdzu, atbildiet vadības panelī.`,
+    }),
+    staffNew: ({ ref, subject, body, link, from, workspace, site }) => ({
+      subject: `[${ref}] Jauns pieteikums: ${subject}`,
+      text: `${from} (${workspace}${site ? ` · ${site}` : ""}) izveidoja pieteikumu:\n\n${quote(body)}\n\n${link}`,
+    }),
+    staffReply: ({ ref, subject, body, link, from }) => ({
+      subject: `[${ref}] Klients atbildēja: ${subject}`,
+      text: `${from} rakstīja pieteikumā ${ref}:\n\n${quote(body)}\n\n${link}`,
+    }),
+    staffAssigned: ({ ref, subject, link }) => ({
+      subject: `[${ref}] Piešķirts jums: ${subject}`,
+      text: `Pieteikums ${ref} ir piešķirts jums.\n\n${link}`,
+    }),
+  },
+  et: {
+    received: ({ ref, subject, link }) => ({
+      subject: `[${ref}] Saime teie pöördumise kätte: ${subject}`,
+      text: `Täname, et meile kirjutasite. Teie pöördumine ${ref} on meie tugimeeskonna käes ja vastame niipea kui võimalik.\n\nSaate seda jälgida ja täiendada siin:\n${link}`,
+    }),
+    reply: ({ ref, subject, body, link }) => ({
+      subject: `[${ref}] Uus vastus: ${subject}`,
+      text: `Meie tugimeeskond vastas teie pöördumisele ${ref}:\n\n${quote(body)}\n\nKogu vestluse lugemiseks ja vastamiseks avage:\n${link}\n\nSellele e-kirjale saadetud vastuseid ei loeta; vastake palun juhtpaneelil.`,
+    }),
+    staffNew: ({ ref, subject, body, link, from, workspace, site }) => ({
+      subject: `[${ref}] Uus pöördumine: ${subject}`,
+      text: `${from} (${workspace}${site ? ` · ${site}` : ""}) avas pöördumise:\n\n${quote(body)}\n\n${link}`,
+    }),
+    staffReply: ({ ref, subject, body, link, from }) => ({
+      subject: `[${ref}] Klient vastas: ${subject}`,
+      text: `${from} kirjutas pöördumisse ${ref}:\n\n${quote(body)}\n\n${link}`,
+    }),
+    staffAssigned: ({ ref, subject, link }) => ({
+      subject: `[${ref}] Teile määratud: ${subject}`,
+      text: `Pöördumine ${ref} määrati teile.\n\n${link}`,
+    }),
+  },
+}
+
+/** To the customer: their ticket arrived. */
+export function sendTicketReceived(email: string, t: TicketMail, locale: Locale) {
+  return send({ to: email, ...withSignature(SUPPORT_EMAILS[locale].received(t), locale) })
+}
+
+/** To the customer: staff answered (never for internal notes). */
+export function sendTicketReply(email: string, t: TicketMessageMail, locale: Locale) {
+  return send({ to: email, ...withSignature(SUPPORT_EMAILS[locale].reply(t), locale) })
+}
+
+export type StaffTicketNotice = "staffNew" | "staffReply"
+
+/** To staff: a new ticket, or the customer wrote on one. */
+export function sendTicketStaffNotice(email: string, notice: StaffTicketNotice, t: TicketStaffMail, locale: Locale) {
+  return send({ to: email, ...SUPPORT_EMAILS[locale][notice](t) })
+}
+
+/** To a staff member another one gave a ticket to. */
+export function sendTicketAssigned(email: string, t: TicketMail, locale: Locale) {
+  return send({ to: email, ...SUPPORT_EMAILS[locale].staffAssigned(t) })
+}
