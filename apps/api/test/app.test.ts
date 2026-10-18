@@ -192,9 +192,13 @@ describe("POST /v1/chat", () => {
 
   it("keeps the daily token count across a restart when a usage store is wired", async () => {
     const rows = new Map<string, number>();
+    const split: { input: number; output: number }[] = [];
     const tokenUsage = {
       load: async (id: string, day: string) => rows.get(`${id}:${day}`) ?? 0,
-      add: async (id: string, day: string, n: number) => void rows.set(`${id}:${day}`, (rows.get(`${id}:${day}`) ?? 0) + n),
+      add: async (id: string, day: string, u: { input: number; output: number }) => {
+        split.push(u);
+        rows.set(`${id}:${day}`, (rows.get(`${id}:${day}`) ?? 0) + u.input + u.output);
+      },
     };
     const first = setup({}, { tokenUsage });
     first.model.tokens = 2_000_000;
@@ -203,6 +207,8 @@ describe("POST /v1/chat", () => {
     const res = await chat(restarted.app, { message: "iade" });
     assert.equal(res.status, 429);
     assert.equal(((await res.json()) as { error: string }).error, "budget_exhausted");
+    // input and output reach the store separately, for the admin cost estimate
+    assert.deepEqual(split, [{ input: 2_000_000, output: 0 }]);
   });
 
   it("caps a tenant's own budget at the platform ceiling", async () => {

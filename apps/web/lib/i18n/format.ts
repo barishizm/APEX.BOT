@@ -33,3 +33,9 @@ export function plural(n: number, forms: PluralForms, locale: Locale) {
 // 0.83 -> "83%" / "%83"
 export const formatPercent = (ratio: number, locale: Locale) =>
   new Intl.NumberFormat(LOCALE_META[locale].intl, { style: "percent", maximumFractionDigits: 0 }).format(ratio)
+
+/** US dollars; amounts under a cent keep four digits so they don't read as $0.00. */
+export function formatUsd(n: number, locale: Locale) {
+  const digits = n > 0 && n < 0.01 ? 4 : 2
+  return new Intl.NumberFormat(LOCALE_META[locale].intl, { style: "currency", currency: "USD", minimumFractionDigits: digits, maximumFractionDigits: digits }).format(n)
+}

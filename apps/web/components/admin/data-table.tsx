@@ -40,7 +40,7 @@ const control =
   "h-9 rounded-lg border border-[var(--color-line)] bg-[var(--color-raised)] text-sm text-[var(--color-text)] transition-colors hover:border-[var(--color-muted)]/60 focus-visible:border-amber-500"
 const button = `${control} inline-flex cursor-pointer items-center gap-1.5 px-3 font-medium disabled:cursor-not-allowed disabled:opacity-50`
 
-async function errorMessage(res: Response, fallback: string) {
+export async function errorMessage(res: Response, fallback: string) {
   const body = (await res.json().catch(() => null)) as { message?: string } | null
   return body?.message || fallback
 }

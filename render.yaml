@@ -32,5 +32,8 @@ services:
         value: gemini:gemini-embedding-2@768
       - key: GEMINI_API_KEY
         sync: false
+      # "paid" once billing is on for that key; /admin/usage warns about the free tier's quota until then
+      - key: APEX_GEMINI_TIER
+        value: free
       - key: RESEND_API_KEY
         sync: false
