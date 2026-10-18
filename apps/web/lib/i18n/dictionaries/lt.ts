@@ -119,6 +119,7 @@ export const lt: Dictionary = {
       oauth_denied: "Prisijungimas atšauktas. Bandykite dar kartą arba naudokite el. pašto adresą",
       oauth_email_unverified: "Jūsų paslaugų teikėjas neturi patvirtinto šios paskyros el. pašto adreso. Patvirtinkite jį ten ir bandykite dar kartą",
       oauth_failed: "Nepavyko prisijungti per šį paslaugų teikėją. Bandykite dar kartą arba naudokite el. pašto adresą",
+      oauth_signups_closed: "Naujų registracijų kol kas nepriimame. Prisijunkite prie laukiančiųjų sąrašo ir parašysime, kai atsidarysime",
       account_suspended: "Ši paskyra sustabdyta. Susisiekite su pagalbos tarnyba",
       generic: "Kažkas nepavyko. Bandykite dar kartą",
       network: "Nepavyko pasiekti serverio. Patikrinkite interneto ryšį ir bandykite dar kartą",
@@ -186,6 +187,27 @@ export const lt: Dictionary = {
       haveAccount: "Jau turite paskyrą?",
       logIn: "Prisijunkite",
     },
+    waitlist: {
+      title: "Prisijunkite prie laukiančiųjų sąrašo",
+      subtitle: "Registracija dar neatidaryta. Palikite el. pašto adresą ir pranešime tą dieną, kai atsidarysime.",
+      email: "El. paštas",
+      emailPlaceholder: "ruta@imone.lt",
+      submitting: "Jungiamasi...",
+      submit: "Prisijungti prie sąrašo",
+      doneTitle: "Esate sąraše",
+      doneText: "Parašysime vieną kartą – tą dieną, kai atidarysime registraciją.",
+      close: "Uždaryti",
+      inviteOnly: "Kol kas registruotis galima tik gavus kvietimą. Palikite el. pašto adresą ir atsiųsime kvietimą, kai atsiras vietų.",
+      doneInvite: "Parašysime jums vieną kartą, kai galėsime pakviesti.",
+      haveInvite: "Gavote kvietimą?",
+      haveInviteLink: "Užsiregistruokite",
+    },
+  },
+
+  // the announcement banner (admin area → Announcements) on the site and in the dashboard
+  announcement: {
+    label: "Pranešimas",
+    dismiss: "Uždaryti",
   },
 
   landing: {

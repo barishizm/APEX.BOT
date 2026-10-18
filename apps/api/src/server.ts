@@ -9,6 +9,7 @@ import { serve } from "@hono/node-server";
 import { getConnInfo } from "@hono/node-server/conninfo";
 import type { Context } from "hono";
 import { createEmbedder } from "@apex/knowledge/embed";
+import { FEATURE_FLAGS, type FeatureFlag } from "@apex/db/flags";
 import { createApp } from "./app.ts";
 import { loadConfig } from "./config.ts";
 import { log } from "./log.ts";
@@ -66,12 +67,14 @@ for (const tenant of tenants.all()) {
 // DATABASE_URL as the web app); without one, only data/tenants.json (outside production) is served, from memory.
 let botSync: BotSync | null = null;
 let onWidgetSeen: ((tenant: Tenant, origin: string) => void) | undefined;
+let featureEnabled: ((flag: FeatureFlag, tenant: Tenant) => Promise<boolean>) | undefined;
 let tokenUsage: TokenUsageStore | undefined;
 let store = new ConversationStore();
 if (process.env.DATABASE_URL) {
   const {
     addTokenUsage,
     createDbFromEnv,
+    featureEnabled: flagOn,
     loadEmbeddings,
     missingMigrations,
     pruneEmbeddings,
@@ -141,6 +144,16 @@ if (process.env.DATABASE_URL) {
     log("info", "topic labeling on", { model: config.topicModel });
   }
 
+  // Feature flags staff set in /admin/settings, read through a 30-second cache. Should the database
+  // be unreachable, a flag keeps its default rather than failing the chat.
+  featureEnabled = (flag, tenant) =>
+    tenant.managed
+      ? flagOn(db, flag, tenant.organizationId).catch((error) => {
+          log("warn", "couldn't read feature flags; using the default", { flag, error });
+          return FEATURE_FLAGS[flag].default;
+        })
+      : Promise.resolve(FEATURE_FLAGS[flag].default);
+
   // "Live on your site" in the dashboard; at most one write per bot every few minutes
   const lastWrite = new Map<string, number>();
   onWidgetSeen = (tenant, origin) => {
@@ -185,6 +198,7 @@ const app = createApp({
   clientIp,
   tokenUsage,
   onWidgetSeen,
+  featureEnabled,
   health: () => ({ botSync: botSync ? botSync.status() : "off", semanticSearch: queryEmbedder ? queryEmbedder.status() : "off" }),
 });
 
