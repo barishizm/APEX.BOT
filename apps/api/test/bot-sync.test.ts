@@ -63,6 +63,11 @@ describe("bot sync", () => {
     const sync = startBotSync(db, tenants, knowledge, 3_600_000);
     await sync.tick();
     assert.equal(sync.status(), "ok");
+    const details = sync.details();
+    assert.equal(details.status, "ok");
+    assert.equal(details.lastError, null);
+    assert.ok(details.lastOkAt && details.lastAttemptAt);
+    assert.ok(details.bots >= 1);
     const tenant = tenants.findById(bot.id)!;
     assert.ok(tenant);
     assert.equal(knowledge.search(bot.id, [{ text: "iade kaç gün", weight: 1 }], 3)[0]?.chunk.title, "İade politikası");

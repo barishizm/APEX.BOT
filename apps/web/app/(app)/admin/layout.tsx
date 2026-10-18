@@ -11,7 +11,8 @@ export const metadata: Metadata = {
 }
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const admin = await requirePlatformAdmin()
+  // /admin/system must open while migrations are pending; every other page still sends staff to /database-update itself
+  const admin = await requirePlatformAdmin("support", { outdatedSchema: true })
   const { user } = admin
   return <AdminShell user={{ name: user.displayName ?? user.username, email: user.email, platformRole: user.platformRole }}>{children}</AdminShell>
 }

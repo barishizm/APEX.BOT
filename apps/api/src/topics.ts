@@ -99,13 +99,27 @@ export interface TopicQueue {
 }
 
 /** Labels the queue every `intervalMs`, one bot and one batch at a time. */
+export interface TopicLabelerStatus {
+  running: boolean;
+  failing: boolean;
+  lastRunAt: string | null;
+  lastOkAt: string | null;
+  /** Questions labeled by the last successful pass. */
+  lastSaved: number;
+  intervalMs: number;
+}
+
 export function startTopicLabeler(queue: TopicQueue, labeler: TopicLabeler, intervalMs = 120_000) {
   let running = false;
   let failing = false;
+  let lastRunAt: Date | null = null;
+  let lastOkAt: Date | null = null;
+  let lastSaved = 0;
 
   const tick = async (): Promise<number> => {
     if (running) return 0;
     running = true;
+    lastRunAt = new Date();
     let saved = 0;
     try {
       const byBot = new Map<string, UnlabeledQuestion[]>();
@@ -128,6 +142,8 @@ export function startTopicLabeler(queue: TopicQueue, labeler: TopicLabeler, inte
       }
       if (saved) log("info", "questions labeled with topics", { count: saved });
       failing = false;
+      lastOkAt = new Date();
+      lastSaved = saved;
     } catch (error) {
       // the rest stays in the queue for the next pass
       if (!failing) log("warn", "topic labeling failed", { error });
@@ -141,5 +157,13 @@ export function startTopicLabeler(queue: TopicQueue, labeler: TopicLabeler, inte
   const timer = setInterval(() => void tick(), intervalMs);
   timer.unref();
   void tick();
-  return { tick, stop: () => clearInterval(timer) };
+  const status = (): TopicLabelerStatus => ({
+    running,
+    failing,
+    lastRunAt: lastRunAt?.toISOString() ?? null,
+    lastOkAt: lastOkAt?.toISOString() ?? null,
+    lastSaved,
+    intervalMs,
+  });
+  return { tick, status, stop: () => clearInterval(timer) };
 }

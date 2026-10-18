@@ -428,3 +428,37 @@ describe("token budget override", () => {
     await readSSE(after);
   });
 });
+
+describe("GET /health/details", () => {
+  const details = () => ({ sync: { status: "ok" }, runtime: { model: "echo" } });
+
+  it("serves the details only with the right token", async () => {
+    const { app } = setup({}, { healthToken: "s3cret-token", healthDetails: details, health: () => ({ botSync: "ok" }) });
+    const ok = await app.request("/health/details", { headers: { "x-apex-health-token": "s3cret-token" } });
+    assert.equal(ok.status, 200);
+    assert.equal(ok.headers.get("cache-control"), "no-store");
+    const body = (await ok.json()) as Record<string, unknown>;
+    assert.equal(body.botSync, "ok");
+    assert.deepEqual(body.sync, { status: "ok" });
+    assert.deepEqual(body.runtime, { model: "echo" });
+
+    for (const h of [{}, { "x-apex-health-token": "wrong" }, { "x-apex-health-token": "s3cret-tokeN" }]) {
+      const res = await app.request("/health/details", { headers: h });
+      assert.equal(res.status, 404);
+      assert.equal(await res.text(), "");
+    }
+  });
+
+  it("doesn't exist when no token is configured", async () => {
+    const { app } = setup({}, { healthDetails: details });
+    assert.equal((await app.request("/health/details", { headers: { "x-apex-health-token": "" } })).status, 404);
+    assert.equal((await app.request("/health/details", { headers: { "x-apex-health-token": "undefined" } })).status, 404);
+  });
+
+  it("keeps the public /health free of the details", async () => {
+    const { app } = setup({}, { healthToken: "s3cret-token", healthDetails: details });
+    const body = (await (await app.request("/health")).json()) as Record<string, unknown>;
+    assert.equal(body.sync, undefined);
+    assert.equal(body.runtime, undefined);
+  });
+});

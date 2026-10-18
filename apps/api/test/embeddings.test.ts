@@ -55,6 +55,21 @@ describe("ChunkIndexer", () => {
     assert.equal(embedder.calls.length, 3);
   });
 
+  it("reports its queue while jobs wait", async () => {
+    const knowledge = new KnowledgeBase();
+    const indexer = new ChunkIndexer(knowledge, new ConceptEmbedder(), memoryVectorStore());
+    assert.deepEqual(indexer.stats(), { model: "test:concepts@3", pending: 0, active: null, lastDoneAt: null, lastError: null });
+    const first = indexer.index("a", knowledge.load("a", chunks), chunks);
+    void indexer.index("b", knowledge.load("b", chunks), chunks);
+    assert.equal(indexer.stats().pending, 2);
+    await first;
+    await settle();
+    const done = indexer.stats();
+    assert.equal(done.pending, 0);
+    assert.equal(done.active, null);
+    assert.ok(done.lastDoneAt);
+  });
+
   it("drops work for a load that has been replaced", async () => {
     const knowledge = new KnowledgeBase();
     const embedder = new ConceptEmbedder();
@@ -73,6 +88,10 @@ describe("ChunkIndexer", () => {
     const indexer = new ChunkIndexer(knowledge, embedder, memoryVectorStore(), { batchSize: 2, retryMs: 5 });
     await indexer.index("t", knowledge.load("t", chunks), chunks);
     assert.equal(knowledge.coverage("t").embedded, 2, "the first batch stays attached");
+    const failed = indexer.stats();
+    assert.equal(failed.pending, 0);
+    assert.equal(failed.lastError?.tenant, "t");
+    assert.match(failed.lastError!.error, /./);
     assert.equal(knowledge.search("t", [{ text: "iade", weight: 1 }], 3)[0].chunk.title, "İade");
 
     embedder.failAfter = null;

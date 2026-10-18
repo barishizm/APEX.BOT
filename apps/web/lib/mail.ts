@@ -1,6 +1,9 @@
 // Transactional email. With RESEND_API_KEY set, mail goes out through Resend; without it,
-// development prints messages to the server log and production logs an error.
+// development prints messages to the server log and production logs an error. Mail that doesn't go
+// out is also recorded, masked, in app.email_failures for /admin/system.
 
+import { recordEmailFailure } from "@apex/db"
+import { db } from "@/lib/db"
 import type { Locale } from "@/lib/i18n"
 import type { Messages } from "@/lib/i18n/app/types"
 
@@ -13,31 +16,49 @@ export interface SupportAccessMail {
 }
 
 interface Mail {
+  /** Which mail this is, for the failure log; never the subject, which can carry a code. */
+  kind: string
   to: string
   subject: string
   text: string
+}
+
+/** Records a mail that didn't go out; recordEmailFailure masks the address and the error. Never throws. */
+async function failed(mail: Mail, status: number | null, error: string) {
+  await recordEmailFailure(db(), { source: "web", kind: mail.kind, to: mail.to, status, error }).catch((err: unknown) =>
+    console.error("[mail] couldn't record the failure:", err instanceof Error ? err.message : err),
+  )
 }
 
 async function send(mail: Mail) {
   const key = process.env.RESEND_API_KEY
   if (!key) {
     if (process.env.NODE_ENV === "production") {
-      console.error(`[mail] RESEND_API_KEY is not set; "${mail.subject}" was not sent`)
+      console.error(`[mail] RESEND_API_KEY is not set; a "${mail.kind}" mail was not sent`)
+      await failed(mail, null, "RESEND_API_KEY is not set")
       return
     }
     console.log(`[mail] to ${mail.to} · ${mail.subject}\n${mail.text}`)
     return
   }
+  let reachError = ""
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
     body: JSON.stringify({ from: process.env.MAIL_FROM || "Apex Bot <no-reply@apexbot.eu>", to: [mail.to], subject: mail.subject, text: mail.text }),
     signal: AbortSignal.timeout(10_000),
   }).catch((err: unknown) => {
-    console.error("[mail] couldn't reach the email provider:", err instanceof Error ? err.message : err)
+    reachError = err instanceof Error ? `${err.name}: ${err.message}` : String(err)
+    console.error("[mail] couldn't reach the email provider:", reachError)
     return null
   })
-  if (res && !res.ok) console.error(`[mail] the email provider refused the message (${res.status})`)
+  if (!res) return failed(mail, null, reachError)
+  if (!res.ok) {
+    console.error(`[mail] the email provider refused the message (${res.status})`)
+    // Resend explains a refusal in the body ({"message": ...}); only its first bytes are kept
+    const detail = (await res.text().catch(() => "")).slice(0, 300)
+    await failed(mail, res.status, detail || `HTTP ${res.status}`)
+  }
 }
 
 // Sent in the language the person was using when they asked for it
@@ -321,52 +342,52 @@ const EMAILS: Messages<{
   },
 }
 
-function compose(to: string, locale: Locale, mail: { subject: string; text: string }) {
-  return send({ to, subject: mail.subject, text: mail.text + EMAILS[locale].footer })
+function compose(kind: string, to: string, locale: Locale, mail: { subject: string; text: string }) {
+  return send({ kind, to, subject: mail.subject, text: mail.text + EMAILS[locale].footer })
 }
 
 export function sendVerificationCode(email: string, code: string, locale: Locale) {
-  return compose(email, locale, EMAILS[locale].verification(code))
+  return compose("verification", email, locale, EMAILS[locale].verification(code))
 }
 
 export function sendPasswordResetCode(email: string, code: string, locale: Locale) {
-  return compose(email, locale, EMAILS[locale].passwordReset(code))
+  return compose("password_reset", email, locale, EMAILS[locale].passwordReset(code))
 }
 
 export function sendHandoffConfirmationCode(email: string, code: string, locale: Locale) {
-  return compose(email, locale, EMAILS[locale].handoffConfirmation(code))
+  return compose("handoff_confirmation", email, locale, EMAILS[locale].handoffConfirmation(code))
 }
 
 export function sendAccountExistsNotice(email: string, locale: Locale) {
-  return compose(email, locale, EMAILS[locale].accountExists)
+  return compose("account_exists", email, locale, EMAILS[locale].accountExists)
 }
 
 /** To the old address after the account email changed. */
 export function sendEmailChangedNotice(previous: string, next: string, locale: Locale) {
-  return send({ to: previous, ...EMAILS[locale].emailChanged(next) })
+  return send({ kind: "email_changed", to: previous, ...EMAILS[locale].emailChanged(next) })
 }
 
 export function sendInvitation(email: string, i: { workspace: string; inviter: string; link: string; locale: Locale }) {
-  return compose(email, i.locale, EMAILS[i.locale].invitation(i))
+  return compose("invitation", email, i.locale, EMAILS[i.locale].invitation(i))
 }
 
 /** A reset code staff sent from the admin area; the user picks the password, staff never see it. */
 export function sendStaffPasswordReset(email: string, code: string, locale: Locale) {
-  return send({ to: email, ...withSignature(EMAILS[locale].staffPasswordReset(code), locale) })
+  return send({ kind: "staff_password_reset", to: email, ...withSignature(EMAILS[locale].staffPasswordReset(code), locale) })
 }
 
 export type StaffNotice = "twoFactorReset" | "accountSuspended" | "accountReinstated" | "accountDeleted"
 
 /** Tells the user what platform staff did to their account. */
 export function sendStaffNotice(email: string, notice: StaffNotice, locale: Locale) {
-  return send({ to: email, ...withSignature(EMAILS[locale][notice], locale) })
+  return send({ kind: "staff_notice", to: email, ...withSignature(EMAILS[locale][notice], locale) })
 }
 
 const withSignature = (mail: { subject: string; text: string }, locale: Locale) => ({ subject: mail.subject, text: mail.text + EMAILS[locale].signature })
 
 /** Tells a workspace owner that staff opened support access to one of their sites' conversations. */
 export function sendSupportAccessNotice(email: string, access: SupportAccessMail, locale: Locale) {
-  return send({ to: email, ...withSignature(EMAILS[locale].supportAccess(access), locale) })
+  return send({ kind: "support_access", to: email, ...withSignature(EMAILS[locale].supportAccess(access), locale) })
 }
 
 // --- Support tickets (/dashboard/support, /admin/support) ---
@@ -521,24 +542,24 @@ const SUPPORT_EMAILS: Messages<{
 
 /** To the customer: their ticket arrived. */
 export function sendTicketReceived(email: string, t: TicketMail, locale: Locale) {
-  return send({ to: email, ...withSignature(SUPPORT_EMAILS[locale].received(t), locale) })
+  return send({ kind: "ticket_received", to: email, ...withSignature(SUPPORT_EMAILS[locale].received(t), locale) })
 }
 
 /** To the customer: staff answered (never for internal notes). */
 export function sendTicketReply(email: string, t: TicketMessageMail, locale: Locale) {
-  return send({ to: email, ...withSignature(SUPPORT_EMAILS[locale].reply(t), locale) })
+  return send({ kind: "ticket_reply", to: email, ...withSignature(SUPPORT_EMAILS[locale].reply(t), locale) })
 }
 
 export type StaffTicketNotice = "staffNew" | "staffReply"
 
 /** To staff: a new ticket, or the customer wrote on one. */
 export function sendTicketStaffNotice(email: string, notice: StaffTicketNotice, t: TicketStaffMail, locale: Locale) {
-  return send({ to: email, ...SUPPORT_EMAILS[locale][notice](t) })
+  return send({ kind: "ticket_staff", to: email, ...SUPPORT_EMAILS[locale][notice](t) })
 }
 
 /** To a staff member another one gave a ticket to. */
 export function sendTicketAssigned(email: string, t: TicketMail, locale: Locale) {
-  return send({ to: email, ...SUPPORT_EMAILS[locale].staffAssigned(t) })
+  return send({ kind: "ticket_assigned", to: email, ...SUPPORT_EMAILS[locale].staffAssigned(t) })
 }
 
 // To people staff invited from the waitlist (/admin/waitlist), in the language they joined in
@@ -566,5 +587,5 @@ const WAITLIST_EMAILS: Messages<(i: { email: string; link: string }) => { subjec
 }
 
 export function sendWaitlistInvite(email: string, link: string, locale: Locale) {
-  return compose(email, locale, WAITLIST_EMAILS[locale]({ email, link }))
+  return compose("waitlist_invite", email, locale, WAITLIST_EMAILS[locale]({ email, link }))
 }

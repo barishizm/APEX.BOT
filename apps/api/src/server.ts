@@ -13,7 +13,8 @@ import { FEATURE_FLAGS, type FeatureFlag } from "@apex/db/flags";
 import { createApp } from "./app.ts";
 import { loadConfig } from "./config.ts";
 import { log } from "./log.ts";
-import { mailerFromEnv } from "./mailer.ts";
+import { maskPII } from "./pii.ts";
+import { mailerFromEnv, type MailFailure } from "./mailer.ts";
 import { startBotSync, type BotSync } from "./bot-sync.ts";
 import { ChunkIndexer, QueryEmbedder, memoryVectorStore, type VectorStore } from "./embeddings.ts";
 import { ClaudeChatModel, EchoChatModel, GeminiChatModel, ModelRouter, OpenAIChatModel, type ChatModel } from "./model.ts";
@@ -27,6 +28,32 @@ import { WIDGET_CACHE_CONTROL, widgetHandler } from "./widget-bundle.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const config = loadConfig();
+const version = (JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as { version?: string }).version ?? null;
+
+// Environment variables the API reads; /health/details reports which are set, never a value
+const ENV_KEYS = [
+  "DATABASE_URL",
+  "DATABASE_SSL",
+  "DATABASE_CA_CERT",
+  "ANTHROPIC_API_KEY",
+  "OPENAI_API_KEY",
+  "OPENAI_BASE_URL",
+  "GEMINI_API_KEY",
+  "GOOGLE_API_KEY",
+  "GEMINI_BASE_URL",
+  "RESEND_API_KEY",
+  "MAIL_FROM",
+  "TRUST_PROXY",
+  "APEX_MODEL",
+  "APEX_EFFORT",
+  "APEX_FALLBACKS",
+  "APEX_PROVIDER_TIMEOUT_MS",
+  "APEX_EMBEDDINGS",
+  "APEX_GEMINI_TIER",
+  "APEX_TOPIC_MODEL",
+  "APEX_DEMO_TENANT",
+  "APEX_HEALTH_TOKEN",
+] as const;
 
 // data/tenants.json is the local demo tenant (localhost origins, large token budget). In production
 // anyone could call it with a forged Origin and spend tokens, so it is only loaded outside production
@@ -69,6 +96,11 @@ let botSync: BotSync | null = null;
 let onWidgetSeen: ((tenant: Tenant, origin: string) => void) | undefined;
 let featureEnabled: ((flag: FeatureFlag, tenant: Tenant) => Promise<boolean>) | undefined;
 let tokenUsage: TokenUsageStore | undefined;
+let indexer: ChunkIndexer | undefined;
+let topicLabeler: ReturnType<typeof startTopicLabeler> | undefined;
+let onMailFailure: ((failure: MailFailure) => void) | undefined;
+// the hourly retention sweep, for /health/details (its runs are also kept in app.job_runs)
+let lastSweep: { at: string; ok: boolean; deleted: number; error: string | null } | null = null;
 let store = new ConversationStore();
 if (process.env.DATABASE_URL) {
   const {
@@ -77,8 +109,12 @@ if (process.env.DATABASE_URL) {
     featureEnabled: flagOn,
     loadEmbeddings,
     missingMigrations,
+    finishJobRun,
     pruneEmbeddings,
+    recordEmailFailure,
     reportApiRuntime,
+    RETENTION_SWEEP_JOB,
+    startJobRun,
     saveEmbeddings,
     tokensUsedOn,
     recordWidgetSeen,
@@ -119,7 +155,8 @@ if (process.env.DATABASE_URL) {
     save: (id, model, rows) => saveEmbeddings(db, id, model, rows),
     prune: (id, model, keep) => pruneEmbeddings(db, id, model, keep),
   };
-  botSync = startBotSync(db, tenants, knowledge, undefined, indexerFor?.(vectors));
+  indexer = indexerFor?.(vectors);
+  botSync = startBotSync(db, tenants, knowledge, undefined, indexer);
   log("info", "syncing dashboard bots from the database");
 
   store = new ConversationStore({
@@ -129,15 +166,35 @@ if (process.env.DATABASE_URL) {
     persists: (tenantId) => tenants.findSite(tenantId)?.managed === true,
     onError: (error, conversation) => log("error", "couldn't save conversation", { conversation, error }),
   });
-  setInterval(() => {
-    sweepConversations(db)
-      .then((n) => n && log("info", "expired conversations deleted", { count: n }))
-      .catch((error) => log("error", "conversation sweep failed", { error }));
-  }, 3_600_000).unref();
+  // Each sweep is recorded in app.job_runs (from migration 0026 on) for /admin/system
+  const recordRuns = !missing.includes("0026_job_runs.sql");
+  const sweep = async () => {
+    const runId = recordRuns ? await startJobRun(db, RETENTION_SWEEP_JOB).catch(() => null) : null;
+    try {
+      const n = await sweepConversations(db);
+      if (n) log("info", "expired conversations deleted", { count: n });
+      lastSweep = { at: new Date().toISOString(), ok: true, deleted: n, error: null };
+      if (runId) await finishJobRun(db, runId, { ok: true, result: { deleted: n } }).catch(() => {});
+    } catch (error) {
+      log("error", "conversation sweep failed", { error });
+      const message = maskPII(error instanceof Error ? error.message : String(error)).slice(0, 300);
+      lastSweep = { at: new Date().toISOString(), ok: false, deleted: 0, error: message };
+      if (runId) await finishJobRun(db, runId, { ok: false, error: message }).catch(() => {});
+    }
+  };
+  setInterval(() => void sweep(), 3_600_000).unref();
+
+  // Mail the provider refused, for /admin/system (masked on the way in); from migration 0032 on
+  if (!missing.includes("0032_email_failures.sql")) {
+    onMailFailure = (f) =>
+      void recordEmailFailure(db, { source: "api", kind: f.kind, to: f.to, status: f.status, error: f.error }).catch((error) =>
+        log("warn", "couldn't record an email failure", { error }),
+      );
+  }
 
   // "Top topics" on the analytics page
   if (config.topicModel && !missing.includes("0015_message_topics.sql")) {
-    startTopicLabeler(
+    topicLabeler = startTopicLabeler(
       { unlabeled: (limit) => unlabeledQuestions(db, limit), vocabulary: (id) => topicVocabulary(db, id), save: (id, labels) => saveTopics(db, id, labels) },
       new ClaudeTopicLabeler(config.topicModel),
     );
@@ -193,13 +250,31 @@ const app = createApp({
   embedder: queryEmbedder,
   store,
   model: chatModel(),
-  mailer: mailerFromEnv(),
+  mailer: mailerFromEnv(process.env, (failure) => onMailFailure?.(failure)),
   limits: config.limits,
   clientIp,
   tokenUsage,
   onWidgetSeen,
   featureEnabled,
   health: () => ({ botSync: botSync ? botSync.status() : "off", semanticSearch: queryEmbedder ? queryEmbedder.status() : "off" }),
+  // /admin/system; the token is shared with the web app (APEX_HEALTH_TOKEN on both)
+  healthToken: process.env.APEX_HEALTH_TOKEN || undefined,
+  healthDetails: () => ({
+    sync: botSync?.details() ?? null,
+    indexer: indexer?.stats() ?? null,
+    topics: topicLabeler?.status() ?? null,
+    retention: lastSweep,
+    runtime: {
+      nodeEnv: process.env.NODE_ENV ?? null,
+      version,
+      // Render sets this on every deploy
+      commit: process.env.RENDER_GIT_COMMIT ?? null,
+      model: config.model,
+      embeddings: queryEmbedder ? config.embeddings : null,
+      topicModel: config.topicModel,
+      env: Object.fromEntries(ENV_KEYS.map((k) => [k, !!process.env[k]])),
+    },
+  }),
 });
 
 // The embed snippet loads the widget from here, behind Cloudflare in production.

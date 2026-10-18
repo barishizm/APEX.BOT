@@ -37,3 +37,6 @@ services:
         value: free
       - key: RESEND_API_KEY
         sync: false
+      # the same secret as on Vercel; opens /health/details to /admin/system
+      - key: APEX_HEALTH_TOKEN
+        sync: false
