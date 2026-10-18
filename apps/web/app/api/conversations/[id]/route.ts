@@ -1,5 +1,5 @@
-import { deleteConversationForUser, getConversationForUser } from "@apex/db"
-import { errorJson } from "@/lib/auth"
+import { deleteConversationForUser, getConversationForUser, maskConversation } from "@apex/db"
+import { errorJson, isImpersonating } from "@/lib/auth"
 import { botErrorResponse, requireApiUser } from "@/lib/bot"
 import { conversationJson } from "@/lib/conversations"
 import { db } from "@/lib/db"
@@ -11,7 +11,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   try {
     const user = await requireApiUser()
     const conversation = await getConversationForUser(db(), await siteScope(user.id), (await params).id)
-    return conversation ? Response.json(conversationJson(conversation)) : notFound()
+    if (!conversation) return notFound()
+    // a superadmin viewing as the user sees the visitor's details masked, with no way to show them
+    if (await isImpersonating()) return Response.json({ ...conversationJson(maskConversation(conversation)), masked: true })
+    return Response.json(conversationJson(conversation))
   } catch (err) {
     return botErrorResponse(err)
   }

@@ -1,20 +1,27 @@
 "use client"
 
 import type { AdminBotDetail } from "@apex/db"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, LockKeyhole, MessagesSquare } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState, type ReactNode } from "react"
 import { useAppI18n } from "@/components/i18n/app-provider"
+import { LOCALE_META, LOCALES, type Locale } from "@/lib/i18n/config"
 import { formatDate, formatNumber } from "@/lib/i18n/format"
 import { cn } from "@/lib/utils"
-import { button, ConfirmDialog, dangerButton, Empty, field, fill, postJson, Section, tag, When, type Jsonify } from "./detail-ui"
+import { button, ConfirmDialog, dangerButton, Empty, field, fill, postJson, primaryButton, Section, tag, When, type Jsonify } from "./detail-ui"
 
 // /admin/bots/[id]: one customer site's bot, its stored settings as they are (with what fails
 // validation), and what staff can do to it. Every action goes through POST /api/admin/bots/<id>/<action>
 // with a reason and a step-up; the page re-renders from the server after each one.
 
 export type BotDetailJson = Jsonify<AdminBotDetail>
+
+/** This staff member's open support access window on the bot (support-access.ts), if any. */
+export interface SupportAccessJson {
+  expiresAt: string
+  ticketRef: string | null
+}
 
 type Kind = "repair" | "rotate" | "disable" | "enable" | "budget" | "budgetClear" | "handoff"
 
@@ -37,7 +44,7 @@ const STATUS_TONE = {
   suspended: "bg-red-500/15 text-red-700 dark:text-red-300",
 } as const
 
-export function BotDetail({ detail }: { detail: BotDetailJson }) {
+export function BotDetail({ detail, support }: { detail: BotDetailJson; support: SupportAccessJson | null }) {
   const { t: app, locale } = useAppI18n()
   const t = app.admin!.bots.detail
   const bots = app.admin!.bots
@@ -45,6 +52,16 @@ export function BotDetail({ detail }: { detail: BotDetailJson }) {
   const { bot: b, tokens, handoff } = detail
   const [dialog, setDialog] = useState<Kind | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [supportDialog, setSupportDialog] = useState(false)
+  const [closing, setClosing] = useState(false)
+
+  async function closeSupport() {
+    setClosing(true)
+    const res = await postJson(`/api/admin/bots/${b.id}/support-access-close`, {})
+    setClosing(false)
+    setNotice(res.ok ? t.support.closedDone : res.message || app.admin!.users.detail.dialog.failed)
+    router.refresh()
+  }
 
   const settings = detail.settings as { model?: { provider?: unknown; id?: unknown }; security?: { allowedOrigins?: unknown } } | null
   const origins = Array.isArray(settings?.security?.allowedOrigins) ? (settings.security.allowedOrigins as unknown[]).filter((o): o is string => typeof o === "string") : []
@@ -176,6 +193,41 @@ export function BotDetail({ detail }: { detail: BotDetailJson }) {
         </div>
 
         <aside className="flex min-w-0 flex-col gap-6">
+          <Section title={t.sections.support}>
+            {support ? (
+              <>
+                <p className="m-0 flex flex-col gap-0.5 text-sm">
+                  <span className="font-medium text-amber-800 dark:text-amber-200">{fill(t.support.openUntil, { time: formatDate(support.expiresAt, locale, { timeStyle: "short" }) })}</span>
+                  {support.ticketRef && <span className="text-xs text-[var(--color-muted)]">{fill(t.support.ticket, { ref: support.ticketRef })}</span>}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Link href={`/admin/bots/${b.id}/conversations`} className={cn(button, primaryButton, "no-underline")}>
+                    <MessagesSquare className="h-4 w-4" aria-hidden /> {t.support.view}
+                  </Link>
+                  <button type="button" onClick={closeSupport} disabled={closing} className={button}>
+                    {t.support.close}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="m-0 flex items-start gap-2 text-sm text-[var(--color-muted)]">
+                  <LockKeyhole className="mt-0.5 h-4 w-4 shrink-0" aria-hidden /> {t.support.closed}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNotice(null)
+                    setSupportDialog(true)
+                  }}
+                  className={cn(button, "w-full justify-start")}
+                >
+                  {t.support.open}
+                </button>
+              </>
+            )}
+          </Section>
+
           <Section title={t.sections.actions}>
             <ul className="m-0 flex list-none flex-col gap-2 p-0">
               {actions.map((kind) => (
@@ -238,7 +290,52 @@ export function BotDetail({ detail }: { detail: BotDetailJson }) {
       </div>
 
       {dialog && <ActionDialog kind={dialog} detail={detail} onClose={() => setDialog(null)} onDone={() => done(dialog)} />}
+      {supportDialog && (
+        <SupportAccessDialog
+          botId={b.id}
+          onClose={() => setSupportDialog(false)}
+          onDone={() => {
+            setSupportDialog(false)
+            setNotice(t.support.opened)
+            router.refresh()
+          }}
+        />
+      )}
     </div>
+  )
+}
+
+function SupportAccessDialog({ botId, onClose, onDone }: { botId: string; onClose: () => void; onDone: () => void }) {
+  const { t: app, locale } = useAppI18n()
+  const t = app.admin!.bots.detail.support
+  const [ticket, setTicket] = useState("")
+  const [mailLocale, setMailLocale] = useState<Locale>(locale)
+  const label = "flex flex-col gap-1.5 text-sm font-medium"
+  return (
+    <ConfirmDialog
+      title={t.open}
+      text={t.dialogText}
+      stepUp={false}
+      submit={(reason) => postJson(`/api/admin/bots/${botId}/support-access`, { reason, ticket: ticket.trim() || null, locale: mailLocale })}
+      onClose={onClose}
+      onDone={onDone}
+    >
+      <label className={label}>
+        {t.ticketLabel}
+        <input value={ticket} onChange={(e) => setTicket(e.target.value)} maxLength={100} autoComplete="off" className={`${field} h-10`} />
+      </label>
+      <label className={label}>
+        {t.language}
+        <select value={mailLocale} onChange={(e) => setMailLocale(e.target.value as Locale)} className={`${field} h-10 cursor-pointer`}>
+          {LOCALES.map((l) => (
+            <option key={l} value={l}>
+              {LOCALE_META[l].name}
+            </option>
+          ))}
+        </select>
+        <span className="text-xs font-normal text-[var(--color-muted)]">{t.reasonOwners}</span>
+      </label>
+    </ConfirmDialog>
   )
 }
 

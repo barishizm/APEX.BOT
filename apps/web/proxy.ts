@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { APP_PATHS, DEFAULT_LOCALE, isLocale, LOCALE_COOKIE, localizePath, matchLocale, splitLocale, type Locale } from "@/lib/i18n/config"
+import { IMPERSONATION_COOKIE, IMPERSONATION_READ_ONLY, impersonationBlocks } from "@/lib/impersonation"
 
 const SESSION_COOKIE = "apex_session"
 const SIGNED_IN_COOKIE = "apex_signed_in"
@@ -59,6 +60,13 @@ function route(request: NextRequest, signedIn: boolean) {
 }
 
 export function proxy(request: NextRequest) {
+  // Viewing as a user is read-only: refuse every write, API or page, before any route runs
+  if (impersonationBlocks(request.method, request.nextUrl.pathname, request.cookies.has(IMPERSONATION_COOKIE))) {
+    return NextResponse.json(IMPERSONATION_READ_ONLY, { status: 403 })
+  }
+  // API routes only pass through for that check
+  if (request.nextUrl.pathname.startsWith("/api/")) return NextResponse.next()
+
   const signedIn = request.cookies.has(SESSION_COOKIE)
   const response = route(request, signedIn)
 
@@ -74,6 +82,6 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Every page; not API routes, Next internals or files such as /sitemap.xml and /icon.png
-  matcher: ["/((?!api/|_next/|.*\\..*).*)"],
+  // Every page and API route; not Next internals or files such as /sitemap.xml and /icon.png
+  matcher: ["/((?!api/|_next/|.*\\..*).*)", "/api/:path*"],
 }

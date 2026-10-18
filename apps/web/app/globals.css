@@ -1271,3 +1271,14 @@ button:not(:focus-visible) {
 ::view-transition-new(root) {
   z-index: 2;
 }
+
+/* "View as user" bar (components/impersonation-banner.tsx): the page moves down to make room for it */
+body:has([data-impersonation-bar]) {
+  padding-top: 2.5rem;
+}
+body:has([data-impersonation-bar]) .h-dvh {
+  height: calc(100dvh - 2.5rem);
+}
+body:has([data-impersonation-bar]) .min-h-screen {
+  min-height: calc(100vh - 2.5rem);
+}

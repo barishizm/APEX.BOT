@@ -1,5 +1,6 @@
 import type { Db, Queryable } from "./db.ts"
 import { BotError, canEditBot, getBotForUser, type BotScope } from "./bots.ts"
+import { maskPII } from "./pii.ts"
 
 // ---------- Written by the chat API (scoped by bot id, which it resolved from the site key) ----------
 
@@ -232,14 +233,32 @@ const FILTERS: Record<ConversationFilter, string> = {
   negative: "negative_count > 0",
 }
 
+export interface ListConversationsOptions {
+  filter?: ConversationFilter
+  before?: Date | null
+  /** Only conversations active in the last N days, the window the overview counts over. */
+  days?: number | null
+  /** Words that must all appear in the visitor's details, the start page or any message. */
+  search?: string | null
+  limit?: number
+}
+
 export async function listConversations(
   db: Db,
   who: BotScope,
-  /** days: only conversations active in the last N days, the window the overview counts over */
-  /** search: words that must all appear in the visitor's details, the start page or any message */
-  options: { filter?: ConversationFilter; before?: Date | null; days?: number | null; search?: string | null; limit?: number } = {},
+  options: ListConversationsOptions = {},
 ): Promise<{ conversations: ConversationSummary[]; hasMore: boolean }> {
   const bot = await getBotForUser(db, who)
+  return listBotConversations(db, bot.id, options)
+}
+
+/** One bot's inbox page. The caller has checked the bot is theirs to read (or staff's, see support-access.ts). */
+export async function listBotConversations(
+  db: Queryable,
+  botId: string,
+  options: ListConversationsOptions = {},
+): Promise<{ conversations: ConversationSummary[]; hasMore: boolean }> {
+  if (!UUID.test(botId)) return { conversations: [], hasMore: false }
   // own keys only: an inherited one ("constructor") would put a function's source into the SQL
   const filter = options.filter && Object.hasOwn(FILTERS, options.filter) ? FILTERS[options.filter] : FILTERS.all
   const limit = Math.min(Math.max(options.limit ?? 30, 1), 100)
@@ -268,7 +287,7 @@ export async function listConversations(
                       or exists (select 1 from app.messages m where m.conversation_id = c.id and m.bot_id = c.bot_id and m.content ilike t.pattern)))
       order by updated_at desc
       limit $3`,
-    [bot.id, options.before ?? null, limit + 1, options.days ?? null, terms],
+    [botId, options.before ?? null, limit + 1, options.days ?? null, terms],
   )
   return {
     hasMore: rows.length > limit,
@@ -380,4 +399,25 @@ export async function addTokenUsage(db: Queryable, botId: string, day: string, t
      on conflict (bot_id, day) do update set tokens = app.token_usage.tokens + excluded.tokens`,
     [botId, day, Math.max(0, Math.round(tokens))],
   )
+}
+
+// ---------- Masked copies, for staff (support access) and impersonation ----------
+
+/** What a masked visitor field reads as; the value itself never leaves the server. */
+export const MASKED = { email: "[email]", phone: "[phone]", name: "[name]" } as const
+
+const maskField = (value: string | null, token: string) => (value ? token : null)
+
+/** The list row with the visitor's details hidden and personal data in the preview masked. */
+export function maskConversationSummary(c: ConversationSummary): ConversationSummary {
+  return { ...c, preview: maskPII(c.preview), visitorEmail: maskField(c.visitorEmail, MASKED.email), visitorName: maskField(c.visitorName, MASKED.name) }
+}
+
+/** The transcript with the visitor's details hidden and personal data in every message masked. */
+export function maskConversation(c: StoredConversation): StoredConversation {
+  return {
+    ...c,
+    visitor: c.visitor && { email: MASKED.email, name: maskField(c.visitor.name, MASKED.name), phone: maskField(c.visitor.phone, MASKED.phone) },
+    messages: c.messages.map((m) => ({ ...m, content: maskPII(m.content) })),
+  }
 }

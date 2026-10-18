@@ -1,6 +1,6 @@
 "use client"
 
-import { ArrowLeft, BookPlus, CircleHelp, FileText, Languages, LifeBuoy, LoaderCircle, Mail, MessageSquareText, Monitor, Search, Smartphone, Tablet, ThumbsDown, ThumbsUp, Trash2, UserRound, X } from "lucide-react"
+import { ArrowLeft, BookPlus, CircleHelp, Eye, EyeOff, FileText, Languages, LifeBuoy, LoaderCircle, Mail, MessageSquareText, Monitor, Search, Smartphone, Tablet, ThumbsDown, ThumbsUp, Trash2, UserRound, X } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react"
@@ -73,10 +73,10 @@ function ContextLine({ context, full = false }: { context: ConversationContext; 
 const STALE_MS = 15_000
 type Cached = { at: number; promise: Promise<ConversationJson> }
 
-function fetchTranscript(cache: Map<string, Cached>, id: string, fallback: string, force = false): Promise<ConversationJson> {
+function fetchTranscript(cache: Map<string, Cached>, apiBase: string, id: string, fallback: string, force = false): Promise<ConversationJson> {
   const hit = cache.get(id)
   if (hit && !force && Date.now() - hit.at < STALE_MS) return hit.promise
-  const promise = fetch(`/api/conversations/${id}`).then(async (res) => {
+  const promise = fetch(`${apiBase}/${id}`).then(async (res) => {
     const body = await res.json().catch(() => ({}))
     if (!res.ok) throw new Error(body.message ?? fallback)
     return body as ConversationJson
@@ -146,7 +146,10 @@ function Transcript({
   id,
   summary,
   cache,
+  apiBase,
   canEdit,
+  readOnly,
+  revealable,
   onDeleted,
   onBack,
 }: {
@@ -154,16 +157,23 @@ function Transcript({
   /** The list row, so the header shows before the messages arrive. */
   summary?: SummaryJson
   cache: Map<string, Cached>
+  apiBase: string
   canEdit: boolean
+  /** No reply, delete or "add an answer": support access, or viewing as a user. */
+  readOnly: boolean
+  /** Masked details can be shown (support access), an audited request of its own. */
+  revealable: boolean
   onDeleted: (id: string) => void
   onBack: () => void
 }) {
   const { t: app, locale } = useAppI18n()
   const t = app.inbox
+  const support = app.admin?.support
   const [data, setData] = useState<ConversationJson | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [confirming, setConfirming] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [revealing, setRevealing] = useState(false)
 
   useEffect(() => {
     let live = true
@@ -176,17 +186,28 @@ function Transcript({
         (err: unknown) => live && setError(err instanceof TypeError ? t.offline : err instanceof Error ? err.message : t.loadFailed),
       )
     const hit = cache.get(id)
-    void show(fetchTranscript(cache, id, t.loadFailed))
+    void show(fetchTranscript(cache, apiBase, id, t.loadFailed))
     // a stale copy is shown while a fresh one loads
     if (hit && Date.now() - hit.at >= STALE_MS) void hit.promise.then((body) => live && setData((d) => d ?? body), () => {})
     return () => {
       live = false
     }
-  }, [id, t, cache])
+  }, [id, t, cache, apiBase])
+
+  // shown for this transcript only, and never cached: switching away masks it again
+  const reveal = async () => {
+    setRevealing(true)
+    setError(null)
+    const res = await fetch(`${apiBase}/${id}/reveal`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }).catch(() => null)
+    setRevealing(false)
+    const body = await res?.json().catch(() => null)
+    if (res?.ok) setData(body as ConversationJson)
+    else setError(body?.message ?? t.loadFailed)
+  }
 
   const remove = async () => {
     setDeleting(true)
-    const res = await fetch(`/api/conversations/${id}`, { method: "DELETE" }).catch(() => null)
+    const res = await fetch(`${apiBase}/${id}`, { method: "DELETE" }).catch(() => null)
     setDeleting(false)
     if (res && (res.ok || res.status === 404)) onDeleted(id)
     else setError(t.deleteFailed)
@@ -217,7 +238,23 @@ function Transcript({
           </p>
           {(data ?? summary) && <ContextLine context={(data ?? summary)!.context} full />}
         </div>
-        {data?.visitor?.email && (
+        {revealable && data?.masked && support && (
+          <button
+            type="button"
+            onClick={reveal}
+            disabled={revealing}
+            title={support.revealHint}
+            className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md border border-amber-500/50 bg-transparent px-2.5 text-xs font-semibold text-[var(--color-text)] hover:border-amber-500 disabled:opacity-50"
+          >
+            {revealing ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <Eye className="h-3.5 w-3.5" aria-hidden />} {support.reveal}
+          </button>
+        )}
+        {revealable && data && !data.masked && support && (
+          <span className="inline-flex h-8 items-center gap-1.5 rounded-md bg-amber-500/12 px-2.5 text-xs font-semibold text-amber-800 dark:text-amber-200">
+            <EyeOff className="h-3.5 w-3.5" aria-hidden /> {support.revealed}
+          </span>
+        )}
+        {!readOnly && data?.visitor?.email && (
           <a
             href={`mailto:${data.visitor.email}?subject=${encodeURIComponent(t.replySubject)}`}
             className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[var(--color-line)] px-2.5 text-xs font-semibold text-[var(--color-text)] no-underline hover:border-[var(--color-muted)]"
@@ -226,6 +263,7 @@ function Transcript({
           </a>
         )}
         {canEdit &&
+          !readOnly &&
           data &&
           (confirming ? (
             <span className="flex items-center gap-2">
@@ -308,7 +346,7 @@ function Transcript({
                 {format(t.sentToTeam, { date: formatDate(data.handoffAt, locale, DATE_TIME) })}
               </p>
             )}
-            {data.messages.some((m) => m.unanswered) && (
+            {!readOnly && data.messages.some((m) => m.unanswered) && (
               <div className="mt-2 flex flex-col items-start gap-2 rounded-xl border border-dashed border-[var(--color-line)] p-4 text-sm">
                 <p>{t.unansweredNote}</p>
                 <Link
@@ -335,6 +373,8 @@ export function ConversationInbox({
   search = null,
   canEdit,
   open,
+  support,
+  readOnly = false,
 }: {
   initial: SummaryJson[]
   hasMore: boolean
@@ -345,6 +385,13 @@ export function ConversationInbox({
   canEdit: boolean
   /** Conversation to show first (linked from the analytics page), even if it isn't on the first page. */
   open?: string | null
+  /**
+   * Staff reading a bot's inbox under support access (/admin/bots/[id]/conversations): read-only,
+   * details masked until shown, no search, and no prefetching, since every transcript read is audited.
+   */
+  support?: { botId: string }
+  /** Viewing the app as a user: read-only, the visitor's details masked. */
+  readOnly?: boolean
 }) {
   const { t: app, locale } = useAppI18n()
   const t = app.inbox
@@ -355,14 +402,17 @@ export function ConversationInbox({
   const [selected, setSelected] = useState<string | null>(open ?? null)
   const [query, setQuery] = useState(search ?? "")
   const cache = useRef(new Map<string, Cached>()).current
-  const prefetch = (id: string) => void fetchTranscript(cache, id, t.loadFailed).catch(() => {})
+  const apiBase = support ? `/api/admin/bots/${support.botId}/conversations` : "/api/conversations"
+  const pageBase = support ? `/admin/bots/${support.botId}/conversations` : "/dashboard/conversations"
+  const href = (f: ConversationFilter, d?: number | null, q?: string | null) => conversationsHref(f, d, support ? null : q, pageBase)
+  const prefetch = (id: string) => void (!support && fetchTranscript(cache, apiBase, id, t.loadFailed).catch(() => {}))
 
   // the search runs on the server: typing updates the address after a short pause
   useEffect(() => setQuery(search ?? ""), [search])
   useEffect(() => {
     const q = query.trim()
     if (q === (search ?? "")) return
-    const timer = setTimeout(() => router.replace(conversationsHref(filter, days, q)), 300)
+    const timer = setTimeout(() => router.replace(href(filter, days, q)), 300)
     return () => clearTimeout(timer)
   }, [query, search, filter, days, router])
 
@@ -380,7 +430,7 @@ export function ConversationInbox({
     const params = new URLSearchParams({ filter, before: last.updatedAt })
     if (days) params.set("days", String(days))
     if (search) params.set("q", search)
-    const res = await fetch(`/api/conversations?${params}`).catch(() => null)
+    const res = await fetch(`${apiBase}?${params}`).catch(() => null)
     setLoadingMore(false)
     if (!res?.ok) return
     const data = await res.json()
@@ -397,11 +447,11 @@ export function ConversationInbox({
           <h1 className="text-lg font-semibold">{t.title}</h1>
           <p className="truncate text-xs text-[var(--color-muted)]">{t.lede}</p>
         </div>
-        <form
+        {!support && <form
           role="search"
           onSubmit={(e) => {
             e.preventDefault()
-            router.replace(conversationsHref(filter, days, query.trim()))
+            router.replace(href(filter, days, query.trim()))
           }}
           className="relative w-full sm:w-64"
         >
@@ -420,7 +470,7 @@ export function ConversationInbox({
               type="button"
               onClick={() => {
                 setQuery("")
-                router.replace(conversationsHref(filter, days))
+                router.replace(href(filter, days))
               }}
               aria-label={t.clearSearch}
               title={t.clearSearch}
@@ -429,12 +479,12 @@ export function ConversationInbox({
               <X className="h-3.5 w-3.5" aria-hidden />
             </button>
           )}
-        </form>
+        </form>}
         <nav aria-label={t.filterLabel} className="flex gap-1 overflow-x-auto rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] p-0.5">
           {FILTERS.map((f) => (
             <Link
               key={f}
-              href={conversationsHref(f, days, search)}
+              href={href(f, days, search)}
               aria-current={filter === f ? "page" : undefined}
               className={cn(
                 "flex h-8 shrink-0 items-center rounded-md px-2.5 text-xs font-semibold no-underline transition-colors",
@@ -447,7 +497,7 @@ export function ConversationInbox({
         </nav>
         {days && (
           <Link
-            href={conversationsHref(filter, null, search)}
+            href={href(filter, null, search)}
             title={t.allTime}
             className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-[var(--color-line)] bg-[var(--color-surface)] pr-2 pl-3 text-xs font-semibold text-[var(--color-text)] no-underline transition-colors hover:border-[var(--color-muted)]"
           >
@@ -468,11 +518,11 @@ export function ConversationInbox({
             {unfiltered ? t.emptyAllText : search ? format(t.emptySearchText, { q: search }) : t.emptyFilteredText}
           </p>
           {unfiltered ? (
-            <Link href="/dashboard/widget?section=install" className="mt-2 text-sm font-semibold">
+            !readOnly && !support && <Link href="/dashboard/widget?section=install" className="mt-2 text-sm font-semibold">
               {t.install}
             </Link>
           ) : (
-            <button type="button" onClick={() => router.push("/dashboard/conversations")} className="mt-2 cursor-pointer border-0 bg-transparent text-sm font-semibold text-[var(--color-text)] underline">
+            <button type="button" onClick={() => router.push(pageBase)} className="mt-2 cursor-pointer border-0 bg-transparent text-sm font-semibold text-[var(--color-text)] underline">
               {t.showAll}
             </button>
           )}
@@ -528,7 +578,10 @@ export function ConversationInbox({
                 id={selected}
                 summary={items.find((x) => x.id === selected)}
                 cache={cache}
+                apiBase={apiBase}
                 canEdit={canEdit}
+                readOnly={readOnly || !!support}
+                revealable={!!support}
                 onBack={() => setSelected(null)}
                 onDeleted={(id) => {
                   cache.delete(id)

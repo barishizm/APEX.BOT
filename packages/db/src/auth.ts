@@ -399,6 +399,64 @@ export interface Session {
   persistent: boolean
   /** When this session last confirmed an authenticator code; see stepUpSession. */
   stepUpAt: Date | null
+  /** Set when a superadmin is viewing the app as `user`; such a session is read-only. */
+  impersonation?: Impersonation
+}
+
+export interface Impersonation {
+  id: string
+  /** The superadmin doing the viewing, and their own session (left as it is). */
+  admin: User
+  adminSessionId: string
+  reason: string
+  startedAt: Date
+  expiresAt: Date
+}
+
+/** Longest a superadmin may view the app as a customer, in one go. */
+export const IMPERSONATION_MAX_MINUTES = 30
+
+/**
+ * The customer's session as an impersonation token sees it, or null. Valid only while it hasn't
+ * ended or expired, the staff member's own session (`adminToken`) is still alive and the same one
+ * that started it, the staff member is still an unsuspended superadmin, and the customer isn't
+ * suspended either. The returned session has no step-up and carries `impersonation`.
+ */
+export async function getImpersonatedSession(db: Db, token: string | undefined | null, adminToken: string | undefined | null): Promise<Session | null> {
+  if (!token || !adminToken) return null
+  const { rows } = await db.query<
+    UserRow & { imp_id: string; reason: string; started_at: Date; imp_expires_at: Date; admin_session_id: string; admin: UserRow }
+  >(
+    `select ${USER_COLUMNS}, i.id as imp_id, i.reason, i.created_at as started_at, i.expires_at as imp_expires_at, i.admin_session_id,
+            (select to_jsonb(x) from (select ${USER_COLUMNS} from app.users u where u.id = a.id) x) as admin
+       from app.impersonation_sessions i
+       join app.sessions s on s.id = i.admin_session_id and s.user_id = i.admin_id
+       join app.users a on a.id = i.admin_id
+       join app.users u on u.id = i.target_user_id
+      where i.token_hash = $1 and s.token_hash = $2
+        and i.ended_at is null and i.expires_at > now() and s.expires_at > now()
+        and a.suspended_at is null and a.platform_role = 'superadmin' and u.suspended_at is null`,
+    [sha256(token), sha256(adminToken)],
+  )
+  const row = rows[0]
+  if (!row) return null
+  const admin = typeof row.admin === "string" ? (JSON.parse(row.admin) as UserRow) : row.admin
+  return {
+    user: toUser(row),
+    // ids of the real session: nothing is ever written against a customer's own sessions
+    sessionId: row.admin_session_id,
+    expiresAt: row.imp_expires_at,
+    persistent: false,
+    stepUpAt: null,
+    impersonation: {
+      id: row.imp_id,
+      admin: toUser({ ...admin, created_at: new Date(admin.created_at) }),
+      adminSessionId: row.admin_session_id,
+      reason: row.reason,
+      startedAt: row.started_at,
+      expiresAt: row.imp_expires_at,
+    },
+  }
 }
 
 // Resolves a cookie token to its user; null when unknown, expired or the account is suspended.

@@ -28,6 +28,26 @@ const en = {
   palette: {
     group: "Admin",
   },
+  // /admin/bots/[id]/conversations and the inbox in that mode
+  support: {
+    title: "Conversations (support access)",
+    banner: "Support access to {bot} · read-only · until {time}",
+    ticket: "ticket {ref}",
+    masked: "Visitors' details and personal data in messages are masked. Showing them is recorded.",
+    reveal: "Show contact details",
+    revealHint: "Shows the visitor's details and the messages unmasked. Recorded in the admin history.",
+    revealed: "Shown · recorded",
+    close: "Close access",
+    backToBot: "Back to the bot",
+    noAccess: "You have no open support access to this bot's conversations, or it has ended. Open it from the bot's page, with a reason.",
+  },
+  // the bar on every page while a superadmin views the app as a user
+  impersonation: {
+    banner: "You're viewing as {name} ({email}) · read-only",
+    remaining: "{n} min left",
+    exit: "Exit",
+    exiting: "Exiting…",
+  },
   overview: {
     title: "Overview",
     lede: "Platform administration. Every change you make here is recorded in the audit log with your reason.",
@@ -246,6 +266,8 @@ const en = {
         "user.platform_role": "Changed the platform role",
         "user.platform_role.bootstrap": "Made superadmin (bootstrap)",
         "user.note": "Added a note",
+        "user.impersonate.start": "Viewed the app as this user",
+        "user.impersonate.end": "Stopped viewing as this user",
       } as Record<string, string>,
       locked: {
         self: "This is your own account. Change it from your settings instead.",
@@ -263,6 +285,10 @@ const en = {
         delete: { label: "Delete account", text: "Erases the account for good, as if the user deleted it themselves." },
         grantSupport: { label: "Make support staff", text: "Gives access to the admin area with the support role. They must turn on two-step sign-in to use it." },
         revokeSupport: { label: "Remove support role", text: "Takes away access to the admin area." },
+        impersonate: {
+          label: "View as this user",
+          text: "Opens the app as {email} sees it, read-only, in a short session of its own; your own session stays as it is. Nothing can be changed while you view, and visitors' details stay masked. A red bar on every page lets you exit.",
+        },
       },
       dialog: {
         reason: "Reason",
@@ -279,6 +305,8 @@ const en = {
         transferWorkspaces: "These pass to another member:",
         transferTo: "{workspace} → {email}",
         noWorkspaceImpact: "No workspace is deleted.",
+        minutes: "For",
+        minutesOptions: { "5": "5 minutes", "15": "15 minutes", "30": "30 minutes" } as Record<string, string>,
         failed: "Couldn't do that. Try again",
       },
       done: {
@@ -453,6 +481,7 @@ const en = {
         settings: "Settings (read-only)",
         actions: "Actions",
         audit: "Admin history",
+        support: "Support access",
       },
       fields: {
         id: "ID",
@@ -506,6 +535,10 @@ const en = {
         "bot.budget_override_clear": "Ended the budget override",
         "bot.handoff_reset": "Reset the confirmed hand-off address",
         "bots.export": "Exported the bot list",
+        "bot.support_access.open": "Opened support access",
+        "bot.support_access.close": "Closed support access",
+        "bot.conversation.view": "Read a conversation",
+        "bot.conversation.reveal_pii": "Showed a visitor's details",
       } as Record<string, string>,
       actions: {
         repair: { label: "Repair settings", text: "Each field that fails validation is saved as its default. The old settings stay in the admin history." },
@@ -530,6 +563,20 @@ const en = {
         budget: "Token budget overridden.",
         budgetClear: "Budget override ended.",
         handoff: "Hand-off address reset.",
+      },
+      support: {
+        closed: "Staff can't read this bot's conversations. To help with a request, open support access: for 60 minutes you, and only you, can read them, read-only and with visitors' details masked. The workspace owners get an email.",
+        openUntil: "Open for you until {time}",
+        ticket: "Ticket {ref}",
+        view: "Read conversations",
+        open: "Open support access",
+        close: "Close access",
+        dialogText: "For 60 minutes you can read this bot's conversations, read-only, with visitors' details and personal data in messages masked. Every conversation you open is recorded. The workspace owners are emailed the reason.",
+        ticketLabel: "Support ticket number (optional)",
+        reasonOwners: "The workspace owners receive this reason by email.",
+        language: "Email language",
+        opened: "Support access is open for 60 minutes. The workspace owners were emailed.",
+        closedDone: "Support access closed.",
       },
     },
   },
@@ -660,6 +707,24 @@ const tr: AdminMessages = {
   },
   palette: {
     group: "Yönetim",
+  },
+  support: {
+    title: "Konuşmalar (destek erişimi)",
+    banner: "{bot} için destek erişimi · salt okunur · {time} saatine kadar",
+    ticket: "talep {ref}",
+    masked: "Ziyaretçi bilgileri ve mesajlardaki kişisel veriler maskelidir. Göstermek kayda geçer.",
+    reveal: "İletişim bilgilerini göster",
+    revealHint: "Ziyaretçinin bilgilerini ve mesajları maskesiz gösterir. Yönetim geçmişine kaydedilir.",
+    revealed: "Gösterildi · kaydedildi",
+    close: "Erişimi kapat",
+    backToBot: "Bota dön",
+    noAccess: "Bu botun konuşmalarına açık bir destek erişiminiz yok ya da süresi doldu. Botun sayfasından bir gerekçeyle açın.",
+  },
+  impersonation: {
+    banner: "{name} ({email}) olarak görüntülüyorsunuz · salt okunur",
+    remaining: "{n} dk kaldı",
+    exit: "Çık",
+    exiting: "Çıkılıyor…",
   },
   overview: {
     title: "Genel Bakış",
@@ -879,6 +944,8 @@ const tr: AdminMessages = {
         "user.platform_role": "Platform rolünü değiştirdi",
         "user.platform_role.bootstrap": "Superadmin yaptı (kurulum)",
         "user.note": "Not ekledi",
+        "user.impersonate.start": "Uygulamayı bu kullanıcı olarak görüntüledi",
+        "user.impersonate.end": "Bu kullanıcı olarak görüntülemeyi bitirdi",
       },
       locked: {
         self: "Bu sizin hesabınız. Değişiklikleri ayarlarınızdan yapın.",
@@ -896,6 +963,10 @@ const tr: AdminMessages = {
         delete: { label: "Hesabı sil", text: "Hesabı, kullanıcı kendisi silmiş gibi kalıcı olarak siler." },
         grantSupport: { label: "Destek personeli yap", text: "Yönetim alanına destek rolüyle erişim verir. Kullanmak için iki adımlı girişi açması gerekir." },
         revokeSupport: { label: "Destek rolünü al", text: "Yönetim alanına erişimi kaldırır." },
+        impersonate: {
+          label: "Kullanıcı olarak görüntüle",
+          text: "Uygulamayı {email} nasıl görüyorsa öyle, salt okunur ve kendine ait kısa bir oturumda açar; kendi oturumunuz olduğu gibi kalır. Görüntülerken hiçbir şey değiştirilemez, ziyaretçi bilgileri maskeli kalır. Her sayfadaki kırmızı bant ile çıkabilirsiniz.",
+        },
       },
       dialog: {
         reason: "Gerekçe",
@@ -912,6 +983,8 @@ const tr: AdminMessages = {
         transferWorkspaces: "Bunlar başka bir üyeye devredilir:",
         transferTo: "{workspace} → {email}",
         noWorkspaceImpact: "Hiçbir çalışma alanı silinmez.",
+        minutes: "Süre",
+        minutesOptions: { "5": "5 dakika", "15": "15 dakika", "30": "30 dakika" },
         failed: "Yapılamadı. Tekrar deneyin",
       },
       done: {
@@ -1086,6 +1159,7 @@ const tr: AdminMessages = {
         settings: "Ayarlar (salt okunur)",
         actions: "İşlemler",
         audit: "Yönetim geçmişi",
+        support: "Destek erişimi",
       },
       fields: {
         id: "ID",
@@ -1139,6 +1213,10 @@ const tr: AdminMessages = {
         "bot.budget_override_clear": "Bütçe geçersiz kılmasını bitirdi",
         "bot.handoff_reset": "Onaylı devir adresini sıfırladı",
         "bots.export": "Bot listesini dışa aktardı",
+        "bot.support_access.open": "Destek erişimi açtı",
+        "bot.support_access.close": "Destek erişimini kapattı",
+        "bot.conversation.view": "Bir konuşmayı okudu",
+        "bot.conversation.reveal_pii": "Bir ziyaretçinin bilgilerini gösterdi",
       } as Record<string, string>,
       actions: {
         repair: { label: "Ayarları onar", text: "Doğrulamadan geçemeyen her alan varsayılan değeriyle kaydedilir. Eski ayarlar yönetim geçmişinde kalır." },
@@ -1163,6 +1241,20 @@ const tr: AdminMessages = {
         budget: "Token bütçesi geçersiz kılındı.",
         budgetClear: "Bütçe geçersiz kılması bitti.",
         handoff: "Devir adresi sıfırlandı.",
+      },
+      support: {
+        closed: "Personel bu botun konuşmalarını okuyamaz. Bir talebe yardım etmek için destek erişimi açın: 60 dakika boyunca yalnızca siz, salt okunur ve ziyaretçi bilgileri maskeli olarak okuyabilirsiniz. Çalışma alanı sahiplerine e-posta gider.",
+        openUntil: "Sizin için {time} saatine kadar açık",
+        ticket: "Talep {ref}",
+        view: "Konuşmaları oku",
+        open: "Destek erişimi aç",
+        close: "Erişimi kapat",
+        dialogText: "60 dakika boyunca bu botun konuşmalarını salt okunur okuyabilirsiniz; ziyaretçi bilgileri ve mesajlardaki kişisel veriler maskelenir. Açtığınız her konuşma kayda geçer. Gerekçe çalışma alanı sahiplerine e-postayla gönderilir.",
+        ticketLabel: "Destek talebi numarası (isteğe bağlı)",
+        reasonOwners: "Çalışma alanı sahipleri bu gerekçeyi e-postayla alır.",
+        language: "E-posta dili",
+        opened: "Destek erişimi 60 dakikalığına açıldı. Çalışma alanı sahiplerine e-posta gönderildi.",
+        closedDone: "Destek erişimi kapatıldı.",
       },
     },
   },

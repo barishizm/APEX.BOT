@@ -1,8 +1,9 @@
 import type { Metadata } from "next"
 import { AppI18nProvider } from "@/components/i18n/app-provider"
 import { I18nProvider } from "@/components/i18n/provider"
+import { ImpersonationBanner, StaleImpersonation } from "@/components/impersonation-banner"
 import { RootDocument } from "@/components/root-document"
-import { currentSession } from "@/lib/auth"
+import { currentSession, hasImpersonationCookie } from "@/lib/auth"
 import { getAppDictionary } from "@/lib/i18n/app"
 import { getDictionary, requestLocale } from "@/lib/i18n/server"
 import { siteUrl } from "@/lib/site"
@@ -20,21 +21,32 @@ export const metadata: Metadata = {
 
 export const viewport = sharedViewport
 
-// Platform staff also get the admin area's strings; a database hiccup just leaves them out
-async function isStaff() {
+// Platform staff also get the admin area's strings, and so does a superadmin viewing the app as a
+// user (for the bar); a database hiccup just leaves them out
+async function viewer() {
   try {
-    return !!(await currentSession())?.user.platformRole
+    const session = await currentSession()
+    // a view that ended elsewhere or ran out still has its cookie, which keeps the browser read-only
+    const stale = !session?.impersonation && (await hasImpersonationCookie())
+    return { staff: !!session?.user.platformRole || !!session?.impersonation, impersonation: session?.impersonation && { session, ...session.impersonation }, stale }
   } catch {
-    return false
+    return { staff: false, impersonation: undefined, stale: false }
   }
 }
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const [locale, staff] = await Promise.all([requestLocale(), isStaff()])
+  const [locale, { staff, impersonation, stale }] = await Promise.all([requestLocale(), viewer()])
+  const viewed = impersonation?.session.user
   return (
     <RootDocument locale={locale}>
       <I18nProvider locale={locale} dict={getDictionary(locale)}>
-        <AppI18nProvider dict={getAppDictionary(locale, { admin: staff })}>{children}</AppI18nProvider>
+        <AppI18nProvider dict={getAppDictionary(locale, { admin: staff })}>
+          {viewed && impersonation && (
+            <ImpersonationBanner name={viewed.displayName ?? viewed.username} email={viewed.email} expiresAt={impersonation.expiresAt.toISOString()} />
+          )}
+          {stale && <StaleImpersonation />}
+          {children}
+        </AppI18nProvider>
       </I18nProvider>
     </RootDocument>
   )

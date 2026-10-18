@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation"
 import { isIP } from "node:net"
 import {
   AuthError,
+  getImpersonatedSession,
   getSession,
   hasRecentStepUp,
   hitRateLimit,
@@ -14,6 +15,7 @@ import {
   type Session,
 } from "@apex/db"
 import { db, schemaMissing } from "@/lib/db"
+import { IMPERSONATION_COOKIE } from "@/lib/impersonation"
 import { translateMessage } from "@/lib/i18n/messages"
 import { requestLocale } from "@/lib/i18n/server"
 
@@ -66,11 +68,49 @@ export async function sessionToken() {
   return (await cookies()).get(SESSION_COOKIE)?.value
 }
 
-// One lookup per request, shared by every server component that asks
+export async function impersonationToken() {
+  return (await cookies()).get(IMPERSONATION_COOKIE)?.value
+}
+
+/** "View as user": its own cookie, next to the staff member's session cookie, which stays as it is. */
+export async function setImpersonationCookie(token: string, expiresAt: Date) {
+  ;(await cookies()).set(IMPERSONATION_COOKIE, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    // strict: a link from another site never opens the app in someone else's name
+    sameSite: "strict",
+    path: "/",
+    expires: expiresAt,
+  })
+}
+
+export async function clearImpersonationCookie() {
+  ;(await cookies()).delete(IMPERSONATION_COOKIE)
+}
+
+// One lookup per request, shared by every server component that asks. While a superadmin views the
+// app as a user (and that view is still valid), this is the user's session, marked `impersonation`;
+// a view that ended or ran out falls back to the staff member's own session.
 export const currentSession = cache(async () => {
   const token = await sessionToken()
-  return token ? getSession(db(), token) : null
+  if (!token) return null
+  const viewAs = await impersonationToken()
+  if (viewAs) {
+    const viewed = await getImpersonatedSession(db(), viewAs, token)
+    if (viewed) return viewed
+  }
+  return getSession(db(), token)
 })
+
+/** A superadmin is viewing the app as this user: show visitors' details masked. */
+export async function isImpersonating() {
+  return !!(await currentSession())?.impersonation
+}
+
+/** Whether this browser still holds an impersonation cookie (valid or not); writes are refused while it does. */
+export async function hasImpersonationCookie() {
+  return !!(await impersonationToken())
+}
 
 // Marketing pages only switch "Log in" for "Dashboard"; a database hiccup must not break them
 export async function isSignedIn() {
@@ -123,7 +163,7 @@ export async function requirePlatformAdmin(minRole: PlatformRole = "support"): P
   await requireVerifiedUser()
   const session = (await currentSession())!
   const role = session.user.platformRole
-  if (!role) notFound()
+  if (!role || session.impersonation) notFound()
   if (!session.user.twoFactor) redirect(`/dashboard/settings?notice=${ADMIN_TWO_FACTOR_NOTICE}`)
   // staff, just not senior enough for this page
   if (!hasRole(role, minRole)) redirect("/admin")
@@ -151,6 +191,8 @@ export async function requireAdminSession(minRole: PlatformRole = "support", opt
   if (ip) await adminRateLimit(`ip:${ip}`, ADMIN_LIMITS.ip)
   const session = await requireSession()
   const { user } = session
+  // staff can't be viewed as, so this only guards the admin API against a view that is open
+  if (session.impersonation) throw new AuthError("forbidden", "You don't have access to this")
   if (!user.emailVerified || !hasRole(user.platformRole, minRole)) throw new AuthError("forbidden", "You don't have access to this")
   if (!user.twoFactor) throw new AuthError("two_factor_required", "Turn on two-step sign-in to use the admin area")
   await adminRateLimit(`user:${user.id}`, ADMIN_LIMITS.user)

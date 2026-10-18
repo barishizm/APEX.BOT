@@ -6,13 +6,20 @@ import {
   adminResetHandoffEmail,
   adminRotateBotSiteKey,
   adminSetTokenBudgetOverride,
+  closeSupportAccess,
+  openSupportAccess,
+  SUPPORT_ACCESS_MINUTES,
 } from "@apex/db"
 import { withAdminAction, type AdminActionContext } from "@/lib/admin"
 import { errorJson } from "@/lib/auth"
+import { isLocale } from "@/lib/i18n/config"
+import { requestLocale } from "@/lib/i18n/server"
+import { sendSupportAccessNotice } from "@/lib/mail"
 
 // POST /api/admin/bots/<id>/<action>, body { reason, … }. Every action is audited with its reason
-// against the bot (target "bot") and needs a recent step-up. Each one changes the bot's row, so the
-// chat API's sync applies it within one interval (30 s).
+// against the bot (target "bot"). Those that change the bot's row need a recent step-up, and the
+// chat API's sync applies them within one interval (30 s). Support access changes nothing of the
+// bot's: it lets this staff member read its conversations for an hour (support-access.ts).
 
 type Params = { id: string; action: string }
 type Ctx = AdminActionContext<Params>
@@ -55,6 +62,33 @@ const ACTIONS: Record<string, ReturnType<typeof withAdminAction<Params>>> = {
     return { targetId: params.id, before: c.before, after: c.after }
   }),
 }
+
+// Support access: body { reason, ticket?, locale? }. No step-up, as it destroys nothing; the reason,
+// the audit entry and the email to every workspace owner (in `locale`) are what guard it.
+ACTIONS["support-access"] = withAdminAction<Params>({ action: "bot.support_access.open", targetType: "bot", stepUp: false }, async ({ tx, admin, params, body, reason }: Ctx) => {
+  const opened = await openSupportAccess(tx, admin.user.id, params.id, reason, body.ticket)
+  const { grant } = opened
+  const locale = isLocale(body.locale) ? body.locale : await requestLocale()
+  const mail = { site: opened.bot.name, workspace: opened.bot.organizationName, reason, ticket: grant.ticketRef, minutes: SUPPORT_ACCESS_MINUTES }
+  return {
+    targetId: params.id,
+    before: opened.replaced ? { grantId: opened.replaced } : null,
+    // how many owners were told, not who: the audit log keeps no customer addresses
+    after: { grantId: grant.id, ticketRef: grant.ticketRef, expiresAt: grant.expiresAt.toISOString(), ownersNotified: opened.owners.length, locale },
+    result: { expiresAt: grant.expiresAt.toISOString() },
+    afterCommit: async () => {
+      await Promise.all(opened.owners.map((email) => sendSupportAccessNotice(email, mail, locale)))
+    },
+  }
+})
+
+ACTIONS["support-access-close"] = withAdminAction<Params>(
+  { action: "bot.support_access.close", targetType: "bot", stepUp: false, reason: false },
+  async ({ tx, admin, params }: Ctx) => {
+    const closed = await closeSupportAccess(tx, admin.user.id, params.id)
+    return { targetId: params.id, before: closed && { grantId: closed.id }, after: null }
+  },
+)
 
 export async function POST(request: Request, route: { params: Promise<Params> }) {
   const handler = ACTIONS[(await route.params).action]
