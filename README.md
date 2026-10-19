@@ -344,7 +344,7 @@ Sitenin tamamı İngilizce ve Türkçedir: herkese açık sayfalar, giriş/kayı
 - [ ] Ayrıntılı analitik
 - [x] İnsana devretme (e-posta formu), lead toplama
 - [x] Hesaplar, çalışma alanları, ekip davetleri, planlar ve plan bazlı limitler
-- [x] Platform yönetim paneli: kullanıcılar, çalışma alanları, botlar, bilgi kaynakları, kullanım/maliyet, güvenlik (engeller, kilit sıfırlama), destek talepleri, bekleme listesi, duyurular, özellik bayrakları, sistem durumu; rol + 2FA + step-up korumaları, değiştirilemez audit kaydı, salt okunur "kullanıcı olarak görüntüle" ([runbook](docs/admin-runbook.md))
+- [x] Platform yönetim paneli: kullanıcılar, çalışma alanları, botlar, bilgi kaynakları, konuşma metrikleri ve destek erişimi denetimi, kullanım/maliyet, güvenlik (engeller, kilit sıfırlama), destek talepleri, bekleme listesi, duyurular, özellik bayrakları, sistem durumu; rol + 2FA + step-up korumaları, değiştirilemez audit kaydı, salt okunur "kullanıcı olarak görüntüle" ([runbook](docs/admin-runbook.md))
 - [ ] Kullanım kotalarının faturalaması ve ödeme (satış için gerekli)
 - [x] KVKK araçları (silme, saklama süresi)
 
