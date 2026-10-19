@@ -37,6 +37,8 @@ Bunların unutulmaması testlerle korunur: `apps/web/test/admin-routes.test.ts`,
 
 Bir botun konuşmalarını okumak için `/admin/bots/<id>` → "Destek erişimi" bir saatlik izin açar: gerekçe zorunlu, çalışma alanı sahiplerine e-posta gider, içerik maskeli gelir; tek tek açılan her konuşma ve maskenin kaldırılması audit'e yazılır.
 
+`/admin/conversations` konuşmaların yalnızca sayılarını gösterir (hacim, yanıtlanamayan oranı, geri bildirim, aktarımlar; bot bazında ve CSV olarak), hiçbir mesajı ya da ziyaretçi bilgisini göstermez. Aynı sayfanın **Destek erişimi** bölümü son 30 günde açılan her pencereyi kimin, hangi bot için, hangi gerekçeyle açtığını ve içinde kaç konuşma okunup kaç kez iletişim bilgisinin gösterildiğini listeler.
+
 ## İlk superadmin nasıl atanır
 
 Bu yalnızca bir kez yapılır; bir superadmin varken komut başka bir hesabı superadmin yapmaz.
