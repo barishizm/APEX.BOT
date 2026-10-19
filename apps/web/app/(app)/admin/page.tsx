@@ -62,11 +62,11 @@ interface AttentionRow {
 function AttentionList({ icon: Icon, title, total, rows, more }: { icon: React.ComponentType<{ className?: string }>; title: string; total: number; rows: AttentionRow[]; more: string }) {
   if (!total) return null
   return (
-    <section className="flex flex-col gap-2 rounded-2xl border border-amber-500/40 bg-[var(--color-surface)] p-4">
+    <section className="flex flex-col gap-2 rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface)] p-4">
       <h3 className="flex items-center gap-2 text-sm font-semibold">
         <Icon className="h-4 w-4 text-amber-600 dark:text-amber-400" aria-hidden />
         {title}
-        <span className="rounded-full bg-amber-500/15 px-2 py-px text-xs font-semibold text-amber-800 tabular-nums dark:text-amber-200">{total}</span>
+        <span className="rounded-full bg-[var(--color-bubble)] px-2 py-px text-xs font-semibold tabular-nums">{total}</span>
       </h3>
       <ul className="m-0 flex list-none flex-col p-0">
         {rows.map((r) => (
@@ -143,7 +143,7 @@ export default async function AdminOverviewPage({ searchParams }: PageProps<"/ad
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">{o.title}</h1>
           <p className="mt-1 max-w-2xl text-[var(--color-muted)]">{o.lede}</p>
-          <p className="mt-3 inline-flex rounded-full bg-amber-500/15 px-2.5 py-0.5 text-xs font-semibold text-amber-800 dark:text-amber-200">
+          <p className="mt-3 inline-flex rounded-full border border-[var(--color-line)] px-2.5 py-0.5 text-xs font-medium text-[var(--color-muted)]">
             {o.signedInAs.replace("{role}", role)}
           </p>
         </div>

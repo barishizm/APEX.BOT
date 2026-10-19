@@ -36,7 +36,7 @@ const link = "font-medium text-[var(--color-text)] no-underline hover:underline"
 const TONE = {
   locked: "bg-amber-500/15 text-amber-800 dark:text-amber-200",
   blocked: "bg-red-500/15 text-red-700 dark:text-red-300",
-  staff: "bg-sky-500/15 text-sky-800 dark:text-sky-300",
+  staff: "bg-[var(--color-bubble)] text-[var(--color-text)]",
   muted: "bg-[var(--color-raised)] text-[var(--color-muted)]",
   ok: "bg-green-500/15 text-green-800 dark:text-green-300",
 } as const

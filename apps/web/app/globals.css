@@ -87,6 +87,34 @@
   color-scheme: dark;
 }
 
+/* Admin area: monochrome data series, separated by lightness only */
+.admin-mono {
+  --color-secondary: var(--color-text);
+  --chart-1: #0c0c09;
+  --chart-2: #6b6b63;
+  --chart-3: #a3a39b;
+  --chart-4: #c9c9c1;
+  --chart-5: #deded8;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .admin-mono {
+    --chart-1: #f4f4f1;
+    --chart-2: #b5b5ad;
+    --chart-3: #7c7c74;
+    --chart-4: #55554e;
+    --chart-5: #3a3a34;
+  }
+}
+
+:root[data-theme="dark"] .admin-mono {
+  --chart-1: #f4f4f1;
+  --chart-2: #b5b5ad;
+  --chart-3: #7c7c74;
+  --chart-4: #55554e;
+  --chart-5: #3a3a34;
+}
+
 /* ---------- Base ---------- */
 
 *,

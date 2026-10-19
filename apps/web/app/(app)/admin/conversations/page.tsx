@@ -132,7 +132,7 @@ function Breakdown({ title, rows, name, other, locale }: { title: string; rows: 
               </span>
             </span>
             <span className="h-1.5 overflow-hidden rounded-full bg-[var(--color-raised)]" aria-hidden>
-              <span className={cn("block h-full rounded-full", r.key === null ? "bg-[var(--color-muted)]/40" : "bg-amber-500")} style={{ width: `${(r.n / total) * 100}%` }} />
+              <span className={cn("block h-full rounded-full", r.key === null ? "bg-[var(--color-muted)]/40" : "bg-[var(--color-text)]")} style={{ width: `${(r.n / total) * 100}%` }} />
             </span>
           </li>
         ))}

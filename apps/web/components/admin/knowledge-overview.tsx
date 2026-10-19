@@ -34,7 +34,7 @@ const runState = (r: Jsonify<JobRun>): RunState =>
 const RUN_TONE: Record<RunState, string> = {
   ok: "bg-green-500/15 text-green-800 dark:text-green-300",
   failed: "bg-red-500/15 text-red-700 dark:text-red-300",
-  running: "bg-sky-500/15 text-sky-800 dark:text-sky-300",
+  running: "bg-[var(--color-bubble)] text-[var(--color-text)]",
   dead: "bg-red-500/15 text-red-700 dark:text-red-300",
 }
 

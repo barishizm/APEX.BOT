@@ -45,7 +45,7 @@ interface PageJson<T> {
 const SEARCH_DELAY_MS = 300
 
 const control =
-  "h-9 rounded-lg border border-[var(--color-line)] bg-[var(--color-raised)] text-sm text-[var(--color-text)] transition-colors hover:border-[var(--color-muted)]/60 focus-visible:border-amber-500"
+  "h-9 rounded-lg border border-[var(--color-line)] bg-[var(--color-raised)] text-sm text-[var(--color-text)] transition-colors hover:border-[var(--color-muted)]/60 focus-visible:border-[var(--color-text)]"
 const button = `${control} inline-flex cursor-pointer items-center gap-1.5 px-3 font-medium disabled:cursor-not-allowed disabled:opacity-50`
 
 export async function errorMessage(res: Response, fallback: string) {
@@ -275,7 +275,7 @@ export function DataTable<T>({
       </div>
 
       {notice && (
-        <p role="status" className="rounded-lg bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
+        <p role="status" className="rounded-lg bg-[var(--color-bubble)] px-3 py-2 text-sm text-[var(--color-text)]">
           {notice}
         </p>
       )}
@@ -295,7 +295,7 @@ export function DataTable<T>({
                     }}
                     disabled={!pageKeys.length}
                     onChange={togglePage}
-                    className="h-4 w-4 cursor-pointer accent-amber-500"
+                    className="h-4 w-4 cursor-pointer accent-[var(--color-text)]"
                   />
                 </th>
               )}
@@ -346,7 +346,7 @@ export function DataTable<T>({
               rows.map((row) => (
                 <tr
                   key={rowKey(row)}
-                  className={cn("border-t border-[var(--color-line)] hover:bg-[var(--color-surface)]/60", selection?.selected.has(rowKey(row)) && "bg-amber-500/5")}
+                  className={cn("border-t border-[var(--color-line)] hover:bg-[var(--color-surface)]/60", selection?.selected.has(rowKey(row)) && "bg-[var(--color-bubble)]/60")}
                 >
                   {selection && (
                     <td className="w-10 px-4 py-3 align-middle">
@@ -355,7 +355,7 @@ export function DataTable<T>({
                         aria-label={t.selectRow}
                         checked={selection.selected.has(rowKey(row))}
                         onChange={() => toggleRow(rowKey(row))}
-                        className="h-4 w-4 cursor-pointer accent-amber-500"
+                        className="h-4 w-4 cursor-pointer accent-[var(--color-text)]"
                       />
                     </td>
                   )}

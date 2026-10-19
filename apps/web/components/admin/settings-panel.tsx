@@ -61,7 +61,7 @@ export function SettingsPanel({ settings, defaultMode, canEdit }: { settings: Se
 
   return (
     <div className="flex flex-col gap-6">
-      {!canEdit && <p className="m-0 rounded-lg bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">{t.superadminOnly}</p>}
+      {!canEdit && <p className="m-0 rounded-lg bg-[var(--color-bubble)] px-3 py-2 text-sm text-[var(--color-muted)]">{t.superadminOnly}</p>}
 
       <Section title={t.signups.title}>
         <p className="m-0 text-sm text-[var(--color-muted)]">{t.signups.text}</p>
@@ -72,10 +72,10 @@ export function SettingsPanel({ settings, defaultMode, canEdit }: { settings: Se
               key={m}
               className={cn(
                 "flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2.5",
-                mode === m ? "border-amber-500 bg-amber-500/5" : "border-[var(--color-line)] hover:border-[var(--color-muted)]/60",
+                mode === m ? "border-[var(--color-text)] bg-[var(--color-bubble)]/50" : "border-[var(--color-line)] hover:border-[var(--color-muted)]/60",
               )}
             >
-              <input type="radio" name="signups" value={m} checked={mode === m} onChange={() => setMode(m)} className="mt-1 accent-amber-500" />
+              <input type="radio" name="signups" value={m} checked={mode === m} onChange={() => setMode(m)} className="mt-1 accent-[var(--color-text)]" />
               <span className="flex flex-col gap-0.5">
                 <span className="flex items-center gap-2 text-sm font-semibold">
                   {t.signups.modes[m].label}

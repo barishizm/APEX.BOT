@@ -37,7 +37,7 @@ export function WorkspacesTable({ initialQuery }: { initialQuery: TableQuery }) 
     {
       key: "plan",
       header: t.columns.plan,
-      cell: (w) => <span className={cn(tag, w.plan === "free" ? "bg-[var(--color-bubble)] text-[var(--color-muted)]" : "bg-amber-500/15 text-amber-800 dark:text-amber-200")}>{t.plans[w.plan]}</span>,
+      cell: (w) => <span className={cn(tag, w.plan === "free" ? "bg-[var(--color-bubble)] text-[var(--color-muted)]" : "bg-[var(--color-text)] text-[var(--color-surface)]")}>{t.plans[w.plan]}</span>,
     },
     { key: "size", header: t.columns.size, className: "whitespace-nowrap", cell: (w) => (w.size ? t.sizes[w.size] : <span className="text-[var(--color-muted)]">—</span>) },
     { key: "members", header: t.columns.members, sortKey: "members", firstDir: "desc", className: "text-right tabular-nums", cell: (w) => formatNumber(w.members, locale) },

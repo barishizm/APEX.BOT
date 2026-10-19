@@ -114,7 +114,7 @@ export function UserDetail({ detail, viewer }: { detail: UserDetailJson; viewer:
           >
             {users.statuses[status]}
           </span>
-          {p.platformRole && <span className={`${tag} bg-amber-500/15 text-amber-800 dark:text-amber-200`}>{users.roles[p.platformRole]}</span>}
+          {p.platformRole && <span className={`${tag} bg-[var(--color-bubble)] text-[var(--color-text)]`}>{users.roles[p.platformRole]}</span>}
         </div>
         <p className="m-0 break-all text-[var(--color-muted)]">{p.email}</p>
       </header>
@@ -282,7 +282,7 @@ export function UserDetail({ detail, viewer }: { detail: UserDetailJson; viewer:
             {detail.audit.length ? (
               <ol className="m-0 flex list-none flex-col gap-3 p-0 text-sm">
                 {detail.audit.map((a) => (
-                  <li key={a.id} className="flex flex-col gap-0.5 border-l-2 border-amber-500/40 pl-3">
+                  <li key={a.id} className="flex flex-col gap-0.5 border-l-2 border-[var(--color-line)] pl-3">
                     <span className="font-medium">{(t.auditActions as Record<string, string>)[a.action] ?? a.action}</span>
                     <span className="text-xs text-[var(--color-muted)]">
                       {fill(t.by, { name: a.actorName ?? t.deletedStaff })} · <When at={a.createdAt} locale={locale} />
@@ -488,7 +488,7 @@ function ActionDialog({ action, detail, onClose, onDone }: { action: ActionKey; 
 
         {spec.notify && (
           <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={notify} onChange={(e) => setNotify(e.target.checked)} className="h-4 w-4 accent-amber-500" />
+            <input type="checkbox" checked={notify} onChange={(e) => setNotify(e.target.checked)} className="h-4 w-4 accent-[var(--color-text)]" />
             {t.dialog.notify}
           </label>
         )}

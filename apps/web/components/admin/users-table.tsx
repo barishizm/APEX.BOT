@@ -37,7 +37,7 @@ export function UsersTable({ initialQuery }: { initialQuery: TableQuery }) {
       header: t.columns.role,
       cell: (u) =>
         u.platform_role ? (
-          <span className={`${tag} bg-amber-500/15 text-amber-800 dark:text-amber-200`}>{t.roles[u.platform_role]}</span>
+          <span className={`${tag} bg-[var(--color-bubble)] text-[var(--color-text)]`}>{t.roles[u.platform_role]}</span>
         ) : (
           <span className="text-[var(--color-muted)]">{t.roles.none}</span>
         ),

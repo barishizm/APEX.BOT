@@ -91,7 +91,7 @@ export function TicketDetail({ detail, adminId }: { detail: AdminTicketJson; adm
                   className={cn(
                     "flex flex-col gap-1 rounded-xl border px-4 py-3",
                     m.internal
-                      ? "border-dashed border-amber-500/50 bg-amber-500/5"
+                      ? "border-dashed border-[var(--color-muted)]/60 bg-[var(--color-bubble)]/50"
                       : m.fromStaff
                         ? "border-[var(--color-line)] bg-[var(--color-raised)] sm:ml-8"
                         : "border-transparent bg-[var(--color-bubble)] sm:mr-8",
@@ -101,7 +101,7 @@ export function TicketDetail({ detail, adminId }: { detail: AdminTicketJson; adm
                     <span className="font-semibold text-[var(--color-text)]">{m.authorName ?? t.deleted}</span>
                     {!m.fromStaff && <span>{t.customer}</span>}
                     {m.internal && (
-                      <span className="inline-flex items-center gap-1 font-medium text-amber-800 dark:text-amber-200">
+                      <span className="inline-flex items-center gap-1 font-medium text-[var(--color-muted)]">
                         <Lock className="h-3 w-3" aria-hidden /> {t.internal}
                       </span>
                     )}
@@ -372,7 +372,7 @@ function Composer({
       onSubmit={submit}
       className={cn(
         "flex flex-col gap-3 rounded-xl border bg-[var(--color-surface)] p-4 sm:p-5",
-        note ? "border-dashed border-amber-500/60" : "border-[var(--color-line)]",
+        note ? "border-dashed border-[var(--color-muted)]/60" : "border-[var(--color-line)]",
       )}
     >
       <div role="tablist" className="flex gap-1 self-start rounded-lg border border-[var(--color-line)] bg-[var(--color-raised)] p-1 text-sm">

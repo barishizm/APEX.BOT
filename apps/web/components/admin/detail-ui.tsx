@@ -15,11 +15,11 @@ export type Jsonify<T> = T extends Date ? string : T extends (infer U)[] ? Jsoni
 
 export const card = "flex flex-col gap-4 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] p-4 sm:p-5"
 export const field =
-  "rounded-lg border border-[var(--color-line)] bg-[var(--color-raised)] px-3 text-sm font-normal text-[var(--color-text)] outline-none focus:border-amber-500"
+  "rounded-lg border border-[var(--color-line)] bg-[var(--color-raised)] px-3 text-sm font-normal text-[var(--color-text)] outline-none focus:border-[var(--color-text)]"
 export const button =
   "inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-[var(--color-line)] bg-[var(--color-raised)] px-3 text-sm font-medium text-[var(--color-text)] transition-colors hover:border-[var(--color-muted)]/60 disabled:cursor-not-allowed disabled:opacity-50"
 export const dangerButton = "border-red-500/40 text-red-700 hover:border-red-500 hover:bg-red-500/5 dark:text-red-300"
-export const primaryButton = "border-amber-600 bg-amber-500 text-black hover:bg-amber-400"
+export const primaryButton = "border-[var(--color-primary)] bg-[var(--color-primary)] text-[var(--color-on-primary)] hover:opacity-85"
 export const tag = "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold"
 export const th = "whitespace-nowrap px-3 py-2 font-semibold"
 export const td = "px-3 py-2.5 align-top"
