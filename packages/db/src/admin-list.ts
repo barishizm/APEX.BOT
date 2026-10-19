@@ -7,7 +7,7 @@ import { AdminError } from "./admin.ts"
 // becomes SQL, only values bound as parameters or keys looked up in the spec.
 
 /** Postgres types a sort value or the row id can have; the cursor value is cast back to it. */
-export type ListValueType = "text" | "uuid" | "timestamptz" | "bigint" | "int" | "boolean"
+export type ListValueType = "text" | "uuid" | "timestamptz" | "bigint" | "int" | "numeric" | "boolean"
 export type SortDir = "asc" | "desc"
 
 export interface ListSpec {

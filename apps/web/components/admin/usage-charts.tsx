@@ -23,7 +23,7 @@ export interface UsageDayJson {
   cost: number
 }
 
-function useDayLabel() {
+export function useDayLabel() {
   const { locale } = useAppI18n()
   return useMemo(() => {
     const short = new Intl.DateTimeFormat(LOCALE_META[locale].intl, { day: "numeric", month: "short", timeZone: "UTC" })
