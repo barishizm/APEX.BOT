@@ -81,7 +81,7 @@ export function BotsTable({ initialQuery }: { initialQuery: TableQuery }) {
       cell: (b) => (
         <span className="flex flex-col items-end gap-0.5">
           {formatNumber(b.today_tokens, locale)}
-          {b.budget_override && <span className={`${tag} bg-amber-500/15 text-amber-800 dark:text-amber-200`}>{t.overrideTag}</span>}
+          {b.budget_override && <span className={`${tag} bg-[var(--color-bubble)] text-[var(--color-text)]`}>{t.overrideTag}</span>}
         </span>
       ),
     },

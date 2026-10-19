@@ -13,7 +13,7 @@ type SourceJson = Omit<AdminKnowledgeRow, "synced_at" | "updated_at" | "created_
 const tag = "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap"
 export const SOURCE_STATUS_TONE = {
   pending: "bg-[var(--color-raised)] text-[var(--color-muted)]",
-  syncing: "bg-sky-500/15 text-sky-800 dark:text-sky-300",
+  syncing: "bg-[var(--color-bubble)] text-[var(--color-text)]",
   stuck: "bg-amber-500/15 text-amber-800 dark:text-amber-200",
   ready: "bg-green-500/15 text-green-800 dark:text-green-300",
   failed: "bg-red-500/15 text-red-700 dark:text-red-300",

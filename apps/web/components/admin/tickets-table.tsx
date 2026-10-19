@@ -21,7 +21,7 @@ const tag = "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semi
 
 export const PRIORITY_TONE: Record<TicketPriority, string> = {
   low: "bg-[var(--color-bubble)] text-[var(--color-muted)]",
-  normal: "bg-sky-500/15 text-sky-800 dark:text-sky-200",
+  normal: "bg-[var(--color-bubble)] text-[var(--color-text)]",
   high: "bg-amber-500/15 text-amber-800 dark:text-amber-200",
   urgent: "bg-red-500/15 text-red-700 dark:text-red-300",
 }

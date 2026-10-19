@@ -51,7 +51,7 @@ function Kpi({ label, value, help, estimated }: { label: string; value: string; 
     <div className={box}>
       <span className="flex items-center gap-2 text-xs font-medium text-[var(--color-muted)]">
         {label}
-        {estimated && <span className={cn(tag, "bg-amber-500/15 px-1.5 py-px font-medium text-amber-800 dark:text-amber-200")}>{estimated}</span>}
+        {estimated && <span className={cn(tag, "bg-[var(--color-bubble)] px-1.5 py-px font-medium text-[var(--color-muted)]")}>{estimated}</span>}
       </span>
       <span className="text-2xl font-semibold tracking-tight tabular-nums">{value}</span>
       <span className="mt-auto pt-1 text-xs leading-snug text-[var(--color-muted)]">{help}</span>
@@ -229,10 +229,10 @@ export default async function AdminUsagePage({ searchParams }: PageProps<"/admin
                   <td className={cn(td, num)}>
                     {n(b.limit)}
                     <span className="mt-1 flex justify-end gap-1">
-                      <span className={cn(tag, b.limitedBy === "platform" ? "bg-sky-500/15 text-sky-800 dark:text-sky-300" : "bg-[var(--color-bubble)] text-[var(--color-muted)]")}>
+                      <span className={cn(tag, b.limitedBy === "platform" ? "bg-[var(--color-bubble)] text-[var(--color-text)]" : "bg-[var(--color-bubble)] text-[var(--color-muted)]")}>
                         {b.limitedBy === "platform" ? t.near.byPlatform : t.near.byBot}
                       </span>
-                      {b.override && <span className={cn(tag, "bg-amber-500/15 text-amber-800 dark:text-amber-200")}>{t.near.override}</span>}
+                      {b.override && <span className={cn(tag, "bg-[var(--color-bubble)] text-[var(--color-text)]")}>{t.near.override}</span>}
                     </span>
                   </td>
                   <td className={cn(td, num, "font-semibold", b.tokens >= b.limit && "text-red-700 dark:text-red-300")}>{pct(b.tokens, b.limit)}</td>

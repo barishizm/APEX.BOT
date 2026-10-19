@@ -9,8 +9,8 @@ import { useAppI18n } from "@/components/i18n/app-provider"
 import { CommandPalette } from "./command-palette"
 import { ProfileMenu } from "./profile-menu"
 
-// The admin area's frame. Same layout as DashboardShell, but with an amber accent, a stripe along
-// the top and an ADMIN badge, so it can't be mistaken for a customer's dashboard.
+// The admin area's frame. Same layout as DashboardShell, kept monochrome; the ADMIN badge is what
+// tells it apart from a customer's dashboard.
 
 const pill = "flex h-9 items-center gap-2 rounded-full border border-[var(--color-line)] bg-[var(--color-raised)] px-3 text-sm"
 
@@ -22,15 +22,15 @@ function RailLink({ label, active, href, children }: { label: string; active?: b
       aria-current={active ? "page" : undefined}
       className={`group relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg no-underline transition-colors ${
         active
-          ? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
-          : "text-[var(--color-muted)] hover:bg-amber-500/10 hover:text-[var(--color-text)]"
+          ? "bg-[var(--color-bubble)] text-[var(--color-text)]"
+          : "text-[var(--color-muted)] hover:bg-[var(--color-bubble)] hover:text-[var(--color-text)]"
       }`}
     >
-      {active && <span aria-hidden className="absolute -left-3 h-5 w-1 rounded-r-full bg-amber-500" />}
+      {active && <span aria-hidden className="absolute -left-3 h-5 w-1 rounded-r-full bg-[var(--color-text)]" />}
       {children}
       <span
         role="tooltip"
-        className="pointer-events-none absolute left-full z-20 ml-3 whitespace-nowrap rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-medium text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+        className="pointer-events-none absolute left-full z-20 ml-3 whitespace-nowrap rounded-lg bg-[var(--color-text)] px-3 py-1.5 text-sm font-medium text-[var(--color-surface)] opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
       >
         {label}
       </span>
@@ -63,22 +63,21 @@ export function AdminShell({
   }, [])
 
   return (
-    <div className="flex h-dvh flex-col bg-[var(--color-surface)] text-[var(--color-text)]">
-      <div aria-hidden className="h-1 shrink-0 bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500" />
+    <div className="admin-mono flex h-dvh flex-col bg-[var(--color-surface)] text-[var(--color-text)]">
       <header className="flex h-14 shrink-0 items-center gap-3 pr-3">
         <Link href="/admin" aria-label={t.home} className="-mr-3 flex h-14 w-16 shrink-0 items-center justify-center">
           <img src="/brand/mini-logo.png" alt="" className="block h-11 w-11 rounded-xl" />
         </Link>
 
-        <span className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md bg-amber-500 px-2.5 text-xs font-bold uppercase tracking-[0.12em] text-amber-950">
-          <ShieldCheck className="h-3.5 w-3.5" strokeWidth={2.5} aria-hidden />
+        <span className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-[var(--color-text)] px-2 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-text)]">
+          <ShieldCheck className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
           {t.badge}
         </span>
 
         <button
           type="button"
           onClick={() => setPaletteOpen(true)}
-          className="mx-auto flex h-9 w-full max-w-[28rem] cursor-pointer items-center gap-2 rounded-full border border-[var(--color-line)] bg-[var(--color-raised)] px-4 text-sm text-[var(--color-muted)] transition-colors hover:border-amber-500/60"
+          className="mx-auto flex h-9 w-full max-w-[28rem] cursor-pointer items-center gap-2 rounded-full border border-[var(--color-line)] bg-[var(--color-raised)] px-4 text-sm text-[var(--color-muted)] transition-colors hover:border-[var(--color-muted)]"
         >
           <Search className="h-4 w-4" aria-hidden />
           <span className="truncate">{app.shell.search}</span>
@@ -106,7 +105,7 @@ export function AdminShell({
 
         <main
           id="main"
-          className="min-w-0 flex-1 overflow-auto rounded-tl-2xl border-l border-t border-amber-500/30 bg-[var(--color-raised)]"
+          className="min-w-0 flex-1 overflow-auto rounded-tl-2xl border-l border-t border-[var(--color-line)] bg-[var(--color-raised)]"
         >
           {children}
         </main>

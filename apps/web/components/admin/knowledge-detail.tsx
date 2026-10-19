@@ -141,7 +141,7 @@ export function KnowledgeDetail({ detail }: { detail: KnowledgeDetailJson }) {
             {detail.audit.length ? (
               <ol className="m-0 flex list-none flex-col gap-3 p-0 text-sm">
                 {detail.audit.map((a) => (
-                  <li key={a.id} className="flex flex-col gap-0.5 border-l-2 border-amber-500/40 pl-3">
+                  <li key={a.id} className="flex flex-col gap-0.5 border-l-2 border-[var(--color-line)] pl-3">
                     <span className="font-medium">{t.auditActions[a.action] ?? a.action}</span>
                     <span className="text-xs text-[var(--color-muted)]">
                       {fill(t.by, { name: a.actorName ?? t.deletedStaff })} · <When at={a.createdAt} locale={locale} />

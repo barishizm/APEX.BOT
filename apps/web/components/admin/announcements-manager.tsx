@@ -24,12 +24,12 @@ const PLANS = ["free", "starter", "pro", "business"] as const
 const MAX_MESSAGE = 500
 
 const LEVEL_TONE: Record<AnnouncementLevel, string> = {
-  info: "bg-sky-500/15 text-sky-800 dark:text-sky-200",
+  info: "bg-[var(--color-bubble)] text-[var(--color-text)]",
   warn: "bg-amber-500/15 text-amber-800 dark:text-amber-200",
   critical: "bg-red-500/15 text-red-700 dark:text-red-300",
 }
 const STATUS_TONE = {
-  scheduled: "bg-violet-500/15 text-violet-800 dark:text-violet-200",
+  scheduled: "border border-[var(--color-line)] text-[var(--color-muted)]",
   active: "bg-green-500/15 text-green-800 dark:text-green-200",
   ended: "bg-[var(--color-bubble)] text-[var(--color-muted)]",
 } as const
@@ -306,7 +306,7 @@ function Editor({ initial, isNew, onCancel, onSave }: { initial: Draft; isNew: b
           <div className="flex flex-wrap gap-4">
             {AUDIENCES.map((a) => (
               <label key={a} className="flex cursor-pointer items-center gap-2 text-sm">
-                <input type="radio" name="audience" checked={d.audience === a} onChange={() => set({ audience: a })} className="accent-amber-500" />
+                <input type="radio" name="audience" checked={d.audience === a} onChange={() => set({ audience: a })} className="accent-[var(--color-text)]" />
                 {t.audiences[a]}
               </label>
             ))}
@@ -319,7 +319,7 @@ function Editor({ initial, isNew, onCancel, onSave }: { initial: Draft; isNew: b
                     type="checkbox"
                     checked={d.plans.includes(p)}
                     onChange={(ev) => set({ plans: ev.target.checked ? [...d.plans, p] : d.plans.filter((x) => x !== p) })}
-                    className="accent-amber-500"
+                    className="accent-[var(--color-text)]"
                   />
                   {t.plans[p]}
                 </label>
@@ -358,7 +358,7 @@ function Editor({ initial, isNew, onCancel, onSave }: { initial: Draft; isNew: b
             checked={d.audience === "all" && d.marketing}
             disabled={d.audience !== "all"}
             onChange={(ev) => set({ marketing: ev.target.checked })}
-            className="mt-0.5 accent-amber-500"
+            className="mt-0.5 accent-[var(--color-text)]"
           />
           <span className="flex flex-col">
             {e.marketing}
@@ -366,7 +366,7 @@ function Editor({ initial, isNew, onCancel, onSave }: { initial: Draft; isNew: b
           </span>
         </label>
         <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={d.dismissible} onChange={(ev) => set({ dismissible: ev.target.checked })} className="accent-amber-500" />
+          <input type="checkbox" checked={d.dismissible} onChange={(ev) => set({ dismissible: ev.target.checked })} className="accent-[var(--color-text)]" />
           {e.dismissible}
         </label>
 

@@ -150,7 +150,7 @@ export function BotDetail({
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="m-0 break-words text-2xl font-semibold tracking-tight">{b.name}</h1>
           <span className={cn(tag, STATUS_TONE[b.status])}>{bots.statuses[b.status]}</span>
-          {tokens.override && <span className={`${tag} bg-amber-500/15 text-amber-800 dark:text-amber-200`}>{bots.overrideTag}</span>}
+          {tokens.override && <span className={`${tag} bg-[var(--color-bubble)] text-[var(--color-text)]`}>{bots.overrideTag}</span>}
         </div>
       </header>
 
@@ -278,7 +278,7 @@ export function BotDetail({
             {detail.audit.length ? (
               <ol className="m-0 flex list-none flex-col gap-3 p-0 text-sm">
                 {detail.audit.map((a) => (
-                  <li key={a.id} className="flex flex-col gap-0.5 border-l-2 border-amber-500/40 pl-3">
+                  <li key={a.id} className="flex flex-col gap-0.5 border-l-2 border-[var(--color-line)] pl-3">
                     <span className="font-medium">{t.auditActions[a.action] ?? a.action}</span>
                     <span className="text-xs text-[var(--color-muted)]">
                       {fill(t.by, { name: a.actorName ?? t.deletedStaff })} · <When at={a.createdAt} locale={locale} />

@@ -82,7 +82,7 @@ export function WorkspaceDetail({ detail }: { detail: WorkspaceDetailJson }) {
         </Link>
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="m-0 break-words text-2xl font-semibold tracking-tight">{w.name}</h1>
-          <span className={`${tag} bg-amber-500/15 text-amber-800 dark:text-amber-200`}>{ws.plans[w.plan]}</span>
+          <span className={`${tag} bg-[var(--color-text)] text-[var(--color-surface)]`}>{ws.plans[w.plan]}</span>
           <span className={cn(tag, w.suspendedAt ? "bg-red-500/15 text-red-700 dark:text-red-300" : "bg-green-500/15 text-green-800 dark:text-green-300")}>
             {ws.statuses[w.suspendedAt ? "suspended" : "active"]}
           </span>
@@ -133,12 +133,12 @@ export function WorkspaceDetail({ detail }: { detail: WorkspaceDetailJson }) {
                 return (
                   <li key={e.id} className="relative flex gap-3 pb-4 last:pb-0">
                     {!current && <span className="absolute left-[5px] top-4 h-full w-px bg-[var(--color-line)]" aria-hidden />}
-                    <span className={cn("relative mt-1.5 h-[11px] w-[11px] shrink-0 rounded-full border-2", current ? "border-amber-500 bg-amber-500" : "border-[var(--color-muted)] bg-[var(--color-surface)]")} aria-hidden />
+                    <span className={cn("relative mt-1.5 h-[11px] w-[11px] shrink-0 rounded-full border-2", current ? "border-[var(--color-text)] bg-[var(--color-text)]" : "border-[var(--color-muted)] bg-[var(--color-surface)]")} aria-hidden />
                     <div className="flex min-w-0 flex-col gap-0.5 text-sm">
                       <span className="flex flex-wrap items-center gap-2 font-medium">
                         {e.label}
                         {i === 0 && <span className="font-normal text-[var(--color-muted)]">· {ws.plans[e.plan]}</span>}
-                        {current && <span className={`${tag} bg-amber-500/15 text-amber-800 dark:text-amber-200`}>{t.timeline.current}</span>}
+                        {current && <span className={`${tag} bg-[var(--color-bubble)] text-[var(--color-text)]`}>{t.timeline.current}</span>}
                       </span>
                       <span className="text-xs text-[var(--color-muted)]">
                         {e.actor && <>{fill(t.by, { name: e.actor })} · </>}
@@ -298,7 +298,7 @@ export function WorkspaceDetail({ detail }: { detail: WorkspaceDetailJson }) {
             {detail.audit.length ? (
               <ol className="m-0 flex list-none flex-col gap-3 p-0 text-sm">
                 {detail.audit.map((a) => (
-                  <li key={a.id} className="flex flex-col gap-0.5 border-l-2 border-amber-500/40 pl-3">
+                  <li key={a.id} className="flex flex-col gap-0.5 border-l-2 border-[var(--color-line)] pl-3">
                     <span className="font-medium">{t.auditActions[a.action] ?? a.action}</span>
                     <span className="text-xs text-[var(--color-muted)]">
                       {fill(t.by, { name: a.actorName ?? t.deletedStaff })} · <When at={a.createdAt} locale={locale} />
