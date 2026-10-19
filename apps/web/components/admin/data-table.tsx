@@ -68,6 +68,7 @@ export function DataTable<T>({
   selection,
   actions,
   reloadKey = 0,
+  params,
 }: {
   /** The list's API route, e.g. "/api/admin/users". */
   endpoint: string
@@ -91,6 +92,8 @@ export function DataTable<T>({
   actions?: ReactNode
   /** Bump to load the current page again, e.g. after an action changed rows. */
   reloadKey?: number
+  /** Values the page owns rather than the table, e.g. its time range: sent with every request and kept in the URL. */
+  params?: Record<string, string>
 }) {
   const { t: app, locale } = useAppI18n()
   const t = app.admin!.table
@@ -123,7 +126,7 @@ export function DataTable<T>({
     return () => clearTimeout(id)
   }, [searchInput, query.q, update])
 
-  const qs = tableQueryString(query)
+  const qs = tableQueryString(query, params)
 
   // keep the URL in step (replace: paging through a list shouldn't fill the Back button)
   useEffect(() => {
@@ -180,7 +183,7 @@ export function DataTable<T>({
     setExporting(true)
     setNotice(null)
     try {
-      const res = await fetch(`${endpoint}?${tableQueryString({ ...query, cursor: null }, { format: "csv" })}`, { cache: "no-store" })
+      const res = await fetch(`${endpoint}?${tableQueryString({ ...query, cursor: null }, { ...params, format: "csv" })}`, { cache: "no-store" })
       if (!res.ok) throw new Error(await errorMessage(res, t.exportFailed))
       const truncated = res.headers.get("x-export-truncated")
       const name = /filename="([^"]+)"/.exec(res.headers.get("content-disposition") ?? "")?.[1] ?? "export.csv"

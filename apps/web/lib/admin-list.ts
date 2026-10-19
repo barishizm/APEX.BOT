@@ -17,12 +17,15 @@ export const CSV_EXPORT_MAX = 10_000
 export interface AdminListOptions<Row> {
   /** e.g. "users"; names the audit entry ("users.export") and the CSV file. */
   name: string
-  spec: ListSpec
+  /** The list, or how to build it from the query string, for a list that covers a chosen range. */
+  spec: ListSpec | ((search: URLSearchParams) => ListSpec)
   minRole?: PlatformRole
   /** What the client gets for each row (default: the row as is). Leave out anything staff don't need. */
   toJson?: (row: Row) => unknown
   /** CSV columns, in order: a stable header and how to read the value. */
   csv: { header: string; value: (row: Row) => unknown }[]
+  /** What else shaped the rows, beyond search, filters and sort (e.g. a time range), for the export's audit entry. */
+  context?: (search: URLSearchParams) => Record<string, unknown>
 }
 
 const RESERVED = new Set(["q", "sort", "dir", "cursor", "limit", "format"])
@@ -54,18 +57,19 @@ export function adminListRoute<Row = Record<string, unknown>>(options: AdminList
   return async (request: Request): Promise<Response> => {
     try {
       const search = new URL(request.url).searchParams
-      const params = listParams(search, options.spec)
+      const spec = typeof options.spec === "function" ? options.spec(search) : options.spec
+      const params = listParams(search, spec)
 
       if (search.get("format") === "csv") {
         // counts as a write: exports are heavier and leave the platform
         const admin = await requireAdminSession(options.minRole, { write: true })
-        const { rows, truncated } = await listAll<Row>(db(), options.spec, params, CSV_EXPORT_MAX)
+        const { rows, truncated } = await listAll<Row>(db(), spec, params, CSV_EXPORT_MAX)
         const meta = await requestMeta()
         await writeAudit(db(), {
           actorId: admin.user.id,
           action: `${options.name}.export`,
           targetType: options.name,
-          after: { q: params.q || null, filters: params.filters, sort: params.sort || null, dir: params.dir || null, rows: rows.length, truncated },
+          after: { q: params.q || null, filters: params.filters, sort: params.sort || null, dir: params.dir || null, ...options.context?.(search), rows: rows.length, truncated },
           ip: meta.ip,
           userAgent: meta.userAgent,
         })
@@ -82,7 +86,7 @@ export function adminListRoute<Row = Record<string, unknown>>(options: AdminList
       }
 
       await requireAdminSession(options.minRole)
-      const page = await listPage<Row>(db(), options.spec, params)
+      const page = await listPage<Row>(db(), spec, params)
       const rows = options.toJson ? page.rows.map(options.toJson) : page.rows
       return Response.json({ rows, nextCursor: page.nextCursor }, { headers: NO_STORE })
     } catch (err) {
