@@ -2,25 +2,24 @@
 
 import { ArrowRight, Check } from "lucide-react";
 import { useState } from "react";
+import { OVERAGE_BLOCK, PLANS, PLAN_LIMITS, PLAN_PRICES, annualSaving, type Plan } from "@apex/db/plans";
 import { useI18n } from "@/components/i18n/provider";
 import { CONTACT_EMAIL } from "@/components/site-nav";
 import { openAuth } from "@/components/ui/login-button";
+import { formatNumber, formatPercent } from "@/lib/i18n/format";
+import { LOCALE_META, format, type Locale } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
-type PlanId = "free" | "starter" | "pro" | "business";
+// Names, blurbs and feature wording come from the dictionary; prices and every number in the
+// features come from @apex/db/plans. Prices stay in USD in every language.
+const FEATURED: Plan = "pro";
 
-// Names, blurbs and features come from the dictionary; prices stay the same in every language.
-// Each plan's monthly AI replies keep a gross margin above 50% even at full use on the costliest
-// model mix, and around 75% at typical use; recheck against the model prices before changing them.
-const PLANS: { id: PlanId; price: { monthly: string; annual: string } | string; featured?: boolean }[] = [
-  { id: "free", price: "$0" },
-  { id: "starter", price: { monthly: "$29", annual: "$24" } },
-  { id: "pro", price: { monthly: "$79", annual: "$65" }, featured: true },
-  { id: "business", price: { monthly: "$249", annual: "$199" } },
-];
+// $29, not $29.00: plan prices are whole dollars
+const usd = (cents: number, locale: Locale) =>
+  new Intl.NumberFormat(LOCALE_META[locale].intl, { style: "currency", currency: "USD", currencyDisplay: "narrowSymbol", maximumFractionDigits: cents % 100 ? 2 : 0 }).format(cents / 100);
 
 export const Component = () => {
-  const { t: dict } = useI18n();
+  const { t: dict, locale } = useI18n();
   const t = dict.pricing;
   const [annual, setAnnual] = useState(true);
 
@@ -57,22 +56,32 @@ export const Component = () => {
             <span className={cn("flex items-center gap-2", annual ? "text-[var(--color-text)]" : "text-[var(--color-muted)]")}>
               {t.annually}
               <span className="rounded-full bg-[color-mix(in_srgb,var(--color-secondary)_16%,transparent)] px-2 py-0.5 font-mono text-[10px] uppercase tracking-widest text-[var(--color-secondary)]">
-                {t.save}
+                {format(t.save, { percent: formatPercent(Math.max(...PLANS.map(annualSaving)), locale) })}
               </span>
             </span>
           </div>
         </div>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {PLANS.map((plan) => {
-            const copy = t.plans[plan.id];
-            const price = typeof plan.price === "string" ? plan.price : annual ? plan.price.annual : plan.price.monthly;
+          {PLANS.map((id) => {
+            const copy = t.plans[id];
+            const featured = id === FEATURED;
+            const prices = PLAN_PRICES[id];
+            const paid = prices.monthly > 0;
+            const price = usd(paid && annual ? prices.annual / 12 : prices.monthly, locale);
+            const limits = PLAN_LIMITS[id];
+            const numbers = {
+              replies: formatNumber(limits.monthlyReplies, locale),
+              websites: formatNumber(limits.websites, locale),
+              pages: formatNumber(limits.websitePages, locale),
+              retentionDays: formatNumber(limits.maxRetentionDays, locale),
+            };
             return (
               <article
-                key={plan.id}
+                key={id}
                 className={cn(
                   "relative flex flex-col rounded-xl border p-7",
-                  plan.featured
+                  featured
                     ? "border-[color-mix(in_srgb,var(--color-text)_30%,transparent)] bg-[var(--color-raised)] shadow-xl"
                     : "border-[var(--color-line)] bg-[var(--color-raised)]",
                 )}
@@ -82,7 +91,7 @@ export const Component = () => {
                     <h2 className="text-lg font-semibold">{copy.name}</h2>
                     <p className="mt-2 text-sm text-[var(--color-muted)]">{copy.blurb}</p>
                   </div>
-                  {plan.featured && (
+                  {featured && (
                     <span className="shrink-0 rounded-full bg-[var(--color-text)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-[var(--color-surface)]">
                       {t.popular}
                     </span>
@@ -92,7 +101,7 @@ export const Component = () => {
                 <div className="mb-8 flex items-baseline gap-1.5">
                   <span className="text-4xl font-semibold tracking-tight">{price}</span>
                   {copy.unit && <span className="text-sm font-medium text-[var(--color-muted)]">{copy.unit}</span>}
-                  {typeof plan.price !== "string" && annual && (
+                  {paid && annual && (
                     <span className="text-xs text-[var(--color-muted)]">{t.billedYearly}</span>
                   )}
                 </div>
@@ -102,22 +111,22 @@ export const Component = () => {
                   onClick={(e) => openAuth("register", e.currentTarget)}
                   className={cn(
                     "mb-8 flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-md text-sm font-medium transition-opacity hover:opacity-90 active:scale-[0.98]",
-                    plan.featured
+                    featured
                       ? "border-0 bg-[var(--color-text)] text-[var(--color-surface)]"
                       : "border border-[var(--color-line)] bg-transparent text-[var(--color-text)]",
                   )}
                 >
                   {copy.cta}
-                  {plan.featured && <ArrowRight className="h-4 w-4" aria-hidden />}
+                  {featured && <ArrowRight className="h-4 w-4" aria-hidden />}
                 </button>
 
                 <div className="mb-6 h-px w-full bg-[var(--color-line)]" />
 
                 <ul className="flex flex-col gap-3.5 text-sm">
-                  {copy.features.map((feature) => (
+                  {copy.features.map((template) => format(template, numbers)).map((feature) => (
                     <li key={feature} className="flex items-start gap-3">
                       <Check
-                        className={cn("mt-0.5 h-4 w-4 shrink-0", plan.featured ? "text-[var(--color-secondary)]" : "text-[var(--color-muted)]")}
+                        className={cn("mt-0.5 h-4 w-4 shrink-0", featured ? "text-[var(--color-secondary)]" : "text-[var(--color-muted)]")}
                         aria-hidden
                       />
                       <span>{feature}</span>
@@ -129,7 +138,9 @@ export const Component = () => {
           })}
         </div>
 
-        <p className="mx-auto mt-10 max-w-3xl text-center text-xs leading-relaxed text-[var(--color-muted)]">{t.usageNote}</p>
+        <p className="mx-auto mt-10 max-w-3xl text-center text-xs leading-relaxed text-[var(--color-muted)]">
+          {format(t.usageNote, { blockPrice: usd(OVERAGE_BLOCK.priceCents, locale), blockReplies: formatNumber(OVERAGE_BLOCK.replies, locale) })}
+        </p>
 
         <p className="mt-6 text-center text-sm text-[var(--color-muted)]">
           {t.footerPre}{" "}

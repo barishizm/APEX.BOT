@@ -4,7 +4,7 @@ import type { ActionChange, AdminActor } from "./admin-users.ts"
 import type { ListSpec } from "./admin-list.ts"
 import { touchWorkspaceBots, type MemberRole } from "./bots.ts"
 import { maskEmail } from "./admin-bots.ts"
-import { CRAWL_PAGE_CEILING, PLAN_LIMITS, PLANS, type Plan } from "./plans.ts"
+import { CRAWL_PAGE_CEILING, PLAN_LIMITS, PLANS, type Plan, type PlanEntitlements } from "./plans.ts"
 import {
   staffChangeMemberRole,
   staffRemoveMember,
@@ -96,15 +96,19 @@ export const ADMIN_WORKSPACES_LIST = {
 
 // --- Plan change preview ---
 
-export type PlanLimitKey = keyof (typeof PLAN_LIMITS)[Plan]
+export type PlanLimitKey = keyof PlanEntitlements
+/** A count, a feature switch or the model tiers allowed. */
+export type PlanLimitValue = PlanEntitlements[PlanLimitKey]
 
 export interface PlanLimitChange {
   key: PlanLimitKey
-  from: number
-  to: number
+  from: PlanLimitValue
+  to: PlanLimitValue
   /** What actually applies after technical ceilings (website pages: CRAWL_PAGE_CEILING). */
-  effectiveFrom: number
-  effectiveTo: number
+  effectiveFrom: PlanLimitValue
+  effectiveTo: PlanLimitValue
+  /** 1 when the workspace gains, -1 when it loses, 0 when what applies stays the same. */
+  change: -1 | 0 | 1
 }
 
 export interface PlanPreview {
@@ -116,17 +120,25 @@ export interface PlanPreview {
 }
 
 const CEILINGS: Partial<Record<PlanLimitKey, number>> = { websitePages: CRAWL_PAGE_CEILING }
-const effective = (key: PlanLimitKey, value: number) => Math.min(value, CEILINGS[key] ?? Infinity)
+const effective = (key: PlanLimitKey, value: PlanLimitValue) =>
+  typeof value === "number" ? Math.min(value, CEILINGS[key] ?? Infinity) : value
+// Model tiers only ever add up (fast, then standard, then premium), so their count orders them.
+const rank = (value: PlanLimitValue) => (typeof value === "number" ? value : typeof value === "boolean" ? Number(value) : value.length)
 
 /** How each limit moves from one plan to another. */
 export function planLimitChanges(from: Plan, to: Plan): PlanLimitChange[] {
-  return (Object.keys(PLAN_LIMITS[to]) as PlanLimitKey[]).map((key) => ({
-    key,
-    from: PLAN_LIMITS[from][key],
-    to: PLAN_LIMITS[to][key],
-    effectiveFrom: effective(key, PLAN_LIMITS[from][key]),
-    effectiveTo: effective(key, PLAN_LIMITS[to][key]),
-  }))
+  return (Object.keys(PLAN_LIMITS[to]) as PlanLimitKey[]).map((key) => {
+    const effectiveFrom = effective(key, PLAN_LIMITS[from][key])
+    const effectiveTo = effective(key, PLAN_LIMITS[to][key])
+    return {
+      key,
+      from: PLAN_LIMITS[from][key],
+      to: PLAN_LIMITS[to][key],
+      effectiveFrom,
+      effectiveTo,
+      change: Math.sign(rank(effectiveTo) - rank(effectiveFrom)) as -1 | 0 | 1,
+    }
+  })
 }
 
 interface WebsiteSource {
@@ -138,7 +150,7 @@ interface WebsiteSource {
 }
 
 function planPreview(from: Plan, to: Plan, sources: WebsiteSource[]): PlanPreview {
-  const limit = effective("websitePages", PLAN_LIMITS[to].websitePages)
+  const limit = Math.min(PLAN_LIMITS[to].websitePages, CRAWL_PAGE_CEILING)
   return {
     plan: to,
     limits: planLimitChanges(from, to),

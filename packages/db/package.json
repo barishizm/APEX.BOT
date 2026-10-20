@@ -6,6 +6,7 @@
     ".": "./src/index.ts",
     "./bot-settings": "./src/bot-settings.ts",
     "./flags": "./src/flags.ts",
+    "./plans": "./src/plans.ts",
     "./migrate": "./src/migrate.ts",
     "./pii": "./src/pii.ts"
   },

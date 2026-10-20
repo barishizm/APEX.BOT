@@ -3,6 +3,7 @@ import assert from "node:assert/strict"
 import { PGlite } from "@electric-sql/pglite"
 import type { Db } from "../src/db.ts"
 import { migrate } from "../src/migrate.ts"
+import { PLAN_LIMITS } from "../src/plans.ts"
 import { AuthError, register } from "../src/auth.ts"
 import { AdminError, writeAudit } from "../src/admin.ts"
 import { listPage } from "../src/admin-list.ts"
@@ -110,11 +111,18 @@ describe("plans", () => {
     const detail = (await getAdminWorkspaceDetail(db, org))!
     assert.deepEqual(detail.planPreviews.map((p) => p.plan), ["free", "starter", "business"])
     const free = detail.planPreviews.find((p) => p.plan === "free")!
-    assert.deepEqual(free.limits, [{ key: "websitePages", from: 1000, to: 50, effectiveFrom: 300, effectiveTo: 50 }])
+    assert.deepEqual(free.limits.find((l) => l.key === "websitePages"), { key: "websitePages", from: 1000, to: 50, effectiveFrom: 300, effectiveTo: 50, change: -1 })
+    // every entitlement is listed, switches and model tiers included
+    assert.deepEqual(free.limits.map((l) => l.key), Object.keys(PLAN_LIMITS.free))
+    assert.deepEqual(free.limits.find((l) => l.key === "removeBranding"), { key: "removeBranding", from: true, to: false, effectiveFrom: true, effectiveTo: false, change: -1 })
+    assert.deepEqual(free.limits.find((l) => l.key === "allowedModelTiers"), { key: "allowedModelTiers", from: ["fast", "standard", "premium"], to: ["fast"], effectiveFrom: ["fast", "standard", "premium"], effectiveTo: ["fast"], change: -1 })
     assert.deepEqual(free.overLimit.map((s) => [s.title, s.pages, s.limit]), [["Big site", 250, 50]])
     assert.deepEqual(detail.planPreviews.find((p) => p.plan === "starter")!.overLimit, [])
     // above the crawl ceiling nothing changes in practice
-    assert.deepEqual(planLimitChanges("pro", "business")[0], { key: "websitePages", from: 1000, to: 3000, effectiveFrom: 300, effectiveTo: 300 })
+    const toBusiness = planLimitChanges("pro", "business")
+    assert.deepEqual(toBusiness.find((l) => l.key === "websitePages"), { key: "websitePages", from: 1000, to: 3000, effectiveFrom: 300, effectiveTo: 300, change: 0 })
+    assert.equal(toBusiness.find((l) => l.key === "monthlyReplies")!.change, 1)
+    assert.equal(toBusiness.find((l) => l.key === "declineTopics")!.change, 0)
   })
 
   test("plan changes become the timeline, read back from the audit log", async () => {
