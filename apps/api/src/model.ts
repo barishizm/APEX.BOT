@@ -25,9 +25,15 @@ export interface ChatRequest {
   model?: ModelChoice;
 }
 
+/** The model that wrote an answer: the tenant's choice, or its fallback when that one ran instead. */
+export interface AnsweredBy {
+  provider: Provider;
+  id: string;
+}
+
 export type ModelEvent =
   | { type: "text"; text: string }
-  | { type: "end"; refused: boolean; truncated: boolean; inputTokens: number; outputTokens: number };
+  | { type: "end"; refused: boolean; truncated: boolean; inputTokens: number; outputTokens: number; model?: AnsweredBy };
 
 export interface ChatModel {
   stream(request: ChatRequest): AsyncIterable<ModelEvent>;
@@ -114,6 +120,8 @@ export class ClaudeChatModel implements ChatModel {
       truncated: final.stop_reason === "max_tokens",
       inputTokens: usage.input_tokens + (usage.cache_creation_input_tokens ?? 0) + (usage.cache_read_input_tokens ?? 0),
       outputTokens: usage.output_tokens,
+      // the server-side fallback answers under its own model id; anything else is the one asked for
+      model: { provider: "anthropic", id: final.model && final.model !== id && findModel("anthropic", final.model) ? final.model : id },
     };
   }
 }
@@ -222,6 +230,7 @@ export class OpenAIChatModel implements ChatModel {
             truncated: reason === "max_output_tokens",
             inputTokens: r.usage?.input_tokens ?? 0,
             outputTokens: r.usage?.output_tokens ?? 0,
+            model: { provider: "openai", id: model.id },
           };
           return;
         }
@@ -287,7 +296,7 @@ export class GeminiChatModel implements ChatModel {
         outputTokens = (usage.candidatesTokenCount ?? 0) + (usage.thoughtsTokenCount ?? 0) || outputTokens;
       }
     }
-    yield { type: "end", refused, truncated, inputTokens, outputTokens };
+    yield { type: "end", refused, truncated, inputTokens, outputTokens, model: { provider: "google", id: model.id } };
   }
 }
 
@@ -315,7 +324,7 @@ export class ModelRouter implements ChatModel {
           yield* this.retry(request, choice, event.inputTokens + event.outputTokens);
           return;
         }
-        yield event;
+        yield event.type === "end" ? { ...event, model: event.model ?? { provider: choice.provider, id: choice.id } } : event;
       }
     } catch (error) {
       if (wrote || !choice.fallback || request.signal?.aborted) throw error;
@@ -328,8 +337,8 @@ export class ModelRouter implements ChatModel {
     const fb = choice.fallback!;
     const model: ModelChoice = { ...choice, provider: fb.provider, id: fb.id, fallback: undefined };
     for await (const event of this.providers[fb.provider].stream({ ...request, model })) {
-      // the failed attempt's tokens still count toward the tenant's budget
-      yield event.type === "end" ? { ...event, inputTokens: event.inputTokens + spent } : event;
+      // the failed attempt's tokens still count toward the tenant's budget; the reply is the fallback's
+      yield event.type === "end" ? { ...event, inputTokens: event.inputTokens + spent, model: event.model ?? { provider: fb.provider, id: fb.id } } : event;
     }
   }
 }

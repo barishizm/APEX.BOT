@@ -6,7 +6,10 @@ import { bodyLimit } from "hono/body-limit";
 import { streamSSE } from "hono/streaming";
 import { CHAT_BODY_LIMIT, attachmentNote, parseAttachments } from "./attachments.ts";
 import type { Limits } from "./config.ts";
-import { RateLimiter, TokenBudget, type TokenUsageStore } from "./limits.ts";
+import { FEATURE_FLAGS, type FeatureFlag } from "@apex/db/flags";
+import { replyFifths } from "@apex/db/bot-settings";
+import { replyWindow } from "@apex/db/plans";
+import { RateLimiter, ReplyQuota, TokenBudget, type ReplyUsageStore, type TokenUsageStore } from "./limits.ts";
 import { log } from "./log.ts";
 import type { Mailer } from "./mailer.ts";
 import type { ChatModel } from "./model.ts";
@@ -31,8 +34,10 @@ export interface AppDeps {
   now?: () => number;
   /** Persists daily token counts so the budget survives restarts. */
   tokenUsage?: TokenUsageStore;
+  /** Counts each workspace's monthly AI replies where every API instance sees them (app.reply_usage). */
+  replyUsage?: ReplyUsageStore;
   /** Whether a feature flag (/admin/settings) is on for the tenant's workspace; without it every flag has its default. */
-  featureEnabled?: (flag: "hybrid_search", tenant: Tenant) => Promise<boolean>;
+  featureEnabled?: (flag: FeatureFlag, tenant: Tenant) => Promise<boolean>;
   /** Called when the widget loads its config on an allowed site. */
   onWidgetSeen?: (tenant: Tenant, origin: string) => void;
   /** Extra fields for /health (no secrets: the status page shows them publicly). */
@@ -56,6 +61,7 @@ type ErrorCode =
   | "out_of_service"
   | "rate_limited"
   | "budget_exhausted"
+  | "quota_exhausted"
   | "message_too_long"
   | "conversation_full"
   | "not_found"
@@ -114,6 +120,8 @@ export function createApp(deps: AppDeps) {
   const tenantMailDaily = new RateLimiter(limits.mailsPerTenantPerDay, 86_400_000, now);
   const recipientMail = new RateLimiter(limits.mailsPerRecipientPerHour, 3_600_000, now);
   const budget = new TokenBudget(now, deps.tokenUsage, (error) => log("warn", "token usage store failed", { error }));
+  const replies = new ReplyQuota(now, deps.replyUsage, (error) => log("warn", "reply usage store failed", { error }));
+  const flag = (name: FeatureFlag, tenant: Tenant) => deps.featureEnabled?.(name, tenant) ?? Promise.resolve(FEATURE_FLAGS[name].default);
 
   /** Caps the mail one tenant, and one recipient, can cause: the IP limit alone is easy to dodge. */
   const mailAllowed = (tenant: Tenant) => {
@@ -231,6 +239,25 @@ export function createApp(deps: AppDeps) {
       log("warn", "daily token budget exhausted", { tenant: tenant.id });
       return fail(c, "budget_exhausted", 429);
     }
+    // Past its plan's number of websites (ADR 0003 (e)) the team answers instead, through the
+    // hand-off form the widget opens for this code; visitors are never told why
+    if (tenant.planPaused) return fail(c, "quota_exhausted", 429);
+    // The monthly AI replies of the bot's workspace (ADR 0003 (b), (c)), checked after the daily
+    // budget and counted only for answers that were delivered. JSON-file tenants have no workspace.
+    const workspace = tenants.workspace(tenant.organizationId);
+    const quota = workspace && {
+      organizationId: workspace.organizationId,
+      period: replyWindow(workspace.anchor, new Date(now())).start,
+      limit: workspace.allowanceFifths + workspace.overageCapFifths,
+      overage: workspace.overageCapFifths ? { allowanceFifths: workspace.allowanceFifths, capFifths: workspace.overageCapFifths } : undefined,
+    };
+    if (quota) {
+      await replies.load(quota.organizationId, quota.period, quota.limit);
+      if (replies.usedIn(quota.organizationId, quota.period) >= quota.limit && (await flag("reply_quota", tenant))) {
+        log("warn", "monthly reply quota used up", { tenant: tenant.id, workspace: quota.organizationId });
+        return fail(c, "quota_exhausted", 429);
+      }
+    }
 
     const conversationId = idOf(body.conversationId);
     let conversation = conversationId ? await store.getOrLoad(tenant.id, conversationId) : undefined;
@@ -243,7 +270,7 @@ export function createApp(deps: AppDeps) {
     const queryText = message || attachments.map((a) => a.name).join(" ");
     // only tenants whose chunks are embedded pay for a query embedding
     const semantic =
-      deps.embedder && knowledge.coverage(tenant.id).embedder === deps.embedder.id && (await (deps.featureEnabled?.("hybrid_search", tenant) ?? true))
+      deps.embedder && knowledge.coverage(tenant.id).embedder === deps.embedder.id && (await flag("hybrid_search", tenant))
         ? await deps.embedder.embed(tenant.id, semanticQueryTexts(queryText, previousQuestion))
         : null;
     const { hits } = retrieve(
@@ -283,6 +310,9 @@ export function createApp(deps: AppDeps) {
             return;
           }
           if (event.truncated) log("warn", "answer truncated at max_tokens", { tenant: tenant.id });
+          // weighed by the model that wrote it: after a fallback, the fallback
+          const by = event.model ?? request.model;
+          if (quota) replies.record(quota.organizationId, quota.period, replyFifths(by?.provider ?? "", by?.id ?? ""), quota.overage);
         }
       } catch (error) {
         if (abort.signal.aborted) return;
@@ -357,6 +387,8 @@ export function createApp(deps: AppDeps) {
   // tells the team, so a visitor who leaves without asking anything is still a lead.
   app.post("/v1/lead", async (c) => {
     const tenant = c.get("tenant");
+    // not in the bot's plan: hiding the form in the widget isn't enough
+    if (tenant.leadCaptureLocked) return fail(c, "not_found", 404);
     const body = await readJson(c);
     const address = email(body.email);
     const name = text(body.name, 100);

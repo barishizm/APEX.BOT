@@ -31,6 +31,11 @@ export interface ModelInfo {
   reasoning: boolean
   preview?: boolean
   recommended?: boolean
+  /**
+   * What one answer costs against the monthly AI reply quota, in fifths of a standard reply
+   * (docs/adr/0003-billing.md (b)). Absent: its tier's weight (REPLY_FIFTHS_BY_TIER).
+   */
+  replyFifths?: number
 }
 
 export const PROVIDERS: { id: Provider; label: string; envKey: string }[] = [
@@ -43,7 +48,7 @@ export const PROVIDERS: { id: Provider; label: string; envKey: string }[] = [
 // shut-down models are left out; anything not listed here is rejected on save.
 export const MODELS: ModelInfo[] = [
   // Anthropic: the 5.x models fix sampling, so depth is set with effort instead of temperature
-  { id: "claude-fable-5-1", provider: "anthropic", label: "Claude Fable 5.1", tier: "flagship", description: "Most capable Claude model, for the hardest questions. Slower and the most expensive.", context: "1M", price: { input: 10, output: 50 }, temperature: false, reasoning: true },
+  { id: "claude-fable-5-1", provider: "anthropic", label: "Claude Fable 5.1", tier: "flagship", description: "Most capable Claude model, for the hardest questions. Slower and the most expensive.", context: "1M", price: { input: 10, output: 50 }, temperature: false, reasoning: true, replyFifths: 25 },
   { id: "claude-opus-5-5", provider: "anthropic", label: "Claude Opus 5.5", tier: "flagship", description: "Top-tier reasoning and writing for complex support and sales conversations.", context: "1M", price: { input: 4, output: 20 }, temperature: false, reasoning: true },
   { id: "claude-sonnet-5-5", provider: "anthropic", label: "Claude Sonnet 5.5", tier: "balanced", description: "Fast and capable. A strong default for most websites.", context: "1M", price: { input: 2, output: 10 }, temperature: false, reasoning: true, recommended: true },
   { id: "claude-haiku-5-5", provider: "anthropic", label: "Claude Haiku 5.5", tier: "fast", description: "Fastest and cheapest Claude model, for high-volume FAQ answering.", context: "1M", price: { input: 0.1, output: 0.5 }, temperature: false, reasoning: true },
@@ -72,6 +77,19 @@ export const MODELS: ModelInfo[] = [
 
 export function findModel(provider: string, id: string): ModelInfo | undefined {
   return MODELS.find((m) => m.provider === provider && m.id === id)
+}
+
+/** Reply weight per tier, in fifths: fast ⅕, balanced 1, flagship 2 (ADR 0003 (b)). */
+export const REPLY_FIFTHS_BY_TIER: Record<ModelInfo["tier"], number> = { fast: 1, balanced: 5, flagship: 10 }
+
+/**
+ * Fifths of an AI reply one answer by this model uses. A model missing from the catalog (an
+ * APEX_MODEL default, a model Anthropic's server-side fallback picked) counts as flagship, so an
+ * unknown model never costs less than it should.
+ */
+export function replyFifths(provider: string, id: string): number {
+  const info = findModel(provider, id)
+  return info ? (info.replyFifths ?? REPLY_FIFTHS_BY_TIER[info.tier]) : REPLY_FIFTHS_BY_TIER.flagship
 }
 
 /** Highest temperature each provider accepts. */

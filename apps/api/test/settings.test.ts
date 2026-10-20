@@ -264,7 +264,7 @@ describe("OpenAIChatModel", () => {
     assert.deepEqual(events, [
       { type: "text", text: "Ships " },
       { type: "text", text: "in 2 days." },
-      { type: "end", refused: false, truncated: true, inputTokens: 40, outputTokens: 9 },
+      { type: "end", refused: false, truncated: true, inputTokens: 40, outputTokens: 9, model: { provider: "openai", id: "gpt-6-luna" } },
     ]);
   });
 
@@ -307,14 +307,14 @@ describe("GeminiChatModel", () => {
     assert.deepEqual(events, [
       { type: "text", text: "Ships in " },
       { type: "text", text: "2 days." },
-      { type: "end", refused: false, truncated: false, inputTokens: 50, outputTokens: 10 },
+      { type: "end", refused: false, truncated: false, inputTokens: 50, outputTokens: 10, model: { provider: "google", id: "gemini-3.8-flash" } },
     ]);
   });
 
   it("reports safety blocks as refusals", async () => {
     stubFetch([JSON.stringify({ promptFeedback: { blockReason: "SAFETY" } })]);
     const events = await collect(new GeminiChatModel("g", "https://gemini.test/v1beta").stream(request({ provider: "google", id: "gemini-3.8-flash" })));
-    assert.deepEqual(events.at(-1), { type: "end", refused: true, truncated: false, inputTokens: 0, outputTokens: 0 });
+    assert.deepEqual(events.at(-1), { type: "end", refused: true, truncated: false, inputTokens: 0, outputTokens: 0, model: { provider: "google", id: "gemini-3.8-flash" } });
   });
 });
 
@@ -371,7 +371,7 @@ describe("ModelRouter", () => {
       yield end(false, 10);
     });
     const events = await collect(new ModelRouter({ anthropic: refusing, openai: refusing, google }, refusing).stream(request(choice)));
-    assert.deepEqual(events.at(-1), { type: "end", refused: false, truncated: false, inputTokens: 10 + 35, outputTokens: 5 });
+    assert.deepEqual(events.at(-1), { type: "end", refused: false, truncated: false, inputTokens: 10 + 35, outputTokens: 5, model: { provider: choice.fallback.provider, id: choice.fallback.id } });
   });
 
   it("doesn't retry once text reached the visitor", async () => {

@@ -639,7 +639,7 @@ export class Widget {
         bubble.nextElementSibling?.classList.contains("meta") && bubble.nextElementSibling.remove();
         bubble.remove();
         void this.send(text, files, speak);
-      });
+      }, text);
     } finally {
       if (this.controller === controller) {
         this.controller = null;
@@ -1201,12 +1201,22 @@ export class Widget {
     this.scroll();
   }
 
-  private showError(bubble: HTMLDivElement, code: string, retry: () => void): void {
+  /** `question`: what the visitor asked, carried into the hand-off form when that opens in its place. */
+  private showError(bubble: HTMLDivElement, code: string, retry: () => void, question = ""): void {
     const t = this.t;
     bubble.className = "msg bot error";
-    bubble.replaceChildren(h("p", {}, t.errors[code as keyof Strings["errors"]] ?? t.errors.generic));
+    // the site's monthly replies are used up: the team answers instead (visitors are never told why)
+    const quota = code === "quota_exhausted";
+    const message = quota && !this.handoffOn ? t.errors.out_of_service : (t.errors[code as keyof Strings["errors"]] ?? t.errors.generic);
+    bubble.replaceChildren(h("p", {}, message));
     if (code === "out_of_service") return this.stopService();
     let action: HTMLButtonElement | null = null;
+    if (quota && this.handoffOn) {
+      const open = () => this.showHandoff({ reason: t.errors.quota_exhausted, note: question });
+      action = h("button", { class: "chip", type: "button", onclick: open }, t.human);
+      bubble.after(h("div", { class: "meta in" }, h("div", {}, action)));
+      return open();
+    }
     if ((code === "budget_exhausted" || code === "refused") && this.handoffOn) {
       action = h("button", { class: "chip", type: "button", onclick: () => this.showHandoff() }, t.human);
     } else if (code === "conversation_full") {
@@ -1290,12 +1300,14 @@ export class Widget {
     email.focus();
   }
 
-  private showHandoff(): void {
+  /** `reason`: shown above the form when it opens in place of an answer; `note`: the message box's starting text. */
+  private showHandoff(opening: { reason?: string; note?: string } = {}): void {
     const t = this.t;
     this.open();
     const email = h("input", { type: "email", required: true, autocomplete: "email", maxlength: 254, value: this.identity.email || undefined });
     const name = h("input", { type: "text", autocomplete: "name", maxlength: 100, value: this.identity.name || undefined });
     const note = h("textarea", { rows: 3, maxlength: 2000 });
+    if (opening.note) note.value = opening.note.slice(0, 2000);
     const error = h("p", { class: "err", role: "alert" });
     const submit = h("button", { class: "btn primary", type: "submit" }, t.submit);
     const cancel = h("button", { class: "btn ghost", type: "button", onclick: () => this.backToChat() }, t.cancel);
@@ -1342,6 +1354,7 @@ export class Widget {
         },
       },
       h("h2", {}, t.handoffTitle),
+      opening.reason ? h("p", { class: "reason", role: "status" }, opening.reason) : "",
       h("p", {}, t.handoffIntro),
       h("label", {}, t.email, email),
       h("label", {}, t.name, name),

@@ -12,10 +12,22 @@ import {
 import type { Conversation, ConversationPersistence } from "./store.ts";
 import type { VisitorContext } from "./visitor-context.ts";
 
-export function postgresPersistence(db: Db, options: { context?: boolean } = {}): ConversationPersistence {
+/**
+ * `context: false` and no `retentionCap` leave those columns out, for a database before migrations
+ * 0016 and 0036. `retentionCap` gives the plan's longest retention for a bot (null: no cap).
+ */
+export function postgresPersistence(db: Db, options: { context?: boolean; retentionCap?: (botId: string) => number | null } = {}): ConversationPersistence {
   const withContext = options.context ?? true;
   return {
-    created: (c) => insertConversation(db, { id: c.id, botId: c.tenantId, origin: c.origin ?? null, context: withContext ? (c.context ?? {}) : undefined, createdAt: new Date(c.createdAt) }),
+    created: (c) =>
+      insertConversation(db, {
+        id: c.id,
+        botId: c.tenantId,
+        origin: c.origin ?? null,
+        context: withContext ? (c.context ?? {}) : undefined,
+        retentionCapDays: options.retentionCap?.(c.tenantId),
+        createdAt: new Date(c.createdAt),
+      }),
     appended: (c, m) =>
       insertMessage(db, {
         id: m.id,

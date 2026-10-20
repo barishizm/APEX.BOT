@@ -108,8 +108,8 @@ them.
 
 When a workspace moves to a smaller plan (by choice, at period end, or by (f)):
 
-- **Websites over the limit are paused, not removed.** The owner picks which stay active; if they don't by the change
-  date, the most recently active ones stay. A paused bot's widget shows the hand-off form only; its knowledge,
+- **Websites over the limit are paused, not removed.** The owner picks which stay active; until they do, the oldest
+  ones stay. A paused bot's widget shows the hand-off form only; its knowledge,
   settings and conversations stay and are readable in the dashboard. Unpausing needs a free slot.
 - **Knowledge over the page limit** is kept; the next crawl reads up to the new limit, and pages beyond it stay stored
   but are excluded from retrieval until the plan allows them.
@@ -119,6 +119,12 @@ When a workspace moves to a smaller plan (by choice, at period end, or by (f)):
 - **Retention:** conversations already stored are kept under the retention they were stored with; the shorter window
   applies to new conversations only. Deletion stays the owner's action (KVKK tools) or the retention they chose.
 - Upgrading again restores everything as it was.
+- Implemented (2026-10-20) behind the `plan_limits` flag (off until launch, (g)): the rules are in
+  `packages/db/src/entitlements.ts`. Saves are refused by `saveBotSettings` (a value the bot already has may stay),
+  the chat API serves each bot through `effectiveSettings` (`TenantRegistry`), websites are ranked by
+  `app.bots.standby` and age (migration 0036, `setActiveSites`), a paused one answers `quota_exhausted` so the widget
+  opens the hand-off form, and each new conversation stores its plan's retention cap
+  (`conversations.retention_cap_days`).
 
 ### (f) Failed payments: 7 days' grace, then Free
 
@@ -169,6 +175,10 @@ interface BillingProvider {
   and checked before the model call. Like `TokenBudget`, the in-process check is a shortcut until the API runs on more
   than one instance; Postgres holds the authoritative count, and a few replies over the line at a window's edge are
   accepted, never billed.
+- Implemented in the chat API (2026-10-20): `ReplyQuota` in `apps/api/src/limits.ts`, `addReplyUsage` and
+  `listWorkspaceQuotas` in `packages/db/src/billing.ts`, `replyWindow` in `plans.ts`, `replyFifths` in
+  `bot-settings.ts`. A refused request answers `quota_exhausted`; enforcement waits behind the `reply_quota` flag
+  until the launch date (g), while counting runs from now on (not billed, per (g)).
 
 ## Alternatives not chosen
 

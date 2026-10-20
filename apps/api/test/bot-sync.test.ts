@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
 import { PGlite } from "@electric-sql/pglite";
 import {
+  addReplyUsage,
   addTextSource,
   addWebsiteSource,
   adminClearTokenBudgetOverride,
@@ -18,10 +19,13 @@ import {
   finishSync,
   getBotForUser,
   register,
+  replyUsageFifths,
   saveBotSettings,
   startSync,
+  upsertSubscription,
   type Db,
 } from "@apex/db";
+import { replyWindow } from "@apex/db/plans";
 import { migrate } from "@apex/db/migrate";
 import { startBotSync } from "../src/bot-sync.ts";
 import { createApp } from "../src/app.ts";
@@ -244,6 +248,69 @@ describe("bots taken out of service by staff", () => {
     await staff((tx) => adminClearTokenBudgetOverride(tx, s.bot.id));
     await s.sync.tick();
     assert.equal(s.tenants.findById(s.bot.id)!.budgetOverride, undefined);
+    s.sync.stop();
+  });
+
+  it("each pass brings the workspace's plan and billing anchor, also when no bot row changed", async () => {
+    const s = await site("donem");
+    assert.deepEqual(s.tenants.workspace(s.org), { organizationId: s.org, plan: "free", anchor: null, allowanceFifths: 500, overageCapFifths: 0, enforcePlan: false });
+    const start = new Date(Date.now() - 86_400_000);
+    await staff((tx) =>
+      upsertSubscription(tx, {
+        organizationId: s.org,
+        provider: "paddle",
+        providerSubscriptionId: "sub_donem",
+        plan: "pro",
+        interval: "month",
+        status: "active",
+        currentPeriodStart: start,
+        currentPeriodEnd: new Date(start.getTime() + 30 * 86_400_000),
+        cancelAtPeriodEnd: false,
+        scheduledChange: null,
+        providerUpdatedAt: new Date(),
+      }),
+    );
+    await s.sync.tick();
+    const ws = s.tenants.workspace(s.org)!;
+    assert.equal(ws.plan, "pro");
+    assert.equal(ws.anchor?.getTime(), start.getTime());
+    assert.equal(ws.allowanceFifths, 1500 * 5);
+    s.sync.stop();
+  });
+
+  it("counts replies in app.reply_usage and stops at the quota with the flag on", async () => {
+    const s = await site("kota");
+    let clock = Date.now();
+    const app = createApp({
+      now: () => clock,
+      tenants: s.tenants,
+      knowledge: s.knowledge,
+      store: new ConversationStore(),
+      model: s.model,
+      mailer: new OutboxMailer(),
+      limits: defaultLimits,
+      clientIp: () => "1.1.1.1",
+      replyUsage: { load: (org, at) => replyUsageFifths(db, org, at), add: (org, at, f, o) => addReplyUsage(db, org, at, f, o) },
+      featureEnabled: async (flag) => flag === "reply_quota",
+    });
+    const chat = () =>
+      app.request("/v1/chat", { method: "POST", headers: { "content-type": "application/json", "x-apex-site-key": s.bot.siteKey, origin: s.origin }, body: JSON.stringify({ message: "iade" }) });
+    const period = replyWindow(null, new Date(clock)).start;
+    const res = await chat();
+    assert.equal(res.status, 200);
+    await readSSE(res);
+    await new Promise((r) => setTimeout(r, 50));
+    const weight = await replyUsageFifths(db, s.org, period);
+    assert.ok(weight >= 1, "the delivered answer was counted");
+    // the rest of Free's 100 replies used elsewhere (another instance, another bot of the workspace)
+    await addReplyUsage(db, s.org, period, 500 - weight);
+    // this instance's cached count is re-read once it is 15 seconds old
+    clock += 15_000;
+    const asked = s.model.requests.length;
+    const stopped = await chat();
+    assert.equal(stopped.status, 429);
+    assert.deepEqual(await stopped.json(), { error: "quota_exhausted" });
+    assert.equal(s.model.requests.length, asked);
     s.sync.stop();
   });
 });

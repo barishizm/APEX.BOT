@@ -9,7 +9,9 @@ import {
   finishBillingEvent,
   getSubscription,
   grantPlanOverride,
+  listWorkspaceQuotas,
   recordBillingEvent,
+  replyUsageFifths,
   refreshEffectivePlans,
   revokePlanOverride,
   startBillingEvent,
@@ -195,12 +197,47 @@ describe("webhook inbox", () => {
 })
 
 describe("reply usage", () => {
-  test("adds fifths of a reply to the window", async () => {
+  test("adds fifths of a reply to the window and returns its total in fifths", async () => {
     const org = await workspace()
-    assert.equal(await addReplyUsage(db, org, T0, 1), 0.2)
-    assert.equal(await addReplyUsage(db, org, T0, 25), 5.2)
-    assert.equal(await addReplyUsage(db, org, at(31), 5), 1)
+    assert.equal(await addReplyUsage(db, org, T0, 1), 1)
+    assert.equal(await addReplyUsage(db, org, T0, 25), 26)
+    assert.equal(await addReplyUsage(db, org, at(31), 5), 5)
     await assert.rejects(addReplyUsage(db, org, T0, 0.5))
+    // stored in replies, one decimal
+    const { rows } = await db.query<{ units: string }>("select units::text from app.reply_usage where organization_id = $1 and period_start = $2", [org, T0])
+    assert.equal(rows[0]!.units, "5.2")
+    assert.equal(await replyUsageFifths(db, org, T0), 26)
+    assert.equal(await replyUsageFifths(db, org, at(62)), 0)
+  })
+
+  test("concurrent additions all count", async () => {
+    const org = await workspace()
+    const weights = Array.from({ length: 40 }, (_, i) => [1, 5, 10, 25][i % 4]!)
+    const totals = await Promise.all(weights.map((f) => addReplyUsage(db, org, T0, f)))
+    const sum = weights.reduce((a, b) => a + b, 0)
+    assert.equal(await replyUsageFifths(db, org, T0), sum)
+    // every caller saw a distinct running total, ending at the sum
+    assert.equal(new Set(totals).size, weights.length)
+    assert.equal(Math.max(...totals), sum)
+  })
+
+  test("keeps the part past the allowance as overage, up to the cap", async () => {
+    const org = await workspace("starter")
+    const overage = { allowanceFifths: 10, capFifths: 15 }
+    const overageOf = async () =>
+      Number((await db.query<{ o: string }>("select overage_units::text as o from app.reply_usage where organization_id = $1", [org])).rows[0]!.o)
+    await addReplyUsage(db, org, T0, 5, overage)
+    assert.equal(await overageOf(), 0)
+    await addReplyUsage(db, org, T0, 10, overage) // 15 fifths: 5 past the allowance
+    assert.equal(await overageOf(), 1)
+    await addReplyUsage(db, org, T0, 25, overage) // 40: 30 past it, held to the cap
+    assert.equal(await overageOf(), 3)
+    await addReplyUsage(db, org, T0, 5) // overage off: what was used under it stays
+    assert.equal(await overageOf(), 3)
+    // a first reply that already goes past a zero allowance
+    const other = await workspace("pro")
+    await addReplyUsage(db, other, T0, 10, { allowanceFifths: 0, capFifths: 500 })
+    assert.equal((await db.query<{ o: string }>("select overage_units::text as o from app.reply_usage where organization_id = $1", [other])).rows[0]!.o, "2.0")
   })
 
   test("units must be whole fifths and the overage cap whole blocks", async () => {
@@ -209,5 +246,53 @@ describe("reply usage", () => {
     await assert.rejects(db.query("update app.organizations set overage_enabled = true where id = $1", [org]))
     await assert.rejects(db.query("update app.organizations set overage_cap_units = 150 where id = $1", [org]))
     await db.query("update app.organizations set overage_enabled = true, overage_cap_units = 200 where id = $1", [org])
+  })
+})
+
+describe("workspace quotas for the chat API", () => {
+  async function bot(org: string, opts: { disabled?: boolean } = {}) {
+    await db.query(
+      `insert into app.bots (organization_id, name, site_key, settings, disabled_at) values ($1, 'Site', 'apex_pk_' || md5(random()::text), '{}'::jsonb, $2)`,
+      [org, opts.disabled ? T0 : null],
+    )
+  }
+  const quotaOf = async (org: string, now: Date) => (await listWorkspaceQuotas(db, now)).find((q) => q.organizationId === org)
+
+  test("Free counts calendar months, with its allowance and no overage", async () => {
+    const org = await workspace()
+    await bot(org)
+    assert.deepEqual(await quotaOf(org, T0), { organizationId: org, plan: "free", anchor: null, allowanceFifths: 500, overageCapFifths: 0, enforcePlan: false })
+  })
+
+  test("a granting subscription anchors the window; one that no longer grants doesn't", async () => {
+    const org = await workspace()
+    await bot(org)
+    await upsert(sub(org, { plan: "starter" }))
+    const q = (await quotaOf(org, at(1)))!
+    assert.equal(q.plan, "starter")
+    assert.equal(q.anchor?.getTime(), T0.getTime())
+    assert.equal(q.allowanceFifths, 3000)
+    await upsert(sub(org, { plan: "starter", status: "past_due", providerUpdatedAt: at(2) }), at(2))
+    assert.equal((await quotaOf(org, at(8)))!.anchor?.getTime(), T0.getTime(), "within grace")
+    assert.equal((await quotaOf(org, at(9.1)))!.anchor, null, "grace over")
+  })
+
+  test("overage counts only on a plan that has it, with the owner's cap", async () => {
+    const paid = await workspace("pro")
+    const free = await workspace("free")
+    for (const org of [paid, free]) {
+      await bot(org)
+      await db.query("update app.organizations set overage_enabled = true, overage_cap_units = 200 where id = $1", [org])
+    }
+    assert.equal((await quotaOf(paid, T0))!.overageCapFifths, 1000)
+    assert.equal((await quotaOf(free, T0))!.overageCapFifths, 0)
+  })
+
+  test("only workspaces with a bot that serves", async () => {
+    const none = await workspace()
+    const disabled = await workspace()
+    await bot(disabled, { disabled: true })
+    assert.equal(await quotaOf(none, T0), undefined)
+    assert.equal(await quotaOf(disabled, T0), undefined)
   })
 })

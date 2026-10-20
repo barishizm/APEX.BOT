@@ -2,6 +2,7 @@ import type { Queryable } from "./db.ts"
 import { MIGRATION_NAMES } from "./schema-version.ts"
 import { maskPII } from "./pii.ts"
 import { TOPIC_LOOKBACK_DAYS } from "./topics.ts"
+import { RETENTION_DAYS_SQL } from "./conversations.ts"
 
 // /admin/system: which migrations the database has, the background queues (topic labels, embeddings,
 // the retention sweep) and the mail the provider refused. Platform-wide reads, staff only.
@@ -58,7 +59,7 @@ export async function systemQueues(q: Queryable, embeddingModel: string | null):
     ),
     q.query<{ n: number }>(
       `select count(*)::int as n from app.conversations c join app.bots b on b.id = c.bot_id
-        where c.updated_at < now() - make_interval(days => coalesce((b.settings #>> '{security,retentionDays}')::int, 30))`,
+        where c.updated_at < now() - make_interval(days => ${RETENTION_DAYS_SQL})`,
     ),
     embeddingModel
       ? q.query<{ bots: number; chunks: number; embedded: number }>(

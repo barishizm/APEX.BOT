@@ -1,7 +1,7 @@
 import { createApp, type AppDeps } from "../src/app.ts";
 import { defaultLimits, type Limits } from "../src/config.ts";
 import { OutboxMailer } from "../src/mailer.ts";
-import type { ChatModel, ChatRequest, ModelEvent } from "../src/model.ts";
+import type { AnsweredBy, ChatModel, ChatRequest, ModelEvent } from "../src/model.ts";
 import { KnowledgeBase } from "../src/retrieval.ts";
 import { ConversationStore } from "../src/store.ts";
 import { TenantRegistry, type Tenant } from "../src/tenants.ts";
@@ -36,12 +36,14 @@ export class FakeModel implements ChatModel {
   refuse = false;
   fail = false;
   tokens = 100;
+  /** The model the end event says answered; absent, the app falls back to the tenant's choice. */
+  answeredBy?: AnsweredBy;
 
   async *stream(request: ChatRequest): AsyncIterable<ModelEvent> {
     this.requests.push(request);
     if (this.fail) throw new Error("upstream down");
     for (const text of this.reply) yield { type: "text", text };
-    yield { type: "end", refused: this.refuse, truncated: false, inputTokens: this.tokens, outputTokens: 0 };
+    yield { type: "end", refused: this.refuse, truncated: false, inputTokens: this.tokens, outputTokens: 0, ...(this.answeredBy ? { model: this.answeredBy } : {}) };
   }
 }
 

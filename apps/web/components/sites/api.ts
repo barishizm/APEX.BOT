@@ -23,3 +23,4 @@ export const selectSite = (id: string, t: Strings) => send(`/api/sites/${id}/sel
 export const createSite = (name: string, t: Strings) => send("/api/sites", "POST", { name }, t)
 export const renameSite = (id: string, name: string, t: Strings) => send(`/api/sites/${id}`, "PATCH", { name }, t)
 export const removeSite = (id: string, t: Strings) => send(`/api/sites/${id}`, "DELETE", null, t)
+export const chooseActiveSites = (ids: string[], t: Strings) => send("/api/sites/active", "POST", { ids }, t)

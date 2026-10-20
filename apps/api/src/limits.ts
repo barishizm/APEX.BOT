@@ -82,3 +82,88 @@ export class TokenBudget {
     this.store?.add(tenantId, this.today(), usage).catch(this.onError);
   }
 }
+
+/** Past a window's allowance under overage: what addReplyUsage stores as the window's overage. */
+export interface OverageLimit {
+  allowanceFifths: number;
+  capFifths: number;
+}
+
+/**
+ * Where monthly AI reply counts live (Postgres, app.reply_usage). Shared by every API instance:
+ * `add` is one atomic upsert and returns the window's new total, in fifths of a reply.
+ */
+export interface ReplyUsageStore {
+  load(organizationId: string, periodStart: Date): Promise<number>;
+  add(organizationId: string, periodStart: Date, fifths: number, overage?: OverageLimit): Promise<number>;
+}
+
+/**
+ * A workspace's AI replies in its current monthly window (docs/adr/0003-billing.md (b)), in fifths.
+ * The store holds the count; the one here is a cache of it, re-read when it is older than
+ * `refreshMs` or within `nearFifths` of the limit, so replies other instances counted are seen in
+ * time. What can still slip past the limit is the replies already in flight when it is reached.
+ */
+export class ReplyQuota {
+  /** `base`: the store's total as last seen; `pending`: counted here, not yet confirmed by the store. */
+  private used = new Map<string, { period: number; base: number; pending: number; checkedAt: number }>();
+
+  constructor(
+    private now: () => number = Date.now,
+    private store?: ReplyUsageStore,
+    private onError: (error: unknown) => void = () => {},
+    private refreshMs = 15_000,
+    private nearFifths = 50,
+  ) {}
+
+  private entry(organizationId: string, periodStart: Date) {
+    const entry = this.used.get(organizationId);
+    if (entry && entry.period === periodStart.getTime()) return entry;
+    const fresh = { period: periodStart.getTime(), base: 0, pending: 0, checkedAt: -Infinity };
+    this.used.set(organizationId, fresh);
+    if (this.used.size > 50_000) for (const [id, e] of this.used) if (e.period !== fresh.period) this.used.delete(id);
+    return fresh;
+  }
+
+  /** Brings the cached count up to date when it may be stale (call before `usedIn`). */
+  async load(organizationId: string, periodStart: Date, limitFifths: number): Promise<void> {
+    if (!this.store) return;
+    const entry = this.entry(organizationId, periodStart);
+    const at = this.now();
+    if (at - entry.checkedAt < this.refreshMs && limitFifths - (entry.base + entry.pending) > this.nearFifths) return;
+    try {
+      const persisted = await this.store.load(organizationId, periodStart);
+      entry.base = Math.max(entry.base, persisted);
+      entry.checkedAt = at;
+    } catch (error) {
+      this.onError(error); // fail open on the persisted count; the cached one still applies
+    }
+  }
+
+  usedIn(organizationId: string, periodStart: Date): number {
+    const entry = this.used.get(organizationId);
+    return entry && entry.period === periodStart.getTime() ? entry.base + entry.pending : 0;
+  }
+
+  /** Counts one delivered answer of `fifths` against the window. */
+  record(organizationId: string, periodStart: Date, fifths: number, overage?: OverageLimit): void {
+    const entry = this.entry(organizationId, periodStart);
+    if (!this.store) {
+      entry.base += fifths;
+      return;
+    }
+    entry.pending += fifths;
+    this.store.add(organizationId, periodStart, fifths, overage).then(
+      (total) => {
+        entry.pending -= fifths;
+        entry.base = Math.max(entry.base, total);
+      },
+      (error) => {
+        // not stored: keep counting it here so this instance still holds the line
+        entry.pending -= fifths;
+        entry.base += fifths;
+        this.onError(error);
+      },
+    );
+  }
+}

@@ -1,7 +1,7 @@
 import { describe, test } from "node:test"
 import assert from "node:assert/strict"
-import { MODEL_TIER_OF, PLANS, PLAN_LIMITS, PLAN_PRICES, annualSaving, entitlementsFor, type Plan, type PlanEntitlements } from "../src/plans.ts"
-import { MODELS } from "../src/bot-settings.ts"
+import { MODEL_TIER_OF, PLANS, PLAN_LIMITS, PLAN_PRICES, annualSaving, entitlementsFor, replyWindow, type Plan, type PlanEntitlements } from "../src/plans.ts"
+import { MODELS, replyFifths } from "../src/bot-settings.ts"
 
 // What each plan includes, as decided in docs/adr/0003-billing.md. A change here is a pricing change.
 const EXPECTED: Record<Plan, PlanEntitlements> = {
@@ -57,5 +57,45 @@ describe("plan entitlements", () => {
 
   test("every model's tier maps to a plan tier", () => {
     for (const m of MODELS) assert.ok(MODEL_TIER_OF[m.tier], m.id)
+  })
+})
+
+describe("reply windows", () => {
+  const d = (iso: string) => new Date(iso)
+  const win = (anchor: string | null, now: string) => {
+    const w = replyWindow(anchor ? d(anchor) : null, d(now))
+    return [w.start.toISOString(), w.end.toISOString()]
+  }
+
+  test("Free: calendar months from the 1st, 00:00 UTC", () => {
+    assert.deepEqual(win(null, "2027-01-31T23:59:59.999Z"), ["2027-01-01T00:00:00.000Z", "2027-02-01T00:00:00.000Z"])
+    assert.deepEqual(win(null, "2027-02-01T00:00:00.000Z"), ["2027-02-01T00:00:00.000Z", "2027-03-01T00:00:00.000Z"])
+    assert.deepEqual(win(null, "2027-12-15T08:00:00.000Z"), ["2027-12-01T00:00:00.000Z", "2028-01-01T00:00:00.000Z"])
+  })
+
+  test("paid: from the billing anchor, at its time of day", () => {
+    assert.deepEqual(win("2027-01-10T12:00:00Z", "2027-01-10T12:00:00Z"), ["2027-01-10T12:00:00.000Z", "2027-02-10T12:00:00.000Z"])
+    assert.deepEqual(win("2027-01-10T12:00:00Z", "2027-02-10T11:59:59Z"), ["2027-01-10T12:00:00.000Z", "2027-02-10T12:00:00.000Z"])
+    // an annual subscription: every month of the paid year
+    assert.deepEqual(win("2027-01-10T12:00:00Z", "2027-08-20T00:00:00Z"), ["2027-08-10T12:00:00.000Z", "2027-09-10T12:00:00.000Z"])
+  })
+
+  test("a 31st is clamped to short months and comes back after them", () => {
+    assert.deepEqual(win("2027-01-31T10:00:00Z", "2027-02-28T10:00:00Z"), ["2027-02-28T10:00:00.000Z", "2027-03-31T10:00:00.000Z"])
+    assert.deepEqual(win("2027-01-31T10:00:00Z", "2027-04-15T00:00:00Z"), ["2027-03-31T10:00:00.000Z", "2027-04-30T10:00:00.000Z"])
+    assert.deepEqual(win("2027-01-31T10:00:00Z", "2028-02-29T10:00:00Z"), ["2028-02-29T10:00:00.000Z", "2028-03-31T10:00:00.000Z"])
+  })
+
+  test("a moment before the anchor falls in the window before it", () => {
+    assert.deepEqual(win("2027-03-15T00:00:00Z", "2027-03-14T00:00:00Z"), ["2027-02-15T00:00:00.000Z", "2027-03-15T00:00:00.000Z"])
+  })
+})
+
+describe("reply weights", () => {
+  test("every model in the catalog has one, a whole number of fifths", () => {
+    for (const m of MODELS) {
+      const f = replyFifths(m.provider, m.id)
+      assert.ok(Number.isInteger(f) && f >= 1, m.id)
+    }
   })
 })

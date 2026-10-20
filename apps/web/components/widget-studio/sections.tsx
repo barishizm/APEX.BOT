@@ -16,6 +16,7 @@ import {
   type ModelInfo,
   type Provider,
 } from "@apex/db/bot-settings"
+import { planDefaultModel } from "@apex/db/entitlements"
 import { useAppI18n } from "@/components/i18n/app-provider"
 import { format, LOCALE_META, type Locale } from "@/lib/i18n"
 import { formatNumber, plural } from "@/lib/i18n/format"
@@ -35,6 +36,7 @@ import {
   TextInput,
   Toggle,
 } from "./fields"
+import { PlanNote, usePlanLocks } from "./plan"
 import { LAUNCHER_ICONS } from "./preview"
 
 export type SetSection = <K extends keyof BotSettings>(section: K, patch: Partial<BotSettings[K]>) => void
@@ -163,7 +165,9 @@ export function GeneralSection({ s, set, lang, err }: SectionProps) {
 // ---------- Appearance ----------
 
 export function AppearanceSection({ s, set, lang, err }: SectionProps) {
-  const t = useAppI18n().t.studio.appearance
+  const app = useAppI18n().t
+  const t = app.studio.appearance
+  const plan = usePlanLocks()
   const a = s.appearance
   return (
     <>
@@ -307,7 +311,10 @@ export function AppearanceSection({ s, set, lang, err }: SectionProps) {
           description={t.brandingHint}
           checked={a.showBranding}
           onChange={(showBranding) => set("appearance", { showBranding })}
+          // hiding it needs removeBranding; a bot that hid it on a bigger plan may turn it back on
+          disabled={!!plan.ent && !plan.ent.removeBranding && a.showBranding}
         />
+        {plan.ent && !plan.ent.removeBranding && <PlanNote>{app.studio.plan.branding}</PlanNote>}
       </Group>
     </>
   )
@@ -478,10 +485,16 @@ export function ModelSection({ s, set, err }: SectionProps) {
   const mo = s.model
   const current = findModel(mo.provider, mo.id)
   const list = MODELS.filter((m) => m.provider === mo.provider)
+  const plan = usePlanLocks()
+  const saved = plan.saved?.model
+  // a model above the plan can't be picked; the one the bot already has stays selectable
+  const lockedModel = (m: ModelInfo) => plan.modelLocked(m.provider, m.id) && !(saved?.provider === m.provider && saved.id === m.id)
+  const served = plan.ent && plan.modelLocked(mo.provider, mo.id) ? findModel(planDefaultModel(plan.ent).provider, planDefaultModel(plan.ent).id) : null
 
   const pickProvider = (provider: Provider) => {
     if (provider === mo.provider) return
-    const next = MODELS.find((m) => m.provider === provider && m.recommended) ?? MODELS.find((m) => m.provider === provider)!
+    const open = MODELS.filter((m) => m.provider === provider && !lockedModel(m))
+    const next = open.find((m) => m.recommended) ?? open[0] ?? MODELS.find((m) => m.provider === provider)!
     set("model", { provider, id: next.id, temperature: Math.min(mo.temperature, MAX_TEMPERATURE[provider]) })
   }
 
@@ -519,15 +532,17 @@ export function ModelSection({ s, set, err }: SectionProps) {
           {list.map((m) => {
             const on = m.id === mo.id
             const cost = estimate(m, mo.maxOutputTokens, locale)
+            const locked = lockedModel(m)
             return (
               <button
                 key={m.id}
                 type="button"
                 role="radio"
                 aria-checked={on}
+                disabled={locked}
                 onClick={() => set("model", { id: m.id })}
                 className={cn(
-                  "flex cursor-pointer items-start gap-3 rounded-xl border bg-[var(--color-raised)] p-3.5 text-left transition-colors",
+                  "flex cursor-pointer items-start gap-3 rounded-xl border bg-[var(--color-raised)] p-3.5 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60",
                   on ? "border-[var(--color-secondary)] ring-1 ring-[var(--color-secondary)]" : "border-[var(--color-line)] hover:border-[var(--color-muted)]/60",
                 )}
               >
@@ -546,6 +561,7 @@ export function ModelSection({ s, set, err }: SectionProps) {
                     <Badge>{t.tiers[m.tier]}</Badge>
                     {m.recommended && <Badge tone="accent">{t.recommended}</Badge>}
                     {m.preview && <Badge tone="warn">{t.previewBadge}</Badge>}
+                    {plan.modelLocked(m.provider, m.id) && <Badge>{app.studio.plan.notInPlan}</Badge>}
                   </span>
                   <span className="text-xs leading-relaxed text-[var(--color-muted)]">{t.descriptions[m.id] ?? m.description}</span>
                   <span className="flex flex-wrap gap-x-3 gap-y-0.5 font-mono text-[0.6875rem] text-[var(--color-muted)]">
@@ -559,6 +575,8 @@ export function ModelSection({ s, set, err }: SectionProps) {
             )
           })}
         </div>
+        {served && <PlanNote>{format(app.studio.plan.model, { model: current?.label ?? mo.id, served: served.label })}</PlanNote>}
+        {plan.ent && !served && list.some(lockedModel) && <PlanNote>{app.studio.plan.notInPlan}</PlanNote>}
         {current?.preview && (
           <p className="flex items-start gap-2 rounded-lg bg-amber-500/10 p-3 text-xs leading-relaxed text-amber-700 dark:text-amber-300">
             <TriangleAlert className="mt-px h-4 w-4 shrink-0" aria-hidden />
@@ -640,7 +658,11 @@ export function ModelSection({ s, set, err }: SectionProps) {
               const [provider, ...rest] = v.split(":")
               set("model", { fallback: { ...mo.fallback, provider: provider as Provider, id: rest.join(":") } })
             }}
-            options={MODELS.filter((m) => !(m.provider === mo.provider && m.id === mo.id)).map((m) => ({
+            options={MODELS.filter(
+              (m) =>
+                !(m.provider === mo.provider && m.id === mo.id) &&
+                (!plan.modelLocked(m.provider, m.id) || (saved?.fallback.provider === m.provider && saved.fallback.id === m.id)),
+            ).map((m) => ({
               value: `${m.provider}:${m.id}`,
               label: `${m.label}${m.preview ? t.previewSuffix : ""}`,
               group: PROVIDERS.find((p) => p.id === m.provider)!.label,
@@ -649,6 +671,7 @@ export function ModelSection({ s, set, err }: SectionProps) {
             hint={t.fallbackSelectHint}
           />
         )}
+        {mo.fallback.enabled && plan.ent && MODELS.some((m) => plan.modelLocked(m.provider, m.id)) && <PlanNote>{app.studio.plan.fallback}</PlanNote>}
       </Group>
     </>
   )
@@ -657,8 +680,12 @@ export function ModelSection({ s, set, err }: SectionProps) {
 // ---------- Persona ----------
 
 export function PersonaSection({ s, set, err, listErr }: SectionProps) {
-  const t = useAppI18n().t.studio.persona
+  const app = useAppI18n().t
+  const t = app.studio.persona
   const p = s.persona
+  const plan = usePlanLocks()
+  // without declineTopics, listed topics can be removed but none added
+  const declineLocked = !!plan.ent && !plan.ent.declineTopics
   return (
     <>
       <Group title={t.voice}>
@@ -696,12 +723,13 @@ export function PersonaSection({ s, set, err, listErr }: SectionProps) {
           label={t.decline}
           items={p.blockedTopics}
           onChange={(blockedTopics) => set("persona", { blockedTopics })}
-          max={LIMITS.blockedTopics}
+          max={declineLocked ? p.blockedTopics.length : LIMITS.blockedTopics}
           maxLength={LIMITS.blockedTopic}
           placeholder={t.declinePlaceholder}
           hint={t.declineHint}
           errors={listErr("persona.blockedTopics")}
         />
+        {declineLocked && <PlanNote>{app.studio.plan.decline}</PlanNote>}
       </Group>
       <Group title={t.confidence} description={t.confidenceHint}>
         <ChoiceCards
@@ -835,8 +863,12 @@ function ConfirmAddress({ email, verification }: { email: string; verification: 
 }
 
 export function HandoffSection({ s, set, err, verification }: SectionProps & { verification: HandoffVerification }) {
-  const t = useAppI18n().t.studio.handoff
+  const app = useAppI18n().t
+  const t = app.studio.handoff
   const h = s.handoff
+  const plan = usePlanLocks()
+  // without leadCapture the form can't be turned on; one a bigger plan turned on may be turned off
+  const leadLocked = !!plan.ent && !plan.ent.leadCapture
   return (
     <>
       <Group title={t.title} description={t.hint}>
@@ -877,12 +909,16 @@ export function HandoffSection({ s, set, err, verification }: SectionProps & { v
         <ChoiceCards
           label={t.ask}
           value={h.leadCapture}
-          onChange={(leadCapture) => set("handoff", { leadCapture })}
+          onChange={(leadCapture) => {
+            if (leadLocked && leadCapture !== "off" && plan.saved?.handoff.leadCapture === "off") return
+            set("handoff", { leadCapture })
+          }}
           options={[
             { value: "off", ...t.leadOptions.off },
             { value: "before-chat", ...t.leadOptions.before },
           ]}
         />
+        {leadLocked && <PlanNote>{app.studio.plan.lead}</PlanNote>}
         {h.leadCapture === "before-chat" && (
           <>
             <Field label={t.fields} hint={t.fieldsHint}>
@@ -947,7 +983,9 @@ export function InstallSection({
   dirty,
   onRotate,
 }: SectionProps & { siteKey: string; widgetUrl: string; canEdit: boolean; dirty: boolean; onRotate: () => Promise<void> }) {
-  const t = useAppI18n().t.studio.install
+  const app = useAppI18n().t
+  const t = app.studio.install
+  const plan = usePlanLocks()
   const c = t.apiComments
   const sec = s.security
   const [confirming, setConfirming] = useState(false)
@@ -1027,9 +1065,10 @@ Apex.on("message", (m) => console.log(m.text))`
             value={sec.retentionDays}
             onChange={(retentionDays) => set("security", { retentionDays })}
             min={LIMITS.retentionDays.min}
-            max={LIMITS.retentionDays.max}
+            // a longer retention kept from a bigger plan stays; it isn't applied
+            max={plan.ent ? Math.max(plan.ent.maxRetentionDays, plan.saved?.security.retentionDays ?? 0) : LIMITS.retentionDays.max}
             error={err("security.retentionDays")}
-            hint={t.retentionHint}
+            hint={plan.ent && plan.ent.maxRetentionDays < LIMITS.retentionDays.max ? <PlanNote inline>{format(app.studio.plan.retention, { days: plan.ent.maxRetentionDays })}</PlanNote> : t.retentionHint}
           />
         </div>
       </Group>

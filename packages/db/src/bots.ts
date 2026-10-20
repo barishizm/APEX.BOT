@@ -3,13 +3,17 @@ import type { Db, Queryable } from "./db.ts"
 import { CODE_MAX_ATTEMPTS, CODE_RESEND_SECONDS, CODE_TTL_MS } from "./auth.ts"
 import { DEFAULT_SETTINGS, LIMITS, BotSettingsError, parseSettings, repairSettings, type BotSettings } from "./bot-settings.ts"
 import { newVerificationCode, sha256 } from "./crypto.ts"
+import { planDefaults, planIssues, sitePaused } from "./entitlements.ts"
+import { featureEnabled } from "./platform-settings.ts"
+import { PLANS, entitlementsFor, type Plan, type PlanEntitlements } from "./plans.ts"
 
-export type BotErrorCode = "not_found" | "forbidden" | "conflict" | "invalid_code" | "rate_limited"
+/** "plan_limit": the workspace's plan doesn't include it; the dashboard offers an upgrade. */
+export type BotErrorCode = "not_found" | "forbidden" | "conflict" | "invalid_code" | "rate_limited" | "plan_limit"
 
 /** Confirmation codes the dashboard may send per bot in 24 hours, whatever the address. */
 export const HANDOFF_CODES_PER_DAY = 10
 
-/** Websites (bots) one workspace may have. */
+/** Websites (bots) one workspace may have, whatever its plan. */
 export const BOTS_PER_WORKSPACE = 10
 export const BOT_NAME_MAX = 80
 
@@ -166,7 +170,7 @@ export async function getBotForUser(db: Db, who: BotScope, options: { readOnly?:
   await db.transaction(async (tx) => {
     await tx.query("select 1 from app.organizations where id = $1 for update", [member.organization_id])
     const { rows } = await tx.query("select 1 from app.bots where organization_id = $1 limit 1", [member.organization_id])
-    if (!rows.length) await insertBot(tx, member, userId, member.name)
+    if (!rows.length) await insertBot(tx, member, userId, member.name, await workspacePlan(tx, member.organization_id))
   })
   return toBot((await first()).rows[0])
 }
@@ -178,8 +182,8 @@ function defaultSettingsFor(member: { name: string; email: string }): BotSetting
   return settings
 }
 
-async function insertBot(q: Queryable, member: { organization_id: string; name: string; email: string }, userId: string, name: string) {
-  const settings = defaultSettingsFor(member)
+async function insertBot(q: Queryable, member: { organization_id: string; name: string; email: string }, userId: string, name: string, wp: WorkspacePlan) {
+  const settings = wp.enforced ? planDefaults(defaultSettingsFor(member), wp.entitlements) : defaultSettingsFor(member)
   const { rows } = await q.query<{ id: string }>(
     `insert into app.bots (organization_id, name, site_key, settings, updated_by) values ($1, $2, $3, $4::jsonb, $5) returning id`,
     [member.organization_id, name, newSiteKey(), JSON.stringify(settings), userId],
@@ -196,6 +200,30 @@ async function botForWrite(db: Db, who: BotScope): Promise<Bot> {
   return bot
 }
 
+// ---------- Plan limits ----------
+
+export interface WorkspacePlan {
+  plan: Plan
+  entitlements: PlanEntitlements
+  /** Whether the plan is held to (the plan_limits flag). While it isn't, nothing is locked or paused. */
+  enforced: boolean
+}
+
+/** A workspace's plan and what it includes. */
+export async function workspacePlan(q: Queryable, organizationId: string): Promise<WorkspacePlan> {
+  const { rows } = await q.query<{ plan: string }>("select plan from app.organizations where id = $1", [organizationId])
+  const plan = PLANS.includes(rows[0]?.plan as Plan) ? (rows[0]!.plan as Plan) : "free"
+  return { plan, entitlements: entitlementsFor(plan), enforced: await featureEnabled(q, "plan_limits", organizationId) }
+}
+
+/** Websites the workspace may have (and keep active): its plan's while the plan is held to. */
+export const websiteLimit = (wp: WorkspacePlan) => (wp.enforced ? Math.min(wp.entitlements.websites, BOTS_PER_WORKSPACE) : BOTS_PER_WORKSPACE)
+
+const websites = (n: number) => (n === 1 ? "1 website" : `${n} websites`)
+
+// A bot's place among its workspace's websites; past the plan's number it is paused (migrations/0036_plan_limits.sql)
+const SITE_RANK_SQL = "row_number() over (partition by b.organization_id order by b.standby, b.created_at, b.id)::int"
+
 // ---------- Websites of a workspace ----------
 
 export interface BotSummary {
@@ -205,18 +233,29 @@ export interface BotSummary {
   allowedOrigins: string[]
   widgetSeenAt: Date | null
   createdAt: Date
+  /** Over the plan's number of websites: its widget offers the hand-off form only. */
+  paused: boolean
+}
+
+export interface WorkspaceSites {
+  bots: BotSummary[]
+  canEdit: boolean
+  /** Websites the workspace may have; at most this many are active. */
+  limit: number
+  plan: WorkspacePlan
 }
 
 /** Every website of the user's workspace, oldest first (the first one is the default). */
-export async function listBotsForUser(db: Db, userId: string): Promise<{ bots: BotSummary[]; canEdit: boolean; limit: number }> {
+export async function listBotsForUser(db: Db, userId: string): Promise<WorkspaceSites> {
   const member = await membership(db, userId)
-  const { rows } = await db.query<{ id: string; name: string; site_key: string; settings: unknown; widget_seen_at: Date | null; created_at: Date }>(
-    `select b.id, b.name, b.site_key, b.settings, a.widget_seen_at, b.created_at
+  const { rows } = await db.query<{ id: string; name: string; site_key: string; settings: unknown; widget_seen_at: Date | null; created_at: Date; site_rank: number }>(
+    `select b.id, b.name, b.site_key, b.settings, a.widget_seen_at, b.created_at, ${SITE_RANK_SQL} as site_rank
        from app.bots b left join app.bot_activity a on a.bot_id = b.id
       where b.organization_id = $1
       order by b.created_at, b.id`,
     [member.organization_id],
   )
+  const plan = await workspacePlan(db, member.organization_id)
   return {
     bots: rows.map((r) => ({
       id: r.id,
@@ -225,10 +264,34 @@ export async function listBotsForUser(db: Db, userId: string): Promise<{ bots: B
       allowedOrigins: repairSettings(typeof r.settings === "string" ? JSON.parse(r.settings) : r.settings).security.allowedOrigins,
       widgetSeenAt: r.widget_seen_at,
       createdAt: r.created_at,
+      paused: plan.enforced && sitePaused(r.site_rank, plan.entitlements),
     })),
     canEdit: canEditBot(member.role),
-    limit: BOTS_PER_WORKSPACE,
+    limit: websiteLimit(plan),
+    plan,
   }
+}
+
+/**
+ * Chooses the websites that stay active while the workspace has more than its plan includes; the
+ * others are paused, and nothing is deleted. Fewer than the plan allows leaves the free places to
+ * the oldest of the rest.
+ */
+export async function setActiveSites(db: Db, userId: string, raw: unknown): Promise<void> {
+  const list = Array.isArray(raw) ? raw : []
+  const ids = [...new Set(list.filter((v): v is string => typeof v === "string" && UUID.test(v)).map((v) => v.toLowerCase()))]
+  if (!ids.length || ids.length !== new Set(list).size) throw new BotSettingsError([{ path: "sites", message: "Choose the websites to keep active" }])
+  const member = await membership(db, userId)
+  if (!canEditBot(member.role)) throw new BotError("forbidden", "Only workspace owners and admins can choose active websites")
+  await db.transaction(async (tx) => {
+    await tx.query("select 1 from app.organizations where id = $1 for update", [member.organization_id])
+    const limit = websiteLimit(await workspacePlan(tx, member.organization_id))
+    if (ids.length > limit) throw new BotError("plan_limit", `Your plan includes ${websites(limit)}. Upgrade to keep more active`)
+    const { rows } = await tx.query("select id from app.bots where organization_id = $1 and id = any($2::uuid[])", [member.organization_id, ids])
+    if (rows.length !== ids.length) throw new BotError("not_found", "This website was removed. Reload to see your websites")
+    // every row is updated, so the chat API's sync re-reads each one's place
+    await tx.query("update app.bots set standby = not (id = any($2::uuid[])) where organization_id = $1", [member.organization_id, ids])
+  })
 }
 
 function cleanBotName(raw: unknown): string {
@@ -246,11 +309,17 @@ export async function createBot(db: Db, userId: string, rawName: unknown): Promi
   const id = await db.transaction(async (tx) => {
     // serializes concurrent adds so the limit holds
     await tx.query("select 1 from app.organizations where id = $1 for update", [member.organization_id])
+    const wp = await workspacePlan(tx, member.organization_id)
+    const limit = websiteLimit(wp)
     const { rows } = await tx.query<{ n: number }>("select count(*)::int as n from app.bots where organization_id = $1", [member.organization_id])
-    if (rows[0].n >= BOTS_PER_WORKSPACE) {
+    if (rows[0].n >= limit) {
+      if (limit < BOTS_PER_WORKSPACE) throw new BotError("plan_limit", `Your plan includes ${websites(limit)}. Upgrade to add another`)
       throw new BotError("conflict", `A workspace can have up to ${BOTS_PER_WORKSPACE} websites. Remove one to add another`)
     }
-    return insertBot(tx, member, userId, name)
+    const id = await insertBot(tx, member, userId, name, wp)
+    // a new website ranks ahead of those on standby: the sync re-reads every website's place
+    await touchWorkspaceBots(tx, member.organization_id)
+    return id
   })
   return getBotForUser(db, { userId, botId: id })
 }
@@ -274,6 +343,8 @@ export async function deleteBot(db: Db, who: BotScope): Promise<void> {
     const { rows } = await tx.query<{ n: number }>("select count(*)::int as n from app.bots where organization_id = $1", [bot.organizationId])
     if (rows[0].n <= 1) throw new BotError("conflict", "This is your only website. Add another before removing it")
     await tx.query("delete from app.bots where id = $1", [bot.id])
+    // a paused website may take the free place
+    await touchWorkspaceBots(tx, bot.organizationId)
   })
 }
 
@@ -286,6 +357,11 @@ export async function saveBotSettings(db: Db, who: BotScope, raw: unknown, baseV
   const settings = parseSettings(raw)
   const bot = await botForWrite(db, who)
   const userId = scopeUser(who)
+  const wp = await workspacePlan(db, bot.organizationId)
+  if (wp.enforced) {
+    const issues = planIssues(settings, bot.settings, wp.entitlements)
+    if (issues.length) throw new BotSettingsError(issues)
+  }
   if (settings.handoff.enabled && settings.handoff.email && !(await isHandoffEmailVerified(db, bot, settings.handoff.email))) {
     throw new BotSettingsError([{ path: "handoff.email", message: "Confirm this address with the code we email you before using it" }])
   }
@@ -347,17 +423,31 @@ export interface BotRecord {
   serving: boolean
   /** A daily token budget staff set for a while, in place of settings.security.dailyTokenBudget. */
   budgetOverride: { tokens: number; until: Date } | null
+  /** Its place among its workspace's websites (1 = first); past the plan's number it is paused. */
+  siteRank: number
   updatedAt: Date
 }
 
-/** Every bot changed after `since` (all of them when null), for the chat API's sync. */
-export async function listBotsChangedSince(db: Queryable, since: Date | null): Promise<BotRecord[]> {
+/**
+ * Every bot changed after `since` (all of them when null), for the chat API's sync. `siteRanks:
+ * false` (a database before migration 0036) ranks every bot first.
+ */
+export async function listBotsChangedSince(db: Queryable, since: Date | null, options: { siteRanks?: boolean } = {}): Promise<BotRecord[]> {
+  const ranks = options.siteRanks ?? true
   const { rows } = await db.query<
-    Omit<BotRow, "role"> & { knowledge_version: number; serving: boolean; token_budget_override: string | number | null; token_budget_override_until: Date | null }
+    Omit<BotRow, "role"> & {
+      knowledge_version: number
+      serving: boolean
+      token_budget_override: string | number | null
+      token_budget_override_until: Date | null
+      site_rank: number
+    }
   >(
     `select b.id, b.organization_id, o.name as organization_name, b.site_key, b.settings, b.version, b.knowledge_version, b.updated_at,
-            ${HANDOFF_VERIFIED} as handoff_verified, ${BOT_SERVING_SQL} as serving, b.token_budget_override, b.token_budget_override_until
+            ${HANDOFF_VERIFIED} as handoff_verified, ${BOT_SERVING_SQL} as serving, b.token_budget_override, b.token_budget_override_until,
+            ${ranks ? "r.site_rank" : "1"} as site_rank
        from app.bots b join app.organizations o on o.id = b.organization_id
+       ${ranks ? `join (select b.id, ${SITE_RANK_SQL} as site_rank from app.bots b) r on r.id = b.id` : ""}
       -- JS dates carry milliseconds, Postgres microseconds: compare at JS precision so the
       -- newest bot isn't returned again on every poll
       where $1::timestamptz is null or date_trunc('milliseconds', b.updated_at) > $1::timestamptz
@@ -375,6 +465,7 @@ export async function listBotsChangedSince(db: Queryable, since: Date | null): P
     serving: r.serving,
     budgetOverride:
       r.token_budget_override !== null && r.token_budget_override_until ? { tokens: Number(r.token_budget_override), until: r.token_budget_override_until } : null,
+    siteRank: r.site_rank,
     updatedAt: r.updated_at,
   }))
 }
