@@ -1,6 +1,6 @@
 "use client"
 
-import type { AdminWorkspaceDetail, MemberRole, Plan } from "@apex/db"
+import type { AdminWorkspaceDetail, MemberRole, Plan, PlanLimitValue } from "@apex/db"
 import { ArrowLeft, LoaderCircle } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -392,6 +392,11 @@ function ActionDialog({ dialog, detail, onClose, onDone }: { dialog: Dialog; det
   const preview = detail.planPreviews.find((p) => p.plan === plan)
   const ready = dialog.kind !== "delete" || confirmName.trim() === w.name.trim()
   const label = "flex flex-col gap-1.5 text-sm font-medium"
+  const values = t.limitValues
+  const limitValue = (v: PlanLimitValue) =>
+    typeof v === "number" ? formatNumber(v, locale) : typeof v === "boolean" ? values[v ? "yes" : "no"] : v.map((tier) => values[tier]).join(", ") || values.no
+  // only counts are held to a ceiling; switches and tiers apply as they are
+  const capped = (raw: PlanLimitValue, applied: PlanLimitValue) => typeof raw === "number" && raw !== applied
 
   function body(): Record<string, unknown> {
     switch (dialog.kind) {
@@ -443,13 +448,13 @@ function ActionDialog({ dialog, detail, onClose, onDone }: { dialog: Dialog; det
                   <tr key={l.key} className="border-t border-[var(--color-line)]">
                     <td className={td}>{t.limits[l.key] ?? l.key}</td>
                     <td className={`${td} tabular-nums`}>
-                      {formatNumber(l.from, locale)}
-                      {l.effectiveFrom !== l.from && <span className="block text-xs text-[var(--color-muted)]">{fill(t.dialog.ceiling, { n: formatNumber(l.effectiveFrom, locale) })}</span>}
+                      {limitValue(l.from)}
+                      {capped(l.from, l.effectiveFrom) && <span className="block text-xs text-[var(--color-muted)]">{fill(t.dialog.ceiling, { n: limitValue(l.effectiveFrom) })}</span>}
                     </td>
-                    <td className={cn(td, "tabular-nums font-medium", l.effectiveTo < l.effectiveFrom && "text-red-700 dark:text-red-300", l.effectiveTo > l.effectiveFrom && "text-green-700 dark:text-green-300")}>
-                      {formatNumber(l.to, locale)}
-                      {l.effectiveTo !== l.to && <span className="block text-xs font-normal text-[var(--color-muted)]">{fill(t.dialog.ceiling, { n: formatNumber(l.effectiveTo, locale) })}</span>}
-                      {l.effectiveTo === l.effectiveFrom && <span className="block text-xs font-normal text-[var(--color-muted)]">{t.dialog.unchanged}</span>}
+                    <td className={cn(td, "tabular-nums font-medium", l.change < 0 && "text-red-700 dark:text-red-300", l.change > 0 && "text-green-700 dark:text-green-300")}>
+                      {limitValue(l.to)}
+                      {capped(l.to, l.effectiveTo) && <span className="block text-xs font-normal text-[var(--color-muted)]">{fill(t.dialog.ceiling, { n: limitValue(l.effectiveTo) })}</span>}
+                      {l.change === 0 && <span className="block text-xs font-normal text-[var(--color-muted)]">{t.dialog.unchanged}</span>}
                     </td>
                   </tr>
                 ))}

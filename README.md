@@ -345,7 +345,7 @@ Sitenin tamamı İngilizce ve Türkçedir: herkese açık sayfalar, giriş/kayı
 - [x] İnsana devretme (e-posta formu), lead toplama
 - [x] Hesaplar, çalışma alanları, ekip davetleri, planlar ve plan bazlı limitler
 - [x] Platform yönetim paneli: kullanıcılar, çalışma alanları, botlar, bilgi kaynakları, konuşma metrikleri ve destek erişimi denetimi, kullanım/maliyet, güvenlik (engeller, kilit sıfırlama), destek talepleri, bekleme listesi, duyurular, özellik bayrakları, sistem durumu; rol + 2FA + step-up korumaları, değiştirilemez audit kaydı, salt okunur "kullanıcı olarak görüntüle" ([runbook](docs/admin-runbook.md))
-- [ ] Kullanım kotalarının faturalaması ve ödeme (satış için gerekli)
+- [ ] Kullanım kotalarının faturalaması ve ödeme (satış için gerekli; tasarım: [ADR 0003](docs/adr/0003-billing.md))
 - [x] KVKK araçları (silme, saklama süresi)
 
 **Faz 3 – Büyüme**
@@ -357,8 +357,8 @@ Sitenin tamamı İngilizce ve Türkçedir: herkese açık sayfalar, giriş/kayı
 
 ## Açık sorular
 
-1. **Fiyatlandırma:** Aylık sabit plan mı, kullanıma (mesaj/token) dayalı mı, ikisinin karışımı mı? Model maliyeti API'den geldiği için marjı doğrudan etkiler.
-2. **Ödeme sağlayıcısı:** Türkiye'deki müşteriler için iyzico/PayTR, yurt dışı için Stripe gibi bir ayrım gerekir mi?
+1. ~~**Fiyatlandırma:** Aylık sabit plan mı, kullanıma (mesaj/token) dayalı mı, ikisinin karışımı mı?~~ **Karar verildi:** aylık/yıllık planlar + model ağırlıklı "AI yanıtı" kotası + isteğe bağlı, tavanlı aşım. Bkz. [ADR 0003](docs/adr/0003-billing.md).
+2. ~~**Ödeme sağlayıcısı:** Türkiye'deki müşteriler için iyzico/PayTR, yurt dışı için Stripe gibi bir ayrım gerekir mi?~~ **Karar verildi:** Paddle Billing (merchant of record), bir adaptör arkasında; TL için ileride iyzico eklenebilir. Bkz. [ADR 0003](docs/adr/0003-billing.md).
 3. **Veri bölgesi:** Müşteriler verinin Türkiye/AB içinde kalmasını isteyecek mi? Mesajlar üçüncü taraf model API'sine gittiği için gizlilik sözleşmesinde ve aydınlatma metninde belirtilmeli.
 4. **Müşteri başlangıcı (onboarding):** Self-servis kayıt mı, yoksa ilk müşterilerde kurulumu biz mi yapacağız?
 5. **İsim ve marka:** Ürün adı "Apex Bot" olarak belirlendi. Asistanın bir kişiliği/karakteri olacak mı, widget içinde bu isimle mi anılacak?
