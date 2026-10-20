@@ -352,6 +352,20 @@ export const en = {
     closePanel: "Close preview panel",
   },
 
+  // Replaces the "free during the beta" wording above once billing is live (the billing flag, lib/i18n/server.ts)
+  launch: {
+    metaPricing: "Apex Bot plans: start free, then Starter, Pro or Business, billed monthly or yearly.",
+    metaSignup: "Create your Apex Bot account and set up an AI support assistant for your website in minutes. Start on the free plan.",
+    heroBadge: "Five languages · Answers from your own site",
+    heroNote: "Free plan · No credit card needed",
+    faqCost: { q: "How much does it cost?", a: "There's a free plan for small sites, and Starter, Pro and Business plans billed monthly or yearly. See the pricing page for what each includes." },
+    closingLede: "Set up takes a few minutes. Start on the free plan.",
+    pricingTitleA: "Start free.",
+    pricingTitleB: "Upgrade when you need more.",
+    pricingLede: "Every plan answers from your own content in five languages. Prices are in USD; tax is added at checkout where it applies.",
+    paidCta: "Choose {plan}",
+  },
+
   pricing: {
     eyebrow: "Pricing",
     titleA: "Free during the beta.",

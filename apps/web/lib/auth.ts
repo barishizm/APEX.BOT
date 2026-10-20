@@ -57,17 +57,8 @@ export async function clearChallengeCookie() {
   ;(await cookies()).delete(CHALLENGE_COOKIE)
 }
 
-const INVITE_PATH = /^\/invite\/([A-Za-z0-9_-]{20,100})$/
-
-/** Where to go after signing in: only an invitation link, so `?next=` can't send anyone off-site. */
-export function safeNext(raw: unknown): string | null {
-  return typeof raw === "string" && INVITE_PATH.test(raw) ? raw : null
-}
-
-/** The invitation token in a `next` path, if it is one. */
-export function inviteTokenFrom(next: unknown): string | null {
-  return typeof next === "string" ? (INVITE_PATH.exec(next)?.[1] ?? null) : null
-}
+/** Where to go after signing in (lib/next-path.ts): an invitation link or the billing page, never off-site. */
+export { safeNextPath as safeNext, inviteTokenFromPath as inviteTokenFrom } from "@/lib/next-path"
 
 export async function sessionToken() {
   return (await cookies()).get(SESSION_COOKIE)?.value

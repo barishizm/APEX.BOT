@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { APP_PATHS, DEFAULT_LOCALE, isLocale, LOCALE_COOKIE, localizePath, matchLocale, splitLocale, type Locale } from "@/lib/i18n/config"
 import { IMPERSONATION_COOKIE, IMPERSONATION_READ_ONLY, impersonationBlocks } from "@/lib/impersonation"
+import { safeNextPath } from "@/lib/next-path"
 
 const SESSION_COOKIE = "apex_session"
 const SIGNED_IN_COOKIE = "apex_signed_in"
@@ -32,7 +33,11 @@ function route(request: NextRequest, signedIn: boolean) {
   const to = (path: string, status: 307 | 308 = 307) => NextResponse.redirect(new URL(path, request.url), status)
 
   if (under(pathname, APP_PATHS)) {
-    if (!signedIn && under(pathname, PROTECTED_PATHS)) return to(localizePath("/login", preferredLocale(request)))
+    if (!signedIn && under(pathname, PROTECTED_PATHS)) {
+      // a plan picked on the pricing page survives the detour through log-in (lib/next-path.ts)
+      const next = safeNextPath(pathname + search)
+      return to(localizePath("/login", preferredLocale(request)) + (next ? `?next=${encodeURIComponent(next)}` : ""))
+    }
     return NextResponse.next()
   }
 

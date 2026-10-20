@@ -2,6 +2,7 @@
 import type { Metadata } from "next"
 import { cookies, headers } from "next/headers"
 import { notFound } from "next/navigation"
+import { billingLive } from "@/lib/billing/live"
 import { siteUrl } from "@/lib/site"
 import { DEFAULT_LOCALE, isLocale, LOCALE_COOKIE, LOCALE_META, LOCALES, localizePath, matchLocale, type Locale } from "./config"
 import { en, type Dictionary } from "./dictionaries/en"
@@ -13,6 +14,31 @@ import { tr } from "./dictionaries/tr"
 const DICTIONARIES: Record<Locale, Dictionary> = { en, tr, lt, lv, et }
 
 export const getDictionary = (locale: Locale) => DICTIONARIES[locale]
+
+/** `dict` with its `launch` wording in place of "free during the beta", for once plans are on sale. */
+export function withLaunchCopy(dict: Dictionary): Dictionary {
+  const l = dict.launch
+  return {
+    ...dict,
+    meta: { ...dict.meta, pricing: { ...dict.meta.pricing, description: l.metaPricing }, signup: { ...dict.meta.signup, description: l.metaSignup } },
+    hero: { ...dict.hero, badge: l.heroBadge, note: l.heroNote },
+    landing: {
+      ...dict.landing,
+      faq: { ...dict.landing.faq, items: dict.landing.faq.items.map((item) => (item.q === l.faqCost.q ? l.faqCost : item)) },
+      closing: { ...dict.landing.closing, lede: l.closingLede },
+    },
+    pricing: { ...dict.pricing, titleA: l.pricingTitleA, titleB: l.pricingTitleB, lede: l.pricingLede },
+  }
+}
+
+/**
+ * The public pages' dictionary: the beta wording until billing is live (lib/billing/live.ts). Pages
+ * that use it are regenerated every minute (revalidate in app/[lang]/layout.tsx), and at once when
+ * staff flip the flag.
+ */
+export async function getMarketingDictionary(locale: Locale): Promise<Dictionary> {
+  return (await billingLive()) ? withLaunchCopy(getDictionary(locale)) : getDictionary(locale)
+}
 
 // For pages under app/[lang]: an unknown segment is a 404, not a crash
 export async function resolveLocale(params: Promise<{ lang: string }>): Promise<Locale> {

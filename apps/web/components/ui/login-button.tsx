@@ -4,14 +4,12 @@ import { useI18n } from "@/components/i18n/provider";
 
 type AuthMode = "login" | "register";
 
-// The auth modal lives in the page's Hero; it grows out of the clicked element.
-export function openAuth(mode: AuthMode, from?: Element | null) {
+// The auth modal lives in the page's Hero; it grows out of the clicked element. `next` is where to
+// go once signed in (lib/next-path.ts decides what's allowed).
+export function openAuth(mode: AuthMode, from?: Element | null, next?: string) {
   const r = from?.getBoundingClientRect();
-  window.dispatchEvent(
-    new CustomEvent(`apex:open-${mode}`, {
-      detail: r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : { x: window.innerWidth / 2, y: window.innerHeight / 2 },
-    }),
-  );
+  const at = r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+  window.dispatchEvent(new CustomEvent(`apex:open-${mode}`, { detail: { ...at, ...(next !== undefined && { next }) } }));
 }
 
 // Without JS the link still works: /login opens the same modal after hydration

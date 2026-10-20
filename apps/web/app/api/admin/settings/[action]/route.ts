@@ -1,3 +1,4 @@
+import { revalidatePath } from "next/cache"
 import { clearSettingsCache, setFeatureFlag, setSignupsMode } from "@apex/db"
 import { withAdminAction, type AdminActionContext } from "@/lib/admin"
 import { errorJson } from "@/lib/auth"
@@ -23,7 +24,12 @@ const ACTIONS: Record<string, ReturnType<typeof withAdminAction<Params>>> = {
 
   flag: withAdminAction<Params>(options("settings.flag"), async ({ tx, admin, body }: Ctx) => {
     const c = await setFeatureFlag(tx, admin.user.id, body.flag, { enabled: body.enabled, organizationId: body.organizationId })
-    return { targetId: `flags.${c.extra.flag}`, before: c.before, after: c.after, afterCommit: async () => clearSettingsCache() }
+    const afterCommit = async () => {
+      clearSettingsCache()
+      // the public pages are prerendered with the billing copy (lib/billing/live.ts); rebuild them now
+      if (c.extra.flag === "billing") revalidatePath("/", "layout")
+    }
+    return { targetId: `flags.${c.extra.flag}`, before: c.before, after: c.after, afterCommit }
   }),
 }
 

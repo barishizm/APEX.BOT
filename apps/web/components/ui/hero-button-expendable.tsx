@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { GodRays, MeshGradient } from "@paper-design/shaders-react"
 import { useI18n } from "@/components/i18n/provider"
 import { format } from "@/lib/i18n"
+import { inviteTokenFromPath, safeNextPath } from "@/lib/next-path"
 import { useSignedIn } from "@/lib/signed-in"
 
 function GoogleLogo() {
@@ -127,9 +128,10 @@ export default function Hero({
   const [nextPath, setNextPath] = useState("/verify-email")
   const needsVerify = nextPath.startsWith("/verify-email")
   // An invitation link sends people here with ?next=/invite/<token>: they return there after signing
-  // in, and may sign up with the invited address even while sign-ups aren't open
+  // in, and may sign up with the invited address even while sign-ups aren't open. A plan picked on
+  // the pricing page returns them to the billing page with it (lib/next-path.ts).
   const [afterAuth, setAfterAuth] = useState<string | null>(null)
-  const inviteToken = afterAuth?.slice("/invite/".length) ?? null
+  const inviteToken = inviteTokenFromPath(afterAuth)
   const nextQuery = afterAuth ? `?next=${encodeURIComponent(afterAuth)}` : ""
   // Card height follows its content, animated, so switching forms grows/shrinks smoothly
   const [contentEl, setContentEl] = useState<HTMLDivElement | null>(null)
@@ -179,7 +181,8 @@ export default function Hero({
   // Header "Log in" link and pricing CTAs dispatch these events to open the modal
   useEffect(() => {
     const opener = (mode: "login" | "register") => (e: Event) => {
-      const { x, y } = (e as CustomEvent<{ x: number; y: number }>).detail
+      const { x, y, next } = (e as CustomEvent<{ x: number; y: number; next?: string }>).detail
+      if (next !== undefined) setAfterAuth(safeNextPath(next))
       returnFocus.current = document.activeElement as HTMLElement | null
       setOrigin({ x, y })
       setAuthError(null)
@@ -212,7 +215,7 @@ export default function Hero({
     const query = new URLSearchParams(window.location.search)
     const error = query.get("error")
     const next = query.get("next")
-    setAfterAuth(next && /^\/invite\/[A-Za-z0-9_-]{20,100}$/.test(next) ? next : null)
+    setAfterAuth(safeNextPath(next))
     setAuthError(initialAuth === "login" && error ? (oauthErrors[error] ?? null) : null)
     // drop ?error= so a refresh doesn't replay it
     window.history.replaceState(null, "", window.location.pathname)

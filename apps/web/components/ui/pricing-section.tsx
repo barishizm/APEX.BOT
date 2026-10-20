@@ -6,8 +6,10 @@ import { OVERAGE_BLOCK, PLANS, PLAN_LIMITS, PLAN_PRICES, annualSaving, type Plan
 import { useI18n } from "@/components/i18n/provider";
 import { CONTACT_EMAIL } from "@/components/site-nav";
 import { openAuth } from "@/components/ui/login-button";
+import { billingPath } from "@/lib/billing/intent";
 import { formatNumber, formatPercent } from "@/lib/i18n/format";
 import { LOCALE_META, format, type Locale } from "@/lib/i18n";
+import { useSignedIn } from "@/lib/signed-in";
 import { cn } from "@/lib/utils";
 
 // Names, blurbs and feature wording come from the dictionary; prices and every number in the
@@ -18,10 +20,14 @@ const FEATURED: Plan = "pro";
 const usd = (cents: number, locale: Locale) =>
   new Intl.NumberFormat(LOCALE_META[locale].intl, { style: "currency", currency: "USD", currencyDisplay: "narrowSymbol", maximumFractionDigits: cents % 100 ? 2 : 0 }).format(cents / 100);
 
-export const Component = () => {
+// `billing`: plans are on sale (lib/billing/live.ts). Then a paid plan's button goes to checkout on the
+// billing page with the plan and interval picked here, through sign-up first for a visitor.
+export const Component = ({ billing = false }: { billing?: boolean }) => {
   const { t: dict, locale } = useI18n();
   const t = dict.pricing;
   const [annual, setAnnual] = useState(true);
+  // only a hint; the billing page checks the session and sends a visitor to log in with the plan kept
+  const signedIn = useSignedIn();
 
   return (
     <section className="relative w-full bg-[var(--color-surface)] pb-24 pt-32 text-[var(--color-text)] sm:pb-32 sm:pt-40">
@@ -76,6 +82,13 @@ export const Component = () => {
               pages: formatNumber(limits.websitePages, locale),
               retentionDays: formatNumber(limits.maxRetentionDays, locale),
             };
+            const checkout = billing && id !== "free" ? billingPath({ plan: id, interval: annual ? "year" : "month" }) : null;
+            const ctaClass = cn(
+              "mb-8 flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-md text-sm font-medium no-underline transition-opacity hover:opacity-90 active:scale-[0.98]",
+              featured
+                ? "border-0 bg-[var(--color-text)] text-[var(--color-surface)]"
+                : "border border-[var(--color-line)] bg-transparent text-[var(--color-text)]",
+            );
             return (
               <article
                 key={id}
@@ -106,19 +119,25 @@ export const Component = () => {
                   )}
                 </div>
 
-                <button
-                  type="button"
-                  onClick={(e) => openAuth("register", e.currentTarget)}
-                  className={cn(
-                    "mb-8 flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-md text-sm font-medium transition-opacity hover:opacity-90 active:scale-[0.98]",
-                    featured
-                      ? "border-0 bg-[var(--color-text)] text-[var(--color-surface)]"
-                      : "border border-[var(--color-line)] bg-transparent text-[var(--color-text)]",
-                  )}
-                >
-                  {copy.cta}
-                  {featured && <ArrowRight className="h-4 w-4" aria-hidden />}
-                </button>
+                {checkout ? (
+                  <a
+                    href={checkout}
+                    onClick={(e) => {
+                      if (signedIn) return;
+                      e.preventDefault();
+                      openAuth("register", e.currentTarget, checkout);
+                    }}
+                    className={ctaClass}
+                  >
+                    {format(dict.launch.paidCta, { plan: copy.name })}
+                    {featured && <ArrowRight className="h-4 w-4" aria-hidden />}
+                  </a>
+                ) : (
+                  <button type="button" onClick={(e) => openAuth("register", e.currentTarget)} className={ctaClass}>
+                    {copy.cta}
+                    {featured && <ArrowRight className="h-4 w-4" aria-hidden />}
+                  </button>
+                )}
 
                 <div className="mb-6 h-px w-full bg-[var(--color-line)]" />
 

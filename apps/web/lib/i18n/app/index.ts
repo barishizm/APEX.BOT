@@ -2,6 +2,7 @@ import type { Locale } from "../config"
 import { account } from "./account"
 import { admin, type AdminMessages } from "./admin"
 import { analytics } from "./analytics"
+import { billing } from "./billing"
 import { inbox } from "./inbox"
 import { knowledge } from "./knowledge"
 import { overview } from "./overview"
@@ -14,7 +15,7 @@ import { support } from "./support"
 import { team } from "./team"
 
 // The signed-in app's strings, one namespace per area. Register new namespaces here.
-const NAMESPACES = { shell, setup, overview, analytics, account, settings, inbox, knowledge, studio, sites, team, support }
+const NAMESPACES = { shell, setup, overview, analytics, account, settings, billing, inbox, knowledge, studio, sites, team, support }
 
 type Namespaces = typeof NAMESPACES
 export type AdminDictionary = AdminMessages

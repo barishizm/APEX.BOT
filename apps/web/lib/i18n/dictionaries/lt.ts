@@ -352,6 +352,19 @@ export const lt: Dictionary = {
     closePanel: "Uždaryti peržiūros langą",
   },
 
+  launch: {
+    metaPricing: "Apex Bot planai: pradėkite nemokamai, vėliau – Starter, Pro arba Business, apmokami kas mėnesį arba kasmet.",
+    metaSignup: "Susikurkite Apex Bot paskyrą ir per kelias minutes paruoškite savo svetainei dirbtinio intelekto pagalbos asistentą. Pradėkite nuo nemokamo plano.",
+    heroBadge: "Penkios kalbos · Atsakymai iš jūsų svetainės",
+    heroNote: "Nemokamas planas · Mokėjimo kortelės nereikia",
+    faqCost: { q: "Kiek tai kainuoja?", a: "Mažoms svetainėms yra nemokamas planas, taip pat Starter, Pro ir Business planai, apmokami kas mėnesį arba kasmet. Ką apima kiekvienas planas, rasite kainų puslapyje." },
+    closingLede: "Paruošimas užtrunka kelias minutes. Pradėkite nuo nemokamo plano.",
+    pricingTitleA: "Pradėkite nemokamai.",
+    pricingTitleB: "Patobulinkite, kai prireiks daugiau.",
+    pricingLede: "Kiekvienas planas atsako iš jūsų turinio penkiomis kalbomis. Kainos nurodytos USD; kur taikoma, mokestis pridedamas mokant.",
+    paidCta: "Rinktis {plan}",
+  },
+
   pricing: {
     eyebrow: "Kainos",
     titleA: "Nemokamai beta laikotarpiu.",

@@ -352,6 +352,19 @@ export const et: Dictionary = {
     closePanel: "Sulge eelvaate aken",
   },
 
+  launch: {
+    metaPricing: "Apex Boti paketid: alustage tasuta, seejärel Starter, Pro või Business igakuise või iga-aastase arveldusega.",
+    metaSignup: "Looge Apex Bot konto ja seadistage oma veebisaidile tehisintellektil põhinev tugiassistent mõne minutiga. Alustage tasuta paketiga.",
+    heroBadge: "Viis keelt · Vastused teie enda saidilt",
+    heroNote: "Tasuta pakett · Pangakaarti pole vaja",
+    faqCost: { q: "Kui palju see maksab?", a: "Väikestele saitidele on tasuta pakett, lisaks Starter-, Pro- ja Business-paketid igakuise või iga-aastase arveldusega. Mida iga pakett sisaldab, vaadake hinnalehelt." },
+    closingLede: "Seadistamine võtab mõne minuti. Alustage tasuta paketiga.",
+    pricingTitleA: "Alustage tasuta.",
+    pricingTitleB: "Laiendage, kui vajate rohkem.",
+    pricingLede: "Iga pakett vastab teie enda sisu põhjal viies keeles. Hinnad on USA dollarites; kus kohaldub, lisatakse maks makse ajal.",
+    paidCta: "Vali {plan}",
+  },
+
   pricing: {
     eyebrow: "Hinnad",
     titleA: "Beetaversiooni ajal tasuta.",

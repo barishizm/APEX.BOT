@@ -352,6 +352,19 @@ export const tr: Dictionary = {
     closePanel: "Önizleme panelini kapat",
   },
 
+  launch: {
+    metaPricing: "Apex Bot planları: ücretsiz başlayın, sonra aylık ya da yıllık faturalanan Starter, Pro veya Business.",
+    metaSignup: "Apex Bot hesabınızı oluşturun ve web siteniz için yapay zekâ destek asistanını dakikalar içinde kurun. Ücretsiz planla başlayın.",
+    heroBadge: "Beş dil · Kendi sitenizden yanıtlar",
+    heroNote: "Ücretsiz plan · Kredi kartı gerekmez",
+    faqCost: { q: "Ücreti ne kadar?", a: "Küçük siteler için ücretsiz bir plan, ayrıca aylık ya da yıllık faturalanan Starter, Pro ve Business planları var. Her planın içeriği için fiyatlandırma sayfasına göz atın." },
+    closingLede: "Kurulum birkaç dakika sürer. Ücretsiz planla başlayın.",
+    pricingTitleA: "Ücretsiz başlayın.",
+    pricingTitleB: "Gerektiğinde yükseltin.",
+    pricingLede: "Her plan beş dilde, kendi içeriğinizden yanıt verir. Fiyatlar USD cinsindendir; geçerli olduğu yerlerde vergi ödeme sırasında eklenir.",
+    paidCta: "{plan} planını seçin",
+  },
+
   pricing: {
     eyebrow: "Fiyatlandırma",
     titleA: "Beta süresince ücretsiz.",
