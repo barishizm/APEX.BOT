@@ -42,6 +42,8 @@ export async function isPlatformAdmin(q: Queryable, userId: string, role?: Platf
 export interface AuditEntry {
   /** The staff member; null for system actions such as the bootstrap. */
   actorId: string | null
+  /** Who acted when no staff member did, e.g. "system:billing"; kept where a staff member's email goes. */
+  actorLabel?: string | null
   /** What was done, e.g. "user.suspend" or "bot.disable". */
   action: string
   /** What it was done to, e.g. "user", "organization", "bot", "setting". */
@@ -65,7 +67,7 @@ export async function writeAudit(q: Queryable, entry: AuditEntry): Promise<strin
   if (!entry.action || !entry.targetType) throw new AdminError("invalid_input", "An audit entry needs an action and a target type")
   const { rows } = await q.query<{ id: string }>(
     `insert into app.admin_audit_log (actor_id, actor_email, action, target_type, target_id, reason, before, after, ip, user_agent)
-     values ($1, (select email from app.users where id = $1::uuid), $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9) returning id::text`,
+     values ($1, coalesce((select email from app.users where id = $1::uuid), $10), $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9) returning id::text`,
     [
       entry.actorId,
       entry.action.slice(0, 100),
@@ -76,6 +78,7 @@ export async function writeAudit(q: Queryable, entry: AuditEntry): Promise<strin
       json(entry.after),
       cleanIp(entry.ip),
       entry.userAgent ? entry.userAgent.slice(0, 512) : null,
+      entry.actorId ? null : (entry.actorLabel?.slice(0, 100) ?? null),
     ],
   )
   return rows[0]!.id

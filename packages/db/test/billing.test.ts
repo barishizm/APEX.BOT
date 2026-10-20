@@ -88,9 +88,10 @@ describe("effective plan", () => {
     assert.equal(effectivePlan(canceling, [], at(31)).plan, "free")
   })
 
-  test("the highest of subscription and running overrides wins", () => {
+  test("a running override comes before the subscription; the highest of several overrides wins", () => {
     assert.deepEqual(effectivePlan({ ...base, plan: "starter" }, [override("business", -1, 1)], T0), { plan: "business", source: "override" })
-    assert.deepEqual(effectivePlan(base, [override("starter", -1, 1)], T0), { plan: "pro", source: "subscription" })
+    assert.deepEqual(effectivePlan(base, [override("starter", -1, 1)], T0), { plan: "starter", source: "override" })
+    assert.deepEqual(effectivePlan(base, [override("starter", -1, 1), override("business", -1, 1)], T0), { plan: "business", source: "override" })
     // not started, ended, revoked
     assert.equal(effectivePlan(null, [override("pro", 1, 2), override("pro", -2, 0), override("pro", -1, 1, true)], T0).plan, "free")
   })

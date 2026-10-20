@@ -1,6 +1,12 @@
 // Directives that cannot break Next's inline bootstrap scripts. A script-src policy
-// needs per-request nonces and is not set here.
-const csp = ["frame-ancestors 'none'", "base-uri 'self'", "object-src 'none'"].join("; ");
+// needs per-request nonces and is not set here, and without one connect-src would only
+// fence in fetches an injected script could still make another way; so Paddle.js
+// (cdn.paddle.com) and its API calls need no entry.
+//
+// frame-src lists every frame we open: the Turnstile challenge and Paddle's overlay
+// checkout (lib/billing/paddle-js.ts), live and sandbox. A new embed must be added here.
+const frameSrc = ["'self'", "https://challenges.cloudflare.com", "https://buy.paddle.com", "https://sandbox-buy.paddle.com"];
+const csp = ["frame-ancestors 'none'", "base-uri 'self'", "object-src 'none'", `frame-src ${frameSrc.join(" ")}`].join("; ");
 
 const securityHeaders = [
   { key: "Content-Security-Policy", value: csp },

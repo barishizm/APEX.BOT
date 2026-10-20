@@ -297,6 +297,16 @@ Ortam değişkenleri:
 | `APEX_CRAWL_ALLOW_PRIVATE` | web | Sadece yerel geliştirme: tarayıcının yerel ağdaki siteleri okumasına izin verir |
 | `GOOGLE_*`, `GITHUB_*` | web | Google / GitHub ile giriş |
 | `NEXT_PUBLIC_CONTACT_EMAIL` | web | Sitede ve yasal sayfalarda gösterilen iletişim adresi |
+| `PADDLE_ENV` | web | Faturalama ortamı: `sandbox` (varsayılan) veya `production`. Aşağıdaki anahtarlar ve price id'ler aynı ortamdan olmalı; uyuşmazsa faturalama kapalı kalır ([ADR 0003](docs/adr/0003-billing.md)) |
+| `PADDLE_API_KEY` | web | Paddle sunucu API anahtarı (`pdl_sdbx_apikey_…` / `pdl_live_apikey_…`) |
+| `PADDLE_WEBHOOK_SECRET` | web | Paddle bildirim hedefinin gizli anahtarı; webhook'ların `Paddle-Signature` doğrulaması |
+| `NEXT_PUBLIC_PADDLE_CLIENT_TOKEN` | web | Paddle.js istemci tokeni (`test_…` / `live_…`); tarayıcıya gider, gizli değildir |
+| `PADDLE_PRICE_STARTER_MONTH`, `PADDLE_PRICE_STARTER_YEAR`, `PADDLE_PRICE_PRO_MONTH`, `PADDLE_PRICE_PRO_YEAR`, `PADDLE_PRICE_BUSINESS_MONTH`, `PADDLE_PRICE_BUSINESS_YEAR` | web | Plan × dönem → Paddle `price_id` (`pri_…`) eşlemesi; altısı da gerekli ve birbirinden farklı olmalı. Sandbox ve canlı id'ler farklıdır |
+| `PADDLE_PRICE_OVERAGE` | web | İsteğe bağlı: 100 yanıtlık aşım bloğunun tek seferlik (`billing_cycle` boş) fiyatı. Yoksa aşım faturalanamaz |
+
+Faturalama değişkenlerinden biri eksik ya da hatalıysa faturalama **kapalı** kalır: uygulama çalışmaya devam eder, ödeme/plan değişikliği yapılamaz ve `/admin/system` hangi değişkenin eksik ya da neden kullanılamadığını gösterir.
+
+Değişkenler tamam olsa da planlar, `/admin/settings` içindeki **`billing`** özellik bayrağı açılana kadar satışa çıkmaz. Bayrak açıkken fiyat sayfasındaki ücretli plan düğmeleri `/dashboard/settings/billing?plan=…&interval=…` adresine gider (giriş yapmamış ziyaretçi önce kayıt olur, plan korunur), ödeme Paddle overlay checkout ile açılır ve herkese açık sayfalardaki "beta boyunca ücretsiz" metinleri lansman metinleriyle değişir (sayfalar en geç bir dakikada, bayrak değişince hemen yenilenir). `PADDLE_WEBHOOK_SECRET` değişirse yarım kalmış ödemelerin webhook'ları çalışma alanını kayıtlı abonelikten bulur; `custom_data` imzası bu anahtarla atılır.
 
 ## Çok dilli site (i18n)
 

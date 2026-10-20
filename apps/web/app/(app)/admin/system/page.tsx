@@ -4,6 +4,7 @@ import { AlertTriangle, CircleCheck, Info, RefreshCw } from "lucide-react"
 import {
   KNOWLEDGE_REFRESH_JOB,
   RETENTION_SWEEP_JOB,
+  listBillingEventIssues,
   maskPII,
   migrationStatus,
   readApiRuntime,
@@ -14,6 +15,7 @@ import {
 } from "@apex/db"
 import { Empty, Section, Table, tag, td } from "@/components/admin/detail-ui"
 import { requirePlatformAdmin } from "@/lib/auth"
+import { BILLING_ENV_KEYS, billingStatus } from "@/lib/billing"
 import { db } from "@/lib/db"
 import { format } from "@/lib/i18n"
 import { getAdminDictionary } from "@/lib/i18n/app"
@@ -69,6 +71,7 @@ const WEB_ENV_KEYS = [
   "APEX_CRAWL_ALLOW_PRIVATE",
   "SIGNUPS_MODE",
   "TRUST_PROXY",
+  ...BILLING_ENV_KEYS,
 ] as const
 
 const STATE_TONE: Record<ServiceState, string> = {
@@ -169,12 +172,13 @@ export default async function AdminSystemPage() {
   const [system, runtime] = await Promise.all([checkSystem(), load(readApiRuntime(db()))])
   const api = system.api.state === "ok" ? system.api.data : null
   const embeddingModel = api?.runtime ? api.runtime.embeddings : runtime.ok ? (runtime.value?.embeddings ?? null) : null
-  const [migrations, queues, refreshRuns, sweepRuns, mail] = await Promise.all([
+  const [migrations, queues, refreshRuns, sweepRuns, mail, webhooks] = await Promise.all([
     load(migrationStatus(db())),
     load(systemQueues(db(), embeddingModel)),
     load(recentJobRuns(db(), KNOWLEDGE_REFRESH_JOB, 8)),
     load(recentJobRuns(db(), RETENTION_SWEEP_JOB, 8)),
     load(recentEmailFailures(db())),
+    load(listBillingEventIssues(db())),
   ])
 
   const pending = migrations.ok ? migrations.value.pending : []
@@ -209,6 +213,7 @@ export default async function AdminSystemPage() {
     </Table>
   )
 
+  const billing = billingStatus()
   const webCommit = process.env.VERCEL_GIT_COMMIT_SHA ?? null
   const apiRuntime = api?.runtime
   const reported = runtime.ok ? runtime.value : null
@@ -307,6 +312,61 @@ export default async function AdminSystemPage() {
           )}
         </Section>
       </div>
+
+      <Section title={t.billing.title}>
+        {billing.enabled ? (
+          <>
+            <p className="m-0 flex items-center gap-2 text-sm">
+              <CircleCheck className="h-4 w-4 text-green-600 dark:text-green-400" aria-hidden />
+              {format(t.billing.on, { environment: billing.environment })}
+            </p>
+            {!billing.overage && <Alert tone="info">{t.billing.noOverage}</Alert>}
+          </>
+        ) : (
+          <Alert tone="info" title={t.billing.off}>
+            <p className="m-0">{t.billing.offHelp}</p>
+            <Facts
+              rows={[
+                ...(billing.missing.length ? [[t.billing.missing, <Mono key="m">{billing.missing.join(", ")}</Mono>] as [string, React.ReactNode]] : []),
+                ...billing.invalid.map(
+                  (i) =>
+                    [
+                      t.billing.invalid,
+                      <span key={i.key} className="text-[var(--color-text)]">
+                        <Mono>{i.key}</Mono> {i.reason}
+                      </span>,
+                    ] as [string, React.ReactNode],
+                ),
+              ]}
+            />
+          </Alert>
+        )}
+        <h3 className="m-0 text-sm font-semibold">{t.billing.webhooks.title}</h3>
+        {!webhooks.ok ? (
+          <Alert tone="bad">{format(t.billing.webhooks.unavailable, { error: webhooks.error })}</Alert>
+        ) : webhooks.value.total === 0 ? (
+          <Empty>{t.billing.webhooks.none}</Empty>
+        ) : (
+          <>
+            <Alert tone="warn">{format(t.billing.webhooks.count, { n: num(webhooks.value.total) })}</Alert>
+            <Table head={[t.billing.webhooks.columns.event, t.billing.webhooks.columns.received, t.billing.webhooks.columns.attempts, t.billing.webhooks.columns.error]}>
+              {webhooks.value.events.map((e) => (
+                <tr key={e.id} className="border-t border-[var(--color-line)]">
+                  <td className={td}>
+                    <span className="block font-medium">{e.eventType}</span>
+                    <Mono>{e.eventId}</Mono>
+                  </td>
+                  <td className={cn(td, "whitespace-nowrap")} title={at(e.receivedAt)}>
+                    {ago(e.receivedAt)}
+                  </td>
+                  <td className={cn(td, "tabular-nums")}>{num(e.attempts)}</td>
+                  <td className={td}>{e.error ? <ErrorText>{maskPII(e.error)}</ErrorText> : <Badge tone={MUTED}>{t.billing.webhooks.waiting}</Badge>}</td>
+                </tr>
+              ))}
+            </Table>
+          </>
+        )}
+      </Section>
 
       <Section title={t.migrations.title}>
         {!migrations.ok ? (

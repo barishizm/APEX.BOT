@@ -352,6 +352,19 @@ export const lv: Dictionary = {
     closePanel: "Aizvērt priekšskatījuma logu",
   },
 
+  launch: {
+    metaPricing: "Apex Bot plāni: sāciet bez maksas, pēc tam Starter, Pro vai Business ar ikmēneša vai ikgadējo apmaksu.",
+    metaSignup: "Izveidojiet Apex Bot kontu un dažās minūtēs iestatiet savai vietnei mākslīgā intelekta atbalsta asistentu. Sāciet ar bezmaksas plānu.",
+    heroBadge: "Piecas valodas · Atbildes no jūsu vietnes",
+    heroNote: "Bezmaksas plāns · Maksājumu karte nav vajadzīga",
+    faqCost: { q: "Cik tas maksā?", a: "Mazām vietnēm ir bezmaksas plāns, kā arī Starter, Pro un Business plāni ar ikmēneša vai ikgadējo apmaksu. Ko ietver katrs plāns, skatiet cenu lapā." },
+    closingLede: "Iestatīšana aizņem dažas minūtes. Sāciet ar bezmaksas plānu.",
+    pricingTitleA: "Sāciet bez maksas.",
+    pricingTitleB: "Paplašiniet, kad vajag vairāk.",
+    pricingLede: "Katrs plāns atbild no jūsu satura piecās valodās. Cenas norādītas USD; kur piemērojams, nodoklis tiek pieskaitīts apmaksas laikā.",
+    paidCta: "Izvēlēties {plan}",
+  },
+
   pricing: {
     eyebrow: "Cenas",
     titleA: "Bez maksas beta versijas laikā.",

@@ -163,14 +163,53 @@ interface BillingProvider {
 }
 ```
 
+- Implemented (2026-10-20) as `BillingProvider` in `apps/web/lib/billing/` (`types.ts`; Paddle in `paddle.ts`
+  over `fetch`, configuration in `config.ts`); the sketch above became `checkoutConfig`, `portalUrl`,
+  `previewChange`/`changePlan`, `cancelAtPeriodEnd`/`resume`, `createOneTimeCharge`, `listInvoices`,
+  `verifyWebhook` and `normalizeEvent`. Without every key and price id billing is off and `/admin/system` says
+  why. Three things Paddle can't do directly:
+  - **No idempotency keys.** `createOneTimeCharge` bills a non-catalog copy of each price whose internal
+    description carries the key, and first looks for a charge with it on the subscription.
+  - **No scheduled item change.** A downgrade swaps the items with `full_next_billing_period` (the lower price
+    bills from the renewal) and stores the paid plan and period end in the subscription's `custom_data`;
+    `normalizeEvent` keeps the paid plan until then and reports the downgrade as the scheduled change.
+  - **Billing frequency changes are immediate only.** Annual → monthly is therefore prorated now (the unused
+    time is credited to the customer's Paddle balance) instead of waiting for the period end.
+- Implemented (2026-10-20): checkout. The pricing page's paid-plan buttons (behind the `billing` flag, which also
+  swaps "free during the beta" for launch copy on the public pages) lead to `/dashboard/settings/billing?plan=…&interval=…`,
+  through sign-up for a visitor (`?next=`, `lib/next-path.ts`). `POST /api/billing/checkout` (owner or admin, flag on,
+  no running subscription, 10 per 10 min per user) creates the Paddle **transaction on the server**: price, customer
+  (the workspace's, else the payer's by email, unless it already pays for another workspace) and `custom_data`. The
+  browser gets only the transaction id and opens Paddle.js's overlay on it, in the dashboard's language where Paddle
+  has it (en, tr; English otherwise). `custom_data` carries `organization_id` with `apex_org_sig`, an HMAC under
+  the webhook secret; `normalizeEvent` trusts `organization_id` only with a valid signature, since Paddle.js lets
+  anyone holding the public client token open a checkout with any custom data. Every subscription update rewrites
+  the signature. After the overlay completes, the page polls `GET /api/billing/checkout/<txn>` until the webhook
+  has stored the subscription that transaction created (90 s, then a support link with the transaction as
+  reference). The CSP's `frame-src` allows `buy.paddle.com` and `sandbox-buy.paddle.com`.
 - `BillingEvent` is our own normalised type (`subscription.activated | renewed | changed | past_due | canceled`,
   `payment.succeeded | failed`). Plan, quota and grace logic read only these and our tables, never provider payloads.
 - Webhooks are verified (Paddle's `Paddle-Signature` HMAC), stored by event id before processing (idempotent, replayable
   from the admin area) and processed in a transaction that writes `app.organizations.plan`.
+- Implemented (2026-10-20) at `POST /api/billing/webhooks/paddle` (`apps/web/lib/billing/webhook.ts`): 256 KiB body
+  cap, 300 deliveries/min per address, then the signature, then the inbox. Paddle gets a 2xx once the event is
+  stored, even when applying it fails or its workspace is unknown (no valid `custom_data.organization_id` and no
+  stored subscription, or a customer other than the workspace's): those stay unprocessed with the reason and are
+  listed on `/admin/system`. Processing past 4 s finishes after the response. Nothing from the payload is logged.
+- Implemented (2026-10-20): the state change itself is `applyBillingEvent` in `packages/db/src/billing.ts`. It
+  takes `subscription.created | updated | activated | past_due | paused | canceled`, `transaction.completed |
+  payment_failed` and `customer.updated`, checks each against a transition table (`EVENT_TRANSITIONS`,
+  `STATUS_TRANSITIONS`; canceled is final) and rejects anything else, which stays unprocessed in the inbox with the
+  reason. Upgrades apply now; a downgrade inside the paid period, and a cancellation while paid up, are stored as a
+  `scheduled_change` for the period end, which the plan computation also applies once due. The effective plan is a
+  running override first (the highest, if several), then trialing/active, then past_due within grace, then Free:
+  an override now wins even over a higher subscription, unlike "the highest wins" in migration 0035's comment. When
+  the plan changes, the current window's reply usage moves to the new anchor (`alignReplyUsage`; overage stays on
+  the old window), and every change is written to `app.admin_audit_log` with the actor `system:billing`.
 - New tables: `app.subscriptions` (organization, provider, provider subscription and customer ids, plan, interval,
   status, period start/end, `grace_until`, scheduled change, overage on/cap), `app.usage_windows` (organization, window
   start/end, used fifths, overage blocks opened, overage charged at) and `app.billing_events`. All under the same row
-  level security as the rest of `app.*`; only the owner role changes billing.
+  level security as the rest of `app.*`; the owner and admins change billing (members only see the plan).
 - The usage counter is incremented in the same place the daily token count is recorded, after the answer is delivered,
   and checked before the model call. Like `TokenBudget`, the in-process check is a shortcut until the API runs on more
   than one instance; Postgres holds the authoritative count, and a few replies over the line at a window's edge are

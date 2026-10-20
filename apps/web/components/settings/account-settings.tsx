@@ -1,11 +1,13 @@
 "use client"
 
 import { Check, Copy, Download, LoaderCircle, ShieldCheck } from "lucide-react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { useAppI18n } from "@/components/i18n/app-provider"
 import { useSetLocale } from "@/components/i18n/use-set-locale"
 import { Group, TextInput, Toggle } from "@/components/widget-studio/fields"
+import { BILLING_PATH } from "@/lib/billing/intent"
 import { format, isLocale, LOCALE_META, LOCALES, localizePath } from "@/lib/i18n"
 import { formatDate, plural } from "@/lib/i18n/format"
 
@@ -491,6 +493,12 @@ export function AccountSettings({ initial, adminTwoFactor = false }: { initial: 
             {t.adminTwoFactor}
           </p>
         )}
+        <Group title={app.billing.settingsLink} description={app.billing.settingsLinkText}>
+          <Link href={BILLING_PATH} className={ghost}>
+            {app.billing.title}
+          </Link>
+        </Group>
+
         <Group title={t.profile}>
           <form onSubmit={saveProfile} className="flex flex-col gap-4">
             <TextInput label={t.displayName} value={displayName} onChange={setDisplayName} hint={t.displayNameHint} />

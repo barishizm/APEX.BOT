@@ -1,7 +1,8 @@
 import type { Db, Queryable } from "./db.ts"
+import { writeAudit } from "./admin.ts"
 import { BOT_SERVING_SQL } from "./bots.ts"
 import { flagEnabled, readPlatformSettings } from "./platform-settings.ts"
-import { PLANS, PLAN_LIMITS, type Plan } from "./plans.ts"
+import { PLANS, PLAN_LIMITS, replyWindow, type Plan } from "./plans.ts"
 
 // Subscriptions, plan overrides, webhook inbox and reply usage (docs/adr/0003-billing.md,
 // migrations/0035_billing.sql). app.organizations.plan is a cache of effectivePlan(); every write
@@ -48,29 +49,55 @@ export type PlanSource = "subscription" | "override" | "free"
 
 const rank = (plan: Plan) => PLANS.indexOf(plan)
 
-/** Whether the subscription still grants its plan at `now`. */
-export function subscriptionGrants(sub: Pick<Subscription, "status" | "graceUntil" | "cancelAtPeriodEnd" | "currentPeriodEnd">, now: Date) {
+type GrantFields = Pick<Subscription, "plan" | "status" | "graceUntil" | "cancelAtPeriodEnd" | "currentPeriodEnd" | "scheduledChange">
+
+/**
+ * The paid plan the subscription grants at `now`, or null. A scheduled change that is due applies
+ * even before the provider's event for it arrives (backstop for a lost webhook).
+ */
+export function subscriptionPlanAt(sub: GrantFields, now: Date): PaidPlan | null {
+  const change = sub.scheduledChange
+  const due = change !== null && now >= new Date(change.effectiveAt)
   switch (sub.status) {
     case "trialing":
     case "active":
       // backstop for a lost "canceled" webhook: a cancellation at period end stops there
-      return !(sub.cancelAtPeriodEnd && now >= sub.currentPeriodEnd)
+      if (sub.cancelAtPeriodEnd && now >= sub.currentPeriodEnd) return null
+      if (!change || !due) return sub.plan
+      return change.action === "change" ? (change.plan ?? sub.plan) : null
     case "past_due":
-      return sub.graceUntil !== null && now < sub.graceUntil
+      return sub.graceUntil !== null && now < sub.graceUntil ? sub.plan : null
+    case "canceled":
+      // canceled mid-period while paid up (applyBillingEvent): the paid period runs out first
+      return change?.action === "cancel" && !due ? sub.plan : null
     default:
-      return false
+      return null
   }
 }
 
-/** The plan a workspace is entitled to from its subscription and overrides: the highest that applies. */
+/** Whether the subscription still grants a plan at `now`. */
+export function subscriptionGrants(sub: GrantFields, now: Date) {
+  return subscriptionPlanAt(sub, now) !== null
+}
+
+/** Where the workspace's reply windows count from: the granting subscription's period start, else calendar months. */
+export function quotaAnchor(sub: (GrantFields & Pick<Subscription, "currentPeriodStart">) | null, now: Date): Date | null {
+  return sub && subscriptionGrants(sub, now) ? sub.currentPeriodStart : null
+}
+
+/**
+ * The plan a workspace is entitled to, in order: a running override (the highest, if several), then
+ * what the subscription grants (trialing or active; past_due within its grace), then Free.
+ */
 export function effectivePlan(sub: Subscription | null, overrides: PlanOverride[], now: Date): { plan: Plan; source: PlanSource } {
-  let best: { plan: Plan; source: PlanSource } = { plan: "free", source: "free" }
-  if (sub && subscriptionGrants(sub, now)) best = { plan: sub.plan, source: "subscription" }
+  let override: PaidPlan | null = null
   for (const o of overrides) {
     const running = !o.revokedAt && o.startsAt <= now && now < o.endsAt
-    if (running && rank(o.plan) > rank(best.plan)) best = { plan: o.plan, source: "override" }
+    if (running && (!override || rank(o.plan) > rank(override))) override = o.plan
   }
-  return best
+  if (override) return { plan: override, source: "override" }
+  const paid = sub ? subscriptionPlanAt(sub, now) : null
+  return paid ? { plan: paid, source: "subscription" } : { plan: "free", source: "free" }
 }
 
 const SUBSCRIPTION_COLUMNS = `organization_id as "organizationId", provider, provider_subscription_id as "providerSubscriptionId",
@@ -129,6 +156,36 @@ export async function upsertBillingCustomer(q: Queryable, input: { organizationI
      on conflict (organization_id) do update set provider = excluded.provider, provider_customer_id = excluded.provider_customer_id`,
     [input.organizationId, input.provider, input.providerCustomerId],
   )
+}
+
+/** The provider's customer id stored for the workspace, or null before its first checkout. */
+export async function getBillingCustomerId(q: Queryable, organizationId: string): Promise<string | null> {
+  const { rows } = await q.query<{ id: string }>("select provider_customer_id as id from app.billing_customers where organization_id = $1", [organizationId])
+  return rows[0]?.id ?? null
+}
+
+/** Whether the workspace exists; locks it for the rest of the transaction, as upsertSubscription does. */
+export async function lockOrganization(q: Queryable, organizationId: string): Promise<boolean> {
+  const { rows } = await q.query("select 1 from app.organizations where id = $1 for update", [organizationId])
+  return rows.length > 0
+}
+
+/** The workspace a provider subscription is stored for, or null when we have none. */
+export async function organizationForSubscription(q: Queryable, provider: BillingProviderId, providerSubscriptionId: string): Promise<string | null> {
+  const { rows } = await q.query<{ id: string }>(
+    "select organization_id as id from app.subscriptions where provider = $1 and provider_subscription_id = $2",
+    [provider, providerSubscriptionId],
+  )
+  return rows[0]?.id ?? null
+}
+
+/** The workspace a provider customer is stored for, or null when we have none. */
+export async function organizationForCustomer(q: Queryable, provider: BillingProviderId, providerCustomerId: string): Promise<string | null> {
+  const { rows } = await q.query<{ id: string }>(
+    "select organization_id as id from app.billing_customers where provider = $1 and provider_customer_id = $2",
+    [provider, providerCustomerId],
+  )
+  return rows[0]?.id ?? null
 }
 
 export type SubscriptionInput = Omit<Subscription, "graceUntil">
@@ -213,6 +270,227 @@ export async function revokePlanOverride(tx: Queryable, overrideId: string, revo
   return refreshEffectivePlan(tx, rows[0].organizationId, now)
 }
 
+// --- Applying provider events ---
+
+export const SUBSCRIPTION_EVENT_TYPES = [
+  "subscription.created",
+  "subscription.updated",
+  "subscription.activated",
+  "subscription.past_due",
+  "subscription.paused",
+  "subscription.canceled",
+] as const
+export type SubscriptionEventType = (typeof SUBSCRIPTION_EVENT_TYPES)[number]
+export type TransactionEventType = "transaction.completed" | "transaction.payment_failed"
+export type BillingEventType = SubscriptionEventType | TransactionEventType | "customer.updated"
+
+/** Who the audit log names for what applyBillingEvent changes. */
+export const BILLING_AUDIT_ACTOR = "system:billing"
+
+/** The provider's view of a subscription in an event. The period is null when the provider dropped it (Paddle does on cancellation). */
+export interface SubscriptionSnapshot {
+  provider: BillingProviderId
+  providerSubscriptionId: string
+  customerId: string
+  plan: PaidPlan
+  interval: BillingInterval
+  status: SubscriptionStatus
+  currentPeriodStart: Date | null
+  currentPeriodEnd: Date | null
+  cancelAtPeriodEnd: boolean
+  scheduledChange: ScheduledChange | null
+}
+
+interface AppliedEventBase {
+  provider: BillingProviderId
+  /** The provider's event id, for the audit trail. */
+  eventId: string
+  /** Resolved by the caller (custom data, the stored subscription or customer). */
+  organizationId: string
+  /** When the provider says it happened; orders events (provider_updated_at). */
+  occurredAt: Date
+}
+
+/** A verified, normalised provider event (lib/billing maps the provider's payloads onto this). */
+export type ApplicableBillingEvent =
+  | (AppliedEventBase & { type: SubscriptionEventType; subscription: SubscriptionSnapshot })
+  | (AppliedEventBase & { type: TransactionEventType; customerId: string | null; subscriptionId: string | null })
+  | (AppliedEventBase & { type: "customer.updated"; customerId: string })
+
+export type BillingRejection =
+  /** Not the customer stored for the workspace: custom data copied or tampered with. */
+  | "customer_mismatch"
+  /** About another subscription than the workspace's live one. */
+  | "subscription_mismatch"
+  /** A second subscription, or a second "created", while the workspace's is live. */
+  | "subscription_exists"
+  /** The event's status doesn't fit its type, or can't follow the stored status. */
+  | "invalid_transition"
+
+/** "none": no subscription yet, or a new one replacing a canceled one. */
+export type TransitionFrom = SubscriptionStatus | "none"
+
+/** Which status may follow which within one subscription. Canceled is final: paying again starts a new subscription. */
+export const STATUS_TRANSITIONS: Record<TransitionFrom, readonly SubscriptionStatus[]> = {
+  none: ["trialing", "active", "past_due", "paused", "canceled"],
+  trialing: ["trialing", "active", "past_due", "paused", "canceled"],
+  active: ["active", "past_due", "paused", "canceled"],
+  past_due: ["past_due", "active", "paused", "canceled"],
+  paused: ["paused", "active", "canceled"],
+  canceled: ["canceled"],
+}
+
+/** What each event may come from and report, on top of STATUS_TRANSITIONS. */
+export const EVENT_TRANSITIONS: Record<SubscriptionEventType, { from: readonly TransitionFrom[]; to: readonly SubscriptionStatus[] }> = {
+  "subscription.created": { from: ["none"], to: ["trialing", "active"] },
+  // also right after "created" with an active status; and before it, when deliveries cross
+  "subscription.activated": { from: ["none", "trialing", "active"], to: ["active"] },
+  "subscription.updated": { from: ["none", "trialing", "active", "past_due", "paused", "canceled"], to: ["trialing", "active", "past_due", "paused", "canceled"] },
+  "subscription.past_due": { from: ["none", "trialing", "active", "past_due"], to: ["past_due"] },
+  "subscription.paused": { from: ["none", "trialing", "active", "past_due", "paused"], to: ["paused"] },
+  "subscription.canceled": { from: ["none", "trialing", "active", "past_due", "paused", "canceled"], to: ["canceled"] },
+}
+
+/** Whether `type` may move a subscription from `from` to `to`. */
+export function isValidTransition(type: SubscriptionEventType, from: TransitionFrom, to: SubscriptionStatus): boolean {
+  const rule = EVENT_TRANSITIONS[type]
+  return rule.from.includes(from) && rule.to.includes(to) && STATUS_TRANSITIONS[from].includes(to)
+}
+
+export type ApplyBillingEventResult =
+  | { outcome: "applied"; plan: EffectivePlanResult; subscription: Subscription | null; auditId: string | null }
+  /** Not newer than what is stored; nothing written. */
+  | { outcome: "stale" }
+  /** Nothing to store: a subscription that never reached us without a period, or the late end of a replaced one. */
+  | { outcome: "ignored"; reason: "no_period" | "superseded" }
+  | { outcome: "rejected"; reason: BillingRejection; message: string }
+  | { outcome: "unknown_organization" }
+
+const rejected = (reason: BillingRejection, message: string): ApplyBillingEventResult => ({ outcome: "rejected", reason, message })
+
+/**
+ * Applies one provider event to the workspace's billing state, in the caller's transaction:
+ *   - checks that it belongs to the workspace's customer and subscription and is a valid transition
+ *     (EVENT_TRANSITIONS); anything else is rejected and nothing is written;
+ *   - an upgrade (or a change of interval) takes effect now; a downgrade inside the paid period is
+ *     stored as a scheduled change for the period end, the paid plan running on until then; a
+ *     cancellation of a paid-up subscription likewise keeps the plan to the period end. A failed
+ *     payment's cancellation (past_due) and a trial's end now;
+ *   - recomputes the effective plan (override > trialing/active > past_due within grace > Free) into
+ *     app.organizations.plan; when it changed, moves the current reply window's usage onto the new
+ *     anchor (alignReplyUsage);
+ *   - records what changed in the audit log as BILLING_AUDIT_ACTOR.
+ * Payments and customer updates change no subscription state (grace follows the subscription's
+ * past_due status) but are checked the same way and recompute the plan.
+ */
+export async function applyBillingEvent(tx: Queryable, event: ApplicableBillingEvent, now = new Date()): Promise<ApplyBillingEventResult> {
+  const org = await tx.query<{ plan: Plan }>("select plan from app.organizations where id = $1 for update", [event.organizationId])
+  if (!org.rows[0]) return { outcome: "unknown_organization" }
+  const previousPlan = org.rows[0].plan
+  const stored = await getSubscription(tx, event.organizationId)
+
+  const customerId = event.type === "customer.updated" ? event.customerId : "subscription" in event ? event.subscription.customerId : event.customerId
+  const storedCustomer = await getBillingCustomerId(tx, event.organizationId)
+  if (storedCustomer && customerId && storedCustomer !== customerId)
+    return rejected("customer_mismatch", `the event's customer isn't the one stored for ${event.organizationId}`)
+
+  let subscription: Subscription | null = stored
+  let refreshed: EffectivePlanResult | null = null
+  if ("subscription" in event) {
+    const s = event.subscription
+    if (stored && event.occurredAt <= stored.providerUpdatedAt) return { outcome: "stale" }
+    const same = stored?.providerSubscriptionId === s.providerSubscriptionId
+    const replacing = stored && !same && stored.status !== "canceled"
+    if (replacing && s.status === "canceled") return { outcome: "ignored", reason: "superseded" }
+    if (replacing)
+      return event.type === "subscription.created"
+        ? rejected("subscription_exists", `${event.organizationId} already has a live subscription`)
+        : rejected("subscription_mismatch", `the event is for another subscription than ${event.organizationId}'s`)
+    const from: TransitionFrom = same ? stored!.status : "none"
+    if (!isValidTransition(event.type, from, s.status))
+      return event.type === "subscription.created" && same
+        ? rejected("subscription_exists", `${event.organizationId} already has this subscription`)
+        : rejected("invalid_transition", `${event.type} can't move a subscription from ${from} to ${s.status}`)
+
+    const currentPeriodStart = s.currentPeriodStart ?? (same ? stored!.currentPeriodStart : null)
+    const currentPeriodEnd = s.currentPeriodEnd ?? (same ? stored!.currentPeriodEnd : null)
+    if (!currentPeriodStart || !currentPeriodEnd) return { outcome: "ignored", reason: "no_period" }
+
+    let { plan, interval, scheduledChange } = s
+    if (same && s.status !== "canceled" && rank(plan) < rank(stored!.plan) && currentPeriodStart < stored!.currentPeriodEnd) {
+      // a downgrade inside the paid period: the paid plan runs on, the lower one starts at its end
+      scheduledChange = { action: "change", plan, interval, effectiveAt: stored!.currentPeriodEnd.toISOString() }
+      plan = stored!.plan
+      interval = stored!.interval
+    }
+    if (same && s.status === "canceled" && stored!.status === "active" && subscriptionGrants(stored!, event.occurredAt) && event.occurredAt < currentPeriodEnd) {
+      // canceled while paid up: the plan runs to the end of the period paid for
+      scheduledChange = { action: "cancel", effectiveAt: currentPeriodEnd.toISOString() }
+      plan = stored!.plan
+    }
+
+    const result = await upsertSubscription(
+      tx,
+      {
+        organizationId: event.organizationId,
+        provider: s.provider,
+        providerSubscriptionId: s.providerSubscriptionId,
+        plan,
+        interval,
+        status: s.status,
+        currentPeriodStart,
+        currentPeriodEnd,
+        cancelAtPeriodEnd: s.cancelAtPeriodEnd,
+        scheduledChange,
+        providerUpdatedAt: event.occurredAt,
+      },
+      now,
+    )
+    if (!result.applied) return { outcome: "stale" }
+    subscription = result.subscription
+    refreshed = result.plan
+  } else if (event.type !== "customer.updated" && event.subscriptionId && stored && stored.providerSubscriptionId !== event.subscriptionId && stored.status !== "canceled") {
+    return rejected("subscription_mismatch", `the payment is for another subscription than ${event.organizationId}'s`)
+  }
+
+  const addedCustomer = !storedCustomer && !!customerId && (event.type === "customer.updated" || "subscription" in event)
+  if (addedCustomer) await upsertBillingCustomer(tx, { organizationId: event.organizationId, provider: event.provider, providerCustomerId: customerId! })
+
+  // upsertSubscription recomputed it for a subscription event; payments and customer updates do it here
+  const effective = refreshed ?? (await refreshEffectivePlan(tx, event.organizationId, now))!
+  if (effective.changed) await alignReplyUsage(tx, event.organizationId, quotaAnchor(stored, now), quotaAnchor(subscription, now), now)
+
+  let auditId: string | null = null
+  if ("subscription" in event || effective.changed || addedCustomer) {
+    auditId = await writeAudit(tx, {
+      actorId: null,
+      actorLabel: BILLING_AUDIT_ACTOR,
+      action: `billing.${event.type}`,
+      targetType: "organization",
+      targetId: event.organizationId,
+      reason: `${event.provider} ${event.eventId}`,
+      before: auditState(previousPlan, stored),
+      after: auditState(effective.plan, subscription),
+    })
+  }
+  return { outcome: "applied", plan: effective, subscription, auditId }
+}
+
+// what the audit log keeps: our own state, nothing from the payload
+const auditState = (plan: Plan, sub: Subscription | null) => ({
+  plan,
+  subscription: sub && {
+    id: sub.providerSubscriptionId,
+    plan: sub.plan,
+    interval: sub.interval,
+    status: sub.status,
+    currentPeriodEnd: sub.currentPeriodEnd.toISOString(),
+    cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
+    scheduledChange: sub.scheduledChange,
+    graceUntil: sub.graceUntil?.toISOString() ?? null,
+  },
+})
+
 // --- Webhook inbox ---
 
 export interface BillingEventInput {
@@ -254,6 +532,32 @@ export async function finishBillingEvent(q: Queryable, id: string, error: string
   )
 }
 
+/** A stored webhook that hasn't been applied: still waiting, failed, or for a workspace we couldn't find. */
+export interface BillingEventIssue {
+  id: string
+  provider: BillingProviderId
+  eventId: string
+  eventType: string
+  occurredAt: Date
+  receivedAt: Date
+  attempts: number
+  error: string | null
+}
+
+/** Unprocessed webhooks, newest first, for the admin area, and how many there are in all. */
+export async function listBillingEventIssues(q: Queryable, limit = 20): Promise<{ total: number; events: BillingEventIssue[] }> {
+  const [count, list] = await Promise.all([
+    q.query<{ total: number }>("select count(*)::int as total from app.billing_events where processed_at is null"),
+    q.query<BillingEventIssue>(
+      `select id::text, provider, event_id as "eventId", event_type as "eventType", occurred_at as "occurredAt",
+              received_at as "receivedAt", attempts, error
+         from app.billing_events where processed_at is null order by received_at desc limit $1`,
+      [limit],
+    ),
+  ])
+  return { total: count.rows[0]!.total, events: list.rows }
+}
+
 // --- Reply usage ---
 
 /** How far past its allowance a window may go under overage, in fifths; the excess is stored as overage_units. */
@@ -292,6 +596,34 @@ export async function replyUsageFifths(q: Queryable, organizationId: string, per
   return Number(rows[0]?.fifths ?? 0)
 }
 
+/**
+ * Moves what the workspace used in its current reply window under the anchor `from` into the window
+ * under `to`, so a plan change neither resets nor loses the count (ADR 0003 (a): what was used carries
+ * over). Overage stays on the old window, where it is billed. Null when both anchors give the same window.
+ */
+export async function alignReplyUsage(tx: Queryable, organizationId: string, from: Date | null, to: Date | null, now = new Date()) {
+  const old = replyWindow(from, now).start
+  const next = replyWindow(to, now).start
+  if (old.getTime() === next.getTime()) return null
+  const { rows } = await tx.query<{ units: string; overage: string; billed: boolean }>(
+    `select units::text, overage_units::text as overage, overage_billed_at is not null as billed
+       from app.reply_usage where organization_id = $1 and period_start = $2 for update`,
+    [organizationId, old],
+  )
+  const row = rows[0]
+  if (row && Number(row.units) > 0) {
+    await tx.query(
+      `insert into app.reply_usage as u (organization_id, period_start, units) values ($1, $2, $3::numeric)
+       on conflict (organization_id, period_start) do update set units = u.units + excluded.units`,
+      [organizationId, next, row.units],
+    )
+    if (Number(row.overage) > 0 || row.billed)
+      await tx.query("update app.reply_usage set units = overage_units where organization_id = $1 and period_start = $2", [organizationId, old])
+    else await tx.query("delete from app.reply_usage where organization_id = $1 and period_start = $2", [organizationId, old])
+  }
+  return { from: old, to: next, movedFifths: row ? Math.round(Number(row.units) * 5) : 0 }
+}
+
 /** What the chat API needs to hold a workspace to its monthly AI replies. */
 export interface WorkspaceQuota {
   organizationId: string
@@ -316,15 +648,17 @@ export async function listWorkspaceQuotas(q: Queryable, now = new Date()): Promi
     plan: Plan
     overage_enabled: boolean
     overage_cap_units: number | null
+    sub_plan: PaidPlan | null
     sub_status: SubscriptionStatus | null
     sub_period_start: Date | null
     sub_period_end: Date | null
     sub_cancel_at_period_end: boolean | null
     sub_grace_until: Date | null
+    sub_scheduled_change: ScheduledChange | null
   }>(
     `select o.id, o.plan, o.overage_enabled, o.overage_cap_units,
-            s.status as sub_status, s.current_period_start as sub_period_start, s.current_period_end as sub_period_end,
-            s.cancel_at_period_end as sub_cancel_at_period_end, s.grace_until as sub_grace_until
+            s.plan as sub_plan, s.status as sub_status, s.current_period_start as sub_period_start, s.current_period_end as sub_period_end,
+            s.cancel_at_period_end as sub_cancel_at_period_end, s.grace_until as sub_grace_until, s.scheduled_change as sub_scheduled_change
        from app.organizations o
        left join app.subscriptions s on s.organization_id = o.id
       where exists (select 1 from app.bots b where b.organization_id = o.id and ${BOT_SERVING_SQL})`,
@@ -333,17 +667,23 @@ export async function listWorkspaceQuotas(q: Queryable, now = new Date()): Promi
   return rows.map((r) => {
     const plan: Plan = PLANS.includes(r.plan) ? r.plan : "free"
     const limits = PLAN_LIMITS[plan]
-    const grants =
-      r.sub_status !== null &&
-      subscriptionGrants(
-        { status: r.sub_status, graceUntil: r.sub_grace_until, cancelAtPeriodEnd: !!r.sub_cancel_at_period_end, currentPeriodEnd: r.sub_period_end! },
-        now,
-      )
+    const sub =
+      r.sub_status === null
+        ? null
+        : {
+            plan: r.sub_plan!,
+            status: r.sub_status,
+            graceUntil: r.sub_grace_until,
+            cancelAtPeriodEnd: !!r.sub_cancel_at_period_end,
+            currentPeriodStart: r.sub_period_start!,
+            currentPeriodEnd: r.sub_period_end!,
+            scheduledChange: r.sub_scheduled_change,
+          }
     const overage = limits.overageAllowed && r.overage_enabled && r.overage_cap_units ? r.overage_cap_units * 5 : 0
     return {
       organizationId: r.id,
       plan,
-      anchor: grants ? r.sub_period_start : null,
+      anchor: quotaAnchor(sub, now),
       allowanceFifths: limits.monthlyReplies * 5,
       overageCapFifths: overage,
       enforcePlan: flagEnabled(settings, "plan_limits", r.id),

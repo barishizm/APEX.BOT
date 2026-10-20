@@ -18,6 +18,12 @@ export const FEATURE_FLAGS = {
    * workspace is on Free.
    */
   plan_limits: { default: false },
+  /**
+   * Selling plans (docs/adr/0003-billing.md (g)): checkout in the dashboard, plan CTAs on the
+   * pricing page, and launch copy instead of "free during the beta" on the marketing pages. Needs
+   * the Paddle configuration as well; off until the launch date.
+   */
+  billing: { default: false },
 } as const satisfies Record<string, { default: boolean }>
 export type FeatureFlag = keyof typeof FEATURE_FLAGS
 export const FEATURE_FLAG_NAMES = Object.keys(FEATURE_FLAGS) as FeatureFlag[]
