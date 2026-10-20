@@ -18,6 +18,7 @@ import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { checkSettings, LANGS, type BotSettings, type Lang, type SettingsIssue } from "@apex/db/bot-settings"
 import { useAppI18n } from "@/components/i18n/app-provider"
+import { PlanProvider } from "./plan"
 import type { BotJson } from "@/lib/bot"
 import { format, LOCALE_META } from "@/lib/i18n"
 import { formatDate, plural } from "@/lib/i18n/format"
@@ -333,6 +334,8 @@ export function WidgetStudio({
             <p className="text-sm text-[var(--color-muted)]">{current.blurb}</p>
           </div>
           <fieldset disabled={!bot.canEdit} className="m-0 flex min-w-0 flex-col gap-5 border-0 p-0">
+            {/* the plan loaded with the page; saves don't change it */}
+            <PlanProvider value={{ entitlements: initial.plan?.entitlements ?? null, saved: bot.settings }}>
             {section === "general" && <GeneralSection {...props} />}
             {section === "appearance" && <AppearanceSection {...props} />}
             {section === "messages" && <MessagesSection {...props} />}
@@ -353,6 +356,7 @@ export function WidgetStudio({
             {section === "install" && (
               <InstallSection {...props} siteKey={bot.siteKey} widgetUrl={widgetUrl} canEdit={bot.canEdit} dirty={dirty} onRotate={rotate} />
             )}
+            </PlanProvider>
           </fieldset>
           {guiding && section === "install" && (
             <InstallGuide

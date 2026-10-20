@@ -24,7 +24,15 @@ Conversation and message ids must be server-made UUIDs: anything else starts a n
 Conversation reads, erasures and ratings are rate limited per IP (`lookupsPerMinute`). `test/security.test.ts` (here) and
 `packages/db/test/injection.test.ts` hold the hostile-input suites: SQL/NoSQL payloads, tenant isolation, prototype
 pollution, mail header injection, control characters, and a static check that every query stays parameterized.
-Error codes the widget localizes: `unknown_site`, `origin_not_allowed`, `rate_limited`, `budget_exhausted`, `out_of_service`, `message_too_long`, `conversation_full`, `not_found`, `upstream`, `refused`.
+Error codes the widget localizes: `unknown_site`, `origin_not_allowed`, `rate_limited`, `budget_exhausted`, `quota_exhausted`, `out_of_service`, `message_too_long`, `conversation_full`, `not_found`, `upstream`, `refused`.
+
+Monthly AI replies (docs/adr/0003-billing.md): every delivered answer is counted against its workspace in
+`app.reply_usage`, weighed by the model that wrote it (after a fallback, the fallback; weights in `bot-settings.ts`),
+with one atomic upsert per answer. The count in memory is a cache, re-read when 15 s old or within 10 replies of the
+limit. The bot sync brings each workspace's plan, billing anchor and overage cap every pass. With the `reply_quota`
+flag on (/admin/settings, off until billing launches), a workspace past its allowance plus overage cap gets
+`429 quota_exhausted` before any model call, and the widget opens the hand-off form with the visitor's question. The
+daily token budget (`budget_exhausted`) is checked first and is unchanged.
 
 The demo tenant lives in `data/tenants.json` (only loaded when `NODE_ENV` is not `production`, or `APEX_DEMO_TENANT=1`) and its content in `data/knowledge/<tenant id>.json`.
 With `DATABASE_URL` set, bots configured in the dashboard (`/dashboard/widget`, table `app.bots`) are synced

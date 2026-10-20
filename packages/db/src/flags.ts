@@ -7,6 +7,17 @@ export const FEATURE_FLAGS = {
   hybrid_search: { default: true },
   /** Uploading PDF, Word and text files as knowledge sources in the dashboard. */
   file_uploads: { default: true },
+  /**
+   * Holding workspaces to their plan's monthly AI replies in the chat API (docs/adr/0003-billing.md).
+   * Replies are counted either way; off until billing launches, so beta workspaces aren't cut off.
+   */
+  reply_quota: { default: false },
+  /**
+   * Holding workspaces to the rest of their plan (entitlements.ts): websites, models, branding,
+   * topics to decline, lead capture and retention. Off until billing launches, since every beta
+   * workspace is on Free.
+   */
+  plan_limits: { default: false },
 } as const satisfies Record<string, { default: boolean }>
 export type FeatureFlag = keyof typeof FEATURE_FLAGS
 export const FEATURE_FLAG_NAMES = Object.keys(FEATURE_FLAGS) as FeatureFlag[]

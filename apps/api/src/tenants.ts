@@ -1,6 +1,9 @@
 // Tenant registry. Each customer site is a tenant; its public site_key is only usable
 // from the origins on its allowlist.
-import { DEFAULT_SETTINGS, LANGS, type BotSettings, type PublicWidgetSettings } from "@apex/db/bot-settings";
+import type { WorkspaceQuota } from "@apex/db";
+import { DEFAULT_SETTINGS, LANGS, publicWidgetSettings, type BotSettings, type PublicWidgetSettings } from "@apex/db/bot-settings";
+import { effectiveSettings, sitePaused } from "@apex/db/entitlements";
+import { entitlementsFor, type Plan } from "@apex/db/plans";
 import type { ModelChoice } from "./model.ts";
 import type { Lang } from "./text.ts";
 
@@ -56,6 +59,26 @@ export interface Tenant {
   limits?: TenantLimits;
   /** Managed in the dashboard (a row in app.bots), as opposed to data/tenants.json. */
   managed?: boolean;
+  /** The bot row it was built from, kept to rebuild it under its workspace's plan. */
+  source?: ManagedBot;
+  /** Over its plan's number of websites (ADR 0003 (e)): only the hand-off and lead forms work. */
+  planPaused?: boolean;
+  /** Its plan doesn't include lead capture: the lead form is off and /v1/lead refuses. */
+  leadCaptureLocked?: boolean;
+  /** The plan's longest retention, stored with each new conversation; null while plan limits are off. */
+  retentionCapDays?: number | null;
+}
+
+export interface ManagedBot {
+  id: string;
+  organizationId?: string;
+  organizationName: string;
+  siteKey: string;
+  settings: BotSettings;
+  handoffVerified: boolean;
+  budgetOverride?: { tokens: number; until: Date } | null;
+  /** Its place among its workspace's websites (1 = first). */
+  siteRank?: number;
 }
 
 /** The subset of settings the widget may see. Never includes the handoff address or limits. */
@@ -65,16 +88,14 @@ export function publicSettings(tenant: Tenant) {
 }
 
 /** Maps a dashboard-managed bot to a tenant. */
-export function tenantFromBot(
-  bot: { id: string; organizationId?: string; organizationName: string; siteKey: string; settings: BotSettings; handoffVerified: boolean; budgetOverride?: { tokens: number; until: Date } | null },
-  ui: PublicWidgetSettings,
-): Tenant {
+export function tenantFromBot(bot: ManagedBot, ui: PublicWidgetSettings): Tenant {
   const s = bot.settings;
   const handoffEnabled = s.handoff.enabled && bot.handoffVerified && !!s.handoff.email;
   return {
     id: bot.id,
     ...(bot.organizationId ? { organizationId: bot.organizationId } : {}),
     managed: true,
+    source: bot,
     siteKey: bot.siteKey,
     name: s.general.companyName || bot.organizationName,
     allowedOrigins: s.security.allowedOrigins,
@@ -155,6 +176,10 @@ export class TenantRegistry {
   private pausedById = new Map<string, PausedSite>();
   /** Origin -> how many sites allow it, so removing one keeps the others' origins. */
   private origins = new Map<string, number>();
+  /** Dashboard workspaces' plans and reply limits, replaced on every bot sync. */
+  private workspaces = new Map<string, WorkspaceQuota>();
+  /** Each dashboard bot as its plan allows, rebuilt when the bot or the plan changes. */
+  private views = new Map<string, { base: Tenant; plan: Plan; view: Tenant }>();
 
   constructor(tenants: Tenant[]) {
     for (const tenant of tenants) {
@@ -192,6 +217,7 @@ export class TenantRegistry {
 
   /** Drops a site, serving or paused. */
   remove(id: string): void {
+    this.views.delete(id);
     const old = this.byId.get(id);
     if (old) {
       this.byId.delete(id);
@@ -206,12 +232,13 @@ export class TenantRegistry {
     }
   }
 
+  // Lookups return the tenant as its plan allows (entitled), so every route serves that.
   findById(id: string): Tenant | undefined {
-    return this.byId.get(id);
+    return this.entitled(this.byId.get(id));
   }
 
   findBySiteKey(siteKey: string | undefined): Tenant | undefined {
-    return siteKey ? this.bySiteKey.get(siteKey) : undefined;
+    return siteKey ? this.entitled(this.bySiteKey.get(siteKey)) : undefined;
   }
 
   findPaused(siteKey: string | undefined): PausedSite | undefined {
@@ -220,11 +247,43 @@ export class TenantRegistry {
 
   /** A site by id, serving or paused: for what still applies to a paused site (erasure, retention). */
   findSite(id: string): Tenant | PausedSite | undefined {
-    return this.byId.get(id) ?? this.pausedById.get(id);
+    return this.entitled(this.byId.get(id)) ?? this.pausedById.get(id);
   }
 
   isPaused(id: string): boolean {
     return this.pausedById.has(id);
+  }
+
+  setWorkspaces(workspaces: WorkspaceQuota[]): void {
+    this.workspaces = new Map(workspaces.map((w) => [w.organizationId, w]));
+  }
+
+  /** A workspace's plan and reply limits; undefined for JSON-file tenants and before the first sync. */
+  workspace(organizationId: string | undefined): WorkspaceQuota | undefined {
+    return organizationId ? this.workspaces.get(organizationId) : undefined;
+  }
+
+  /**
+   * A dashboard bot as its workspace's plan allows, while the plan is held to (the plan_limits
+   * flag): rebuilt from its stored settings with what the plan doesn't include taken out
+   * (entitlements.ts), and paused past the plan's number of websites. Anything else as it is.
+   */
+  private entitled(tenant: Tenant | undefined): Tenant | undefined {
+    const ws = tenant?.source && this.workspace(tenant.organizationId);
+    if (!tenant?.source || !ws?.enforcePlan) return tenant;
+    const cached = this.views.get(tenant.id);
+    if (cached?.base === tenant && cached.plan === ws.plan) return cached.view;
+    const plan = entitlementsFor(ws.plan);
+    const settings = effectiveSettings(tenant.source.settings, plan);
+    const view: Tenant = {
+      ...tenantFromBot({ ...tenant.source, settings }, publicWidgetSettings(settings)),
+      allowedOrigins: tenant.allowedOrigins,
+      planPaused: sitePaused(tenant.source.siteRank ?? 1, plan),
+      leadCaptureLocked: !plan.leadCapture,
+      retentionCapDays: plan.maxRetentionDays,
+    };
+    this.views.set(tenant.id, { base: tenant, plan: ws.plan, view });
+    return view;
   }
 
   /** Used for CORS preflights, which carry no site key; the real request is checked per site. */

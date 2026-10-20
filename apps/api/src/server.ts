@@ -20,7 +20,7 @@ import { ChunkIndexer, QueryEmbedder, memoryVectorStore, type VectorStore } from
 import { ClaudeChatModel, EchoChatModel, GeminiChatModel, ModelRouter, OpenAIChatModel, type ChatModel } from "./model.ts";
 import { KnowledgeBase, type ChunkInput } from "./retrieval.ts";
 import { postgresPersistence } from "./persistence.ts";
-import type { TokenUsageStore } from "./limits.ts";
+import type { ReplyUsageStore, TokenUsageStore } from "./limits.ts";
 import { ConversationStore } from "./store.ts";
 import { TenantRegistry, type Tenant } from "./tenants.ts";
 import { ClaudeTopicLabeler, startTopicLabeler } from "./topics.ts";
@@ -96,6 +96,7 @@ let botSync: BotSync | null = null;
 let onWidgetSeen: ((tenant: Tenant, origin: string) => void) | undefined;
 let featureEnabled: ((flag: FeatureFlag, tenant: Tenant) => Promise<boolean>) | undefined;
 let tokenUsage: TokenUsageStore | undefined;
+let replyUsage: ReplyUsageStore | undefined;
 let indexer: ChunkIndexer | undefined;
 let topicLabeler: ReturnType<typeof startTopicLabeler> | undefined;
 let onMailFailure: ((failure: MailFailure) => void) | undefined;
@@ -104,6 +105,7 @@ let lastSweep: { at: string; ok: boolean; deleted: number; error: string | null 
 let store = new ConversationStore();
 if (process.env.DATABASE_URL) {
   const {
+    addReplyUsage,
     addTokenUsage,
     createDbFromEnv,
     featureEnabled: flagOn,
@@ -118,6 +120,7 @@ if (process.env.DATABASE_URL) {
     saveEmbeddings,
     tokensUsedOn,
     recordWidgetSeen,
+    replyUsageFifths,
     saveTopics,
     sweepConversations,
     topicVocabulary,
@@ -136,6 +139,13 @@ if (process.env.DATABASE_URL) {
     load: (id, day) => (tenants.findById(id)?.managed ? tokensUsedOn(db, id, day) : Promise.resolve(0)),
     add: (id, day, usage) => (tenants.findById(id)?.managed ? addTokenUsage(db, id, day, split ? usage : usage.input + usage.output) : Promise.resolve()),
   };
+  // Monthly AI replies per workspace (ADR 0003), from migration 0035 on; one upsert per answer
+  if (!missing.includes("0035_billing.sql")) {
+    replyUsage = {
+      load: (organizationId, periodStart) => replyUsageFifths(db, organizationId, periodStart),
+      add: (organizationId, periodStart, fifths, overage) => addReplyUsage(db, organizationId, periodStart, fifths, overage),
+    };
+  }
   // What this API runs with, for /admin/usage: whether each key is set (never its value) and the token ceiling
   reportApiRuntime(db, {
     keys: {
@@ -156,12 +166,18 @@ if (process.env.DATABASE_URL) {
     prune: (id, model, keep) => pruneEmbeddings(db, id, model, keep),
   };
   indexer = indexerFor?.(vectors);
-  botSync = startBotSync(db, tenants, knowledge, undefined, indexer);
+  // from migration 0036 on, websites past a plan's number are paused (ADR 0003 (e))
+  const planLimits = !missing.includes("0036_plan_limits.sql");
+  botSync = startBotSync(db, tenants, knowledge, undefined, indexer, { siteRanks: planLimits });
   log("info", "syncing dashboard bots from the database");
 
   store = new ConversationStore({
     // before migration 0016 the conversations table has no context column
-    persistence: postgresPersistence(db, { context: !missing.includes("0016_conversation_context.sql") }),
+    persistence: postgresPersistence(db, {
+      context: !missing.includes("0016_conversation_context.sql"),
+      // each new conversation keeps its plan's longest retention, so a downgrade never shortens older ones
+      ...(planLimits ? { retentionCap: (id: string) => tenants.findById(id)?.retentionCapDays ?? null } : {}),
+    }),
     // paused sites too: a visitor may still erase their conversation there
     persists: (tenantId) => tenants.findSite(tenantId)?.managed === true,
     onError: (error, conversation) => log("error", "couldn't save conversation", { conversation, error }),
@@ -171,7 +187,7 @@ if (process.env.DATABASE_URL) {
   const sweep = async () => {
     const runId = recordRuns ? await startJobRun(db, RETENTION_SWEEP_JOB).catch(() => null) : null;
     try {
-      const n = await sweepConversations(db);
+      const n = await sweepConversations(db, { retentionCaps: planLimits });
       if (n) log("info", "expired conversations deleted", { count: n });
       lastSweep = { at: new Date().toISOString(), ok: true, deleted: n, error: null };
       if (runId) await finishJobRun(db, runId, { ok: true, result: { deleted: n } }).catch(() => {});
@@ -254,6 +270,7 @@ const app = createApp({
   limits: config.limits,
   clientIp,
   tokenUsage,
+  replyUsage,
   onWidgetSeen,
   featureEnabled,
   health: () => ({ botSync: botSync ? botSync.status() : "off", semanticSearch: queryEmbedder ? queryEmbedder.status() : "off" }),

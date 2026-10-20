@@ -58,21 +58,41 @@ export interface StoredConversation {
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-/** `context` undefined leaves the column out, for a database still without migration 0016. */
+/**
+ * `context` undefined leaves the column out, for a database still without migration 0016;
+ * `retentionCapDays` undefined likewise for 0036. The cap is the plan's longest retention when the
+ * conversation starts (null while plan limits are off): the sweep never keeps it longer.
+ */
 export async function insertConversation(
   db: Queryable,
-  c: { id: string; botId: string; origin?: string | null; context?: ConversationContext; createdAt: Date },
+  c: { id: string; botId: string; origin?: string | null; context?: ConversationContext; retentionCapDays?: number | null; createdAt: Date },
 ): Promise<void> {
   const params = [c.id, c.botId, c.origin?.slice(0, 300) ?? null, c.createdAt]
   if (!c.context) {
     await db.query("insert into app.conversations (id, bot_id, origin, created_at, updated_at) values ($1, $2, $3, $4, $4) on conflict (id) do nothing", params)
     return
   }
+  const context = JSON.stringify(toContext(c.context))
+  if (c.retentionCapDays === undefined) {
+    await db.query(
+      "insert into app.conversations (id, bot_id, origin, context, created_at, updated_at) values ($1, $2, $3, $5::jsonb, $4, $4) on conflict (id) do nothing",
+      [...params, context],
+    )
+    return
+  }
   await db.query(
-    "insert into app.conversations (id, bot_id, origin, context, created_at, updated_at) values ($1, $2, $3, $5::jsonb, $4, $4) on conflict (id) do nothing",
-    [...params, JSON.stringify(toContext(c.context))],
+    `insert into app.conversations (id, bot_id, origin, context, retention_cap_days, created_at, updated_at)
+     values ($1, $2, $3, $5::jsonb, $6::int, $4, $4) on conflict (id) do nothing`,
+    [...params, context, c.retentionCapDays],
   )
 }
+
+/**
+ * Days a conversation (c) of a bot (b) is kept: the bot's retention setting, no longer than the plan
+ * allowed when it started. Shared by the sweep and the admin area's count of what it will delete.
+ */
+const RETENTION_SETTING_SQL = "coalesce((b.settings #>> '{security,retentionDays}')::int, 30)"
+export const RETENTION_DAYS_SQL = `least(${RETENTION_SETTING_SQL}, coalesce(c.retention_cap_days, 2147483647))`
 
 export async function insertMessage(
   db: Db,
@@ -195,12 +215,22 @@ export async function loadConversation(db: Queryable, botId: string, id: string)
   }
 }
 
-/** Deletes conversations idle for longer than their bot's retention period. */
-export async function sweepConversations(db: Queryable): Promise<number> {
+/**
+ * Deletes conversations idle for longer than their retention period (RETENTION_DAYS_SQL).
+ * `retentionCaps: false` leaves the plan's cap out, for a database still without migration 0036.
+ */
+export async function sweepConversations(db: Queryable, options: { retentionCaps?: boolean } = {}): Promise<number> {
+  if (options.retentionCaps === false) {
+    const { rows } = await db.query(
+      `delete from app.conversations c using app.bots b
+        where c.bot_id = b.id and c.updated_at < now() - make_interval(days => ${RETENTION_SETTING_SQL})
+        returning c.id`,
+    )
+    return rows.length
+  }
   const { rows } = await db.query(
     `delete from app.conversations c using app.bots b
-      where c.bot_id = b.id
-        and c.updated_at < now() - make_interval(days => coalesce((b.settings #>> '{security,retentionDays}')::int, 30))
+      where c.bot_id = b.id and c.updated_at < now() - make_interval(days => ${RETENTION_DAYS_SQL})
       returning c.id`,
   )
   return rows.length

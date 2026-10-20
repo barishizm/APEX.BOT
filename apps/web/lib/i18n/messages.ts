@@ -11,6 +11,13 @@ type Rule = readonly [match: string | RegExp, replacement: string]
 const RULES: Record<Locale, Rule[]> = {
   en: [],
   tr: [
+    // plan limits
+    ["Your plan doesn't include this. Upgrade to use it", "Planınızda bu özellik yok. Kullanmak için planınızı yükseltin"],
+    [/^Your plan keeps conversations for at most (\d+) days\. Upgrade to keep them longer$/, "Planınız sohbetleri en fazla $1 gün saklar. Daha uzun saklamak için planınızı yükseltin"],
+    [/^Your plan includes (\d+) websites?\. Upgrade to add another$/, "Planınız $1 web sitesi içerir. Yenisini eklemek için planınızı yükseltin"],
+    [/^Your plan includes (\d+) websites?\. Upgrade to keep more active$/, "Planınız $1 web sitesi içerir. Daha fazlasını etkin tutmak için planınızı yükseltin"],
+    ["Choose the websites to keep active", "Etkin kalacak web sitelerini seçin"],
+    ["Only workspace owners and admins can choose active websites", "Etkin web sitelerini yalnızca çalışma alanı sahipleri ve yöneticileri seçebilir"],
     // support tickets
     ["Couldn't verify you're human. Reload the page and try again", "İnsan olduğunuz doğrulanamadı. Sayfayı yenileyip tekrar deneyin"],
     ["Write a subject", "Bir konu yazın"],
@@ -275,6 +282,13 @@ const RULES: Record<Locale, Rule[]> = {
     ["This image is too detailed. Try a simpler one", "Bu görsel çok ayrıntılı. Daha sade bir görsel deneyin"],
   ],
   lt: [
+    // plan limits
+    ["Your plan doesn't include this. Upgrade to use it", "Jūsų plane to nėra. Atnaujinkite planą, kad galėtumėte naudotis"],
+    [/^Your plan keeps conversations for at most (\d+) days\. Upgrade to keep them longer$/, "Pagal jūsų planą pokalbiai saugomi ne ilgiau kaip $1 d. Atnaujinkite planą, kad juos saugotumėte ilgiau"],
+    [/^Your plan includes (\d+) websites?\. Upgrade to add another$/, "Svetainių jūsų plane: $1. Atnaujinkite planą, kad pridėtumėte dar vieną"],
+    [/^Your plan includes (\d+) websites?\. Upgrade to keep more active$/, "Svetainių jūsų plane: $1. Atnaujinkite planą, kad daugiau jų liktų aktyvios"],
+    ["Choose the websites to keep active", "Pasirinkite svetaines, kurios liks aktyvios"],
+    ["Only workspace owners and admins can choose active websites", "Aktyvias svetaines gali pasirinkti tik darbo srities savininkai ir administratoriai"],
     // support tickets
     ["Couldn't verify you're human. Reload the page and try again", "Nepavyko patvirtinti, kad esate žmogus. Perkraukite puslapį ir bandykite dar kartą"],
     ["Write a subject", "Įrašykite temą"],
@@ -468,6 +482,13 @@ const RULES: Record<Locale, Rule[]> = {
     ["This image is too detailed. Try a simpler one", "Šis paveikslėlis per detalus. Pabandykite paprastesnį"],
   ],
   lv: [
+    // plan limits
+    ["Your plan doesn't include this. Upgrade to use it", "Jūsu plānā tas nav iekļauts. Uzlabojiet plānu, lai to izmantotu"],
+    [/^Your plan keeps conversations for at most (\d+) days\. Upgrade to keep them longer$/, "Jūsu plāns glabā sarunas ne ilgāk kā $1 dienas. Uzlabojiet plānu, lai tās glabātu ilgāk"],
+    [/^Your plan includes (\d+) websites?\. Upgrade to add another$/, "Tīmekļa vietnes jūsu plānā: $1. Uzlabojiet plānu, lai pievienotu vēl vienu"],
+    [/^Your plan includes (\d+) websites?\. Upgrade to keep more active$/, "Tīmekļa vietnes jūsu plānā: $1. Uzlabojiet plānu, lai vairāk vietņu paliktu aktīvas"],
+    ["Choose the websites to keep active", "Izvēlieties tīmekļa vietnes, kas paliks aktīvas"],
+    ["Only workspace owners and admins can choose active websites", "Aktīvās tīmekļa vietnes var izvēlēties tikai darbvietas īpašnieki un administratori"],
     // support tickets
     ["Couldn't verify you're human. Reload the page and try again", "Neizdevās pārbaudīt, ka esat cilvēks. Pārlādējiet lapu un mēģiniet vēlreiz"],
     ["Write a subject", "Ierakstiet tematu"],
@@ -661,6 +682,13 @@ const RULES: Record<Locale, Rule[]> = {
     ["This image is too detailed. Try a simpler one", "Šis attēls ir pārāk detalizēts. Izmēģiniet vienkāršāku"],
   ],
   et: [
+    // plan limits
+    ["Your plan doesn't include this. Upgrade to use it", "Teie pakett seda ei sisalda. Selle kasutamiseks uuendage paketti"],
+    [/^Your plan keeps conversations for at most (\d+) days\. Upgrade to keep them longer$/, "Teie pakett säilitab vestlusi kuni $1 päeva. Uuendage paketti, et neid kauem säilitada"],
+    [/^Your plan includes (\d+) websites?\. Upgrade to add another$/, "Veebisaite teie paketis: $1. Uuendage paketti, et lisada veel üks"],
+    [/^Your plan includes (\d+) websites?\. Upgrade to keep more active$/, "Veebisaite teie paketis: $1. Uuendage paketti, et rohkem neist aktiivsena hoida"],
+    ["Choose the websites to keep active", "Valige veebisaidid, mis jäävad aktiivseks"],
+    ["Only workspace owners and admins can choose active websites", "Aktiivseid veebisaite saavad valida ainult tööruumi omanikud ja administraatorid"],
     // support tickets
     ["Couldn't verify you're human. Reload the page and try again", "Ei õnnestunud kinnitada, et olete inimene. Laadige leht uuesti ja proovige uuesti"],
     ["Write a subject", "Kirjutage teema"],

@@ -1,6 +1,15 @@
 import type { Messages } from "./types"
 
 const en = {
+  plan: {
+    upgrade: "Upgrade",
+    paused: "Paused",
+    pausedHint: "Over your plan's limit: its widget only offers the contact form.",
+    chooseTitle: "Choose active websites",
+    chooseIntro: "Websites your plan keeps active: {limit}. The others are paused; their knowledge, settings and conversations are kept.",
+    chooseSave: "Save choice",
+    planLimit: "Website limit on your plan: {limit}.",
+  },
   title: "Websites",
   intro: "Each website has its own assistant: settings, knowledge base, conversations and embed code. Switch between them from the top bar.",
   count: "{count} of {limit} websites",
@@ -41,6 +50,15 @@ const en = {
 export const sites: Messages<typeof en> = {
   en,
   tr: {
+    plan: {
+      upgrade: "Yükselt",
+      paused: "Duraklatıldı",
+      pausedHint: "Plan sınırının üzerinde: widget'ı yalnızca iletişim formunu sunar.",
+      chooseTitle: "Etkin web sitelerini seçin",
+      chooseIntro: "Planınızın etkin tuttuğu web siteleri: {limit}. Diğerleri duraklatılır; bilgi tabanları, ayarları ve sohbetleri korunur.",
+      chooseSave: "Seçimi kaydet",
+      planLimit: "Planınızdaki web sitesi sınırı: {limit}.",
+    },
     title: "Web siteleri",
     intro: "Her web sitesinin kendi asistanı vardır: ayarları, bilgi tabanı, konuşmaları ve yerleştirme kodu. Aralarında üst çubuktan geçiş yapın.",
     count: "{limit} web sitesinden {count} tanesi",
@@ -78,6 +96,15 @@ export const sites: Messages<typeof en> = {
     offline: "Çevrimdışı görünüyorsunuz. Tekrar deneyin.",
   },
   lt: {
+    plan: {
+      upgrade: "Atnaujinti planą",
+      paused: "Sustabdyta",
+      pausedHint: "Viršytas plano limitas: valdiklis siūlo tik kontaktinę formą.",
+      chooseTitle: "Pasirinkite aktyvias svetaines",
+      chooseIntro: "Aktyvių svetainių pagal jūsų planą: {limit}. Kitos sustabdytos; jų žinios, nustatymai ir pokalbiai išsaugomi.",
+      chooseSave: "Išsaugoti pasirinkimą",
+      planLimit: "Jūsų plano svetainių limitas: {limit}.",
+    },
     title: "Svetainės",
     intro: "Kiekviena svetainė turi savo asistentą: nustatymus, žinių bazę, pokalbius ir įterpimo kodą. Perjunkite jas viršutinėje juostoje.",
     count: "{count} iš {limit} svetainių",
@@ -115,6 +142,15 @@ export const sites: Messages<typeof en> = {
     offline: "Atrodo, esate neprisijungę. Bandykite dar kartą.",
   },
   lv: {
+    plan: {
+      upgrade: "Uzlabot plānu",
+      paused: "Apturēta",
+      pausedHint: "Pārsniegts plāna limits: logrīks piedāvā tikai saziņas veidlapu.",
+      chooseTitle: "Izvēlieties aktīvās tīmekļa vietnes",
+      chooseIntro: "Tīmekļa vietnes, ko jūsu plāns uztur aktīvas: {limit}. Pārējās ir apturētas; to zināšanas, iestatījumi un sarunas tiek saglabāti.",
+      chooseSave: "Saglabāt izvēli",
+      planLimit: "Tīmekļa vietņu limits jūsu plānā: {limit}.",
+    },
     title: "Vietnes",
     intro: "Katrai vietnei ir savs asistents: iestatījumi, zināšanu bāze, sarunas un iegulšanas kods. Pārslēdzieties starp tām augšējā joslā.",
     count: "{count} no {limit} vietnēm",
@@ -152,6 +188,15 @@ export const sites: Messages<typeof en> = {
     offline: "Šķiet, esat bezsaistē. Mēģiniet vēlreiz.",
   },
   et: {
+    plan: {
+      upgrade: "Uuenda paketti",
+      paused: "Peatatud",
+      pausedHint: "Üle paketi piirangu: vidin pakub ainult kontaktivormi.",
+      chooseTitle: "Valige aktiivsed veebisaidid",
+      chooseIntro: "Veebisaidid, mida teie pakett aktiivsena hoiab: {limit}. Ülejäänud on peatatud; nende teadmised, seaded ja vestlused säilitatakse.",
+      chooseSave: "Salvesta valik",
+      planLimit: "Teie paketi veebisaitide piirang: {limit}.",
+    },
     title: "Veebisaidid",
     intro: "Igal veebisaidil on oma assistent: seaded, teadmusbaas, vestlused ja manustamiskood. Vahetage neid ülemiselt ribalt.",
     count: "{count} / {limit} veebisaidist",

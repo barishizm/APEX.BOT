@@ -151,6 +151,7 @@ textarea::placeholder,input::placeholder{color:var(--muted)}
 .form p{color:var(--muted);font-size:14px}
 .form label{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:500}
 .form .err{color:var(--err);font-size:13px}
+.form .reason{color:inherit;font-weight:500}
 .row{display:flex;gap:8px;margin-top:4px}
 .btn{padding:10px 16px;border-radius:10px;font-weight:500;font-size:14px;transition:background-color .15s,opacity .15s,transform .15s var(--ease)}
 .btn:not(:disabled):active{transform:scale(.97)}

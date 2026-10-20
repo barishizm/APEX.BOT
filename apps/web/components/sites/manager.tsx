@@ -6,7 +6,8 @@ import { useState, type FormEvent } from "react"
 import { useAppI18n } from "@/components/i18n/app-provider"
 import type { SitesJson } from "@/lib/bot"
 import { format } from "@/lib/i18n"
-import { createSite, removeSite, renameSite, selectSite } from "./api"
+import { UpgradeNote } from "@/components/plan/upgrade-note"
+import { chooseActiveSites, createSite, removeSite, renameSite, selectSite } from "./api"
 
 type Site = SitesJson["sites"][number]
 
@@ -29,6 +30,8 @@ export function SitesManager({ initial }: { initial: SitesJson }) {
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const full = sites.length >= initial.limit
+  // the plan, not the platform, sets the limit: the way out is a bigger plan
+  const planLimited = !!initial.plan.entitlements && initial.plan.plan !== "business"
 
   async function add(e: FormEvent) {
     e.preventDefault()
@@ -48,6 +51,8 @@ export function SitesManager({ initial }: { initial: SitesJson }) {
       </header>
 
       <div className="flex w-full max-w-3xl flex-col gap-6 p-4 sm:p-6">
+
+        {initial.canEdit && sites.some((s) => s.paused) && <ChooseActive sites={sites} limit={initial.limit} />}
 
         <ul className="m-0 flex list-none flex-col gap-3 p-0">
           {sites.map((site) => (
@@ -81,7 +86,9 @@ export function SitesManager({ initial }: { initial: SitesJson }) {
               </h2>
               <span className="text-sm text-[var(--color-muted)]">{format(t.count, { count: sites.length, limit: initial.limit })}</span>
             </div>
-            {full ? (
+            {full && planLimited ? (
+              <UpgradeNote upgrade={t.plan.upgrade}>{format(t.plan.planLimit, { limit: initial.limit })}</UpgradeNote>
+            ) : full ? (
               <p className="m-0 text-sm text-[var(--color-muted)]">{format(t.add.limit, { limit: initial.limit })}</p>
             ) : (
               <form onSubmit={add} className="flex flex-col gap-2">
@@ -190,7 +197,13 @@ function SiteRow({
               {current && (
                 <span className="rounded-full bg-[var(--color-bubble)] px-2 py-0.5 text-xs font-semibold text-[var(--color-text)]">{t.item.current}</span>
               )}
+              {site.paused && (
+                <span title={t.plan.pausedHint} className="rounded-full border border-[var(--color-line)] px-2 py-0.5 text-xs font-semibold text-[var(--color-muted)]">
+                  {t.plan.paused}
+                </span>
+              )}
             </div>
+            {site.paused && <p className="m-0 text-sm text-[var(--color-muted)]">{t.plan.pausedHint}</p>}
             <p className="m-0 flex flex-wrap items-center gap-x-2 text-sm text-[var(--color-muted)]">
               <span className="inline-flex items-center gap-1.5">
                 <span className={`h-2 w-2 rounded-full ${site.live ? "bg-[#16a34a]" : "bg-[var(--color-line)]"}`} aria-hidden />
@@ -248,5 +261,61 @@ function SiteRow({
         </p>
       )}
     </li>
+  )
+}
+
+// Over the plan's number of websites: which stay active. The rest keep everything but only offer
+// the contact form until there is a free place again.
+function ChooseActive({ sites, limit }: { sites: Site[]; limit: number }) {
+  const { t: app } = useAppI18n()
+  const t = app.sites
+  const [chosen, setChosen] = useState(() => sites.filter((s) => !s.paused).map((s) => s.id))
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+  const toggle = (id: string) => setChosen((all) => (all.includes(id) ? all.filter((x) => x !== id) : all.length < limit ? [...all, id] : all))
+
+  async function save(e: FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    setMessage(null)
+    const res = await chooseActiveSites(chosen, t)
+    if (res.ok) return window.location.reload()
+    setBusy(false)
+    setMessage(res.message)
+  }
+
+  return (
+    <form onSubmit={save} className={card} aria-labelledby="choose-active">
+      <div className="flex flex-col gap-1">
+        <h2 id="choose-active" className="m-0 text-lg font-semibold">
+          {t.plan.chooseTitle}
+        </h2>
+        <UpgradeNote upgrade={t.plan.upgrade}>{format(t.plan.chooseIntro, { limit })}</UpgradeNote>
+      </div>
+      <fieldset className="m-0 flex flex-col gap-2 border-0 p-0">
+        <legend className="sr-only">{t.plan.chooseTitle}</legend>
+        {sites.map((site) => (
+          <label key={site.id} className="flex cursor-pointer items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={chosen.includes(site.id)}
+              disabled={!chosen.includes(site.id) && chosen.length >= limit}
+              onChange={() => toggle(site.id)}
+            />
+            {site.name}
+          </label>
+        ))}
+      </fieldset>
+      <div>
+        <button type="submit" disabled={busy || !chosen.length} className={primary}>
+          {t.plan.chooseSave}
+        </button>
+      </div>
+      {message && (
+        <p role="alert" className={errorText}>
+          {message}
+        </p>
+      )}
+    </form>
   )
 }

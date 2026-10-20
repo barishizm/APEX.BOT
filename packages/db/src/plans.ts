@@ -89,6 +89,37 @@ export const PLAN_PRICES: Record<Plan, { monthly: number; annual: number }> = {
 /** Overage is sold in blocks of replies (ADR 0003 (c)). */
 export const OVERAGE_BLOCK = { replies: 100, priceCents: 500 }
 
+/** A monthly AI reply window: [start, end). */
+export interface ReplyWindow {
+  start: Date
+  end: Date
+}
+
+/** `anchor` plus `months` calendar months, on the anchor's day clamped to the month's last day, at the anchor's time. */
+function addMonthsClamped(anchor: Date, months: number): Date {
+  const y = anchor.getUTCFullYear()
+  const m = anchor.getUTCMonth() + months
+  const lastDay = new Date(Date.UTC(y, m + 1, 0)).getUTCDate()
+  return new Date(Date.UTC(y, m, Math.min(anchor.getUTCDate(), lastDay), anchor.getUTCHours(), anchor.getUTCMinutes(), anchor.getUTCSeconds(), anchor.getUTCMilliseconds()))
+}
+
+/**
+ * The reply window `now` falls in (ADR 0003 (b)). With a billing anchor (a paid subscription's
+ * period start) windows start on the anchor's day of every month, counted from the anchor so a
+ * 31st stays the 31st after February; without one (Free) they are calendar months, 00:00 UTC.
+ */
+export function replyWindow(anchor: Date | null, now: Date): ReplyWindow {
+  if (!anchor) {
+    const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
+    return { start, end: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)) }
+  }
+  // a first guess from the calendar, then stepped to the window that holds `now` (also before the anchor)
+  let k = (now.getUTCFullYear() - anchor.getUTCFullYear()) * 12 + now.getUTCMonth() - anchor.getUTCMonth()
+  while (addMonthsClamped(anchor, k) > now) k--
+  while (addMonthsClamped(anchor, k + 1) <= now) k++
+  return { start: addMonthsClamped(anchor, k), end: addMonthsClamped(anchor, k + 1) }
+}
+
 /** Share of the monthly price an annual subscription saves, 0 for Free. */
 export function annualSaving(plan: Plan) {
   const { monthly, annual } = PLAN_PRICES[plan]

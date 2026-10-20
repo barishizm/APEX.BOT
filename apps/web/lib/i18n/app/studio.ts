@@ -4,6 +4,16 @@ import type { Messages } from "./types"
 // The widget studio (/dashboard/widget). Text the widget itself shows visitors is edited per
 // language in the settings; these are only the studio's own labels.
 const en = {
+  plan: {
+    upgrade: "Upgrade",
+    notInPlan: "Not in your plan",
+    branding: "Your plan always shows “Powered by Apex Bot”.",
+    model: "Your plan doesn't include {model}. The assistant answers with {served} until you upgrade.",
+    fallback: "Only models in your plan can be picked as the fallback.",
+    decline: "Your plan doesn't include topics to decline. Topics already listed are kept but not applied.",
+    lead: "Your plan doesn't include lead capture. A form you turned on before stays off until you upgrade.",
+    retention: "Your plan keeps conversations for up to {days} days.",
+  },
   title: "Customize widget",
   viewOnly: "View only. Ask a workspace owner or admin to make changes.",
   editingLanguage: "Editing language",
@@ -364,6 +374,16 @@ const en = {
 export const studio: Messages<typeof en> = {
   en,
   tr: {
+    plan: {
+      upgrade: "Yükselt",
+      notInPlan: "Planınızda yok",
+      branding: "Planınızda “Powered by Apex Bot” ibaresi her zaman görünür.",
+      model: "Planınızda {model} yok. Planınızı yükseltene kadar asistan {served} ile yanıt verir.",
+      fallback: "Yedek olarak yalnızca planınızdaki modeller seçilebilir.",
+      decline: "Planınızda reddedilecek konular yok. Listedeki konular korunur ama uygulanmaz.",
+      lead: "Planınızda müşteri adayı toplama yok. Daha önce açtığınız form, planınızı yükseltene kadar kapalı kalır.",
+      retention: "Planınız sohbetleri en fazla {days} gün saklar.",
+    },
     title: "Widget'ı özelleştir",
     viewOnly: "Yalnızca görüntüleme. Değişiklik için bir çalışma alanı sahibine veya yöneticisine başvurun.",
     editingLanguage: "Düzenleme dili",
@@ -747,6 +767,16 @@ export const studio: Messages<typeof en> = {
     },
   },
   lt: {
+    plan: {
+      upgrade: "Atnaujinti planą",
+      notInPlan: "Nėra jūsų plane",
+      branding: "Jūsų plane visada rodomas užrašas „Powered by Apex Bot“.",
+      model: "Jūsų plane nėra {model}. Kol neatnaujinsite plano, asistentas atsakys naudodamas {served}.",
+      fallback: "Kaip atsarginį galima pasirinkti tik jūsų plane esančius modelius.",
+      decline: "Jūsų plane nėra atmetamų temų. Jau įrašytos temos išsaugomos, bet netaikomos.",
+      lead: "Jūsų plane nėra kontaktų rinkimo. Anksčiau įjungta forma liks išjungta, kol neatnaujinsite plano.",
+      retention: "Pagal jūsų planą pokalbiai saugomi iki {days} dienų.",
+    },
     title: "Pritaikyti valdiklį",
     viewOnly: "Tik peržiūra. Norėdami ką nors pakeisti, kreipkitės į darbo srities savininką arba administratorių.",
     editingLanguage: "Redagavimo kalba",
@@ -1134,6 +1164,16 @@ export const studio: Messages<typeof en> = {
     },
   },
   lv: {
+    plan: {
+      upgrade: "Uzlabot plānu",
+      notInPlan: "Nav iekļauts jūsu plānā",
+      branding: "Jūsu plānā vienmēr ir redzams uzraksts “Powered by Apex Bot”.",
+      model: "Jūsu plānā nav iekļauts {model}. Līdz plāna uzlabošanai asistents atbildēs ar {served}.",
+      fallback: "Kā rezerves modeli var izvēlēties tikai jūsu plānā iekļautos modeļus.",
+      decline: "Jūsu plānā nav noraidāmo tēmu. Jau norādītās tēmas tiek saglabātas, bet netiek piemērotas.",
+      lead: "Jūsu plānā nav potenciālo klientu datu vākšanas. Iepriekš ieslēgtā veidlapa paliks izslēgta, līdz uzlabosiet plānu.",
+      retention: "Jūsu plāns glabā sarunas līdz {days} dienām.",
+    },
     title: "Pielāgot logrīku",
     viewOnly: "Tikai skatīšana. Lai veiktu izmaiņas, vērsieties pie darbvietas īpašnieka vai administratora.",
     editingLanguage: "Rediģēšanas valoda",
@@ -1517,6 +1557,16 @@ export const studio: Messages<typeof en> = {
     },
   },
   et: {
+    plan: {
+      upgrade: "Uuenda paketti",
+      notInPlan: "Ei sisaldu teie paketis",
+      branding: "Teie pakett näitab alati märget „Powered by Apex Bot“.",
+      model: "Teie pakett ei sisalda mudelit {model}. Kuni paketi uuendamiseni vastab assistent mudeliga {served}.",
+      fallback: "Varumudeliks saab valida ainult teie paketis sisalduvaid mudeleid.",
+      decline: "Teie pakett ei sisalda keeldutavaid teemasid. Juba lisatud teemad jäävad alles, kuid neid ei rakendata.",
+      lead: "Teie pakett ei sisalda kontaktide kogumist. Varem sisse lülitatud vorm jääb välja lülitatuks, kuni paketi uuendate.",
+      retention: "Teie pakett säilitab vestlusi kuni {days} päeva.",
+    },
     title: "Kohanda vidinat",
     viewOnly: "Ainult vaatamiseks. Muudatuste tegemiseks pöörduge tööruumi omaniku või administraatori poole.",
     editingLanguage: "Muutmise keel",

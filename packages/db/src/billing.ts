@@ -1,5 +1,7 @@
 import type { Db, Queryable } from "./db.ts"
-import { PLANS, type Plan } from "./plans.ts"
+import { BOT_SERVING_SQL } from "./bots.ts"
+import { flagEnabled, readPlatformSettings } from "./platform-settings.ts"
+import { PLANS, PLAN_LIMITS, type Plan } from "./plans.ts"
 
 // Subscriptions, plan overrides, webhook inbox and reply usage (docs/adr/0003-billing.md,
 // migrations/0035_billing.sql). app.organizations.plan is a cache of effectivePlan(); every write
@@ -254,14 +256,97 @@ export async function finishBillingEvent(q: Queryable, id: string, error: string
 
 // --- Reply usage ---
 
-/** Adds `fifths` fifths of a reply (fast model 1, standard 5, Opus 10, Fable 25) to the window and returns the window's total. */
-export async function addReplyUsage(q: Queryable, organizationId: string, periodStart: Date, fifths: number): Promise<number> {
+/** How far past its allowance a window may go under overage, in fifths; the excess is stored as overage_units. */
+export interface OverageLimit {
+  allowanceFifths: number
+  capFifths: number
+}
+
+/**
+ * Adds `fifths` fifths of a reply (fast model 1, standard 5, Opus 10, Fable 25) to the window and
+ * returns the window's total in fifths. One upsert, so concurrent replies from any number of API
+ * instances all count. With `overage`, the part of the total past the allowance (up to the cap) is
+ * kept as the window's overage.
+ */
+export async function addReplyUsage(q: Queryable, organizationId: string, periodStart: Date, fifths: number, overage?: OverageLimit): Promise<number> {
   if (!Number.isInteger(fifths) || fifths < 0) throw new Error(`reply usage must be a whole number of fifths, got ${fifths}`)
-  const { rows } = await q.query<{ units: string }>(
-    `insert into app.reply_usage (organization_id, period_start, units) values ($1, $2, $3::numeric / 5)
-     on conflict (organization_id, period_start) do update set units = reply_usage.units + excluded.units
-     returning units::text`,
-    [organizationId, periodStart, fifths],
+  const { rows } = await q.query<{ fifths: string }>(
+    `insert into app.reply_usage as u (organization_id, period_start, units, overage_units)
+       values ($1, $2, $3::numeric / 5, least(greatest($3::numeric - $4::numeric, 0), $5::numeric) / 5)
+     on conflict (organization_id, period_start) do update set
+       units = u.units + excluded.units,
+       overage_units = case when $4::numeric is null then u.overage_units
+                            else greatest(u.overage_units, least(greatest((u.units + excluded.units) * 5 - $4::numeric, 0), $5::numeric) / 5) end
+     returning (units * 5)::int::text as fifths`,
+    [organizationId, periodStart, fifths, overage?.allowanceFifths ?? null, overage?.capFifths ?? null],
   )
-  return Number(rows[0]!.units)
+  return Number(rows[0]!.fifths)
+}
+
+/** Fifths of a reply the workspace has used in the window starting at `periodStart`. */
+export async function replyUsageFifths(q: Queryable, organizationId: string, periodStart: Date): Promise<number> {
+  const { rows } = await q.query<{ fifths: string }>(
+    "select (units * 5)::int::text as fifths from app.reply_usage where organization_id = $1 and period_start = $2",
+    [organizationId, periodStart],
+  )
+  return Number(rows[0]?.fifths ?? 0)
+}
+
+/** What the chat API needs to hold a workspace to its monthly AI replies. */
+export interface WorkspaceQuota {
+  organizationId: string
+  plan: Plan
+  /** Where its reply windows count from: the granting subscription's period start; null for calendar months (Free, overrides, beta). */
+  anchor: Date | null
+  /** Replies included per window, in fifths. */
+  allowanceFifths: number
+  /** Replies past the allowance the owner allows under overage, in fifths; 0 when overage is off or the plan has none. */
+  overageCapFifths: number
+  /** Whether the rest of the plan (entitlements.ts) is held to: the plan_limits flag. */
+  enforcePlan: boolean
+}
+
+/**
+ * Every workspace with a bot, with its plan, billing anchor and reply limits, for the chat API's
+ * sync. Read on every pass: a renewal or a plan change touches no bot row.
+ */
+export async function listWorkspaceQuotas(q: Queryable, now = new Date()): Promise<WorkspaceQuota[]> {
+  const { rows } = await q.query<{
+    id: string
+    plan: Plan
+    overage_enabled: boolean
+    overage_cap_units: number | null
+    sub_status: SubscriptionStatus | null
+    sub_period_start: Date | null
+    sub_period_end: Date | null
+    sub_cancel_at_period_end: boolean | null
+    sub_grace_until: Date | null
+  }>(
+    `select o.id, o.plan, o.overage_enabled, o.overage_cap_units,
+            s.status as sub_status, s.current_period_start as sub_period_start, s.current_period_end as sub_period_end,
+            s.cancel_at_period_end as sub_cancel_at_period_end, s.grace_until as sub_grace_until
+       from app.organizations o
+       left join app.subscriptions s on s.organization_id = o.id
+      where exists (select 1 from app.bots b where b.organization_id = o.id and ${BOT_SERVING_SQL})`,
+  )
+  const settings = await readPlatformSettings(q)
+  return rows.map((r) => {
+    const plan: Plan = PLANS.includes(r.plan) ? r.plan : "free"
+    const limits = PLAN_LIMITS[plan]
+    const grants =
+      r.sub_status !== null &&
+      subscriptionGrants(
+        { status: r.sub_status, graceUntil: r.sub_grace_until, cancelAtPeriodEnd: !!r.sub_cancel_at_period_end, currentPeriodEnd: r.sub_period_end! },
+        now,
+      )
+    const overage = limits.overageAllowed && r.overage_enabled && r.overage_cap_units ? r.overage_cap_units * 5 : 0
+    return {
+      organizationId: r.id,
+      plan,
+      anchor: grants ? r.sub_period_start : null,
+      allowanceFifths: limits.monthlyReplies * 5,
+      overageCapFifths: overage,
+      enforcePlan: flagEnabled(settings, "plan_limits", r.id),
+    }
+  })
 }

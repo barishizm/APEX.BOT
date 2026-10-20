@@ -5,7 +5,8 @@ import { before, describe, it } from "node:test";
 import { JSDOM } from "jsdom";
 import { A, setup } from "../../api/test/helpers.ts";
 
-const { app, store, mailer, model, tenants } = setup();
+// the reply quota is enforced here (it is off by default until billing launches)
+const { app, store, mailer, model, tenants } = setup({}, { featureEnabled: async (flag) => flag === "reply_quota" });
 // the model cites the excerpt it used, so the widget shows it as a source
 model.reply = ["**Kargo** ", "750 TL üzeri ", "ücretsizdir. [[used: 1]]"];
 
@@ -297,6 +298,34 @@ model.reply = ["**Kargo** ", "750 TL üzeri ", "ücretsizdir. [[used: 1]]"];
     await new Promise((r) => setTimeout(r, 300));
     assert.equal($("section.panel")!.hidden, false);
     assert.ok($(".root")!.hasAttribute("data-open"));
+  });
+
+  it("opens the hand-off form with the question and a note when the site's monthly replies are used up", async () => {
+    const site = tenants.findById("tn_a")!;
+    site.organizationId = "org_a";
+    tenants.setWorkspaces([{ organizationId: "org_a", plan: "free", anchor: null, allowanceFifths: 0, overageCapFifths: 0 }]);
+    const asked = model.requests.length;
+    const sent = mailer.outbox.length;
+    apex().send("Toptan fiyat alabilir miyim?");
+    const form = await until(() => $<HTMLFormElement>("form.form"), "hand-off form");
+    assert.equal(model.requests.length, asked, "the model is never called");
+    assert.match(form.querySelector(".reason")!.textContent!, /Asistan şu anda yanıt veremiyor/);
+    assert.doesNotMatch(form.textContent!, /kota/i, "visitors are never told about the quota");
+    assert.equal(form.querySelector("textarea")!.value, "Toptan fiyat alabilir miyim?");
+    form.querySelector<HTMLInputElement>("input[type=email]")!.value = "ayse@example.com";
+    form.dispatchEvent(new win.Event("submit", { cancelable: true }));
+    await until(() => mailer.outbox.length === sent + 1, "handoff email");
+    assert.match(mailer.outbox.at(-1)!.text, /Toptan fiyat alabilir miyim\?/);
+    ($(".form .btn.primary") as HTMLButtonElement).click();
+    // the chat keeps the explanation and a way back to the form
+    const error = [...shadow.querySelectorAll(".msg.bot.error")].at(-1)!;
+    assert.match(error.textContent!, /ekibimize iletin/);
+    assert.match(error.nextElementSibling!.textContent!, /Bir insanla konuş/);
+    tenants.setWorkspaces([]);
+    delete site.organizationId;
+    menuBtn().click();
+    item(/Yeni sohbet başlat/).click();
+    await until(() => !$(".msg.bot.error"), "a fresh chat");
   });
 
   // last: it locks the composer for the rest of the page

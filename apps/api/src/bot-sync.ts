@@ -3,10 +3,11 @@
 // reaches the widget within one interval. A bot's chunks are reloaded only when its
 // knowledge_version moves, not on every settings save. A bot staff disabled, or one in a suspended
 // workspace, is paused: it stops resolving as a tenant and its knowledge is unloaded, and only its
-// site key and origins are kept so the widget can be told it is out of service.
+// site key and origins are kept so the widget can be told it is out of service. Each pass also
+// re-reads every workspace's plan, billing anchor and reply limits (a renewal touches no bot row).
 // shortcut: polling; switch to LISTEN/NOTIFY once the API keeps a dedicated connection.
 import type { Db } from "@apex/db";
-import { listBotStates, listBotsChangedSince, listKnowledgeChunks, type BotRecord } from "@apex/db";
+import { listBotStates, listBotsChangedSince, listKnowledgeChunks, listWorkspaceQuotas, type BotRecord } from "@apex/db";
 import { publicWidgetSettings } from "@apex/db/bot-settings";
 import { log } from "./log.ts";
 import { maskPII } from "./pii.ts";
@@ -37,8 +38,18 @@ export interface BotSyncDetails {
 
 const OVERLAP_MS = 10_000;
 
-/** `indexer` embeds each loaded bot's chunks in the background (hybrid search); omit it for lexical only. */
-export function startBotSync(db: Db, tenants: TenantRegistry, knowledge: KnowledgeBase, intervalMs = 30_000, indexer?: ChunkIndexer): BotSync {
+/**
+ * `indexer` embeds each loaded bot's chunks in the background (hybrid search); omit it for lexical
+ * only. `siteRanks: false` for a database before migration 0036 (every website then ranks first).
+ */
+export function startBotSync(
+  db: Db,
+  tenants: TenantRegistry,
+  knowledge: KnowledgeBase,
+  intervalMs = 30_000,
+  indexer?: ChunkIndexer,
+  options: { siteRanks?: boolean } = {},
+): BotSync {
   let since: Date | null = null;
   let inFlight: Promise<number> | null = null;
   let state: "starting" | "ok" | "failing" = "starting";
@@ -50,6 +61,7 @@ export function startBotSync(db: Db, tenants: TenantRegistry, knowledge: Knowled
   const applied = new Map<string, number>();
   // set when the database and the registry disagree on whether a bot serves: the next pass reads every bot
   let resync = false;
+  let quotasFailing = false;
 
   const unload = (id: string) => {
     knowledge.load(id, []);
@@ -71,7 +83,7 @@ export function startBotSync(db: Db, tenants: TenantRegistry, knowledge: Knowled
       // a row older than `since`; re-reading a short overlap catches it
       const from = resync ? null : since && new Date(since.getTime() - OVERLAP_MS);
       resync = false;
-      const bots = (await listBotsChangedSince(db, from)).filter(
+      const bots = (await listBotsChangedSince(db, from, options)).filter(
         (bot) => applied.get(bot.id) !== bot.updatedAt.getTime() || (bot.serving && loaded.get(bot.id) !== bot.knowledgeVersion),
       );
       let newest = since;
@@ -125,6 +137,14 @@ export function startBotSync(db: Db, tenants: TenantRegistry, knowledge: Knowled
           applied.delete(id);
           resync = true;
         }
+      }
+      // Without them (before migration 0035, or a failed read) the last ones stay and replies keep being answered
+      try {
+        tenants.setWorkspaces(await listWorkspaceQuotas(db));
+        quotasFailing = false;
+      } catch (error) {
+        if (!quotasFailing) log("warn", "workspace reply limits not synced", { error });
+        quotasFailing = true;
       }
       // A failed bot is fetched again next pass (re-applying the others is harmless)
       since = firstFailure ? new Date(firstFailure.getTime() - 1) : newest;

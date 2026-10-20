@@ -1131,6 +1131,8 @@ const en = {
       names: {
         hybrid_search: { label: "Hybrid search", text: "Embedding search next to keyword search when the chat API answers. Off: answers use keyword search only." },
         file_uploads: { label: "File uploads", text: "Uploading PDF, Word and text files as knowledge sources in the dashboard. Off: the File tab disappears and uploads are refused." },
+        reply_quota: { label: "AI reply quota", text: "Holding workspaces to their plan's monthly AI replies. When used up, the widget offers the hand-off form instead of answering. Off: replies are still counted, never stopped." },
+        plan_limits: { label: "Plan limits", text: "Holding workspaces to the rest of their plan: websites, models, branding, topics to decline, lead capture and retention. Settings above the plan are kept but not applied; websites over the limit are paused. Off: nothing is locked." },
       },
       on: "On",
       off: "Off",
@@ -2525,6 +2527,8 @@ const tr: AdminMessages = {
       names: {
         hybrid_search: { label: "Hibrit arama", text: "Sohbet API'si yanıtlarken anahtar kelime aramasının yanında embedding araması. Kapalı: yanıtlar yalnızca anahtar kelime aramasıyla bulunur." },
         file_uploads: { label: "Dosya yükleme", text: "Panelde PDF, Word ve metin dosyalarını bilgi kaynağı olarak yükleme. Kapalı: Dosya sekmesi kaybolur, yüklemeler reddedilir." },
+        reply_quota: { label: "AI yanıt kotası", text: "Workspace'leri planlarının aylık AI yanıtlarıyla sınırlar. Kota bitince widget yanıt vermek yerine devir formunu açar. Kapalı: yanıtlar yine sayılır ama hiç durdurulmaz." },
+        plan_limits: { label: "Plan sınırları", text: "Workspace'leri planlarının geri kalanıyla sınırlar: web siteleri, modeller, marka, reddedilecek konular, müşteri adayı toplama ve saklama süresi. Plan üstü ayarlar korunur ama uygulanmaz; sınırı aşan web siteleri duraklatılır. Kapalı: hiçbir şey kilitlenmez." },
       },
       on: "Açık",
       off: "Kapalı",
