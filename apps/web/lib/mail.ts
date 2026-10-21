@@ -2,9 +2,10 @@
 // development prints messages to the server log and production logs an error. Mail that doesn't go
 // out is also recorded, masked, in app.email_failures for /admin/system.
 
-import { recordEmailFailure } from "@apex/db"
+import { OVERAGE_BLOCK, recordEmailFailure, type BillingNotice, type BillingNoticeKind } from "@apex/db"
 import { db } from "@/lib/db"
 import type { Locale } from "@/lib/i18n"
+import { billing as PLAN_NAMES } from "@/lib/i18n/app/billing"
 import type { Messages } from "@/lib/i18n/app/types"
 
 export interface SupportAccessMail {
@@ -30,16 +31,17 @@ async function failed(mail: Mail, status: number | null, error: string) {
   )
 }
 
-async function send(mail: Mail) {
+/** Whether the mail went out (in development without a key: printed to the log). Never throws. */
+async function send(mail: Mail): Promise<boolean> {
   const key = process.env.RESEND_API_KEY
   if (!key) {
     if (process.env.NODE_ENV === "production") {
       console.error(`[mail] RESEND_API_KEY is not set; a "${mail.kind}" mail was not sent`)
       await failed(mail, null, "RESEND_API_KEY is not set")
-      return
+      return false
     }
     console.log(`[mail] to ${mail.to} · ${mail.subject}\n${mail.text}`)
-    return
+    return true
   }
   let reachError = ""
   const res = await fetch("https://api.resend.com/emails", {
@@ -52,13 +54,18 @@ async function send(mail: Mail) {
     console.error("[mail] couldn't reach the email provider:", reachError)
     return null
   })
-  if (!res) return failed(mail, null, reachError)
+  if (!res) {
+    await failed(mail, null, reachError)
+    return false
+  }
   if (!res.ok) {
     console.error(`[mail] the email provider refused the message (${res.status})`)
     // Resend explains a refusal in the body ({"message": ...}); only its first bytes are kept
     const detail = (await res.text().catch(() => "")).slice(0, 300)
     await failed(mail, res.status, detail || `HTTP ${res.status}`)
+    return false
   }
+  return true
 }
 
 // Sent in the language the person was using when they asked for it
@@ -588,4 +595,328 @@ const WAITLIST_EMAILS: Messages<(i: { email: string; link: string }) => { subjec
 
 export function sendWaitlistInvite(email: string, link: string, locale: Locale) {
   return compose("waitlist_invite", email, locale, WAITLIST_EMAILS[locale]({ email, link }))
+}
+
+// --- Billing (docs/adr/0003-billing.md (c), (f)): to the workspace owners, from lib/billing/notices.ts ---
+
+interface BillingMail {
+  workspace: string
+  /** The paid plan the notice is about (or, for the quota, the workspace's plan), by name. */
+  plan: string
+  /** The billing settings page. */
+  link: string
+}
+type GraceMail = BillingMail & { until: string }
+type PeriodMail = BillingMail & { renewsAt: string; replies: string }
+type QuotaMail = BillingMail & {
+  used: string
+  allowance: string
+  resetsAt: string
+  overage: "on" | "off" | "none"
+  /** The owner's overage cap, "$50"; empty unless overage is on. */
+  cap: string
+  /** One overage block: "$5" per "100" replies. */
+  price: string
+  per: string
+}
+
+const BILLING_EMAILS: Messages<{
+  paymentFailed: (m: GraceMail) => { subject: string; text: string }
+  graceReminder: (m: GraceMail) => { subject: string; text: string }
+  graceLastCall: (m: GraceMail) => { subject: string; text: string }
+  downgraded: (m: BillingMail & { freeReplies: string }) => { subject: string; text: string }
+  subscriptionStarted: (m: PeriodMail) => { subject: string; text: string }
+  subscriptionRenewed: (m: PeriodMail) => { subject: string; text: string }
+  cancelConfirmed: (m: BillingMail & { endsAt: string }) => { subject: string; text: string }
+  quota80: (m: QuotaMail) => { subject: string; text: string }
+  quota100: (m: QuotaMail) => { subject: string; text: string }
+}> = {
+  en: {
+    paymentFailed: ({ workspace, plan, until, link }) => ({
+      subject: `Payment for ${workspace} didn't go through`,
+      text: `We couldn't take the payment for the ${plan} plan of your ${workspace} workspace on Apex Bot. The card may have expired or been declined.\n\nNothing changes yet: while the payment is retried, ${workspace} keeps ${plan} until ${until}. To keep it, update your payment method before then:\n${link}\n\nIf the payment still hasn't gone through by ${until}, the workspace moves to Free. Nothing is deleted.`,
+    }),
+    graceReminder: ({ workspace, plan, until, link }) => ({
+      subject: `Reminder: update the payment method for ${workspace}`,
+      text: `The payment for the ${plan} plan of ${workspace} still hasn't gone through. The workspace keeps ${plan} until ${until}; after that it moves to Free.\n\nUpdate your payment method here:\n${link}`,
+    }),
+    graceLastCall: ({ workspace, plan, until, link }) => ({
+      subject: `Last reminder: ${workspace} moves to Free on ${until}`,
+      text: `We still couldn't take the payment for the ${plan} plan of ${workspace}. Unless it goes through, the workspace moves to Free on ${until}.\n\nUpdate your payment method now to keep ${plan}:\n${link}\n\nOn Free nothing is deleted: websites beyond its limit are paused, and features above it stop applying until you subscribe again.`,
+    }),
+    downgraded: ({ workspace, plan, freeReplies, link }) => ({
+      subject: `${workspace} is now on the Free plan`,
+      text: `The ${plan} subscription of ${workspace} has ended, so the workspace is now on Free.\n\nNothing was deleted. Websites beyond Free's limit are paused, with their knowledge, settings and conversations kept; features above Free stop applying; and each month includes ${freeReplies} AI replies. Subscribing again restores everything as it was:\n${link}`,
+    }),
+    subscriptionStarted: ({ workspace, plan, renewsAt, replies, link }) => ({
+      subject: `Your ${plan} subscription for ${workspace} has started`,
+      text: `Thank you for subscribing. ${workspace} is now on the ${plan} plan, with ${replies} AI replies a month.\n\nThe next payment is on ${renewsAt}. You can see invoices, change the plan or cancel at any time in billing settings:\n${link}`,
+    }),
+    subscriptionRenewed: ({ workspace, plan, renewsAt, replies, link }) => ({
+      subject: `Your ${plan} subscription for ${workspace} was renewed`,
+      text: `The ${plan} subscription of ${workspace} was renewed and the payment went through. A new period has started, with ${replies} AI replies a month; the next payment is on ${renewsAt}.\n\nThe invoice is in billing settings:\n${link}`,
+    }),
+    cancelConfirmed: ({ workspace, plan, endsAt, link }) => ({
+      subject: `Your ${plan} subscription for ${workspace} was canceled`,
+      text: `Your ${plan} subscription for ${workspace} is canceled and won't be charged again.\n\n${workspace} keeps ${plan} until ${endsAt}, then moves to Free. Nothing is deleted. If you change your mind before then, you can keep the subscription in billing settings:\n${link}`,
+    }),
+    quota80: (m) => ({
+      subject: `${m.workspace} has used 80% of this month's AI replies`,
+      text: `${m.workspace} has used ${m.used} of the ${m.allowance} AI replies included this month. The count starts again on ${m.resetsAt}.\n\n${
+        m.overage === "on"
+          ? `Once they run out, paid extra replies take over at ${m.price} per ${m.per}, up to your cap of ${m.cap}.`
+          : `Once they run out, your assistants offer visitors the hand-off form instead of answering until the count starts again. ${m.overage === "off" ? "To keep them answering, upgrade or turn on paid extra replies." : "Upgrade for more replies."}`
+      }\n\nUsage and plans are in billing settings:\n${m.link}`,
+    }),
+    quota100: (m) => ({
+      subject: `${m.workspace} has used all of this month's AI replies`,
+      text: `${m.workspace} has used all ${m.allowance} AI replies included this month. ${
+        m.overage === "on"
+          ? `Paid extra replies are on, so your assistants keep answering at ${m.price} per ${m.per} replies, up to your cap of ${m.cap}, until the count starts again on ${m.resetsAt}.`
+          : `Until the count starts again on ${m.resetsAt}, your assistants offer visitors the hand-off form instead of answering. ${m.overage === "off" ? "To keep them answering, upgrade or turn on paid extra replies." : "Upgrade to keep them answering."}`
+      }\n\nUsage and plans are in billing settings:\n${m.link}`,
+    }),
+  },
+  tr: {
+    paymentFailed: ({ workspace, plan, until, link }) => ({
+      subject: `${workspace} için ödeme alınamadı`,
+      text: `Apex Bot'taki ${workspace} çalışma alanınızın ${plan} planı için ödemeyi alamadık. Kartınızın süresi dolmuş ya da kart reddedilmiş olabilir.\n\nŞimdilik hiçbir şey değişmiyor: ödeme yeniden denenirken ${workspace}, ${until} tarihine kadar ${plan} planında kalır. Planı korumak için bu tarihten önce ödeme yönteminizi güncelleyin:\n${link}\n\nÖdeme ${until} tarihine kadar alınamazsa çalışma alanı Ücretsiz plana geçer. Hiçbir şey silinmez.`,
+    }),
+    graceReminder: ({ workspace, plan, until, link }) => ({
+      subject: `Hatırlatma: ${workspace} için ödeme yönteminizi güncelleyin`,
+      text: `${workspace} çalışma alanının ${plan} planı için ödeme hâlâ alınamadı. Çalışma alanı ${until} tarihine kadar ${plan} planında kalır; sonrasında Ücretsiz plana geçer.\n\nÖdeme yönteminizi buradan güncelleyin:\n${link}`,
+    }),
+    graceLastCall: ({ workspace, plan, until, link }) => ({
+      subject: `Son hatırlatma: ${workspace}, ${until} tarihinde Ücretsiz plana geçiyor`,
+      text: `${workspace} çalışma alanının ${plan} planı için ödemeyi hâlâ alamadık. Ödeme alınmazsa çalışma alanı ${until} tarihinde Ücretsiz plana geçer.\n\n${plan} planını korumak için ödeme yönteminizi şimdi güncelleyin:\n${link}\n\nÜcretsiz planda hiçbir şey silinmez: sınırı aşan web siteleri duraklatılır, planın üzerindeki özellikler ise yeniden abone olana kadar uygulanmaz.`,
+    }),
+    downgraded: ({ workspace, plan, freeReplies, link }) => ({
+      subject: `${workspace} artık Ücretsiz planda`,
+      text: `${workspace} çalışma alanının ${plan} aboneliği sona erdi; çalışma alanı artık Ücretsiz planda.\n\nHiçbir şey silinmedi. Ücretsiz planın sınırını aşan web siteleri duraklatıldı; bilgi tabanları, ayarları ve sohbetleri olduğu gibi duruyor. Ücretsiz planın üzerindeki özellikler artık uygulanmıyor ve her ay ${freeReplies} yapay zekâ yanıtı dahil. Yeniden abone olduğunuzda her şey eskisi gibi geri gelir:\n${link}`,
+    }),
+    subscriptionStarted: ({ workspace, plan, renewsAt, replies, link }) => ({
+      subject: `${workspace} için ${plan} aboneliğiniz başladı`,
+      text: `Abone olduğunuz için teşekkür ederiz. ${workspace} artık ayda ${replies} yapay zekâ yanıtıyla ${plan} planında.\n\nBir sonraki ödeme ${renewsAt} tarihinde. Faturalarınızı görmek, planı değiştirmek veya istediğiniz zaman iptal etmek için faturalandırma ayarlarına gidin:\n${link}`,
+    }),
+    subscriptionRenewed: ({ workspace, plan, renewsAt, replies, link }) => ({
+      subject: `${workspace} için ${plan} aboneliğiniz yenilendi`,
+      text: `${workspace} çalışma alanının ${plan} aboneliği yenilendi ve ödeme alındı. Ayda ${replies} yapay zekâ yanıtıyla yeni dönem başladı; bir sonraki ödeme ${renewsAt} tarihinde.\n\nFaturanız faturalandırma ayarlarında:\n${link}`,
+    }),
+    cancelConfirmed: ({ workspace, plan, endsAt, link }) => ({
+      subject: `${workspace} için ${plan} aboneliğiniz iptal edildi`,
+      text: `${workspace} için ${plan} aboneliğiniz iptal edildi; sizden yeniden ücret alınmayacak.\n\n${workspace}, ${endsAt} tarihine kadar ${plan} planında kalır, ardından Ücretsiz plana geçer. Hiçbir şey silinmez. Bu tarihten önce fikrinizi değiştirirseniz aboneliği faturalandırma ayarlarından sürdürebilirsiniz:\n${link}`,
+    }),
+    quota80: (m) => ({
+      subject: `${m.workspace} bu ayki yapay zekâ yanıtlarının %80'ini kullandı`,
+      text: `${m.workspace}, bu ay dahil olan ${m.allowance} yapay zekâ yanıtının ${m.used} tanesini kullandı. Sayaç ${m.resetsAt} tarihinde sıfırlanır.\n\n${
+        m.overage === "on"
+          ? `Yanıtlar bittiğinde ücretli ek yanıtlar devreye girer: ${m.per} yanıt başına ${m.price}, belirlediğiniz ${m.cap} sınırına kadar.`
+          : `Yanıtlar bittiğinde asistanlarınız sayaç sıfırlanana kadar ziyaretçilere yanıt vermek yerine insana devir formunu sunar. ${m.overage === "off" ? "Yanıt vermeye devam etmeleri için planınızı yükseltin veya ücretli ek yanıtları açın." : "Daha fazla yanıt için planınızı yükseltin."}`
+      }\n\nKullanımı ve planları faturalandırma ayarlarında görebilirsiniz:\n${m.link}`,
+    }),
+    quota100: (m) => ({
+      subject: `${m.workspace} bu ayki yapay zekâ yanıtlarının tamamını kullandı`,
+      text: `${m.workspace}, bu ay dahil olan ${m.allowance} yapay zekâ yanıtının tamamını kullandı. ${
+        m.overage === "on"
+          ? `Ücretli ek yanıtlar açık olduğu için asistanlarınız, sayaç ${m.resetsAt} tarihinde sıfırlanana kadar ${m.per} yanıt başına ${m.price} ücretle, ${m.cap} sınırınıza kadar yanıt vermeye devam eder.`
+          : `Sayaç ${m.resetsAt} tarihinde sıfırlanana kadar asistanlarınız ziyaretçilere yanıt vermek yerine insana devir formunu sunar. ${m.overage === "off" ? "Yanıt vermeye devam etmeleri için planınızı yükseltin veya ücretli ek yanıtları açın." : "Yanıt vermeye devam etmeleri için planınızı yükseltin."}`
+      }\n\nKullanımı ve planları faturalandırma ayarlarında görebilirsiniz:\n${m.link}`,
+    }),
+  },
+  lt: {
+    paymentFailed: ({ workspace, plan, until, link }) => ({
+      subject: `Nepavyko gauti mokėjimo už ${workspace}`,
+      text: `Nepavyko gauti mokėjimo už jūsų Apex Bot darbo srities ${workspace} planą ${plan}. Gali būti, kad baigėsi kortelės galiojimas arba ji buvo atmesta.\n\nKol kas niekas nesikeičia: kol mokėjimas bandomas pakartotinai, ${workspace} išlieka plane ${plan} iki ${until}. Kad jį išsaugotumėte, iki tol atnaujinkite mokėjimo būdą:\n${link}\n\nJei iki ${until} mokėjimas vis dar nepavyks, darbo sritis pereis į nemokamą planą. Niekas nebus ištrinta.`,
+    }),
+    graceReminder: ({ workspace, plan, until, link }) => ({
+      subject: `Priminimas: atnaujinkite ${workspace} mokėjimo būdą`,
+      text: `Mokėjimas už darbo srities ${workspace} planą ${plan} vis dar nepavyko. Darbo sritis išlieka plane ${plan} iki ${until}, po to pereis į nemokamą planą.\n\nAtnaujinkite mokėjimo būdą čia:\n${link}`,
+    }),
+    graceLastCall: ({ workspace, plan, until, link }) => ({
+      subject: `Paskutinis priminimas: ${until} ${workspace} pereis į nemokamą planą`,
+      text: `Vis dar nepavyko gauti mokėjimo už darbo srities ${workspace} planą ${plan}. Jei mokėjimas nepavyks, ${until} darbo sritis pereis į nemokamą planą.\n\nKad išsaugotumėte planą ${plan}, atnaujinkite mokėjimo būdą dabar:\n${link}\n\nNemokamame plane niekas neištrinama: svetainės virš limito pristabdomos, o funkcijos virš plano netaikomos, kol vėl užsiprenumeruosite.`,
+    }),
+    downgraded: ({ workspace, plan, freeReplies, link }) => ({
+      subject: `${workspace} dabar naudoja nemokamą planą`,
+      text: `Darbo srities ${workspace} plano ${plan} prenumerata baigėsi, todėl darbo sritis dabar naudoja nemokamą planą.\n\nNiekas neištrinta. Svetainės virš nemokamo plano limito pristabdytos, o jų žinios, nustatymai ir pokalbiai išsaugoti; funkcijos virš nemokamo plano nebetaikomos, o kiekvieną mėnesį įskaičiuota ${freeReplies} DI atsakymų. Vėl užsiprenumeravus viskas bus atkurta taip, kaip buvo:\n${link}`,
+    }),
+    subscriptionStarted: ({ workspace, plan, renewsAt, replies, link }) => ({
+      subject: `Darbo srities ${workspace} plano ${plan} prenumerata prasidėjo`,
+      text: `Dėkojame, kad užsiprenumeravote. ${workspace} dabar naudoja planą ${plan}, kuriame per mėnesį įskaičiuota ${replies} DI atsakymų.\n\nKitas mokėjimas – ${renewsAt}. Sąskaitas peržiūrėti, planą pakeisti ar prenumeratą atšaukti bet kada galite atsiskaitymo nustatymuose:\n${link}`,
+    }),
+    subscriptionRenewed: ({ workspace, plan, renewsAt, replies, link }) => ({
+      subject: `Darbo srities ${workspace} plano ${plan} prenumerata atnaujinta`,
+      text: `Darbo srities ${workspace} plano ${plan} prenumerata atnaujinta, mokėjimas gautas. Prasidėjo naujas laikotarpis, kuriame per mėnesį įskaičiuota ${replies} DI atsakymų; kitas mokėjimas – ${renewsAt}.\n\nSąskaitą rasite atsiskaitymo nustatymuose:\n${link}`,
+    }),
+    cancelConfirmed: ({ workspace, plan, endsAt, link }) => ({
+      subject: `Darbo srities ${workspace} plano ${plan} prenumerata atšaukta`,
+      text: `Jūsų darbo srities ${workspace} plano ${plan} prenumerata atšaukta, daugiau mokesčių nebus nuskaičiuota.\n\n${workspace} išlieka plane ${plan} iki ${endsAt}, po to pereis į nemokamą planą. Niekas nebus ištrinta. Jei iki tol apsigalvosite, prenumeratą galite palikti atsiskaitymo nustatymuose:\n${link}`,
+    }),
+    quota80: (m) => ({
+      subject: `${m.workspace} išnaudojo 80 % šio mėnesio DI atsakymų`,
+      text: `${m.workspace} išnaudojo ${m.used} iš ${m.allowance} šį mėnesį įskaičiuotų DI atsakymų. Skaičiavimas prasidės iš naujo ${m.resetsAt}.\n\n${
+        m.overage === "on"
+          ? `Kai jie baigsis, toliau bus teikiami mokami papildomi atsakymai: ${m.price} už ${m.per}, iki jūsų nustatytos ${m.cap} ribos.`
+          : `Kai jie baigsis, kol skaičiavimas prasidės iš naujo, jūsų asistentai vietoj atsakymo lankytojams siūlys perdavimo formą. ${m.overage === "off" ? "Kad jie toliau atsakinėtų, pasirinkite didesnį planą arba įjunkite mokamus papildomus atsakymus." : "Daugiau atsakymų gausite pasirinkę didesnį planą."}`
+      }\n\nNaudojimą ir planus rasite atsiskaitymo nustatymuose:\n${m.link}`,
+    }),
+    quota100: (m) => ({
+      subject: `${m.workspace} išnaudojo visus šio mėnesio DI atsakymus`,
+      text: `${m.workspace} išnaudojo visus ${m.allowance} šį mėnesį įskaičiuotus DI atsakymus. ${
+        m.overage === "on"
+          ? `Mokami papildomi atsakymai įjungti, todėl jūsų asistentai toliau atsakinės už ${m.price} už ${m.per} atsakymų, iki jūsų ${m.cap} ribos, kol skaičiavimas prasidės iš naujo ${m.resetsAt}.`
+          : `Kol skaičiavimas prasidės iš naujo ${m.resetsAt}, jūsų asistentai vietoj atsakymo lankytojams siūlys perdavimo formą. ${m.overage === "off" ? "Kad jie toliau atsakinėtų, pasirinkite didesnį planą arba įjunkite mokamus papildomus atsakymus." : "Kad jie toliau atsakinėtų, pasirinkite didesnį planą."}`
+      }\n\nNaudojimą ir planus rasite atsiskaitymo nustatymuose:\n${m.link}`,
+    }),
+  },
+  lv: {
+    paymentFailed: ({ workspace, plan, until, link }) => ({
+      subject: `Maksājums par ${workspace} neizdevās`,
+      text: `Mēs nevarējām iekasēt maksājumu par jūsu Apex Bot darbvietas ${workspace} plānu ${plan}. Iespējams, kartes derīguma termiņš ir beidzies vai tā tika noraidīta.\n\nPagaidām nekas nemainās: kamēr maksājums tiek mēģināts atkārtoti, ${workspace} saglabā plānu ${plan} līdz ${until}. Lai to saglabātu, līdz tam atjauniniet maksājuma veidu:\n${link}\n\nJa līdz ${until} maksājums joprojām neizdosies, darbvieta pāries uz bezmaksas plānu. Nekas netiks dzēsts.`,
+    }),
+    graceReminder: ({ workspace, plan, until, link }) => ({
+      subject: `Atgādinājums: atjauniniet ${workspace} maksājuma veidu`,
+      text: `Maksājums par darbvietas ${workspace} plānu ${plan} joprojām nav izdevies. Darbvieta saglabā plānu ${plan} līdz ${until}; pēc tam tā pāries uz bezmaksas plānu.\n\nAtjauniniet maksājuma veidu šeit:\n${link}`,
+    }),
+    graceLastCall: ({ workspace, plan, until, link }) => ({
+      subject: `Pēdējais atgādinājums: ${until} ${workspace} pāries uz bezmaksas plānu`,
+      text: `Mēs joprojām nevarējām iekasēt maksājumu par darbvietas ${workspace} plānu ${plan}. Ja maksājums neizdosies, ${until} darbvieta pāries uz bezmaksas plānu.\n\nLai saglabātu plānu ${plan}, atjauniniet maksājuma veidu tagad:\n${link}\n\nBezmaksas plānā nekas netiek dzēsts: vietnes virs limita tiek apturētas, un funkcijas virs plāna netiek piemērotas, līdz jūs atkal abonējat.`,
+    }),
+    downgraded: ({ workspace, plan, freeReplies, link }) => ({
+      subject: `${workspace} tagad izmanto bezmaksas plānu`,
+      text: `Darbvietas ${workspace} plāna ${plan} abonements ir beidzies, tāpēc darbvieta tagad izmanto bezmaksas plānu.\n\nNekas netika dzēsts. Vietnes virs bezmaksas plāna limita ir apturētas, un to zināšanas, iestatījumi un sarunas ir saglabātas; funkcijas virs bezmaksas plāna vairs netiek piemērotas, un katrā mēnesī ir iekļautas ${freeReplies} MI atbildes. Atkal abonējot, viss tiks atjaunots, kā bija:\n${link}`,
+    }),
+    subscriptionStarted: ({ workspace, plan, renewsAt, replies, link }) => ({
+      subject: `Darbvietas ${workspace} plāna ${plan} abonements ir sācies`,
+      text: `Paldies, ka abonējāt. ${workspace} tagad izmanto plānu ${plan} ar ${replies} MI atbildēm mēnesī.\n\nNākamais maksājums ir ${renewsAt}. Rēķinus, plāna maiņu un atcelšanu jebkurā laikā atradīsiet norēķinu iestatījumos:\n${link}`,
+    }),
+    subscriptionRenewed: ({ workspace, plan, renewsAt, replies, link }) => ({
+      subject: `Darbvietas ${workspace} plāna ${plan} abonements ir atjaunots`,
+      text: `Darbvietas ${workspace} plāna ${plan} abonements ir atjaunots, un maksājums ir saņemts. Ir sācies jauns periods ar ${replies} MI atbildēm mēnesī; nākamais maksājums ir ${renewsAt}.\n\nRēķins ir pieejams norēķinu iestatījumos:\n${link}`,
+    }),
+    cancelConfirmed: ({ workspace, plan, endsAt, link }) => ({
+      subject: `Darbvietas ${workspace} plāna ${plan} abonements ir atcelts`,
+      text: `Jūsu darbvietas ${workspace} plāna ${plan} abonements ir atcelts, un turpmāk maksa netiks iekasēta.\n\n${workspace} saglabā plānu ${plan} līdz ${endsAt}, pēc tam pāries uz bezmaksas plānu. Nekas netiks dzēsts. Ja līdz tam pārdomāsiet, abonementu varat saglabāt norēķinu iestatījumos:\n${link}`,
+    }),
+    quota80: (m) => ({
+      subject: `${m.workspace} ir izmantojusi 80 % šī mēneša MI atbilžu`,
+      text: `${m.workspace} ir izmantojusi ${m.used} no ${m.allowance} šajā mēnesī iekļautajām MI atbildēm. Skaitīšana sāksies no jauna ${m.resetsAt}.\n\n${
+        m.overage === "on"
+          ? `Kad tās beigsies, darbu turpinās maksas papildu atbildes: ${m.price} par ${m.per}, līdz jūsu noteiktajam ${m.cap} limitam.`
+          : `Kad tās beigsies, jūsu asistenti līdz skaitīšanas atsākšanai atbildes vietā piedāvās apmeklētājiem nodošanas veidlapu. ${m.overage === "off" ? "Lai tie turpinātu atbildēt, izvēlieties lielāku plānu vai ieslēdziet maksas papildu atbildes." : "Vairāk atbilžu iegūsiet, izvēloties lielāku plānu."}`
+      }\n\nLietojumu un plānus atradīsiet norēķinu iestatījumos:\n${m.link}`,
+    }),
+    quota100: (m) => ({
+      subject: `${m.workspace} ir izmantojusi visas šī mēneša MI atbildes`,
+      text: `${m.workspace} ir izmantojusi visas ${m.allowance} šajā mēnesī iekļautās MI atbildes. ${
+        m.overage === "on"
+          ? `Maksas papildu atbildes ir ieslēgtas, tāpēc jūsu asistenti turpina atbildēt par ${m.price} par ${m.per} atbildēm līdz jūsu ${m.cap} limitam, līdz skaitīšana sāksies no jauna ${m.resetsAt}.`
+          : `Līdz skaitīšana sāksies no jauna ${m.resetsAt}, jūsu asistenti atbildes vietā piedāvās apmeklētājiem nodošanas veidlapu. ${m.overage === "off" ? "Lai tie turpinātu atbildēt, izvēlieties lielāku plānu vai ieslēdziet maksas papildu atbildes." : "Lai tie turpinātu atbildēt, izvēlieties lielāku plānu."}`
+      }\n\nLietojumu un plānus atradīsiet norēķinu iestatījumos:\n${m.link}`,
+    }),
+  },
+  et: {
+    paymentFailed: ({ workspace, plan, until, link }) => ({
+      subject: `Tööruumi ${workspace} makse ebaõnnestus`,
+      text: `Me ei saanud võtta makset teie Apex Boti tööruumi ${workspace} ${plan}-paketi eest. Kaardi kehtivus võib olla lõppenud või kaart tagasi lükatud.\n\nPraegu ei muutu midagi: makset proovitakse uuesti ja ${workspace} säilitab ${plan}-paketi kuni ${until}. Paketi säilitamiseks uuendage enne seda makseviisi:\n${link}\n\nKui makse pole selleks ajaks õnnestunud, läheb tööruum ${until} üle tasuta paketile. Midagi ei kustutata.`,
+    }),
+    graceReminder: ({ workspace, plan, until, link }) => ({
+      subject: `Meeldetuletus: uuendage tööruumi ${workspace} makseviisi`,
+      text: `Tööruumi ${workspace} ${plan}-paketi makse pole endiselt õnnestunud. Tööruum säilitab ${plan}-paketi kuni ${until}, seejärel läheb see üle tasuta paketile.\n\nUuendage makseviisi siin:\n${link}`,
+    }),
+    graceLastCall: ({ workspace, plan, until, link }) => ({
+      subject: `Viimane meeldetuletus: ${workspace} läheb ${until} üle tasuta paketile`,
+      text: `Me pole endiselt saanud võtta makset tööruumi ${workspace} ${plan}-paketi eest. Kui makse ei õnnestu, läheb tööruum ${until} üle tasuta paketile.\n\n${plan}-paketi säilitamiseks uuendage makseviisi kohe:\n${link}\n\nTasuta paketil ei kustutata midagi: limiiti ületavad saidid peatatakse ja paketist kõrgemad funktsioonid ei kehti, kuni te uuesti tellite.`,
+    }),
+    downgraded: ({ workspace, plan, freeReplies, link }) => ({
+      subject: `${workspace} on nüüd tasuta paketil`,
+      text: `Tööruumi ${workspace} ${plan}-paketi tellimus on lõppenud, seega on tööruum nüüd tasuta paketil.\n\nMidagi ei kustutatud. Tasuta paketi limiiti ületavad saidid on peatatud ning nende teadmised, seaded ja vestlused on alles; tasuta paketist kõrgemad funktsioonid enam ei kehti ja igas kuus on kaasas ${freeReplies} TI vastust. Uuesti tellides taastub kõik endisel kujul:\n${link}`,
+    }),
+    subscriptionStarted: ({ workspace, plan, renewsAt, replies, link }) => ({
+      subject: `Tööruumi ${workspace} ${plan}-paketi tellimus algas`,
+      text: `Täname tellimuse eest. ${workspace} on nüüd ${plan}-paketil, mis sisaldab ${replies} TI vastust kuus.\n\nJärgmine makse on ${renewsAt}. Arveid näete ning paketti saate muuta või tellimuse igal ajal tühistada arveldusseadetes:\n${link}`,
+    }),
+    subscriptionRenewed: ({ workspace, plan, renewsAt, replies, link }) => ({
+      subject: `Tööruumi ${workspace} ${plan}-paketi tellimus uuendati`,
+      text: `Tööruumi ${workspace} ${plan}-paketi tellimus uuendati ja makse õnnestus. Algas uus periood, mis sisaldab ${replies} TI vastust kuus; järgmine makse on ${renewsAt}.\n\nArve leiate arveldusseadetest:\n${link}`,
+    }),
+    cancelConfirmed: ({ workspace, plan, endsAt, link }) => ({
+      subject: `Tööruumi ${workspace} ${plan}-paketi tellimus tühistati`,
+      text: `Tööruumi ${workspace} ${plan}-paketi tellimus on tühistatud ja rohkem tasu ei võeta.\n\n${workspace} säilitab ${plan}-paketi kuni ${endsAt}, seejärel läheb see üle tasuta paketile. Midagi ei kustutata. Kui mõtlete enne seda ümber, saate tellimuse alles jätta arveldusseadetes:\n${link}`,
+    }),
+    quota80: (m) => ({
+      subject: `${m.workspace} on kasutanud 80% selle kuu TI vastustest`,
+      text: `${m.workspace} on kasutanud ${m.used} selle kuu ${m.allowance} TI vastusest. Loendus algab uuesti ${m.resetsAt}.\n\n${
+        m.overage === "on"
+          ? `Kui need saavad otsa, jätkavad tasulised lisavastused: ${m.price} ${m.per} vastuse eest, kuni teie määratud piirini ${m.cap}.`
+          : `Kui need saavad otsa, pakuvad teie assistendid kuni loenduse uuesti algamiseni külastajatele vastamise asemel üleandmisvormi. ${m.overage === "off" ? "Et nad vastaksid edasi, valige suurem pakett või lülitage sisse tasulised lisavastused." : "Rohkemate vastuste jaoks valige suurem pakett."}`
+      }\n\nKasutust ja pakette näete arveldusseadetes:\n${m.link}`,
+    }),
+    quota100: (m) => ({
+      subject: `${m.workspace} on kasutanud kõik selle kuu TI vastused`,
+      text: `${m.workspace} on kasutanud kõik selle kuu ${m.allowance} TI vastust. ${
+        m.overage === "on"
+          ? `Tasulised lisavastused on sisse lülitatud, seega vastavad teie assistendid edasi hinnaga ${m.price} ${m.per} vastuse eest kuni teie piirini ${m.cap}, kuni loendus algab uuesti ${m.resetsAt}.`
+          : `Kuni loendus algab uuesti ${m.resetsAt}, pakuvad teie assistendid külastajatele vastamise asemel üleandmisvormi. ${m.overage === "off" ? "Et nad vastaksid edasi, valige suurem pakett või lülitage sisse tasulised lisavastused." : "Et nad vastaksid edasi, valige suurem pakett."}`
+      }\n\nKasutust ja pakette näete arveldusseadetes:\n${m.link}`,
+    }),
+  },
+}
+
+const BILLING_TEMPLATE: Record<BillingNoticeKind, keyof (typeof BILLING_EMAILS)["en"]> = {
+  payment_failed: "paymentFailed",
+  grace_reminder: "graceReminder",
+  grace_last_call: "graceLastCall",
+  downgraded: "downgraded",
+  subscription_started: "subscriptionStarted",
+  subscription_renewed: "subscriptionRenewed",
+  cancel_confirmed: "cancelConfirmed",
+  quota_80: "quota80",
+  quota_100: "quota100",
+}
+
+/** The billing email for a notice, in `locale`, with dates and numbers written its way (dates in UTC). */
+export function billingMail(n: Pick<BillingNotice, "workspace" | "data">, locale: Locale, link: string): { subject: string; text: string } {
+  const mail = billingTemplate(n, locale, link)
+  // a Lithuanian date ends in "d.", so one that ends a sentence would get two periods
+  return { subject: mail.subject, text: mail.text.replace(/(\d d)\.\./g, "$1.") }
+}
+
+function billingTemplate(n: Pick<BillingNotice, "workspace" | "data">, locale: Locale, link: string): { subject: string; text: string } {
+  const date = (d: Date) => new Intl.DateTimeFormat(locale, { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(d)
+  const num = (v: number) => new Intl.NumberFormat(locale).format(v)
+  const usd = (cents: number) => new Intl.NumberFormat(locale, { style: "currency", currency: "USD", maximumFractionDigits: cents % 100 ? 2 : 0 }).format(cents / 100)
+  const d = n.data
+  const base = { workspace: n.workspace, plan: PLAN_NAMES[locale].plans[d.plan], link }
+  const t = BILLING_EMAILS[locale]
+  switch (d.kind) {
+    case "payment_failed":
+    case "grace_reminder":
+    case "grace_last_call":
+      return t[BILLING_TEMPLATE[d.kind] as "paymentFailed"]({ ...base, until: date(d.graceUntil) })
+    case "downgraded":
+      return t.downgraded({ ...base, freeReplies: num(d.freeReplies) })
+    case "subscription_started":
+    case "subscription_renewed":
+      return t[BILLING_TEMPLATE[d.kind] as "subscriptionStarted"]({ ...base, renewsAt: date(d.renewsAt), replies: num(d.monthlyReplies) })
+    case "cancel_confirmed":
+      return t.cancelConfirmed({ ...base, endsAt: date(d.endsAt) })
+    case "quota_80":
+    case "quota_100":
+      return t[BILLING_TEMPLATE[d.kind] as "quota80"]({
+        ...base,
+        used: num(d.usedReplies),
+        allowance: num(d.allowanceReplies),
+        resetsAt: date(d.resetsAt),
+        overage: d.overage,
+        cap: d.capCents === null ? "" : usd(d.capCents),
+        price: usd(OVERAGE_BLOCK.priceCents),
+        per: num(OVERAGE_BLOCK.replies),
+      })
+  }
+}
+
+/** A billing notice to one workspace owner. True when it went out. */
+export function sendBillingNotice(email: string, n: Pick<BillingNotice, "kind" | "workspace" | "data">, locale: Locale, link: string) {
+  return send({ kind: `billing_${n.kind}`, to: email, ...withSignature(billingMail(n, locale, link), locale) })
 }

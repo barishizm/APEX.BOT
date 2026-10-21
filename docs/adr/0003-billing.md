@@ -149,6 +149,20 @@ When a workspace moves to a smaller plan (by choice, at period end, or by (f)):
   webhook is lost), the workspace drops to Free and (e) applies. Paying later starts a new subscription.
 - A failed overage charge gets the same 7 days; until it is paid, overage is switched off for the workspace.
 - Cancellation by the owner is not a failure: the plan runs to the end of the paid period, then Free.
+- Implemented (2026-10-21): the daily cron `/api/cron/billing-notices` (`apps/web/lib/billing/notices.ts`, job
+  `billing.notices`). It first applies the `grace_expired` transition (`expireGrace` in `packages/db/src/billing.ts`)
+  to every past_due subscription whose `grace_until` has passed: `grace_expired_at` is set once, the plan is
+  recomputed (Free unless an override runs, so (e) applies), the window's replies move to calendar months, and it is
+  audited as `billing.grace_expired`; the subscription itself stays past_due for the provider to collect or cancel.
+  Then it sends the owners' emails (`lib/mail.ts`, en/tr/lt/lv/et, in the language each owner last used the
+  dashboard in, `app.users.locale`): failed payment (day 0), reminders (day 3, day 6), moved to Free, subscription
+  started / renewed, cancellation confirmed, and 80% / 100% of the month's replies (only while `reply_quota` holds
+  the workspace to them). What is due is read from the billing state (`dueBillingNotices` in
+  `packages/db/src/billing-notices.ts`), and each email is claimed in `app.billing_notices` (migration 0038) per
+  workspace, kind and period before it goes out, so it is sent once; one that reached no owner is given back and
+  retried the next day. The webhook sends a workspace's due emails right after applying its event, so they don't
+  wait for the cron. While past_due, every dashboard page shows a banner that can't be closed (in the
+  announcements bar) linking to the billing page. Still open: overage switched off while an overage charge is unpaid.
 
 ### (g) Beta workspaces
 

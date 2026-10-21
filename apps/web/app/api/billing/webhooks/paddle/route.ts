@@ -1,6 +1,7 @@
 import { after } from "next/server"
 import { requestMeta } from "@/lib/auth"
 import { getBillingProvider } from "@/lib/billing"
+import { sendBillingNoticesFor } from "@/lib/billing/notices"
 import { handleBillingWebhook } from "@/lib/billing/webhook"
 import { db } from "@/lib/db"
 
@@ -10,5 +11,11 @@ export const maxDuration = 30
 
 export async function POST(request: Request) {
   const { ip } = await requestMeta()
-  return handleBillingWebhook(request, { db: db(), provider: getBillingProvider(), ip: ip ?? null, defer: (work) => after(() => work) })
+  return handleBillingWebhook(request, {
+    db: db(),
+    provider: getBillingProvider(),
+    ip: ip ?? null,
+    defer: (work) => after(() => work),
+    notify: (organizationId) => sendBillingNoticesFor(db(), [organizationId]),
+  })
 }

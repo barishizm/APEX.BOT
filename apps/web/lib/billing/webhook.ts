@@ -44,6 +44,8 @@ export interface WebhookDeps {
   ip: string | null
   /** Keeps work alive after the response (next/server `after`). */
   defer?: (work: Promise<unknown>) => void
+  /** After an event changed a workspace's billing: sends the billing emails now due (lib/billing/notices.ts). */
+  notify?: Notify
   now?: () => Date
   rateLimit?: RateLimit
   budgetMs?: number
@@ -68,7 +70,8 @@ export type WebhookOutcome =
   /** Still running when the budget ran out; finishes after the response. */
   | "deferred"
 
-type Applied = { outcome: Exclude<WebhookOutcome, "duplicate" | "failed" | "deferred">; error?: string }
+type Applied = { outcome: Exclude<WebhookOutcome, "duplicate" | "failed" | "deferred">; error?: string; organizationId?: string }
+type Notify = (organizationId: string) => Promise<unknown>
 
 const json = (status: number, body: Record<string, unknown>, headers: Record<string, string> = {}) => Response.json(body, { status, headers })
 
@@ -144,7 +147,7 @@ export async function handleBillingWebhook(request: Request, deps: WebhookDeps):
     return json(200, { ok: true, outcome: "duplicate" })
   }
 
-  const work = processBillingEvent(deps.db, provider, stored.id, payload, now)
+  const work = processBillingEvent(deps.db, provider, stored.id, payload, now, deps.notify)
   let timer: ReturnType<typeof setTimeout> | undefined
   const budget = new Promise<"deferred">((resolve) => (timer = setTimeout(() => resolve("deferred"), deps.budgetMs ?? PROCESS_BUDGET_MS)))
   const outcome = await Promise.race([work, budget])
@@ -160,7 +163,14 @@ export async function handleBillingWebhook(request: Request, deps: WebhookDeps):
  * Applies a stored event in one transaction and marks it processed; on failure records the error and
  * the attempt. Never throws, and safe to run again on the same event (a replay).
  */
-export async function processBillingEvent(db: Db, provider: BillingProvider, id: string, payload: unknown, now: () => Date = () => new Date()): Promise<WebhookOutcome> {
+export async function processBillingEvent(
+  db: Db,
+  provider: BillingProvider,
+  id: string,
+  payload: unknown,
+  now: () => Date = () => new Date(),
+  notify?: Notify,
+): Promise<WebhookOutcome> {
   let event: BillingEvent | null = null
   try {
     event = provider.normalizeEvent(payload)
@@ -174,6 +184,11 @@ export async function processBillingEvent(db: Db, provider: BillingProvider, id:
     })
     if (!result) return "duplicate"
     log(result.error ? "warn" : "info", result.outcome, { eventId: e.eventId, eventType: e.providerType, organizationId: e.organizationId })
+    // the daily cron sends whatever this misses
+    if (result.outcome === "applied" && result.organizationId && notify)
+      await notify(result.organizationId).catch((err: unknown) =>
+        log("error", "couldn't send the billing emails", { eventId: e.eventId, error: maskPII(err instanceof Error ? err.message : String(err)).slice(0, 300) }),
+      )
     return result.outcome
   } catch (err) {
     // stored for the admin area and logged, so masked like every other error that may quote a value
@@ -237,6 +252,7 @@ async function applyEvent(tx: Queryable, event: BillingEvent, now: Date): Promis
   const result = await applyBillingEvent(tx, toApplicable(event, organizationId), now)
   switch (result.outcome) {
     case "applied":
+      return { outcome: "applied", organizationId }
     case "stale":
     case "ignored":
       return { outcome: result.outcome }
