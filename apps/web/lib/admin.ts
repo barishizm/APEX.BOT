@@ -27,7 +27,7 @@ export interface AdminActionResult {
   after: unknown
   result?: unknown
   /** Runs once the change and its audit entry are committed, e.g. to send the user an email. */
-  afterCommit?: () => Promise<void>
+  afterCommit?: () => Promise<unknown>
 }
 
 export interface AdminActionOptions {

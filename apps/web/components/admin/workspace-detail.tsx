@@ -1,7 +1,7 @@
 "use client"
 
-import type { AdminWorkspaceDetail, MemberRole, Plan, PlanLimitValue } from "@apex/db"
-import { ArrowLeft, LoaderCircle } from "lucide-react"
+import type { AdminWorkspaceBilling, MemberRole, PaidPlan, Plan, PlanLimitValue, AdminWorkspaceDetail } from "@apex/db"
+import { ArrowLeft, ExternalLink, LoaderCircle } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState, type FormEvent } from "react"
@@ -11,22 +11,28 @@ import { formatDate, formatNumber } from "@/lib/i18n/format"
 import { cn } from "@/lib/utils"
 import { button, ConfirmDialog, dangerButton, Empty, field, fill, postJson, Section, Table, tag, td, When, type Jsonify } from "./detail-ui"
 
-// /admin/workspaces/[id]: one workspace, its team, invitations and sites, and what staff can do to it.
+// /admin/workspaces/[id]: one workspace, its subscription, team, invitations and sites, and what staff
+// can do to it. The plan changes here only as a comp (a paid plan for free until a date), never while
+// a subscription pays for the workspace.
 // Every action goes through POST /api/admin/workspaces/<id>/<action> with a reason (the staff note
 // aside); the page re-renders from the server after each one, so it always shows what the database holds.
 
 export type WorkspaceDetailJson = Jsonify<AdminWorkspaceDetail>
+export type WorkspaceBillingJson = Jsonify<AdminWorkspaceBilling> & { links: { subscription: string | null; customer: string | null } }
+type Comp = WorkspaceBillingJson["comps"][number]
 type Member = WorkspaceDetailJson["members"][number]
 type Invite = WorkspaceDetailJson["invites"][number]
 
 type Dialog =
-  | { kind: "plan" | "suspend" | "unsuspend" | "delete" }
+  | { kind: "comp" | "suspend" | "unsuspend" | "delete" }
+  | { kind: "compRevoke"; comp: Comp }
   | { kind: "role" | "transfer" | "remove"; member: Member }
   | { kind: "resend" | "revoke"; invite: Invite }
 type Kind = Dialog["kind"]
 
 const SPEC: Record<Kind, { path: string; stepUp: boolean; danger?: boolean }> = {
-  plan: { path: "plan", stepUp: true },
+  comp: { path: "comp", stepUp: true },
+  compRevoke: { path: "comp-revoke", stepUp: true, danger: true },
   suspend: { path: "suspend", stepUp: true, danger: true },
   unsuspend: { path: "unsuspend", stepUp: true },
   delete: { path: "delete", stepUp: true, danger: true },
@@ -38,9 +44,15 @@ const SPEC: Record<Kind, { path: string; stepUp: boolean; danger?: boolean }> = 
 }
 
 const ROLES: MemberRole[] = ["owner", "admin", "member"]
+// the billing provider's own audit entries (billing.ts BILLING_AUDIT_ACTOR)
+const BILLING_ACTOR = "system:billing"
+const COMP_MAX_DAYS = 730
+const DAY = 86_400_000
+const isoDay = (d: Date) => d.toISOString().slice(0, 10)
+
 const linkButton = "cursor-pointer whitespace-nowrap border-0 bg-transparent p-0 text-xs font-medium text-[var(--color-text)] underline-offset-2 hover:underline"
 
-export function WorkspaceDetail({ detail }: { detail: WorkspaceDetailJson }) {
+export function WorkspaceDetail({ detail, billing }: { detail: WorkspaceDetailJson; billing: WorkspaceBillingJson }) {
   const { t: app, locale } = useAppI18n()
   const t = app.admin!.workspaces.detail
   const ws = app.admin!.workspaces
@@ -69,7 +81,7 @@ export function WorkspaceDetail({ detail }: { detail: WorkspaceDetailJson }) {
       at: h.createdAt,
       label: fill(t.timeline.changed, { from: h.from ? ws.plans[h.from] : "?", to: h.to ? ws.plans[h.to] : "?" }),
       plan: (h.to ?? w.plan) as Plan,
-      actor: h.actorName ?? t.deletedStaff,
+      actor: h.actorName === BILLING_ACTOR ? t.timeline.billingActor : (h.actorName ?? t.deletedStaff),
       reason: h.reason,
     })),
   ]
@@ -156,6 +168,8 @@ export function WorkspaceDetail({ detail }: { detail: WorkspaceDetailJson }) {
             </ol>
             {!detail.planHistory.length && <Empty>{t.timeline.none}</Empty>}
           </Section>
+
+          <BillingCard billing={billing} onRevoke={(comp) => open({ kind: "compRevoke", comp })} />
 
           <Section title={t.sections.members} count={detail.members.length}>
             {detail.members.length ? (
@@ -282,11 +296,17 @@ export function WorkspaceDetail({ detail }: { detail: WorkspaceDetailJson }) {
         <aside className="flex min-w-0 flex-col gap-6">
           <Section title={t.sections.actions}>
             <ul className="m-0 flex list-none flex-col gap-2 p-0">
-              {(["plan", w.suspendedAt ? "unsuspend" : "suspend", "delete"] as const).map((kind) => (
+              {(["comp", w.suspendedAt ? "unsuspend" : "suspend", "delete"] as const).map((kind) => (
                 <li key={kind}>
-                  <button type="button" onClick={() => open({ kind })} className={cn(button, "w-full justify-start", SPEC[kind].danger && dangerButton)}>
+                  <button
+                    type="button"
+                    onClick={() => open({ kind })}
+                    disabled={kind === "comp" && !billing.mayComp}
+                    className={cn(button, "w-full justify-start", SPEC[kind].danger && dangerButton)}
+                  >
                     {t.actions[kind].label}
                   </button>
+                  {kind === "comp" && !billing.mayComp && <p className="m-0 mt-1 text-xs text-[var(--color-muted)]">{t.billing.hasSubscription}</p>}
                 </li>
               ))}
             </ul>
@@ -383,14 +403,17 @@ function ActionDialog({ dialog, detail, onClose, onDone }: { dialog: Dialog; det
   const spec = SPEC[dialog.kind]
   const member = "member" in dialog ? dialog.member : null
   const invite = "invite" in dialog ? dialog.invite : null
+  const comp = "comp" in dialog ? dialog.comp : null
 
-  const [plan, setPlan] = useState<Plan>(detail.planPreviews[0]?.plan ?? w.plan)
+  const [plan, setPlan] = useState<Plan>(detail.planPreviews.find((p) => p.plan !== w.plan)?.plan ?? detail.planPreviews[0]?.plan ?? w.plan)
+  const [today] = useState(() => new Date())
+  const [endsOn, setEndsOn] = useState(() => isoDay(new Date(today.getTime() + 30 * DAY)))
   const [role, setRole] = useState<MemberRole>(ROLES.find((r) => r !== member?.role) ?? "member")
   const [confirmName, setConfirmName] = useState("")
   const [mailLocale, setMailLocale] = useState<Locale>(locale)
 
   const preview = detail.planPreviews.find((p) => p.plan === plan)
-  const ready = dialog.kind !== "delete" || confirmName.trim() === w.name.trim()
+  const ready = dialog.kind === "delete" ? confirmName.trim() === w.name.trim() : dialog.kind === "comp" ? /^\d{4}-\d{2}-\d{2}$/.test(endsOn) : true
   const label = "flex flex-col gap-1.5 text-sm font-medium"
   const values = t.limitValues
   const limitValue = (v: PlanLimitValue) =>
@@ -400,8 +423,11 @@ function ActionDialog({ dialog, detail, onClose, onDone }: { dialog: Dialog; det
 
   function body(): Record<string, unknown> {
     switch (dialog.kind) {
-      case "plan":
-        return { plan }
+      case "comp":
+        // the comp ends as the chosen day starts (UTC); the workspace is on Free from then
+        return { plan, endsAt: `${endsOn}T00:00:00.000Z` }
+      case "compRevoke":
+        return { compId: comp!.id }
       case "delete":
         return { confirmName }
       case "role":
@@ -421,7 +447,7 @@ function ActionDialog({ dialog, detail, onClose, onDone }: { dialog: Dialog; det
   return (
     <ConfirmDialog
       title={t.actions[dialog.kind].label}
-      text={fill(t.actions[dialog.kind].text, { name: member?.name ?? "", email: invite?.email ?? "" })}
+      text={fill(t.actions[dialog.kind].text, { name: member?.name ?? "", email: invite?.email ?? "", plan: comp ? ws.plans[comp.plan] : "" })}
       danger={spec.danger}
       stepUp={spec.stepUp}
       ready={ready}
@@ -429,17 +455,30 @@ function ActionDialog({ dialog, detail, onClose, onDone }: { dialog: Dialog; det
       onClose={onClose}
       onDone={onDone}
     >
-      {dialog.kind === "plan" && (
+      {dialog.kind === "comp" && (
         <>
           <label className={label}>
             {t.dialog.plan}
-            <select value={plan} onChange={(e) => setPlan(e.target.value as Plan)} className={`${field} h-10 cursor-pointer`}>
+            <select value={plan} onChange={(e) => setPlan(e.target.value as PaidPlan)} className={`${field} h-10 cursor-pointer`}>
               {detail.planPreviews.map((p) => (
                 <option key={p.plan} value={p.plan}>
                   {ws.plans[p.plan]}
                 </option>
               ))}
             </select>
+          </label>
+          <label className={label}>
+            {t.dialog.endsAt}
+            <input
+              type="date"
+              required
+              value={endsOn}
+              min={isoDay(new Date(today.getTime() + DAY))}
+              max={isoDay(new Date(today.getTime() + COMP_MAX_DAYS * DAY))}
+              onChange={(e) => setEndsOn(e.target.value)}
+              className={`${field} h-10`}
+            />
+            <span className="text-xs font-normal text-[var(--color-muted)]">{t.dialog.endsHint}</span>
           </label>
           {preview && (
             <div className="flex flex-col gap-3 rounded-lg border border-[var(--color-line)] bg-[var(--color-raised)] p-3 text-sm">
@@ -537,5 +576,140 @@ function ActionDialog({ dialog, detail, onClose, onDone }: { dialog: Dialog; det
         </>
       )}
     </ConfirmDialog>
+  )
+}
+
+const STATUS_TONE: Record<string, string> = {
+  active: "bg-green-500/15 text-green-800 dark:text-green-300",
+  trialing: "bg-green-500/15 text-green-800 dark:text-green-300",
+  past_due: "bg-amber-500/15 text-amber-800 dark:text-amber-200",
+  paused: "bg-[var(--color-bubble)] text-[var(--color-muted)]",
+  canceled: "bg-red-500/15 text-red-700 dark:text-red-300",
+}
+
+function PaddleLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <a href={href} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-1 break-all font-mono text-xs">
+      {children}
+      <ExternalLink className="h-3 w-3 shrink-0" aria-hidden />
+    </a>
+  )
+}
+
+/** The subscription as Paddle last reported it, the comps staff granted, and the webhooks about this workspace. */
+function BillingCard({ billing, onRevoke }: { billing: WorkspaceBillingJson; onRevoke: (comp: Comp) => void }) {
+  const { t: app, locale } = useAppI18n()
+  const t = app.admin!.workspaces.detail.billing
+  const plans = app.admin!.workspaces.plans
+  const sub = billing.subscription
+  const day = (d: string) => formatDate(d, locale, { dateStyle: "medium" })
+  const unprocessed = billing.events.some((e) => !e.processedAt)
+
+  const rows: [string, React.ReactNode][] = [[t.fields.source, t.sources[billing.source]]]
+  if (sub) {
+    rows.push(
+      [t.fields.status, <span key="s" className={cn(tag, STATUS_TONE[sub.status])}>{t.statuses[sub.status]}</span>],
+      [t.fields.plan, `${plans[sub.plan]} · ${t.intervals[sub.interval]}`],
+      [
+        t.fields.period,
+        <span key="p">
+          {day(sub.currentPeriodStart)} – {day(sub.currentPeriodEnd)}
+          {sub.cancelAtPeriodEnd && <span className="block text-xs text-red-700 dark:text-red-300">{t.cancelAtPeriodEnd}</span>}
+        </span>,
+      ],
+    )
+    if (sub.scheduledChange)
+      rows.push([
+        t.fields.scheduled,
+        fill(t.scheduled[sub.scheduledChange.action], { plan: sub.scheduledChange.plan ? plans[sub.scheduledChange.plan] : "", date: day(sub.scheduledChange.effectiveAt) }),
+      ])
+    if (sub.graceUntil) rows.push([t.fields.grace, day(sub.graceUntil)])
+    if (sub.graceExpiredAt) rows.push([t.fields.graceExpired, day(sub.graceExpiredAt)])
+    if (billing.links.subscription)
+      rows.push([t.fields.subscription, <PaddleLink key="sl" href={billing.links.subscription}>{sub.providerSubscriptionId}</PaddleLink>])
+  }
+  if (billing.customerId && billing.links.customer)
+    rows.push([t.fields.customer, <PaddleLink key="cl" href={billing.links.customer}>{billing.customerId}</PaddleLink>])
+
+  const compState = (c: Comp) => (c.running ? "running" : c.revokedAt ? "revoked" : new Date(c.startsAt).getTime() > Date.now() ? "upcoming" : "ended")
+
+  return (
+    <Section title={app.admin!.workspaces.detail.sections.billing}>
+      <dl className="m-0 grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-[auto_1fr]">
+        {rows.map(([label, value]) => (
+          <div key={label} className="contents">
+            <dt className="text-[var(--color-muted)]">{label}</dt>
+            <dd className="m-0 min-w-0">{value}</dd>
+          </div>
+        ))}
+      </dl>
+      {!sub && <Empty>{t.none}</Empty>}
+
+      <h3 className="m-0 text-sm font-semibold">{t.comps}</h3>
+      {billing.comps.length ? (
+        <ul className="m-0 flex list-none flex-col gap-3 p-0 text-sm">
+          {billing.comps.map((c) => {
+            const state = compState(c)
+            return (
+              <li key={c.id} className="flex flex-col gap-0.5 border-l-2 border-[var(--color-line)] pl-3">
+                <span className="flex flex-wrap items-center gap-2 font-medium">
+                  {fill(t.comp, { plan: plans[c.plan], date: day(c.endsAt) })}
+                  <span className={cn(tag, state === "running" ? "bg-green-500/15 text-green-800 dark:text-green-300" : "bg-[var(--color-bubble)] text-[var(--color-muted)]")}>
+                    {t.compStates[state]}
+                  </span>
+                  {c.running && (
+                    <button type="button" className={cn(linkButton, "text-red-700 dark:text-red-300")} onClick={() => onRevoke(c)}>
+                      {t.endNow}
+                    </button>
+                  )}
+                </span>
+                <span className="text-xs text-[var(--color-muted)]">
+                  {c.grantedBy && <>{fill(t.grantedBy, { name: c.grantedBy })} · </>}
+                  {day(c.startsAt)}
+                </span>
+                <span className="whitespace-pre-wrap break-words text-xs">{c.reason}</span>
+              </li>
+            )
+          })}
+        </ul>
+      ) : (
+        <Empty>{t.noComps}</Empty>
+      )}
+
+      <h3 className="m-0 text-sm font-semibold">{t.events}</h3>
+      {billing.events.length ? (
+        <>
+          <ol className="m-0 flex list-none flex-col gap-2 p-0 text-sm">
+            {billing.events.map((e) => {
+              const state = e.processedAt ? "processed" : e.error ? "failed" : "waiting"
+              return (
+                <li key={e.id} className="flex flex-col gap-0.5 border-l-2 border-[var(--color-line)] pl-3">
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium">{e.eventType}</span>
+                    {state !== "processed" && (
+                      <span className={cn(tag, state === "failed" ? "bg-red-500/15 text-red-700 dark:text-red-300" : "bg-[var(--color-bubble)] text-[var(--color-muted)]")}>
+                        {t.eventStates[state]}
+                      </span>
+                    )}
+                  </span>
+                  <span className="text-xs text-[var(--color-muted)]">
+                    <When at={e.occurredAt} locale={locale} />
+                    {e.attempts > 1 && <> · {fill(t.attempts, { n: formatNumber(e.attempts, locale) })}</>} · <code className="break-all">{e.eventId}</code>
+                  </span>
+                  {e.error && <span className="break-words text-xs text-red-700 dark:text-red-300">{e.error}</span>}
+                </li>
+              )
+            })}
+          </ol>
+          {unprocessed && (
+            <Link href="/admin/billing" className="text-sm">
+              {t.replayHint}
+            </Link>
+          )}
+        </>
+      ) : (
+        <Empty>{t.noEvents}</Empty>
+      )}
+    </Section>
   )
 }

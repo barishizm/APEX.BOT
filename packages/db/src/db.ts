@@ -18,6 +18,26 @@ export const inTransaction = (tx: Queryable): Db => ({
   close: async () => {},
 })
 
+/**
+ * Like inTransaction, but each `transaction` is a savepoint: one that throws is rolled back on its
+ * own and the outer transaction carries on, as code written for separate transactions expects.
+ */
+export const inSavepoints = (tx: Queryable): Db => ({
+  query: (text, params) => tx.query(text, params),
+  transaction: async (fn) => {
+    await tx.query("savepoint nested")
+    try {
+      const result = await fn(tx)
+      await tx.query("release savepoint nested")
+      return result
+    } catch (err) {
+      await tx.query("rollback to savepoint nested")
+      throw err
+    }
+  },
+  close: async () => {},
+})
+
 export interface DbOptions {
   // "require": encrypt without verifying the server certificate (Supabase poolers
   // present a chain Node doesn't trust by default); "verify": also verify, against

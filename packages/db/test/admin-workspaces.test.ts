@@ -11,13 +11,11 @@ import { createBot, getBotForUser, listBotIds, listBotsChangedSince, membership 
 import { acceptInvitation, getInvitation, getTeam, inviteMember } from "../src/team.ts"
 import {
   ADMIN_WORKSPACES_LIST,
-  PLAN_AUDIT_ACTION,
   adminChangeMemberRole,
   adminDeleteWorkspace,
   adminRemoveMember,
   adminResendInvite,
   adminRevokeInvite,
-  adminSetPlan,
   adminSetWorkspaceNote,
   adminSuspendWorkspace,
   adminTransferOwnership,
@@ -27,6 +25,7 @@ import {
   planLimitChanges,
   type AdminWorkspaceRow,
 } from "../src/admin-workspaces.ts"
+import { adminGrantComp, adminRevokeComp, COMP_AUDIT_ACTION, COMP_REVOKE_AUDIT_ACTION } from "../src/admin-billing.ts"
 
 let pg: PGlite
 let db: Db
@@ -98,7 +97,7 @@ describe("workspace list", () => {
 })
 
 describe("plans", () => {
-  test("the preview lists every limit and the websites a downgrade cuts", async () => {
+  test("the comp preview lists every limit of each paid plan", async () => {
     const { owner, org } = await team()
     await db.query("update app.organizations set plan = 'pro' where id = $1", [org])
     const bot = await getBotForUser(db, owner)
@@ -109,14 +108,16 @@ describe("plans", () => {
       [bot.id],
     )
     const detail = (await getAdminWorkspaceDetail(db, org))!
-    assert.deepEqual(detail.planPreviews.map((p) => p.plan), ["free", "starter", "business"])
-    const free = detail.planPreviews.find((p) => p.plan === "free")!
-    assert.deepEqual(free.limits.find((l) => l.key === "websitePages"), { key: "websitePages", from: 1000, to: 50, effectiveFrom: 300, effectiveTo: 50, change: -1 })
+    // comps are paid plans only, the current one included (to give a hand-placed plan an end date)
+    assert.deepEqual(detail.planPreviews.map((p) => p.plan), ["starter", "pro", "business"])
+    assert.ok(detail.planPreviews.find((p) => p.plan === "pro")!.limits.every((l) => l.change === 0))
+    const free = planLimitChanges("pro", "free")
+    assert.deepEqual(free.find((l) => l.key === "websitePages"), { key: "websitePages", from: 1000, to: 50, effectiveFrom: 300, effectiveTo: 50, change: -1 })
     // every entitlement is listed, switches and model tiers included
-    assert.deepEqual(free.limits.map((l) => l.key), Object.keys(PLAN_LIMITS.free))
-    assert.deepEqual(free.limits.find((l) => l.key === "removeBranding"), { key: "removeBranding", from: true, to: false, effectiveFrom: true, effectiveTo: false, change: -1 })
-    assert.deepEqual(free.limits.find((l) => l.key === "allowedModelTiers"), { key: "allowedModelTiers", from: ["fast", "standard", "premium"], to: ["fast"], effectiveFrom: ["fast", "standard", "premium"], effectiveTo: ["fast"], change: -1 })
-    assert.deepEqual(free.overLimit.map((s) => [s.title, s.pages, s.limit]), [["Big site", 250, 50]])
+    assert.deepEqual(free.map((l) => l.key), Object.keys(PLAN_LIMITS.free))
+    assert.deepEqual(free.find((l) => l.key === "removeBranding"), { key: "removeBranding", from: true, to: false, effectiveFrom: true, effectiveTo: false, change: -1 })
+    assert.deepEqual(free.find((l) => l.key === "allowedModelTiers"), { key: "allowedModelTiers", from: ["fast", "standard", "premium"], to: ["fast"], effectiveFrom: ["fast", "standard", "premium"], effectiveTo: ["fast"], change: -1 })
+    // every paid plan reads at least the crawl ceiling
     assert.deepEqual(detail.planPreviews.find((p) => p.plan === "starter")!.overLimit, [])
     // above the crawl ceiling nothing changes in practice
     const toBusiness = planLimitChanges("pro", "business")
@@ -125,19 +126,26 @@ describe("plans", () => {
     assert.equal(toBusiness.find((l) => l.key === "declineTopics")!.change, 0)
   })
 
-  test("plan changes become the timeline, read back from the audit log", async () => {
-    const { org } = await team()
+  test("comps, and plan changes from Paddle, become the timeline, read back from the audit log", async () => {
+    const { owner, org } = await team()
+    const endsAt = new Date(Date.now() + 30 * 86_400_000).toISOString()
+    let compId = ""
     for (const plan of ["starter", "pro"]) {
       await run(async (tx) => {
-        const c = await adminSetPlan(tx, org, plan)
-        await writeAudit(tx, { actorId: null, action: PLAN_AUDIT_ACTION, targetType: "organization", targetId: org, reason: `to ${plan}`, before: c.before, after: c.after })
+        const c = await adminGrantComp(tx, org, { plan, endsAt, reason: `to ${plan}`, grantedBy: owner })
+        compId = (c.after as { comp: { id: string } }).comp.id
+        await writeAudit(tx, { actorId: null, action: COMP_AUDIT_ACTION, targetType: "organization", targetId: org, reason: `to ${plan}`, before: c.before, after: c.after })
       })
     }
-    await assert.rejects(run((tx) => adminSetPlan(tx, org, "pro")), code("invalid_input"))
-    await assert.rejects(run((tx) => adminSetPlan(tx, org, "gold")), code("invalid_input"))
+    // the provider's entries count when they moved the plan, not otherwise
+    await writeAudit(db, { actorId: null, actorLabel: "system:billing", action: "billing.customer.updated", targetType: "organization", targetId: org, before: { plan: "pro" }, after: { plan: "pro" } })
+    await run(async (tx) => {
+      const c = await adminRevokeComp(tx, org, { compId, revokedBy: owner })
+      await writeAudit(tx, { actorId: null, action: COMP_REVOKE_AUDIT_ACTION, targetType: "organization", targetId: org, reason: "done", before: c.before, after: c.after })
+    })
     const detail = (await getAdminWorkspaceDetail(db, org))!
-    assert.equal(detail.workspace.plan, "pro")
-    assert.deepEqual(detail.planHistory.map((h) => [h.from, h.to, h.reason]), [["free", "starter", "to starter"], ["starter", "pro", "to pro"]])
+    assert.equal(detail.workspace.plan, "free")
+    assert.deepEqual(detail.planHistory.map((h) => [h.from, h.to, h.reason]), [["free", "starter", "to starter"], ["starter", "pro", "to pro"], ["pro", "free", "done"]])
   })
 })
 

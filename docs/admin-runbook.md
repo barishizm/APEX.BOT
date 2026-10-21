@@ -1,6 +1,6 @@
 # Yönetim paneli (admin) runbook'u
 
-Apex Bot'un platform yönetimi `/admin` altındadır: kullanıcılar, çalışma alanları, botlar, bilgi kaynakları, kullanım ve maliyet, güvenlik, destek talepleri, bekleme listesi, duyurular, ayarlar, sistem durumu ve audit kaydı. Bu belge panelin güvenlik modelini ve elle yapılması gereken işleri (ilk admin, 2FA kaybı, rol değişiklikleri, olaylar) anlatır.
+Apex Bot'un platform yönetimi `/admin` altındadır: kullanıcılar, çalışma alanları, botlar, bilgi kaynakları, kullanım ve maliyet, faturalama, güvenlik, destek talepleri, bekleme listesi, duyurular, ayarlar, sistem durumu ve audit kaydı. Bu belge panelin güvenlik modelini ve elle yapılması gereken işleri (ilk admin, 2FA kaybı, rol değişiklikleri, olaylar) anlatır.
 
 > Canlı veritabanı **Neon**'dadır (ayrıntı: [`packages/db/README.md`](../packages/db/README.md#canlı-veritabanı-nerede)). Aşağıdaki SQL ve komutlar canlıda ya Neon konsolundaki **SQL Editor**'de ya da `DATABASE_URL='<Neon adresi>'` ile yerelden çalıştırılır. `apps/web/.env.local` geliştirme veritabanına bakar, canlıya değil.
 
@@ -22,7 +22,7 @@ Yazma işlemleri yalnızca `withAdminAction` (`apps/web/lib/admin.ts`) ile yapı
 
 - JSON gövde zorunludur (`readJson`): başka sitedeki bir `<form>` CORS ön kontrolü olmadan JSON gönderemez (CSRF).
 - Bir **gerekçe** (`reason`) zorunludur; yalnızca iç notlar hariç.
-- Yıkıcı işlemler (silme, askıya alma, plan, 2FA sıfırlama, görüntüleme…) son 10 dakikada doğrulama uygulamasından girilmiş bir kodla **step-up** ister. Kurtarma kodu step-up sayılmaz. Başarılı her step-up güvenlik kaydına `step_up` olarak düşer.
+- Yıkıcı işlemler (silme, askıya alma, ücretsiz plan, webhook'u yeniden işleme, 2FA sıfırlama, görüntüleme…) son 10 dakikada doğrulama uygulamasından girilmiş bir kodla **step-up** ister. Kurtarma kodu step-up sayılmaz. Başarılı her step-up güvenlik kaydına `step_up` olarak düşer.
 - Değişiklik ve audit kaydı **aynı transaction'da** yazılır: audit yazılamazsa değişiklik geri alınır. `app.admin_audit_log` yalnızca eklemeye açıktır (veritabanı tetikleyicileri güncellemeyi ve silmeyi reddeder).
 
 Bunların unutulmaması testlerle korunur: `apps/web/test/admin-routes.test.ts`, `app/api/admin` altındaki her route dosyasını okur ve oturum kontrolü olmayan, JSON dışı gövde okuyan ya da (çalışma alanı, bot ve kaynak işlemlerinde) personel kontrolünü atlayan bir handler'da başarısız olur.
@@ -108,6 +108,60 @@ commit;
 ```
 
 Hesap ele geçirildiyse eski hesabın oturumlarını da sil (`delete from app.sessions where user_id = '<eski id>'`) ve şifresini sıfırlat.
+
+## Faturalama
+
+Ödemeleri **Paddle** alır (merchant of record: vergiyi, faturayı, kartları, tahsilat denemelerini ve ödeme itirazlarını o yürütür; ayrıntı: [ADR 0003](adr/0003-billing.md)). Uygulama Paddle'ın webhook'larıyla aboneliği `app.subscriptions`'a yazar ve çalışma alanının planını ondan hesaplar. **Para ile ilgili her işlem (iade, iptal, plan değişikliği) Paddle panelinde yapılır**; admin panelinde para hareketi yoktur.
+
+- **`/admin/billing`**: MRR/ARR (liste fiyatıyla, vergi ve indirim öncesi; yıllık plan 1/12 sayılır, deneme dahil değil), risk altındaki ve iptal edilecek gelir, durumlara göre abonelikler, plan dağılımı (ödeyen / ücretsiz plan (comp) / elle atanmış), ödemesi gecikenler, işlenmemiş webhook'lar ve son 12 ayın aşım gelirleri.
+- **`/admin/workspaces/<id>` → Abonelik kartı**: durum, dönem, planlanan değişiklik, ek süre, Paddle'daki abonelik ve müşteri bağlantıları (`PADDLE_ENV`'e göre sandbox ya da canlı panel), ücretsiz planlar ve o çalışma alanına ait webhook geçmişi.
+
+### Ücretsiz plan tanımak (comp)
+
+Personelin elle yapabildiği tek plan değişikliği budur: `/admin/workspaces/<id>` → **Ücretsiz plan tanı (comp)** → plan, bitiş tarihi (en fazla 2 yıl) ve gerekçe; step-up ister, audit'e `organization.comp` olarak düşer. Bitiş günü çalışma alanı kendiliğinden Free'ye döner. Yeni bir comp, süren comp'un yerini alır; **Şimdi bitir** onu hemen sonlandırır (`organization.comp_revoke`).
+
+- **Aboneliği olan bir çalışma alanına comp verilemez** (iptal edilmiş ama dönemi bitmemiş abonelik dahil): planı abonelik belirler ve Paddle'da değişir. Abonelik bittikten sonra comp verilebilir.
+- Comp'lar öncesinde elle plan verilmiş (beta) çalışma alanları "Elle atanmış" görünür ve planlarını korur. Bitiş tarihi vermek için aynı plandan bir comp tanı. Hemen Free'ye düşürmek için bir comp tanıyıp **Şimdi bitir** de.
+- Destek personeli, içinde personel olan bir çalışma alanına comp veremez (kendi alanı dahil); bunu superadmin yapar.
+
+### Ödemesi gecikenler (past_due)
+
+Yenileme ödemesi başarısız olunca abonelik `past_due` olur ve **7 günlük ek süre** başlar: plan bu sürede devam eder, sahiplere e-posta gider, Paddle ödemeyi kendisi yeniden dener. Ek süre biterse günlük cron (`/api/cron/billing-notices`) çalışma alanını Free'ye alır (`billing.grace_expired`). `/admin/billing` → **Ödemesi gecikenler** bunları ek sürenin bitişine göre sıralar. Müşteri ödeme yöntemini değiştirmek için **Ayarlar → Plan ve faturalandırma → Ödeme yöntemini güncelle**'yi kullanır. Ek süre elle uzatılmaz.
+
+### Webhook'u yeniden işlemek
+
+Her webhook işlenmeden önce `app.billing_events`'e yazılır. Uygulanamayan olay (çalışma alanı bulunamadı, müşteri uyuşmuyor, geçersiz durum geçişi, hata) işlenmemiş kalır ve `/admin/billing` → **İşlenmemiş webhook'lar**'da (ve `/admin/system`'de) hatasıyla listelenir. Paddle'ın kendi yeniden denemeleri bunu düzeltmez; yeniden işlemek bizim işimiz.
+
+1. Hatayı oku ve **önce nedeni gider**:
+   | Hata | Anlamı | Yapılacak |
+   |---|---|---|
+   | `unknown_organization` | Olayda imzalı `custom_data` yok ve abonelik/müşteri kayıtlı değil, ya da çalışma alanı silinmiş | Paddle'da müşteriyi bul; çalışma alanı silindiyse aboneliği Paddle'da iptal et ve olayı bırak |
+   | `customer_mismatch` | Olaydaki müşteri, çalışma alanının kayıtlı müşterisi değil | **Körü körüne yeniden işleme.** Checkout verisi kopyalanmış ya da kurcalanmış olabilir: Paddle'da iki müşteriyi karşılaştır, gerekiyorsa yanlış aboneliği iade edip iptal et |
+   | `subscription_mismatch`, `subscription_exists`, `invalid_transition` | Olay kayıtlı durumla çelişiyor (ikinci abonelik, sırası bozuk olay) | Paddle'daki gerçek durumu kontrol et; daha yeni bir olay zaten uygulandıysa yeniden işlemek bir şey değiştirmez ve olayı kapatır |
+   | Başka bir hata | Veritabanı ya da kod hatası | Logları (`[billing] webhook`) incele, düzeltmeyi deploy et |
+2. **Yeniden işle** → gerekçe → step-up kodu. Sonuç hemen gösterilir: `Uygulandı`, `Kayıtlı durumdan eski` (değişiklik yok, işlendi sayılır), ya da hâlâ uygulanamıyorsa hata. Her deneme audit'e `billing.webhook_replay` olarak, deneme sayısıyla düşer.
+3. Yeniden işlemek güvenlidir: aynı olay iki kez uygulanmaz, kayıtlı durumdan eski bir olay hiçbir şeyi değiştirmez. Değişiklik ve audit kaydı aynı transaction'dadır.
+
+Faturalama yapılandırılmamışsa (`/admin/system` → Faturalama) düğme kapalıdır. Olay hiç gelmediyse (bizim tarafta kayıt yok) Paddle panelinde **Developer tools → Notifications**'tan olayı yeniden gönder; aynı olay kimliğiyle gelir ve normal yoldan işlenir.
+
+### İade (refund)
+
+İadeyi Paddle yapar: **Paddle → Transactions → işlem → Refund** (tam ya da kısmi). Uygulama iade olaylarını işlemez; iade tek başına planı ya da aboneliği değiştirmez.
+
+1. Çalışma alanının Abonelik kartından Paddle'daki müşteriye git, iade edilecek işlemi bul. Aşım ücretlerinin işlem kimliği `/admin/audit`'te `billing.overage_charged` kaydının gerekçesindedir.
+2. İadeyi Paddle'da yap; gerekçeyi Paddle'a ve çalışma alanının **personel notuna** yaz.
+3. Müşteri ayrılıyorsa aboneliği de Paddle'da iptal et: **hemen** (plan şimdi Free'ye düşer) ya da **dönem sonunda** (dönem bitene kadar plan sürer). Webhook gelince plan kendiliğinden güncellenir. Kartta durumun değiştiğini kontrol et.
+4. Para yerine süre vermek istiyorsan: abonelik sürerken comp verilemez. Önce aboneliği iptal et, abonelik bitince comp tanı.
+
+### Ödeme itirazı (chargeback)
+
+Kart sahibi bankasından itiraz açarsa itirazı Paddle yürütür ve gerekirse bizden kanıt ister. Tutar ve itiraz ücreti Paddle'daki bakiyeden düşülür.
+
+1. Paddle'dan gelen bildirimdeki işlemden müşteriyi ve çalışma alanını bul (Abonelik kartındaki müşteri kimliği, ya da `/admin/workspaces`'ta sahibin e-postası).
+2. Kanıt isterse: hesabın oluşturulma tarihi, girişler (`/admin/users/<id>`), sitelerin ve konuşmaların sayısı (`/admin/workspaces/<id>`), aşım için o pencerenin kullanımı. **Konuşma içeriği ve ziyaretçi verisi gönderme.**
+3. Aboneliğin durumunu Paddle'da kontrol et. Paddle aboneliği iptal ettiyse plan webhook'la düşer. İptal etmediyse ve itiraz kötü niyetliyse aboneliği Paddle'da **hemen** iptal et.
+4. Dolandırıcılık şüphesi varsa çalışma alanını askıya al (`/admin/workspaces/<id>` → Askıya al) ve kullanıcıyı da askıya al. Gerekçeye itirazın Paddle kimliğini yaz.
+5. İtiraz sonuçlanınca sonucu personel notuna ekle.
 
 ## Olay anında
 
