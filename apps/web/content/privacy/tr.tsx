@@ -80,6 +80,10 @@ function Body() {
             <td>Bekleme listesine yazılırsanız e-posta adresiniz (ve sayfanın dili)</td>
             <td>Kayıtlar açıldığında size bir kez haber vermek. Başka hiçbir amaçla kullanmayız</td>
           </tr>
+          <tr>
+            <td>Faturalandırma: çalışma alanının planı, abonelik durumu ve yenileme tarihleri, Paddle müşteri ve abonelik kimlikleri, Paddle'ın kestiği faturalar ve çalışma alanı başına aylık yapay zekâ yanıtı sayısı. Kart ve diğer ödeme bilgileri Paddle'a girilir; bunları hiçbir zaman görmez ve saklamayız</td>
+            <td>Ödediğiniz planı uygulamak, açtığınız ek yanıtları faturalandırmak, faturaları göstermek ve faturalandırma e-postaları göndermek</td>
+          </tr>
         </tbody>
       </table>
 
@@ -126,6 +130,7 @@ function Body() {
         <li>Hizmeti sunmak için: giriş yaptırmak, ziyaretçileri yanıtlamak, devir taleplerini ve potansiyel müşterileri iletmek, konuşmaları göstermek.</li>
         <li>Hizmeti güvende tutmak için: hız sınırları, bot kontrolleri, kötüye kullanım tespiti ve olay incelemesi.</li>
         <li>Size e-posta göndermek için: doğrulama ve şifre sıfırlama kodları, devir ve potansiyel müşteri bildirimleri, güvenlik bildirimleri.</li>
+        <li>Ücretli planları faturalandırmak için: planı uygulamak, yapay zekâ yanıtlarını plana göre saymak, açtığınız ek yanıtları ücretlendirmek ve sahiplere ödemeler, yenilemeler, beta planının sona ermesi ve kullanım hakkında e-posta göndermek.</li>
         <li>Kendi modellerimizi geliştirmek için, yalnızca siz izin verdiyseniz (aşağıya bakın).</li>
         <li>Yasal yükümlülüklerimizi yerine getirmek için.</li>
       </ul>
@@ -188,6 +193,11 @@ function Body() {
             <td>Google ve GitHub</td>
             <td>"ile giriş yap" düğmeleri, yalnızca kullanırsanız</td>
             <td>Sağlayıcının geri gönderdikleri (yukarıya bakın)</td>
+          </tr>
+          <tr>
+            <td>Paddle (Paddle.com Market Ltd, Birleşik Krallık)</td>
+            <td>Ücretli planların satıcısı (Merchant of Record): ödeme sayfası, tahsilat, faturalar, vergi, iadeler ve dolandırıcılık kontrolleri</td>
+            <td>Ad, e-posta adresi, fatura ülkesi ve adresi, verirseniz KDV numarası, ödeme bilgileri (yalnızca Paddle'da tutulur), satın alınan ürün ve çalışma alanının kimliği. Satıcı olduğu için Paddle, ödeme sırasında topladığı veriler bakımından kendi <a href="https://www.paddle.com/legal/privacy">gizlilik bildirimi</a> kapsamında bağımsız veri sorumlusudur</td>
           </tr>
         </tbody>
       </table>
@@ -253,6 +263,10 @@ function Body() {
           <tr>
             <td>Uygulama kayıtları (log)</td>
             <td>Sınırlı bir süre; e-posta, telefon, kart numarası ve IBAN yazılmadan önce maskelenir</td>
+          </tr>
+          <tr>
+            <td>Faturalandırma kayıtları (abonelikler, faturalar, tahsilatlar)</td>
+            <td>Vergi ve muhasebe mevzuatının gerektirdiği süre boyunca; bu süre hesap silindikten sonrasını da kapsayabilir. Aylık yapay zekâ yanıtı sayıları çalışma alanıyla birlikte tutulur</td>
           </tr>
         </tbody>
       </table>

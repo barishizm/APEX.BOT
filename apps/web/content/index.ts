@@ -92,6 +92,6 @@ export const PUBLIC_PAGES: Record<string, string> = {
   ...Object.fromEntries(Object.keys(USE_CASES).map((slug) => [`/use-cases/${slug}`, "2026-10-16"])),
   ...Object.fromEntries(Object.keys(INTEGRATIONS).map((slug) => [`/integrations/${slug}`, "2026-10-16"])),
   "/security": "2026-10-16",
-  "/privacy": "2026-10-16",
-  "/terms": "2026-10-15",
+  "/privacy": "2026-10-21",
+  "/terms": "2026-10-21",
 }

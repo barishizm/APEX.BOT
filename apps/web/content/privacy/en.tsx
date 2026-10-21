@@ -75,6 +75,10 @@ function Body() {
             <td>Email address (and the language of the page) if you join the waitlist</td>
             <td>To tell you once, when sign-ups open. We don't use it for anything else</td>
           </tr>
+          <tr>
+            <td>Billing: the workspace's plan, subscription status and renewal dates, Paddle's customer and subscription IDs, the invoices Paddle issued, and the monthly count of AI replies per workspace. Card and other payment details are entered at Paddle; we never see or store them</td>
+            <td>To apply the plan you pay for, bill extra replies you turned on, show invoices and send billing emails</td>
+          </tr>
         </tbody>
       </table>
 
@@ -121,6 +125,7 @@ function Body() {
         <li>To provide the service: sign you in, answer visitors, deliver hand-offs and leads, show conversations.</li>
         <li>To keep the service safe: rate limits, bot checks, abuse detection and incident investigation.</li>
         <li>To email you: verification and password-reset codes, hand-off and lead notifications, and security notices.</li>
+        <li>To bill paid plans: apply the plan, count AI replies against it, charge extra replies you turned on, and email owners about payments, renewals, the end of a beta plan and usage.</li>
         <li>To improve our own models, only if you opted in (see below).</li>
         <li>To meet legal obligations.</li>
       </ul>
@@ -184,6 +189,11 @@ function Body() {
             <td>"Sign in with" buttons, only if you use them</td>
             <td>What the provider sends back (see above)</td>
           </tr>
+          <tr>
+            <td>Paddle (Paddle.com Market Ltd, United Kingdom)</td>
+            <td>Reseller and merchant of record for paid plans: checkout, payment, invoices, tax, refunds and fraud checks</td>
+            <td>Name, email address, billing country and address, VAT number if you give one, payment details (held by Paddle only), what was bought and the workspace's ID. As the seller, Paddle is also an independent controller for the data it collects at checkout, under its own <a href="https://www.paddle.com/legal/privacy">privacy notice</a></td>
+          </tr>
         </tbody>
       </table>
       <p>
@@ -246,6 +256,10 @@ function Body() {
           <tr>
             <td>Application logs</td>
             <td>A limited time, with emails, phone numbers, card numbers and IBANs masked before they're written</td>
+          </tr>
+          <tr>
+            <td>Billing records (subscriptions, invoices, charges)</td>
+            <td>As long as tax and accounting law requires, which can be after the account is deleted. Monthly AI reply counts stay with the workspace</td>
           </tr>
         </tbody>
       </table>

@@ -26,8 +26,11 @@ const ACTIONS: Record<string, ReturnType<typeof withAdminAction<Params>>> = {
     const c = await setFeatureFlag(tx, admin.user.id, body.flag, { enabled: body.enabled, organizationId: body.organizationId })
     const afterCommit = async () => {
       clearSettingsCache()
-      // the public pages are prerendered with the billing copy (lib/billing/live.ts); rebuild them now
-      if (c.extra.flag === "billing") revalidatePath("/", "layout")
+      // the public pages and llms.txt are prerendered with the billing copy (lib/billing/live.ts); rebuild them now
+      if (c.extra.flag === "billing" || c.extra.flag === "launch_copy") {
+        revalidatePath("/", "layout")
+        revalidatePath("/llms.txt")
+      }
     }
     return { targetId: `flags.${c.extra.flag}`, before: c.before, after: c.after, afterCommit }
   }),

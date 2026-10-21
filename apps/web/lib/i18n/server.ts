@@ -2,7 +2,7 @@
 import type { Metadata } from "next"
 import { cookies, headers } from "next/headers"
 import { notFound } from "next/navigation"
-import { billingLive } from "@/lib/billing/live"
+import { launchCopyLive } from "@/lib/billing/live"
 import { siteUrl } from "@/lib/site"
 import { DEFAULT_LOCALE, isLocale, LOCALE_COOKIE, LOCALE_META, LOCALES, localizePath, matchLocale, type Locale } from "./config"
 import { en, type Dictionary } from "./dictionaries/en"
@@ -32,12 +32,12 @@ export function withLaunchCopy(dict: Dictionary): Dictionary {
 }
 
 /**
- * The public pages' dictionary: the beta wording until billing is live (lib/billing/live.ts). Pages
- * that use it are regenerated every minute (revalidate in app/[lang]/layout.tsx), and at once when
- * staff flip the flag.
+ * The public pages' dictionary: the beta wording until billing or the launch_copy flag is on
+ * (lib/billing/live.ts). Pages that use it are regenerated every minute (revalidate in
+ * app/[lang]/layout.tsx), and at once when staff flip a flag.
  */
 export async function getMarketingDictionary(locale: Locale): Promise<Dictionary> {
-  return (await billingLive()) ? withLaunchCopy(getDictionary(locale)) : getDictionary(locale)
+  return (await launchCopyLive()) ? withLaunchCopy(getDictionary(locale)) : getDictionary(locale)
 }
 
 // For pages under app/[lang]: an unknown segment is a 404, not a crash

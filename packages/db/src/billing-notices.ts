@@ -3,7 +3,7 @@ import { GRACE_DAYS, SUBSCRIPTION_COLUMNS, quotaAnchor, subscriptionGrants, type
 import { flagEnabled, readPlatformSettings } from "./platform-settings.ts"
 import { PLANS, PLAN_LIMITS, OVERAGE_BLOCK, replyWindow, type Plan } from "./plans.ts"
 
-// Billing emails to workspace owners (docs/adr/0003-billing.md (c), (f); migrations/0038_billing_notices.sql).
+// Billing emails to workspace owners (docs/adr/0003-billing.md (c), (f), (g); migrations/0038_billing_notices.sql).
 // What is due is read from the billing state, not from events, so the daily cron
 // (/api/cron/billing-notices) catches whatever a webhook-time send missed. Each notice goes out once
 // per workspace, kind and period: claimBillingNotice takes the row before any mail is sent.
@@ -21,6 +21,8 @@ export const BILLING_NOTICE_KINDS = [
   "cancel_confirmed",
   "quota_80",
   "quota_100",
+  "beta_ending_30",
+  "beta_ending_7",
 ] as const
 export type BillingNoticeKind = (typeof BILLING_NOTICE_KINDS)[number]
 
@@ -29,6 +31,8 @@ export const GRACE_REMINDER_DAY = 3
 export const GRACE_LAST_CALL_DAY = 6
 /** A start or a renewal older than this isn't announced any more (a cron that was down for a while). */
 export const NOTICE_FRESH_DAYS = 3
+/** Days before a beta placement ends when its owners hear about it (ADR 0003 (g)). */
+export const BETA_ENDING_DAYS = { first: 30, last: 7 } as const
 /** Share of the monthly replies that sends the first quota warning. */
 export const QUOTA_WARNING_SHARE = 0.8
 
@@ -52,6 +56,8 @@ export type BillingNoticeData =
       overage: "on" | "off" | "none"
       capCents: number | null
     }
+  /** The plan a beta workspace was given at launch ends at `endsAt` (30 days ahead, then 7). */
+  | { kind: "beta_ending_30" | "beta_ending_7"; plan: PaidPlan; endsAt: Date; freeReplies: number }
 
 export interface NoticeRef {
   organizationId: string
@@ -80,12 +86,13 @@ export async function dueBillingNotices(q: Queryable, now = new Date(), organiza
     `select o.id, o.name, o.plan, o.overage_enabled, o.overage_cap_units from app.organizations o
       where ($2::uuid[] is null or o.id = any($2::uuid[]))
         and (exists (select 1 from app.subscriptions s where s.organization_id = o.id)
-             or exists (select 1 from app.reply_usage u where u.organization_id = o.id and u.period_start >= $1))`,
-    [since, organizationIds],
+             or exists (select 1 from app.reply_usage u where u.organization_id = o.id and u.period_start >= $1)
+             or exists (select 1 from app.plan_overrides p where p.organization_id = o.id and p.kind = 'beta' and p.revoked_at is null and p.ends_at > $3))`,
+    [since, organizationIds, now],
   )
   if (!orgs.rows.length) return []
   const ids = orgs.rows.map((o) => o.id)
-  const [subs, usage, sent, owners, settings] = await Promise.all([
+  const [subs, usage, sent, owners, settings, betas] = await Promise.all([
     q.query<SubscriptionRow>(`select ${SUBSCRIPTION_COLUMNS}, grace_expired_at as "graceExpiredAt" from app.subscriptions where organization_id = any($1::uuid[])`, [ids]),
     q.query<{ id: string; start: Date; fifths: number }>(
       `select organization_id as id, period_start as start, (units * 5)::int as fifths from app.reply_usage
@@ -99,7 +106,13 @@ export async function dueBillingNotices(q: Queryable, now = new Date(), organiza
       [ids],
     ),
     readPlatformSettings(q),
+    q.query<{ id: string; overrideId: string; plan: PaidPlan; endsAt: Date }>(
+      `select organization_id as id, id as "overrideId", plan, ends_at as "endsAt" from app.plan_overrides
+        where organization_id = any($1::uuid[]) and kind = 'beta' and revoked_at is null and starts_at <= $2 and ends_at > $2`,
+      [ids, now],
+    ),
   ])
+  const betaOf = new Map(betas.rows.map((b) => [b.id, b]))
   const subOf = new Map(subs.rows.map((s) => [s.organizationId, s]))
   const done = new Set(sent.rows.map((n) => `${n.organizationId}|${n.kind}|${n.period}`))
   const ownersOf = new Map<string, BillingNotice["recipients"]>()
@@ -136,6 +149,15 @@ export async function dueBillingNotices(q: Queryable, now = new Date(), organiza
         if (!done.has(`${org.id}|subscription_started|${id}`)) add(id, { kind: "subscription_started", ...data }, [{ kind: "subscription_renewed", period: renewal }])
         else add(renewal, { kind: "subscription_renewed", ...data })
       }
+    }
+    // a beta placement nearing its end, unless the workspace subscribed meanwhile: one per stage,
+    // by how close the end is, so a missed run never sends both
+    const beta = betaOf.get(org.id)
+    if (beta && !(sub && subscriptionGrants(sub, now))) {
+      const daysLeft = (beta.endsAt.getTime() - now.getTime()) / DAY
+      const data = { plan: beta.plan, endsAt: beta.endsAt, freeReplies: PLAN_LIMITS.free.monthlyReplies }
+      if (daysLeft <= BETA_ENDING_DAYS.last) add(beta.overrideId, { kind: "beta_ending_7", ...data }, [{ kind: "beta_ending_30", period: beta.overrideId }])
+      else if (daysLeft <= BETA_ENDING_DAYS.first) add(beta.overrideId, { kind: "beta_ending_30", ...data })
     }
     // the warnings go out only while the chat API holds the workspace to its replies (ADR 0003 (g))
     if (flagEnabled(settings, "reply_quota", org.id)) {

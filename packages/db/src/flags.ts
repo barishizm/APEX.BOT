@@ -24,6 +24,11 @@ export const FEATURE_FLAGS = {
    * the Paddle configuration as well; off until the launch date.
    */
   billing: { default: false },
+  /**
+   * Launch copy instead of "free during the beta" on the public pages and in llms.txt, before
+   * plans are on sale (the launch announcement, ADR 0003 (g)). `billing` turns it on as well.
+   */
+  launch_copy: { default: false },
 } as const satisfies Record<string, { default: boolean }>
 export type FeatureFlag = keyof typeof FEATURE_FLAGS
 export const FEATURE_FLAG_NAMES = Object.keys(FEATURE_FLAGS) as FeatureFlag[]

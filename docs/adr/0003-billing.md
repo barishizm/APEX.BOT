@@ -175,6 +175,26 @@ When a workspace moves to a smaller plan (by choice, at period end, or by (f)):
   restricted to beta workspaces), on any paid plan and interval.
 - At the end of the 60 days a workspace without a subscription moves to Free under (e): nothing is deleted.
 - Usage counted during the beta is not billed; quota counting starts at launch.
+- Implemented (2026-10-21): the placement is `npm run billing:beta-placement -- --dry-run | --apply`
+  (`packages/db/src/beta-placement.ts`, `beta-placement-cli.ts`), which grants each workspace created before the
+  run a plan override of kind `beta` (migration 0039; staff comps are `comp`, one beta placement per workspace)
+  for `BETA_PLACEMENT_DAYS` (60). The plan is the smallest that holds the last 30 days (`planCovering`): replies
+  from the assistant messages weighed by each bot's current model (a message doesn't keep its model; the larger of
+  that and `reply_usage` counts), websites, the most pages of one website, the dearest model tier including the
+  fallback, and the features in use (branding removed, topics to decline, lead capture, retention), so nothing
+  pauses or stops applying at launch; at least Starter (`--min-plan`), and a paid plan staff set by hand is kept
+  when larger. `--plan` gives everyone one plan, `--days`/`--months` change the length. A workspace that pays or
+  was placed is skipped, also under the workspace's lock, and each placement is audited as
+  `organization.beta_placement`. The owners get an email 30 and 7 days before the end (`beta_ending_30`,
+  `beta_ending_7`, one per stage) and the dashboard a banner from 30 days, unless they subscribed. At the end the
+  daily notices cron recomputes every workspace with an override (`refreshOverridePlans`; until then an ended
+  override, comps included, kept its plan). The `launch_copy` flag swaps the beta wording on the public pages and
+  in llms.txt for the launch wording before plans are on sale (the announcement); `billing` implies it. llms.txt
+  and the JSON-LD offers (`planOffers`, `apps/web/lib/structured-data.ts`) are generated from `plans.ts`, and the
+  Terms and Privacy Policy (five languages) cover Paddle as reseller, renewal, cancellation, refunds (14 days on a
+  first payment or a yearly renewal), extra replies, taxes and Paddle as a processor, quoting the numbers from
+  the same constants (`apps/web/content/legal.ts`). Still open: the 30% beta discount at checkout, and the billing
+  page's "what Free would mean" for a placed workspace.
 
 ### Adapter and data
 

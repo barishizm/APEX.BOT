@@ -1,5 +1,5 @@
 import type { ReactNode } from "react"
-import { announcementsFor, botPlan, getSubscription, liveAnnouncements, rememberUserLocale } from "@apex/db"
+import { BETA_ENDING_DAYS, announcementsFor, botPlan, getSubscription, liveAnnouncements, rememberUserLocale, runningBetaPlacement, subscriptionGrants } from "@apex/db"
 import type { AnnouncementJson } from "@/components/announcement-banner"
 import { DashboardShell, type NavLabel } from "@/components/ui/dashboard-shell"
 import { announcementJson } from "@/lib/announcements"
@@ -23,15 +23,34 @@ async function announcements(bot: { id: string; organizationId: string }): Promi
 }
 
 // A failed payment (ADR 0003 (f)), shown to every member of the workspace on every dashboard page until
-// the subscription leaves past_due: it can't be closed, and links to the billing page to fix it
+// the subscription leaves past_due: it can't be closed, and links to the billing page to fix it. And
+// the end of a beta placement (ADR 0003 (g)) from 30 days before it: closable, back again at 7 days.
 async function billingBanners(organizationId: string): Promise<AnnouncementJson[]> {
   try {
-    const [sub, locale] = await Promise.all([getSubscription(db(), organizationId), requestLocale()])
-    if (sub?.status !== "past_due" || !sub.graceUntil) return []
+    const now = new Date()
+    const [sub, beta, locale] = await Promise.all([getSubscription(db(), organizationId), runningBetaPlacement(db(), organizationId, now), requestLocale()])
     const t = getAppDictionary(locale).billing
+    const formatDate = (d: Date) => new Intl.DateTimeFormat(locale, { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(d)
+    if (beta && !(sub && subscriptionGrants(sub, now))) {
+      const daysLeft = (beta.endsAt.getTime() - now.getTime()) / 86_400_000
+      if (daysLeft <= BETA_ENDING_DAYS.first) {
+        const last = daysLeft <= BETA_ENDING_DAYS.last
+        return [
+          {
+            id: "billing-beta-ending",
+            level: last ? "critical" : "warn",
+            text: format(t.betaEnding, { date: formatDate(beta.endsAt), plan: t.plans[beta.plan] }),
+            dismissible: true,
+            version: `${beta.id}:${last ? BETA_ENDING_DAYS.last : BETA_ENDING_DAYS.first}`,
+            action: { label: t.choose, href: "/dashboard/settings/billing" },
+          },
+        ]
+      }
+    }
+    if (sub?.status !== "past_due" || !sub.graceUntil) return []
     const plan = t.plans[sub.plan]
-    const inGrace = Date.now() < sub.graceUntil.getTime()
-    const date = new Intl.DateTimeFormat(locale, { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(sub.graceUntil)
+    const inGrace = now < sub.graceUntil
+    const date = formatDate(sub.graceUntil)
     return [
       {
         id: "billing-past-due",

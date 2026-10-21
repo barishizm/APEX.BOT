@@ -124,6 +124,24 @@ Personelin elle yapabildiği tek plan değişikliği budur: `/admin/workspaces/<
 - Comp'lar öncesinde elle plan verilmiş (beta) çalışma alanları "Elle atanmış" görünür ve planlarını korur. Bitiş tarihi vermek için aynı plandan bir comp tanı. Hemen Free'ye düşürmek için bir comp tanıyıp **Şimdi bitir** de.
 - Destek personeli, içinde personel olan bir çalışma alanına comp veremez (kendi alanı dahil); bunu superadmin yapar.
 
+### Lansman: beta çalışma alanlarını plana yerleştirmek
+
+[ADR 0003 (g)](adr/0003-billing.md): lansman günü her beta çalışma alanı, son 30 gününü karşılayan planı **60 gün** ücretsiz ve kartsız alır (en az Starter), sonra abone olmadıysa Free'ye geçer. Bu, `kind = 'beta'` olan bir plan override'ıdır; personelin comp'larından ayrı tutulur.
+
+1. `DATABASE_URL`'in **prod (Neon)** veritabanını gösterdiğini kontrol et; `apps/web/.env.local` eski geliştirme veritabanını gösterir. Script çıktısının ilk satırı bağlandığı host'u yazar.
+2. Kuru çalıştırma, hiçbir şey yazmaz:
+   ```sh
+   DATABASE_URL=... npm run billing:beta-placement -- --dry-run
+   ```
+   Her çalışma alanı için şu anki planı, son 30 günün yanıtlarını, site/sayfa sayısını, model katmanını, kullanımı karşılayan planı ve vereceği planı listeler. `(short)`: kullanım Business'ı da aşıyor (Business verilir; müşteriyle konuş).
+3. Doğruysa aynı seçeneklerle `--apply`. Her yerleştirme audit'e `organization.beta_placement` (aktör `system:beta-placement`) olarak düşer. Tekrar çalıştırmak zararsızdır: yerleştirilmiş ve ödeyen çalışma alanları atlanır.
+
+Seçenekler: `--plan pro` (herkese aynı plan), `--days 90` ya da `--months 3` (varsayılan 60 gün), `--min-plan free` (kullanımı Free'ye sığanları Free'de bırakır), `--created-before 2026-11-01` (yalnızca bu tarihten önce açılanlar).
+
+Bitişten **30 ve 7 gün** önce sahiplere e-posta gider (`beta_ending_30`, `beta_ending_7`) ve panelde kapatılabilen bir bant çıkar (7 günde yeniden). Bitişte günlük `/api/cron/billing-notices` planı yeniden hesaplar ve çalışma alanı Free'ye geçer (biten comp'lar da öyle). Bir yerleştirmeyi uzatmak ya da erken bitirmek için comp kullan: yeni comp süren yerleştirmenin yerini alır.
+
+Herkese açık sayfalardaki "beta boyunca ücretsiz" metni `/admin/settings` → **Lansman metinleri** (`launch_copy`) bayrağıyla, satış açılmadan kaldırılabilir (lansman duyurusu için); **Faturalandırma** (`billing`) bayrağı da aynı metni açar.
+
 ### Ödemesi gecikenler (past_due)
 
 Yenileme ödemesi başarısız olunca abonelik `past_due` olur ve **7 günlük ek süre** başlar: plan bu sürede devam eder, sahiplere e-posta gider, Paddle ödemeyi kendisi yeniden dener. Ek süre biterse günlük cron (`/api/cron/billing-notices`) çalışma alanını Free'ye alır (`billing.grace_expired`). `/admin/billing` → **Ödemesi gecikenler** bunları ek sürenin bitişine göre sıralar. Müşteri ödeme yöntemini değiştirmek için **Ayarlar → Plan ve faturalandırma → Ödeme yöntemini güncelle**'yi kullanır. Ek süre elle uzatılmaz.
@@ -146,7 +164,7 @@ Faturalama yapılandırılmamışsa (`/admin/system` → Faturalama) düğme kap
 
 ### İade (refund)
 
-İadeyi Paddle yapar: **Paddle → Transactions → işlem → Refund** (tam ya da kısmi). Uygulama iade olaylarını işlemez; iade tek başına planı ya da aboneliği değiştirmez.
+İadeyi Paddle yapar: **Paddle → Transactions → işlem → Refund** (tam ya da kısmi). Kullanım Koşulları (madde 11) aboneliğin ilk ödemesi ve yıllık yenileme için ödemeden itibaren **14 gün** içinde tam iade sözü verir; diğerleri yalnızca faturalama hatasında ya da kanun gerektirdiğinde. Uygulama iade olaylarını işlemez; iade tek başına planı ya da aboneliği değiştirmez.
 
 1. Çalışma alanının Abonelik kartından Paddle'daki müşteriye git, iade edilecek işlemi bul. Aşım ücretlerinin işlem kimliği `/admin/audit`'te `billing.overage_charged` kaydının gerekçesindedir.
 2. İadeyi Paddle'da yap; gerekçeyi Paddle'a ve çalışma alanının **personel notuna** yaz.

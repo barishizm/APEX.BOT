@@ -15,3 +15,16 @@ export async function billingLive(organizationId?: string | null): Promise<boole
     return false
   }
 }
+
+/**
+ * Whether the public pages drop the beta wording: plans are on sale, or staff turned the launch_copy
+ * flag on ahead of that (the launch announcement). Never throws, like billingLive.
+ */
+export async function launchCopyLive(): Promise<boolean> {
+  try {
+    if (await featureEnabled(db(), "launch_copy")) return true
+  } catch {
+    return false
+  }
+  return billingLive()
+}
