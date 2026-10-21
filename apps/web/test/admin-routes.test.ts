@@ -318,6 +318,53 @@ test("workspace, site and source actions check for staff in the workspace first"
   }
 })
 
+// Billing moves money and plans: the routes and pages for it are named here, so a rename can't drop
+// them from the checks above unnoticed, and each of their actions keeps withAdminAction's defaults
+// (a reason, a step-up from the last 10 minutes, the audit entry in the same transaction).
+const BILLING_ACTIONS: Record<string, string[]> = {
+  "billing/[action]/route.ts": ["webhook-replay"],
+  "workspaces/[id]/[action]/route.ts": ["comp", "comp-revoke"],
+}
+const BILLING_PAGES = ["billing/page.tsx", "workspaces/[id]/page.tsx"]
+
+/** Throws unless `name` is a withAdminAction in the file's ACTIONS whose options leave step-up and reason on. */
+function checkBillingAction(file: string, src: string, name: string) {
+  const code = codeOnly(src, file)
+  const key = /^[A-Za-z_$][\w$]*$/.test(name) ? `(?:"${name}"|${name})` : `"${name}"`
+  const m = new RegExp(`(?:^|\\n)\\s*${key}\\s*:\\s*withAdminAction\\s*(?:<[^>]*>)?\\s*\\(`).exec(src)
+  assert.ok(m, `${file}: no \`${name}: withAdminAction(…)\` action`)
+  const open = code.indexOf("{", m.index + m[0].length)
+  assert.ok(open >= 0, `${file} ${name}: options not found`)
+  const options = code.slice(open, closing(code, open, file) + 1)
+  assert.doesNotMatch(options, /\bstepUp\s*:/, `${file} ${name}: billing actions keep the step-up`)
+  assert.doesNotMatch(options, /\breason\s*:/, `${file} ${name}: billing actions keep the required reason`)
+}
+
+test("billing routes and pages exist, are checked above, and keep a reason and a step-up", () => {
+  for (const [file, names] of Object.entries(BILLING_ACTIONS)) {
+    const path = join(API_ADMIN, file)
+    assert.ok(routes.includes(path), `${file} is missing from app/api/admin`)
+    const src = readFileSync(path, "utf8")
+    for (const name of names) checkBillingAction(file, src, name)
+  }
+  const pages = sourceFiles(ADMIN_PAGES, /^page\.tsx$/).map((p) => relative(ADMIN_PAGES, p))
+  for (const page of BILLING_PAGES) assert.ok(pages.includes(page), `admin page ${page} is missing`)
+
+  // staff no longer set a plan by hand: a comp, with an end date, is the only plan change
+  const workspaces = readFileSync(join(API_ADMIN, "workspaces/[id]/[action]/route.ts"), "utf8")
+  assert.doesNotMatch(workspaces, /\badminSetPlan\b/)
+  assert.doesNotMatch(codeOnly(workspaces, "workspaces"), /(?:^|\n)\s*plan\s*:\s*withAdminAction/)
+
+  const ADMIN = `import { withAdminAction } from "@/lib/admin"\n`
+  const bad: Record<string, string> = {
+    missing: `${ADMIN}const ACTIONS = { other: withAdminAction({ action: "x", targetType: "t" }, h) }`,
+    "no step-up": `${ADMIN}const ACTIONS = {\n  comp: withAdminAction<P>({ action: "x", targetType: "t", stepUp: false }, h),\n}`,
+    "no reason": `${ADMIN}const ACTIONS = {\n  comp: withAdminAction({ action: "x", targetType: "t", reason: false }, h),\n}`,
+  }
+  for (const [label, src] of Object.entries(bad)) assert.throws(() => checkBillingAction(label, src, "comp"), new RegExp({ missing: "no `comp", "no step-up": "keep the step-up", "no reason": "keep the required reason" }[label]!), label)
+  assert.doesNotThrow(() => checkBillingAction("good", `${ADMIN}const ACTIONS = {\n  "comp": withAdminAction<P>({ action: "x", targetType: "t" }, async ({ tx }: Ctx) => ({})),\n}`, "comp"))
+})
+
 test("adminListRoute checks the session on both the JSON and the CSV path", () => {
   const file = "lib/admin-list.ts"
   const code = codeOnly(readFileSync(join(WEB, file), "utf8"), file)

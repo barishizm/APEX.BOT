@@ -102,3 +102,11 @@ export function planForPrice(prices: PriceMap, priceId: string): { plan: PaidPla
   for (const plan of PAID_PLANS) for (const interval of INTERVALS) if (prices[plan][interval] === priceId) return { plan, interval }
   return null
 }
+
+const DASHBOARD: Record<PaddleEnvironment, string> = { sandbox: "https://sandbox-vendors.paddle.com", production: "https://vendors.paddle.com" }
+
+/** A subscription or customer in the Paddle dashboard; the environment is PADDLE_ENV's, sandbox when unset or wrong. */
+export function paddleDashboardUrl(kind: "subscription" | "customer", id: string, env: Env = process.env): string {
+  const environment: PaddleEnvironment = env.PADDLE_ENV?.trim() === "production" ? "production" : "sandbox"
+  return `${DASHBOARD[environment]}/${kind === "subscription" ? "subscriptions-v2" : "customers-v2"}/${encodeURIComponent(id)}`
+}

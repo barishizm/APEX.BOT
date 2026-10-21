@@ -4,10 +4,10 @@ import { createHmac } from "node:crypto"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { PGlite } from "@electric-sql/pglite"
-import { getSubscription, listBillingEventIssues, type Db } from "@apex/db"
+import { AdminError, getSubscription, listBillingEventIssues, type Db } from "@apex/db"
 import type { PaddleConfig } from "../lib/billing/config.ts"
 import { createPaddleProvider, organizationData } from "../lib/billing/paddle.ts"
-import { MAX_BODY_BYTES, handleBillingWebhook, type WebhookDeps } from "../lib/billing/webhook.ts"
+import { MAX_BODY_BYTES, handleBillingWebhook, replayBillingEvent, type WebhookDeps } from "../lib/billing/webhook.ts"
 
 // The webhook endpoint end to end against migrated PGlite, with Paddle's sandbox payloads
 // (test/fixtures/paddle) signed the way Paddle signs them.
@@ -170,6 +170,42 @@ test("an unknown workspace is answered 200, kept unprocessed with the reason, an
   const issues = await listBillingEventIssues(db)
   assert.equal(issues.total, 2)
   assert.deepEqual(issues.events.map((e) => e.eventType).sort(), ["subscription.activated", "subscription.created"])
+})
+
+test("a replay from the admin area applies a held-back event once its cause is fixed, together with the caller's transaction", async () => {
+  const org = "6f1c2b9e-4d3a-4c5b-9a8e-1f2d3c4b5a69"
+  assert.equal((await (await deliver(forOrg("subscription-created", org))).json()).outcome, "unknown_organization")
+  const [{ id }] = (await listBillingEventIssues(db)).events
+  await db.query("insert into app.organizations (id, name, plan) values ($1, 'Kahve', 'free')", [org])
+
+  // the audit entry failing undoes the replay with it
+  await assert.rejects(
+    db.transaction(async (tx) => {
+      assert.equal((await replayBillingEvent(tx, provider, id!, () => NOW)).outcome, "applied")
+      throw new Error("audit failed")
+    }),
+    /audit failed/,
+  )
+  assert.equal(await getSubscription(db, org), null)
+  assert.equal((await listBillingEventIssues(db)).total, 1)
+
+  const r = await db.transaction((tx) => replayBillingEvent(tx, provider, id!, () => NOW))
+  assert.deepEqual([r.outcome, r.error, r.attempts, r.changed], ["applied", null, 2, [org]])
+  assert.equal((await getSubscription(db, org))?.status, "active")
+  assert.equal((await listBillingEventIssues(db)).total, 0)
+
+  const refused = (c: string) => (err: unknown) => err instanceof AdminError && err.code === c
+  await assert.rejects(db.transaction((tx) => replayBillingEvent(tx, provider, id!, () => NOW)), refused("invalid_input"))
+  await assert.rejects(db.transaction((tx) => replayBillingEvent(tx, provider, "999999", () => NOW)), refused("not_found"))
+})
+
+test("a replay that fails again is recorded, and the caller's transaction still commits", async () => {
+  assert.equal((await (await deliver(forOrg("subscription-created", null))).json()).outcome, "unknown_organization")
+  const [{ id }] = (await listBillingEventIssues(db)).events
+  const r = await db.transaction((tx) => replayBillingEvent(tx, provider, id!, () => NOW))
+  assert.equal(r.outcome, "unknown_organization")
+  assert.match(r.error ?? "", /^unknown_organization: /)
+  assert.deepEqual([r.attempts, r.changed], [2, []])
 })
 
 test("an event without custom_data finds its workspace through the stored subscription", async () => {

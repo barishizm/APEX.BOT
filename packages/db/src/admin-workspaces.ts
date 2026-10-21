@@ -4,6 +4,7 @@ import type { ActionChange, AdminActor } from "./admin-users.ts"
 import type { ListSpec } from "./admin-list.ts"
 import { touchWorkspaceBots, type MemberRole } from "./bots.ts"
 import { maskEmail } from "./admin-bots.ts"
+import { COMP_AUDIT_ACTION, COMP_REVOKE_AUDIT_ACTION } from "./admin-billing.ts"
 import { CRAWL_PAGE_CEILING, PLAN_LIMITS, PLANS, type Plan, type PlanEntitlements } from "./plans.ts"
 import {
   staffChangeMemberRole,
@@ -26,7 +27,7 @@ import {
 
 export const WORKSPACE_AUDIT_LIMIT = 50
 export const ADMIN_NOTE_MAX = 5000
-/** The audit action a plan change is written as; the plan timeline reads these back. */
+/** The audit action plan changes by hand were written as before comps; the plan timeline still reads them back. */
 export const PLAN_AUDIT_ACTION = "organization.plan"
 
 export type WorkspaceSize = "1-50" | "51-200" | "201-1000" | "1000+"
@@ -226,9 +227,9 @@ export interface AdminWorkspaceDetail {
   members: AdminWorkspaceMember[]
   invites: TeamInvite[]
   sites: AdminWorkspaceSite[]
-  /** Oldest first: plan changes made in the admin area. */
+  /** Oldest first: plan changes by staff (comps, and hand changes before them) and by the billing provider. */
   planHistory: PlanHistoryEntry[]
-  /** One per other plan, for the change-plan dialog. */
+  /** One per paid plan, for the comp dialog. */
   planPreviews: PlanPreview[]
   audit: WorkspaceAuditEntry[]
   deletion: WorkspaceDeletionImpact
@@ -300,9 +301,11 @@ export async function getAdminWorkspaceDetail(q: Queryable, organizationId: stri
     q.query<{ id: string; before: { plan?: unknown } | null; after: { plan?: unknown } | null; reason: string | null; actorId: string | null; actorName: string | null; createdAt: Date }>(
       `select l.id::text, l.before, l.after, l.reason, l.actor_id as "actorId", coalesce(a.display_name, a.username, l.actor_email) as "actorName", l.created_at as "createdAt"
          from app.admin_audit_log l left join app.users a on a.id = l.actor_id
-        where l.target_type = 'organization' and l.target_id = $1 and l.action = $2
+        where l.target_type = 'organization' and l.target_id = $1
+          and (l.action = any($2::text[]) or l.action like 'billing.%')
+          and l.before ->> 'plan' is distinct from l.after ->> 'plan'
         order by l.id`,
-      [organizationId, PLAN_AUDIT_ACTION],
+      [organizationId, [PLAN_AUDIT_ACTION, COMP_AUDIT_ACTION, COMP_REVOKE_AUDIT_ACTION]],
     ),
     q.query<WorkspaceAuditEntry>(
       `select l.id::text, l.action, l.reason, l.actor_id as "actorId", coalesce(a.display_name, a.username, l.actor_email) as "actorName",
@@ -334,7 +337,7 @@ export async function getAdminWorkspaceDetail(q: Queryable, organizationId: stri
       actorName: r.actorName,
       createdAt: r.createdAt,
     })),
-    planPreviews: PLANS.filter((p) => p !== workspace.plan).map((p) => planPreview(workspace.plan, p, sources.rows)),
+    planPreviews: PLANS.filter((p) => p !== "free").map((p) => planPreview(workspace.plan, p, sources.rows)),
     audit: audit.rows,
     deletion,
   }
@@ -386,21 +389,6 @@ export async function assertMayChangeWorkspace(
     [id, of],
   )
   if (rows[0]?.staff) throw new AdminError("forbidden", "Only a superadmin can change a workspace with staff in it")
-}
-
-/** Moves the workspace to another plan. Limits apply from the next sync of each website. */
-export async function adminSetPlan(tx: Queryable, organizationId: string, rawPlan: unknown): Promise<ActionChange<{ limits: PlanLimitChange[] }>> {
-  const plan = asPlan(rawPlan)
-  if (!plan) throw new AdminError("invalid_input", "Choose a plan")
-  const ws = await lockWorkspace(tx, organizationId)
-  if (ws.plan === plan) throw new AdminError("invalid_input", "The workspace is already on this plan")
-  await tx.query("update app.organizations set plan = $2 where id = $1", [organizationId, plan])
-  const limits = planLimitChanges(ws.plan, plan)
-  return {
-    before: { plan: ws.plan, limits: Object.fromEntries(limits.map((l) => [l.key, l.from])) },
-    after: { plan, limits: Object.fromEntries(limits.map((l) => [l.key, l.to])) },
-    extra: { limits },
-  }
 }
 
 /** Suspends the workspace: none of its sites answer in the widget until it is lifted. `reason` is for staff only. */

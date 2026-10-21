@@ -3,7 +3,7 @@ import { createPaddleProvider } from "./paddle.ts"
 import { BillingError, type BillingProvider } from "./types.ts"
 
 export * from "./types.ts"
-export { BILLING_ENV_KEYS, type BillingStatus } from "./config.ts"
+export { BILLING_ENV_KEYS, paddleDashboardUrl, type BillingStatus } from "./config.ts"
 
 /** Whether billing is on, and if not, which variables are missing or wrong. Never throws. */
 export function billingStatus(env: Record<string, string | undefined> = process.env): BillingStatus {

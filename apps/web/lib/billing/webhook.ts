@@ -1,6 +1,9 @@
 import {
+  AdminError,
   applyBillingEvent,
   finishBillingEvent,
+  getBillingEvent,
+  inSavepoints,
   hitRateLimit,
   maskPII,
   organizationForCustomer,
@@ -204,6 +207,31 @@ export async function processBillingEvent(
     }
     return "failed"
   }
+}
+
+export interface ReplayResult {
+  outcome: WebhookOutcome
+  /** Left unprocessed: why, as stored. */
+  error: string | null
+  attempts: number
+  /** Workspaces whose billing changed; send their billing emails once the replay commits. */
+  changed: string[]
+}
+
+/**
+ * Applies a stored event again, for the replay button on /admin/billing. It runs in the caller's
+ * transaction, with savepoints standing in for processBillingEvent's own transactions, so the replay
+ * and its audit entry commit or roll back together.
+ */
+export async function replayBillingEvent(tx: Queryable, provider: BillingProvider, id: string, now: () => Date = () => new Date()): Promise<ReplayResult> {
+  const stored = await getBillingEvent(tx, id)
+  if (!stored) throw new AdminError("not_found", "No such webhook")
+  if (stored.processedAt) throw new AdminError("invalid_input", "This webhook was processed already")
+  if (stored.provider !== provider.id) throw new AdminError("invalid_input", `This webhook came from ${stored.provider}, which isn't the configured provider`)
+  const changed: string[] = []
+  const outcome = await processBillingEvent(inSavepoints(tx), provider, id, stored.payload, now, async (organizationId) => changed.push(organizationId))
+  const { rows } = await tx.query<{ error: string | null; attempts: number }>("select error, attempts from app.billing_events where id = $1", [id])
+  return { outcome, error: rows[0]?.error ?? null, attempts: rows[0]?.attempts ?? 0, changed }
 }
 
 const SUBSCRIPTION_EVENT: Record<Extract<BillingEvent, { type: "subscription.updated" }>["reason"], SubscriptionEventType> = {

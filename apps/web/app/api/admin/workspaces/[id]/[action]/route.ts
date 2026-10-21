@@ -1,16 +1,18 @@
 import {
   adminChangeMemberRole,
   adminDeleteWorkspace,
+  adminGrantComp,
   adminRemoveMember,
   adminResendInvite,
+  adminRevokeComp,
   adminRevokeInvite,
-  adminSetPlan,
   adminSetWorkspaceNote,
   adminSuspendWorkspace,
   adminTransferOwnership,
   adminUnsuspendWorkspace,
   assertMayChangeWorkspace,
-  PLAN_AUDIT_ACTION,
+  COMP_AUDIT_ACTION,
+  COMP_REVOKE_AUDIT_ACTION,
 } from "@apex/db"
 import { withAdminAction, type AdminActionContext } from "@/lib/admin"
 import { errorJson, type AdminSession } from "@/lib/auth"
@@ -33,11 +35,18 @@ const mayChange = (tx: Ctx["tx"], admin: AdminSession, id: string) =>
   assertMayChangeWorkspace(tx, { id: admin.user.id, role: admin.user.platformRole }, id)
 
 const ACTIONS: Record<string, ReturnType<typeof withAdminAction<Params>>> = {
-  // the plan timeline on the detail page reads these entries back
-  plan: withAdminAction<Params>({ action: PLAN_AUDIT_ACTION, targetType: "organization" }, async ({ tx, params, body, admin }: Ctx) => {
+  // the only plan change staff make: a paid plan for free until `endsAt`, never on a workspace that
+  // pays (admin-billing.ts). The plan timeline on the detail page reads these entries back.
+  comp: withAdminAction<Params>({ action: COMP_AUDIT_ACTION, targetType: "organization" }, async ({ tx, params, body, reason, admin }: Ctx) => {
     await mayChange(tx, admin, params.id)
-    const c = await adminSetPlan(tx, params.id, body.plan)
-    return { targetId: params.id, before: c.before, after: c.after, result: { limits: c.extra.limits } }
+    const c = await adminGrantComp(tx, params.id, { plan: body.plan, endsAt: body.endsAt, reason, grantedBy: admin.user.id })
+    return { targetId: params.id, before: c.before, after: c.after, result: c.extra }
+  }),
+
+  "comp-revoke": withAdminAction<Params>({ action: COMP_REVOKE_AUDIT_ACTION, targetType: "organization" }, async ({ tx, params, body, admin }: Ctx) => {
+    await mayChange(tx, admin, params.id)
+    const c = await adminRevokeComp(tx, params.id, { compId: body.compId, revokedBy: admin.user.id })
+    return { targetId: params.id, before: c.before, after: c.after, result: c.extra }
   }),
 
   suspend: withAdminAction<Params>({ action: "organization.suspend", targetType: "organization" }, async ({ tx, params, reason, admin }: Ctx) => {
