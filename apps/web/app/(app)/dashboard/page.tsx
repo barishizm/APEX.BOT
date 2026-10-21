@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import Link from "next/link"
-import { ArrowRight, BookOpen, ChevronRight, CircleCheck, Code2, Cpu, Globe, MessageSquareText, Palette, Radio } from "lucide-react"
-import { PROVIDERS, conversationStats, findModel } from "@apex/db"
+import { AlertTriangle, ArrowRight, BookOpen, ChevronRight, CircleCheck, Code2, Cpu, Globe, MessageSquareText, Palette, Radio } from "lucide-react"
+import { OVERAGE_BLOCK, PROVIDERS, conversationStats, findModel, membership, workspaceReplyUsage, type ReplyUsage } from "@apex/db"
 import { CopySnippet } from "@/components/copy-snippet"
 import { DashboardFrame } from "@/components/dashboard/frame"
 import { requireVerifiedUser } from "@/lib/auth"
@@ -10,10 +10,11 @@ import { conversationsHref } from "@/lib/conversations"
 import { db } from "@/lib/db"
 import { SETUP_STEPS } from "@/lib/setup-steps"
 import { embedSnippet } from "@/lib/site"
+import { BILLING_PATH } from "@/lib/billing/intent"
 import { firstName } from "@/lib/display-name"
-import { format } from "@/lib/i18n"
+import { format, type Locale } from "@/lib/i18n"
 import { getAppDictionary } from "@/lib/i18n/app"
-import { formatNumber, formatPercent, plural, timeAgo } from "@/lib/i18n/format"
+import { formatDate, formatNumber, formatPercent, formatUsd, plural, timeAgo } from "@/lib/i18n/format"
 import { requestLocale } from "@/lib/i18n/server"
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -43,6 +44,57 @@ function StatLink({ href, value, label }: { href: string; value: string; label: 
   )
 }
 
+/** Share of the allowance at which the overview starts warning (ADR 0003 (c)); full is 1. */
+const QUOTA_WARN = 0.8
+
+/**
+ * The 80% and 100% reply warnings, while the workspace is held to its replies (reply_quota). At 100%
+ * what happens next depends on overage: paid replies continue up to the cap, then the contact form.
+ */
+function QuotaAlert({ usage, t, locale }: { usage: ReplyUsage; t: ReturnType<typeof getAppDictionary>["overview"]["quota"]; locale: Locale }) {
+  if (!usage.enforced || !usage.allowanceFifths) return null
+  const ratio = usage.usedFifths / usage.allowanceFifths
+  if (ratio < QUOTA_WARN) return null
+  const date = formatDate(usage.window.end, locale)
+  const capCents = usage.overage.enabled ? (usage.overage.capCents ?? 0) : 0
+  // overage is used in blocks; the cap is reached once every block it allows is used up
+  const capFifths = (capCents / OVERAGE_BLOCK.priceCents) * OVERAGE_BLOCK.replies * 5
+  const full = ratio >= 1
+  const capped = full && capCents > 0 && usage.overage.usedFifths >= capFifths
+  const title = !full
+    ? format(t.nearTitle, { percent: formatPercent(Math.min(ratio, 0.99), locale) })
+    : capped
+      ? t.capTitle
+      : t.fullTitle
+  const text = !full
+    ? format(t.nearText, { used: formatNumber(Math.round(usage.usedFifths * 2) / 10, locale), total: formatNumber(usage.allowanceFifths / 5, locale), date })
+    : capped
+      ? format(t.capText, { date })
+      : capCents > 0
+        ? format(t.fullOverage, { cap: formatUsd(capCents / 100, locale) })
+        : format(usage.overage.allowed ? t.fullOff : t.fullFree, { date })
+  // red only while the assistant has stopped answering
+  const stopped = full && (capped || capCents === 0)
+  return (
+    <section
+      role={stopped ? "alert" : "status"}
+      className={`flex flex-col gap-3 rounded-2xl border p-5 sm:flex-row sm:items-center ${
+        stopped ? "border-red-500/40 bg-red-500/10" : "border-amber-500/40 bg-amber-500/10"
+      }`}
+    >
+      <AlertTriangle className={`h-5 w-5 shrink-0 ${stopped ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400"}`} aria-hidden />
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <h2 className="text-base font-semibold">{title}</h2>
+        <p className="text-sm">{text}</p>
+      </div>
+      <Link href={BILLING_PATH} className={`${linkButton} shrink-0 bg-[var(--color-raised)]`}>
+        {t.cta}
+        <ArrowRight className="h-4 w-4" aria-hidden />
+      </Link>
+    </section>
+  )
+}
+
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ welcome?: string }> }) {
   const user = await requireVerifiedUser()
   const locale = await requestLocale()
@@ -50,7 +102,14 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const t = app.overview
   const num = (n: number) => formatNumber(n, locale)
   const { welcome } = await searchParams
-  const [bot, sources, setup, stats] = await Promise.all([currentBot(user.id), currentSources(user.id), getSetup(user.id), conversationStats(db(), await shownSite(user.id), DAYS)])
+  const [bot, sources, setup, stats, member] = await Promise.all([
+    currentBot(user.id),
+    currentSources(user.id),
+    getSetup(user.id),
+    conversationStats(db(), await shownSite(user.id), DAYS),
+    membership(db(), user.id),
+  ])
+  const usage = await workspaceReplyUsage(db(), member.organization_id)
   const s = bot.settings
   const model = findModel(s.model.provider, s.model.id)
   const next = SETUP_STEPS.find((step) => !setup[step.id])
@@ -69,6 +128,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         </header>
 
         <div className="flex flex-col gap-6 p-4 sm:p-6">
+          {usage && <QuotaAlert usage={usage} t={t.quota} locale={locale} />}
           {next && (
             <section className={`${card} sm:flex-row sm:items-center`} aria-label={t.nextStep}>
               <div className="flex min-w-0 flex-1 flex-col gap-1">

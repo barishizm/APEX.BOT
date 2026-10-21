@@ -1,11 +1,12 @@
 "use client"
 
-import { ChartColumn, BookOpen, Globe, LayoutDashboard, ListChecks, MessageSquareText, Palette, Search, Settings, Users, type LucideIcon } from "lucide-react"
+import { ChartColumn, BookOpen, CreditCard, Globe, LayoutDashboard, ListChecks, MessageSquareText, Palette, Search, Settings, Users, type LucideIcon } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useEffect, useState, type ReactNode } from "react"
 import { AnnouncementBanners, type AnnouncementJson } from "@/components/announcement-banner"
 import { useAppI18n } from "@/components/i18n/app-provider"
+import { BILLING_PATH } from "@/lib/billing/intent"
 import { SiteSwitcher } from "@/components/sites/site-switcher"
 import { HelpMenu } from "@/components/support/help-menu"
 import type { SitesJson } from "@/lib/bot"
@@ -13,7 +14,7 @@ import { CommandPalette } from "./command-palette"
 import { PrismFluxLoader } from "./prism-flux-loader"
 import { ProfileMenu } from "./profile-menu"
 
-export type NavLabel = "Overview" | "Analytics" | "Knowledge" | "Conversations" | "Widget" | "Setup" | "Sites" | "Team" | "Settings" | "Support"
+export type NavLabel = "Overview" | "Analytics" | "Knowledge" | "Conversations" | "Widget" | "Setup" | "Sites" | "Team" | "Billing" | "Settings" | "Support"
 
 const NAV: { id: NavLabel; key: "overview" | "analytics" | "knowledge" | "conversations" | "widget" | "setup" | "sites" | "team"; icon: LucideIcon; href: string }[] = [
   { id: "Overview", key: "overview", icon: LayoutDashboard, href: "/dashboard" },
@@ -162,6 +163,9 @@ export function DashboardShell({
           ))}
 
           <div className="mt-auto flex flex-col items-center gap-2">
+            <RailLink label={t.nav.billing} href={BILLING_PATH} active={active === "Billing"}>
+              <CreditCard className="h-5 w-5" aria-hidden />
+            </RailLink>
             <RailLink label={t.nav.settings} href="/dashboard/settings" active={active === "Settings"}>
               <Settings className="h-5 w-5" aria-hidden />
             </RailLink>

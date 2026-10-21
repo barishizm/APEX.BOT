@@ -1,8 +1,8 @@
 import type { Db, Queryable } from "./db.ts"
 import { writeAudit } from "./admin.ts"
 import { BOT_SERVING_SQL } from "./bots.ts"
-import { flagEnabled, readPlatformSettings } from "./platform-settings.ts"
-import { PLANS, PLAN_LIMITS, replyWindow, type Plan } from "./plans.ts"
+import { featureEnabled, flagEnabled, readPlatformSettings } from "./platform-settings.ts"
+import { OVERAGE_BLOCK, OVERAGE_CAP_MAX_CENTS, PLANS, PLAN_LIMITS, replyWindow, type Plan, type ReplyWindow } from "./plans.ts"
 
 // Subscriptions, plan overrides, webhook inbox and reply usage (docs/adr/0003-billing.md,
 // migrations/0035_billing.sql). app.organizations.plan is a cache of effectivePlan(); every write
@@ -689,4 +689,109 @@ export async function listWorkspaceQuotas(q: Queryable, now = new Date()): Promi
       enforcePlan: flagEnabled(settings, "plan_limits", r.id),
     }
   })
+}
+
+/** Where a workspace stands in its current reply window, for the dashboard. */
+export interface ReplyUsage {
+  plan: Plan
+  window: ReplyWindow
+  /** Used in the window, in fifths of a reply (overage included). */
+  usedFifths: number
+  /** Replies included per window, in fifths. */
+  allowanceFifths: number
+  /** Whether the chat API holds the workspace to its replies (the reply_quota flag); counted either way. */
+  enforced: boolean
+  overage: {
+    /** Whether the plan offers overage at all. */
+    allowed: boolean
+    enabled: boolean
+    /** The owner's cap in US cents; kept while overage is off, so turning it on again restores it. */
+    capCents: number | null
+    /** Used past the allowance under overage in this window, in fifths. */
+    usedFifths: number
+  }
+}
+
+/** The workspace's current reply window and what it used of it; null when there is no such workspace. */
+export async function workspaceReplyUsage(q: Queryable, organizationId: string, now = new Date()): Promise<ReplyUsage | null> {
+  const org = await q.query<{ plan: Plan; overage_enabled: boolean; overage_cap_units: number | null }>(
+    "select plan, overage_enabled, overage_cap_units from app.organizations where id = $1",
+    [organizationId],
+  )
+  const row = org.rows[0]
+  if (!row) return null
+  const plan: Plan = PLANS.includes(row.plan) ? row.plan : "free"
+  // the same window the chat API counts in (listWorkspaceQuotas)
+  const window = replyWindow(quotaAnchor(await getSubscription(q, organizationId), now), now)
+  const [usage, enforced] = await Promise.all([
+    q.query<{ used: string; overage: string }>(
+      "select (units * 5)::int::text as used, (overage_units * 5)::int::text as overage from app.reply_usage where organization_id = $1 and period_start = $2",
+      [organizationId, window.start],
+    ),
+    featureEnabled(q, "reply_quota", organizationId),
+  ])
+  const limits = PLAN_LIMITS[plan]
+  return {
+    plan,
+    window,
+    usedFifths: Number(usage.rows[0]?.used ?? 0),
+    allowanceFifths: limits.monthlyReplies * 5,
+    enforced,
+    overage: {
+      allowed: limits.overageAllowed,
+      enabled: limits.overageAllowed && row.overage_enabled,
+      capCents: row.overage_cap_units === null ? null : (row.overage_cap_units / OVERAGE_BLOCK.replies) * OVERAGE_BLOCK.priceCents,
+      usedFifths: Number(usage.rows[0]?.overage ?? 0),
+    },
+  }
+}
+
+/** Whether `cents` is a cap an owner may set: whole $5 blocks, from one block to OVERAGE_CAP_MAX_CENTS. */
+export const isOverageCap = (cents: unknown): cents is number =>
+  Number.isSafeInteger(cents) && (cents as number) >= OVERAGE_BLOCK.priceCents && (cents as number) <= OVERAGE_CAP_MAX_CENTS && (cents as number) % OVERAGE_BLOCK.priceCents === 0
+
+export type OverageRefusal =
+  /** The plan has no overage (Free). */
+  | "plan_has_no_overage"
+  /** Overage is billed to a subscription; a plan from an override or the beta has none. */
+  | "no_subscription"
+  | "invalid_cap"
+
+/**
+ * Turns overage on with a cap (ADR 0003 (c)) or off, and records who did it. Turning it on needs a
+ * plan with overage and a subscription that grants it to bill. Must run in a transaction.
+ */
+export async function setOverage(
+  tx: Queryable,
+  input: { organizationId: string; enabled: boolean; capCents: number | null; actorId: string },
+  now = new Date(),
+): Promise<{ ok: true } | { ok: false; reason: OverageRefusal }> {
+  const org = await tx.query<{ plan: Plan; overage_enabled: boolean; overage_cap_units: number | null }>(
+    "select plan, overage_enabled, overage_cap_units from app.organizations where id = $1 for update",
+    [input.organizationId],
+  )
+  const before = org.rows[0]
+  if (!before) throw new Error(`no workspace ${input.organizationId}`)
+  let capUnits = before.overage_cap_units
+  if (input.enabled) {
+    if (!PLAN_LIMITS[before.plan]?.overageAllowed) return { ok: false, reason: "plan_has_no_overage" }
+    const sub = await getSubscription(tx, input.organizationId)
+    if (!sub || (sub.status !== "active" && sub.status !== "trialing") || subscriptionPlanAt(sub, now) === null) return { ok: false, reason: "no_subscription" }
+  }
+  if (input.capCents !== null) {
+    if (!isOverageCap(input.capCents)) return { ok: false, reason: "invalid_cap" }
+    capUnits = (input.capCents / OVERAGE_BLOCK.priceCents) * OVERAGE_BLOCK.replies
+  } else if (input.enabled && capUnits === null) return { ok: false, reason: "invalid_cap" }
+
+  await tx.query("update app.organizations set overage_enabled = $2, overage_cap_units = $3 where id = $1", [input.organizationId, input.enabled, capUnits])
+  if (before.overage_enabled !== input.enabled || before.overage_cap_units !== capUnits)
+    await writeAudit(tx, {
+      actorId: input.actorId,
+      action: "billing.overage",
+      targetType: "organization",
+      targetId: input.organizationId,
+      before: { enabled: before.overage_enabled, capUnits: before.overage_cap_units },
+      after: { enabled: input.enabled, capUnits },
+    })
+  return { ok: true }
 }

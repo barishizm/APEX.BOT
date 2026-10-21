@@ -363,6 +363,7 @@ export function NumberInput({
   unit,
   hint,
   error,
+  disabled,
 }: {
   label: ReactNode
   value: number
@@ -373,6 +374,7 @@ export function NumberInput({
   unit?: string
   hint?: ReactNode
   error?: string
+  disabled?: boolean
 }) {
   const id = useId()
   // keep the raw text while typing so "1" on the way to "1000" isn't rejected
@@ -389,6 +391,7 @@ export function NumberInput({
           step={step}
           value={text ?? String(value)}
           aria-invalid={!!error}
+          disabled={disabled}
           onChange={(e) => {
             setText(e.target.value)
             const n = Number(e.target.value)

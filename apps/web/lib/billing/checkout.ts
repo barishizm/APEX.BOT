@@ -8,26 +8,46 @@ import type { Locale } from "../i18n/config"
 
 export const canPay = (role: MemberRole) => role === "owner" || role === "admin"
 
-/** Per user: a few attempts at checkout, and polling every couple of seconds while one is processing. */
+/**
+ * Per user: a few attempts at checkout, polling every couple of seconds while one is processing,
+ * managing the subscription (each preview is a call to the provider), and reading invoices.
+ */
 const LIMITS = {
   start: { max: 10, windowSeconds: 600 },
   poll: { max: 60, windowSeconds: 60 },
+  manage: { max: 40, windowSeconds: 600 },
+  read: { max: 30, windowSeconds: 60 },
 }
 
 export class CheckoutRefused extends Error {
   constructor(
     readonly status: number,
-    readonly code: "forbidden" | "billing_disabled" | "already_subscribed" | "rate_limited" | "not_found",
+    readonly code:
+      | "forbidden"
+      | "billing_disabled"
+      | "already_subscribed"
+      | "rate_limited"
+      | "not_found"
+      // managing a subscription (lib/billing/manage.ts)
+      | "no_subscription"
+      | "pending_change"
+      | "not_canceling"
+      | "invalid_cap"
+      | "plan_has_no_overage"
+      | "overage_unavailable",
     message: string,
   ) {
     super(message)
   }
 }
 
-/** The caller's workspace, if they may pay for it and plans are on sale there. */
-async function payingWorkspace(q: Db, userId: string, provider: BillingProvider | null, limit: keyof typeof LIMITS) {
+/**
+ * The caller's workspace, if they may pay for it (or, with `readOnly`, just belong to it) and plans
+ * are on sale there.
+ */
+export async function payingWorkspace(q: Db, userId: string, provider: BillingProvider | null, limit: keyof typeof LIMITS, readOnly = false) {
   const member = await membership(q, userId)
-  if (!canPay(member.role)) throw new CheckoutRefused(403, "forbidden", "Only the workspace's owner or an admin can manage billing")
+  if (!readOnly && !canPay(member.role)) throw new CheckoutRefused(403, "forbidden", "Only the workspace's owner or an admin can manage billing")
   // as billingLive (lib/billing/live.ts): a provider exists only with the whole configuration
   if (!provider || !(await featureEnabled(q, "billing", member.organization_id))) throw new CheckoutRefused(409, "billing_disabled", "Plans aren't on sale yet")
   const over = await hitRateLimit(q, `billing:${limit}:${userId}`, LIMITS[limit])

@@ -12,6 +12,8 @@ import {
   listWorkspaceQuotas,
   recordBillingEvent,
   replyUsageFifths,
+  setOverage,
+  workspaceReplyUsage,
   refreshEffectivePlans,
   revokePlanOverride,
   startBillingEvent,
@@ -247,6 +249,75 @@ describe("reply usage", () => {
     await assert.rejects(db.query("update app.organizations set overage_enabled = true where id = $1", [org]))
     await assert.rejects(db.query("update app.organizations set overage_cap_units = 150 where id = $1", [org]))
     await db.query("update app.organizations set overage_enabled = true, overage_cap_units = 200 where id = $1", [org])
+  })
+})
+
+describe("reply usage for the dashboard", () => {
+  test("reads the window the chat API counts in, with overage", async () => {
+    const org = await workspace()
+    await upsert(sub(org, { plan: "starter" }))
+    await db.query("update app.organizations set overage_enabled = true, overage_cap_units = 300 where id = $1", [org])
+    await addReplyUsage(db, org, T0, 25)
+    await addReplyUsage(db, org, at(31), 7) // the next window
+    const u = (await workspaceReplyUsage(db, org, at(3)))!
+    assert.equal(u.plan, "starter")
+    assert.deepEqual(u.window, { start: T0, end: new Date("2027-02-10T12:00:00Z") })
+    assert.equal(u.usedFifths, 25)
+    assert.equal(u.allowanceFifths, 600 * 5)
+    assert.equal(u.enforced, false)
+    assert.deepEqual(u.overage, { allowed: true, enabled: true, capCents: 1500, usedFifths: 0 })
+  })
+
+  test("Free counts calendar months and has no overage", async () => {
+    const org = await workspace()
+    const u = (await workspaceReplyUsage(db, org, at(3)))!
+    assert.deepEqual(u.window, { start: new Date("2027-01-01T00:00:00Z"), end: new Date("2027-02-01T00:00:00Z") })
+    assert.equal(u.usedFifths, 0)
+    assert.deepEqual(u.overage, { allowed: false, enabled: false, capCents: null, usedFifths: 0 })
+    assert.equal(await workspaceReplyUsage(db, "00000000-0000-4000-8000-000000000000"), null)
+  })
+})
+
+describe("setting overage", () => {
+  const actorId = "11111111-1111-4111-8111-111111111111"
+  const set = (organizationId: string, enabled: boolean, capCents: number | null, now = at(1)) =>
+    db.transaction((tx) => setOverage(tx, { organizationId, enabled, capCents, actorId }, now))
+  const stored = async (org: string) =>
+    (await db.query<{ enabled: boolean; cap: number | null }>("select overage_enabled as enabled, overage_cap_units as cap from app.organizations where id = $1", [org])).rows[0]
+
+  test("turns on with a cap in $5 blocks, and off keeping the cap", async () => {
+    const org = await workspace()
+    await upsert(sub(org))
+    assert.deepEqual(await set(org, true, 2500), { ok: true })
+    assert.deepEqual(await stored(org), { enabled: true, cap: 500 })
+    assert.deepEqual(await set(org, false, null), { ok: true })
+    assert.deepEqual(await stored(org), { enabled: false, cap: 500 })
+    // on again without a cap: the kept one
+    assert.deepEqual(await set(org, true, null), { ok: true })
+    assert.deepEqual(await stored(org), { enabled: true, cap: 500 })
+    const audit = await db.query<{ n: number }>("select count(*)::int as n from app.admin_audit_log where action = 'billing.overage' and target_id = $1", [org])
+    assert.equal(audit.rows[0]!.n, 3)
+  })
+
+  test("refuses caps that aren't whole blocks within the limit", async () => {
+    const org = await workspace()
+    await upsert(sub(org))
+    for (const cap of [0, 250, 499, 501, 100_500, 1.5]) assert.deepEqual(await set(org, true, cap), { ok: false, reason: "invalid_cap" }, String(cap))
+    assert.deepEqual(await set(org, true, null), { ok: false, reason: "invalid_cap" })
+    assert.deepEqual(await stored(org), { enabled: false, cap: null })
+  })
+
+  test("needs a plan with overage and a subscription that bills it", async () => {
+    const free = await workspace()
+    assert.deepEqual(await set(free, true, 500), { ok: false, reason: "plan_has_no_overage" })
+    const granted = await workspace()
+    await db.transaction((tx) => grantPlanOverride(tx, { organizationId: granted, plan: "pro", reason: "beta", endsAt: at(60) }, T0))
+    assert.deepEqual(await set(granted, true, 500, T0), { ok: false, reason: "no_subscription" })
+    const late = await workspace()
+    await upsert(sub(late, { status: "past_due" }))
+    assert.deepEqual(await set(late, true, 500), { ok: false, reason: "no_subscription" })
+    // turning it off is always possible
+    assert.deepEqual(await set(late, false, null), { ok: true })
   })
 })
 
