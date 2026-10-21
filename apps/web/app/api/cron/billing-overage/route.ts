@@ -1,4 +1,4 @@
-import { OVERAGE_BILLING_JOB, finishJobRun, startJobRun } from "@apex/db"
+import { OVERAGE_BILLING_JOB, finishJobRun, maskPII, startJobRun } from "@apex/db"
 import { billOverage, overageBilling } from "@/lib/billing/overage"
 import { db } from "@/lib/db"
 import { cronAuthorized } from "@/lib/knowledge"
@@ -11,7 +11,7 @@ export const maxDuration = 300
 export async function GET(request: Request) {
   if (!cronAuthorized(request)) return new Response(null, { status: 401 })
   const runId = await startJobRun(db(), OVERAGE_BILLING_JOB).catch((err: unknown) => {
-    console.error("[billing] overage: couldn't record the run", err)
+    console.error("[billing] overage: couldn't record the run", maskPII(err instanceof Error ? err.message : String(err)))
     return null
   })
   try {
@@ -22,10 +22,10 @@ export async function GET(request: Request) {
         ok: result.failed === 0,
         result,
         error: result.failed ? `${result.failed} of ${result.due} windows couldn't be billed` : null,
-      }).catch((err: unknown) => console.error("[billing] overage: couldn't record the result", err))
+      }).catch((err: unknown) => console.error("[billing] overage: couldn't record the result", maskPII(err instanceof Error ? err.message : String(err))))
     return Response.json({ due: result.due, billed: result.billed, failed: result.failed })
   } catch (err) {
-    if (runId) await finishJobRun(db(), runId, { ok: false, error: err instanceof Error ? err.message : String(err) }).catch(() => {})
+    if (runId) await finishJobRun(db(), runId, { ok: false, error: maskPII(err instanceof Error ? err.message : String(err)) }).catch(() => {})
     throw err
   }
 }

@@ -1,4 +1,4 @@
-import { BILLING_NOTICES_JOB, finishJobRun, startJobRun } from "@apex/db"
+import { BILLING_NOTICES_JOB, finishJobRun, maskPII, startJobRun } from "@apex/db"
 import { runBillingNotices } from "@/lib/billing/notices"
 import { db } from "@/lib/db"
 import { cronAuthorized } from "@/lib/knowledge"
@@ -11,7 +11,7 @@ export const maxDuration = 300
 export async function GET(request: Request) {
   if (!cronAuthorized(request)) return new Response(null, { status: 401 })
   const runId = await startJobRun(db(), BILLING_NOTICES_JOB).catch((err: unknown) => {
-    console.error("[billing] notices: couldn't record the run", err)
+    console.error("[billing] notices: couldn't record the run", maskPII(err instanceof Error ? err.message : String(err)))
     return null
   })
   try {
@@ -23,10 +23,10 @@ export async function GET(request: Request) {
         ok: failed === 0,
         result,
         error: failed ? `${result.failed} notices and ${result.graceFailed} grace expiries failed${result.plansChanged < 0 ? "; plans couldn't be recomputed" : ""}` : null,
-      }).catch((err: unknown) => console.error("[billing] notices: couldn't record the result", err))
+      }).catch((err: unknown) => console.error("[billing] notices: couldn't record the result", maskPII(err instanceof Error ? err.message : String(err))))
     return Response.json({ graceExpired: result.graceExpired, due: result.due, sent: result.sent, failed })
   } catch (err) {
-    if (runId) await finishJobRun(db(), runId, { ok: false, error: err instanceof Error ? err.message : String(err) }).catch(() => {})
+    if (runId) await finishJobRun(db(), runId, { ok: false, error: maskPII(err instanceof Error ? err.message : String(err)) }).catch(() => {})
     throw err
   }
 }

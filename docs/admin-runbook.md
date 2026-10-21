@@ -162,6 +162,23 @@ Her webhook işlenmeden önce `app.billing_events`'e yazılır. Uygulanamayan ol
 
 Faturalama yapılandırılmamışsa (`/admin/system` → Faturalama) düğme kapalıdır. Olay hiç gelmediyse (bizim tarafta kayıt yok) Paddle panelinde **Developer tools → Notifications**'tan olayı yeniden gönder; aynı olay kimliğiyle gelir ve normal yoldan işlenir.
 
+### Gece uzlaştırması (Paddle ↔ `app.subscriptions`)
+
+`/api/cron/billing-reconcile` her gece 04:00'te (UTC, aşım tahsilatından önce) Paddle'daki canlı abonelikleri (`active`, `trialing`, `past_due`, `paused`) ve bizde canlı görünen ama Paddle'ın listelemediği her aboneliği tek tek karşılaştırır. Fark, Paddle'ın o anki hâli bir olaymış gibi `applyBillingEvent`'ten geçirilerek düzeltilir: webhook'la aynı müşteri/abonelik/geçiş kontrolleri, aynı düşürme ve iptal kuralları, audit'te `billing.subscription.*` ve gerekçesi `paddle reconcile:<çalıştırma>:<abonelik>`. Olayın zamanı Paddle'ın okunduğu andır; sonrasında gelen bir webhook yine uygulanır.
+
+Sonuçlar `/admin/system` → Faturalama → **Abonelik uzlaştırması**'nda görünür:
+
+| Sonuç | Anlamı | Ne yapmalı |
+|---|---|---|
+| Düzeltildi | Kaybolmuş bir webhook'un etkisi uygulandı | Çalışma alanının Abonelik kartında durumu kontrol et; neden kaybolduğunu `/admin/billing` → İşlenmemiş webhook'lar'da ara |
+| Bu arada değişti | Okuma sırasında daha yeni bir webhook geldi | Bir şey yapma; ertesi gece yeniden bakılır |
+| Reddedildi | `subscription_mismatch` (çalışma alanında ikinci canlı abonelik), `customer_mismatch`, `invalid_transition` | Paddle'da iki aboneliği karşılaştır; fazlasını iade edip iptal et (aşağıda) |
+| Çalışma alanı yok | Paddle'da imzalı `custom_data`'sı ve kayıtlı müşterisi olmayan canlı abonelik | Paddle'da müşteriyi bul; bize ait değilse dokunma, bizimse ilgili webhook'u Paddle'dan yeniden gönder |
+| Paddle'da yok | Bizde canlı, Paddle'da 404 | Çoğunlukla `PADDLE_ENV` / API anahtarı yanlış ortamda; değilse aboneliği Paddle'da ara |
+| Başarısız | Paddle ya da veritabanı hatası | Logda `[billing] reconcile`; ertesi gece yeniden denenir |
+
+Çözülemeyen fark varsa çalıştırma "hatalı" işaretlenir. Elle çalıştırmak için: `curl -H "Authorization: Bearer $CRON_SECRET" https://apexbot.eu/api/cron/billing-reconcile`.
+
 ### İade (refund)
 
 İadeyi Paddle yapar: **Paddle → Transactions → işlem → Refund** (tam ya da kısmi). Kullanım Koşulları (madde 11) aboneliğin ilk ödemesi ve yıllık yenileme için ödemeden itibaren **14 gün** içinde tam iade sözü verir; diğerleri yalnızca faturalama hatasında ya da kanun gerektirdiğinde. Uygulama iade olaylarını işlemez; iade tek başına planı ya da aboneliği değiştirmez.
@@ -199,6 +216,22 @@ Audit kaydı `/admin/audit`'te aktöre, işleme ve hedefe göre filtrelenir, CSV
 2. **Vercel (web):** `TOTP_ENCRYPTION_KEY` (zorunlu, 2FA için), `APEX_HEALTH_TOKEN` (`/admin/system` için, API'dekiyle aynı), `TRUST_PROXY=1`. İsteğe bağlı: `SIGNUPS_MODE`, `SUPPORT_INBOX_EMAIL`.
 3. **Render (API):** `APEX_HEALTH_TOKEN` aynı değer. Bot senkronu değiştiğinde API'yi yeniden deploy et; `/health` → `"botSync": "ok"` olmalı.
 4. Deploy sonrası: superadmin ile giriş → `/admin/system`'de servisler yeşil → `/admin/audit`'te son kayıtlar görünüyor.
+
+## Faturalamayı canlıya alma
+
+Sırayla; her adım geri alınabilir, geri dönüş en altta.
+
+1. **Paddle hesabı (canlı):** hesap doğrulaması tamam; **Checkout → Website approval**'da `apexbot.eu` onaylı (onaysız domainde overlay checkout açılmaz). Varsayılan ödeme bağlantısı `https://apexbot.eu/dashboard/settings/billing`.
+2. **Katalog (canlı):** altı plan fiyatı (Starter/Pro/Business × aylık/yıllık) ve tek seferlik aşım fiyatı (`billing_cycle` boş, 100 yanıt = 5 USD). Sandbox'taki id'ler canlıda geçmez.
+3. **Bildirim hedefi (canlı):** **Developer tools → Notifications → New destination**: URL `https://apexbot.eu/api/billing/webhooks/paddle`, olaylar `subscription.*`, `transaction.completed`, `transaction.payment_failed`, `transaction.past_due`, `customer.updated`. Hedefin **secret key**'i `PADDLE_WEBHOOK_SECRET` olur.
+4. **Vercel (web, Production):** `PADDLE_ENV=production`, `PADDLE_API_KEY` (`pdl_live_apikey_…`), `PADDLE_WEBHOOK_SECRET`, `NEXT_PUBLIC_PADDLE_CLIENT_TOKEN` (`live_…`), `PADDLE_PRICE_{STARTER,PRO,BUSINESS}_{MONTH,YEAR}`, `PADDLE_PRICE_OVERAGE`. `CRON_SECRET` zaten var (faturalama cron'ları onu kullanır). `NEXT_PUBLIC_` değişkeni build'e gömülür: değiştirince **yeniden deploy** et. Sonra `/admin/system` → Faturalama "Açık: Paddle production" ve eksik değişken yok demeli.
+5. **Render (API):** Paddle değişkeni gerekmez; API kotayı veritabanından okur. Yalnızca en son kodla deploy edilmiş olmalı.
+6. **Neon migration'ları:** faturalama `0035_billing` … `0039_beta_placement`'tan oluşur. Render deploy'u bunları kendisi uygular (`buildCommand` → `npm run db:migrate`). Kontrol: `/admin/system` → Migration'lar'da bekleyen yok, ya da Neon'da `select name from app.schema_migrations where name >= '0035' order by name;` beş satır döner. Elle: `DATABASE_URL='<Neon adresi>' DATABASE_SSL=verify npm run db:migrate`. (`.env.local` eski geliştirme veritabanına bakar, prod'a değil.)
+7. **Duman testi (canlı, kendi kartınla):** test çalışma alanında Starter aylık satın al → webhook `/admin/billing`'de işlenmiş, plan aktif → Paddle'dan **hemen iade ve iptal** et → plan Free'ye döndü. Ertesi sabah `/admin/system`'de gece uzlaştırması temiz.
+8. **Lansman (bu sırayla):** beta yerleştirmesi (`npm run billing:beta-placement -- --dry-run`, sonra gerçek) → `/admin/settings`'te `reply_quota` ve `plan_limits` → **`billing`** bayrağı. İstersen önce tek bir çalışma alanında aç (bayrağın çalışma alanı istisnası).
+9. **İlk 48 saat:** `/admin/system` (işlenmemiş webhook, uzlaştırma, aşım), `/admin/billing` (ödemesi gecikenler), Vercel loglarında `[billing]`.
+
+**Geri dönüş:** Önce **`billing` bayrağını kapat**: yeni satış durur, fiyat sayfası beta metnine döner; mevcut abonelikler ve webhook'lar çalışmaya devam eder (kapatma kimsenin planını değiştirmez). Kota/limit sorunu ise `reply_quota` / `plan_limits`'i kapat. Kod sorunu: Vercel'de önceki deploy'a **Instant Rollback**; migration'lar yalnızca ekleyicidir (yeni tablo/sütun), eski kod onlarla çalışır, geri alınmaz. Paddle'ı tamamen ayırmak gerekirse `PADDLE_API_KEY`'i kaldırıp yeniden deploy et: faturalama "kapalı" olur, webhook'lar 503 alır ve Paddle onları yeniden dener (bildirim hedefini silme, olaylar kaybolur). Yanlış alınmış ödemeleri Paddle'dan iade et (yukarıda); tahsil edilmiş aşımın işlem kimliği audit'teki `billing.overage_charged` kaydındadır.
 
 ## Yerelde uçtan uca deneme
 

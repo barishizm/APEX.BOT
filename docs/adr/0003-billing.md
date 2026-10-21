@@ -302,6 +302,23 @@ interface BillingProvider {
   it needs the same unit and integration tests as the daily budget (window rollover, weights, fallback model, overage
   cap, grace).
 
+## Implementation notes (2026-10-21)
+
+- **Reconciliation:** `/api/cron/billing-reconcile` (nightly, 04:00 UTC, before the overage charges) lists Paddle's
+  live subscriptions and fetches every live one we store that the list misses. A difference is applied through
+  `applyBillingEvent`, stamped with the subscription's own `updated_at`, so it gets a webhook's checks and ordering.
+  What it can't fix is reported in `app.job_runs` and on `/admin/system` (`apps/web/lib/billing/reconcile.ts`).
+- **Security review:**
+  - A downgrade's `apex_paid_plan` / `apex_paid_until` now carry `apex_paid_sig`, an HMAC bound to the subscription
+    id. Unsigned, a Paddle.js checkout for Starter could claim Business was paid for.
+  - A subscription we don't store needs the signed `organization_id`. The stored customer alone no longer attaches
+    one, because Paddle matches customers by email.
+  - Webhook bodies are stored without card details, billing details, addresses, names or emails (`redactPayload`).
+- **Open:**
+  - Deleting an account or workspace doesn't cancel its Paddle subscription.
+  - Two paid checkouts leave a second subscription that is only reported (`subscription_exists`), not canceled.
+  - `app.billing_events` has no retention sweep.
+
 ## Revisit when
 
 - Turkish customers ask to pay in TRY or by bank transfer: add the iyzico adapter.

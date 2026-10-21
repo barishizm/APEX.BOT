@@ -1,11 +1,11 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { createHmac } from "node:crypto"
-import { readFileSync } from "node:fs"
+import { readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { BILLING_ENV_KEYS, billingStatus, getBillingProvider, requireBillingProvider, BillingError, type BillingEvent } from "../lib/billing/index.ts"
 import { readBillingConfig, type PriceMap } from "../lib/billing/config.ts"
-import { changeTiming, createPaddleProvider, normalizePaddleEvent, organizationData, signOrganization, verifyPaddleSignature, SIGNATURE_TOLERANCE_SECONDS } from "../lib/billing/paddle.ts"
+import { changeTiming, createPaddleProvider, normalizePaddleEvent, organizationData, redactPaddlePayload, signOrganization, signPaidPlan, verifyPaddleSignature, SIGNATURE_TOLERANCE_SECONDS } from "../lib/billing/paddle.ts"
 
 // Normalising is tested against Paddle's real sandbox payloads (test/fixtures/paddle/README.md).
 
@@ -22,6 +22,8 @@ const ORG = "6f1c2b9e-4d3a-4c5b-9a8e-1f2d3c4b5a69"
 // the webhook secret; it also signs the workspace in custom_data
 const SECRET = "pdl_ntfset_01testsecret_abcdefghijklmnop"
 const signed = (organizationId = ORG) => organizationData(organizationId, SECRET)
+// a downgrade's marker as changePlan writes it
+const paidMarker = (subscriptionId: string, plan: any, until: string) => ({ apex_paid_plan: plan, apex_paid_until: until, apex_paid_sig: signPaidPlan(subscriptionId, plan, until, SECRET) })
 
 const normalize = (payload: unknown) => normalizePaddleEvent(payload, PRICES, SECRET)
 function expectType<T extends BillingEvent["type"]>(e: BillingEvent, type: T): BillingEvent & { type: T } {
@@ -127,7 +129,7 @@ test("a scheduled cancellation sets cancelAtPeriodEnd and the change's date", ()
 test("a downgrade keeps the paid plan until the period it was paid for ends", () => {
   const raw = fixture("subscription-updated")
   const periodEnd = raw.data.current_billing_period.ends_at
-  raw.data.custom_data = { ...signed(), apex_paid_plan: "business", apex_paid_until: periodEnd }
+  raw.data.custom_data = { ...signed(), ...paidMarker(raw.data.id, "business", periodEnd) }
   const during = expectType(normalize(raw), "subscription.updated").subscription
   assert.equal(during.plan, "business")
   assert.deepEqual(during.scheduledChange, { action: "change", plan: "pro", interval: "month", effectiveAt: new Date(periodEnd).toISOString() })
@@ -143,16 +145,32 @@ test("a downgrade marker never lowers a plan or names an unknown one", () => {
   const raw = fixture("subscription-updated")
   const until = raw.data.current_billing_period.ends_at
   for (const paid of ["starter", "free", "enterprise", null]) {
-    raw.data.custom_data = { ...signed(), apex_paid_plan: paid, apex_paid_until: until }
+    raw.data.custom_data = { ...signed(), ...paidMarker(raw.data.id, paid, until) }
     const s = expectType(normalize(raw), "subscription.updated").subscription
     assert.equal(s.plan, "pro", `marker ${paid}`)
     assert.equal(s.scheduledChange, null)
   }
 })
 
+test("a downgrade marker we didn't sign for this subscription is ignored", () => {
+  const raw = fixture("subscription-updated")
+  const until = raw.data.current_billing_period.ends_at
+  // what a payer could put in a Paddle.js checkout's customData for a cheaper plan
+  for (const custom of [
+    { ...signed(), apex_paid_plan: "business", apex_paid_until: until },
+    { ...signed(), ...paidMarker("sub_01hv8x29kz0t586xy6zn1a6zzz", "business", until) },
+    { ...signed(), ...paidMarker(raw.data.id, "business", until), apex_paid_until: "2099-01-01T00:00:00.000Z" },
+  ]) {
+    raw.data.custom_data = custom
+    const s = expectType(normalize(raw), "subscription.updated").subscription
+    assert.equal(s.plan, "pro")
+    assert.equal(s.scheduledChange, null)
+  }
+})
+
 test("a cancellation outranks a pending downgrade", () => {
   const raw = fixture("subscription-updated")
-  raw.data.custom_data = { apex_paid_plan: "business", apex_paid_until: raw.data.current_billing_period.ends_at }
+  raw.data.custom_data = paidMarker(raw.data.id, "business", raw.data.current_billing_period.ends_at)
   raw.data.scheduled_change = { action: "cancel", effective_at: raw.data.current_billing_period.ends_at, resume_at: null }
   const s = expectType(normalize(raw), "subscription.updated").subscription
   assert.equal(s.plan, "business")
@@ -432,7 +450,7 @@ test("changePlan: upgrades prorate now; a downgrade bills from renewal and keeps
     assert.deepEqual(stub.calls[1]!.body, {
       items: [{ price_id: PRICES.starter.month, quantity: 1 }],
       proration_billing_mode: "full_next_billing_period",
-      custom_data: { ...signed(), apex_paid_plan: "pro", apex_paid_until: SUB.currentPeriodEnd.toISOString() },
+      custom_data: { ...signed(), ...paidMarker(SUB.providerSubscriptionId, "pro", SUB.currentPeriodEnd.toISOString()) },
     })
     // Paddle only takes immediate modes for a billing frequency change
     const yearly = { ...SUB, interval: "year" as const }
@@ -523,4 +541,43 @@ test("checkoutStatus reports the workspace only from our signed custom_data", as
   } finally {
     stub.restore()
   }
+})
+
+test("listSubscriptions follows Paddle's pages and reads each subscription; fetchSubscription is null on a 404", async () => {
+  const provider = createPaddleProvider(readBillingConfig(SANDBOX_ENV).config!)
+  const base = fixture("subscription-updated").data
+  const urls: string[] = []
+  const original = globalThis.fetch
+  globalThis.fetch = (async (url: string) => {
+    urls.push(String(url))
+    const u = new URL(String(url))
+    if (u.pathname.endsWith("/subscriptions/sub_missing")) return new Response(JSON.stringify({ error: { code: "not_found", detail: "not found" } }), { status: 404 })
+    const second = u.searchParams.has("after")
+    const page = second ? [{ ...base, id: "sub_2", custom_data: signed() }] : [{ ...base, id: "sub_1" }]
+    const next = second ? undefined : `${u.origin}/subscriptions?after=sub_1&status=active`
+    return new Response(JSON.stringify({ data: page, meta: { request_id: "req", pagination: { per_page: 200, next, has_more: !second } } }), { status: 200 })
+  }) as typeof fetch
+  try {
+    const subs = await provider.listSubscriptions(["active", "past_due"])
+    assert.deepEqual(subs.map((s) => [s.providerSubscriptionId, s.organizationId, s.subscription?.plan]), [["sub_1", null, "pro"], ["sub_2", ORG, "pro"]])
+    assert.equal(new URL(urls[0]!).searchParams.get("status"), "active,past_due")
+    assert.equal(urls.length, 2)
+    assert.equal(await provider.fetchSubscription("sub_missing"), null)
+  } finally {
+    globalThis.fetch = original
+  }
+})
+
+test("the stored payload drops the card, names, emails and addresses, and normalises the same", () => {
+  for (const file of readdirSync(FIXTURES).filter((f) => f.endsWith(".json"))) {
+    const raw = fixture(file.replace(/\.json$/, ""))
+    raw.data.custom_data = signed()
+    const redacted = redactPaddlePayload(raw)
+    assert.deepEqual(normalize(redacted), normalize(raw), file)
+    const text = JSON.stringify(redacted)
+    for (const key of ["method_details", "cardholder_name", "last4", "billing_details", "\"email\"", "\"address\""]) assert.ok(!text.includes(key), `${file} still has ${key}`)
+    assert.deepEqual((redacted as any).data.custom_data, signed(), "custom_data is kept as it is")
+  }
+  const customer = { event_id: "evt_1", event_type: "customer.updated", occurred_at: "2026-10-20T10:00:00Z", data: { id: "ctm_1", name: "Ayşe Yılmaz", email: "ayse@example.com", status: "active" } }
+  assert.deepEqual((redactPaddlePayload(customer) as any).data, { id: "ctm_1", status: "active" })
 })

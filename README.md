@@ -4,7 +4,7 @@ Apex Bot, web sitelerine eklenen bir AI asistanıdır. Ziyaretçilerin soruları
 
 Apex Bot **kapalı kaynaklı, ticari bir SaaS** ürünüdür: birçok müşteri sitesine abonelikle sunulur, tamamı bizim tarafımızda barındırılır. Yapay zekâ modelleri kendi altyapımızda değil, **bulut API'leri üzerinden** çalışır.
 
-> **Durum:** Kapalı beta / MVP çalışıyor: kayıt ve giriş, site tarama ile bilgi tabanı, widget stüdyosu, konuşma kaydı, insana devir ve lead e-postaları, platform yönetim paneli (`/admin`, [runbook](docs/admin-runbook.md)). Hibrit arama (BM25 + embedding) ve eval seti var; faturalama henüz yok (aşağıdaki yol haritası). Bu doküman hedefleri ve mimariyi de tanımlar.
+> **Durum:** Kapalı beta / MVP çalışıyor: kayıt ve giriş, site tarama ile bilgi tabanı, widget stüdyosu, konuşma kaydı, insana devir ve lead e-postaları, platform yönetim paneli (`/admin`, [runbook](docs/admin-runbook.md)). Hibrit arama (BM25 + embedding) ve eval seti var; faturalama (Paddle) kodda hazır, `billing` bayrağıyla açılmayı bekliyor ([runbook](docs/admin-runbook.md#faturalamayı-canlıya-alma)). Bu doküman hedefleri ve mimariyi de tanımlar.
 
 ## Verilen kararlar
 
@@ -355,7 +355,7 @@ Sitenin tamamı İngilizce ve Türkçedir: herkese açık sayfalar, giriş/kayı
 - [x] İnsana devretme (e-posta formu), lead toplama
 - [x] Hesaplar, çalışma alanları, ekip davetleri, planlar ve plan bazlı limitler
 - [x] Platform yönetim paneli: kullanıcılar, çalışma alanları, botlar, bilgi kaynakları, konuşma metrikleri ve destek erişimi denetimi, kullanım/maliyet, güvenlik (engeller, kilit sıfırlama), destek talepleri, bekleme listesi, duyurular, özellik bayrakları, sistem durumu; rol + 2FA + step-up korumaları, değiştirilemez audit kaydı, salt okunur "kullanıcı olarak görüntüle" ([runbook](docs/admin-runbook.md))
-- [ ] Kullanım kotalarının faturalaması ve ödeme (satış için gerekli; tasarım: [ADR 0003](docs/adr/0003-billing.md))
+- [x] Kullanım kotalarının faturalaması ve ödeme: Paddle abonelikleri, plan değişikliği, tavanlı aşım tahsilatı, ek süre, faturalama e-postaları, gece uzlaştırması ([ADR 0003](docs/adr/0003-billing.md); canlıya alma: [runbook](docs/admin-runbook.md#faturalamayı-canlıya-alma))
 - [x] KVKK araçları (silme, saklama süresi)
 
 **Faz 3 – Büyüme**
