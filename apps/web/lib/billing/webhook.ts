@@ -22,7 +22,8 @@ import { BillingError, type BillingEvent, type BillingProvider } from "./types.t
 //   1. size and rate limits, before anything is parsed;
 //   2. the signature over the raw bytes (verifyWebhook: HMAC, constant-time, 5 minutes);
 //   3. the event goes into app.billing_events by its event id, outside any transaction, so it is kept
-//      even when applying it fails; a delivery of an event already applied stops here;
+//      even when applying it fails, without the personal and payment data nothing reads
+//      (redactPayload); a delivery of an event already applied stops here;
 //   4. it is applied (applyBillingEvent) in one transaction that also marks it processed. Events for
 //      one workspace are serialised on its row lock, anything not newer than what is stored
 //      (provider_updated_at = the event's occurred_at) is dropped, so late or reordered deliveries
@@ -144,6 +145,8 @@ export async function handleBillingWebhook(request: Request, deps: WebhookDeps):
   const env = envelope(payload)
   if (!env) return json(400, { error: "invalid_payload" })
 
+  // stored and processed without the card, names, emails and addresses, so a replay reads the same
+  payload = provider.redactPayload(payload)
   const stored = await recordBillingEvent(deps.db, { provider: provider.id, ...env, payload })
   if (stored.processed) {
     log("info", "already processed", { eventId: env.eventId, eventType: env.eventType })
@@ -203,7 +206,7 @@ export async function processBillingEvent(
         if ((await startBillingEvent(tx, id)) !== null) await finishBillingEvent(tx, id, message)
       })
     } catch (recordErr) {
-      log("error", "couldn't record the failure", { id, error: recordErr instanceof Error ? recordErr.message.slice(0, 300) : null })
+      log("error", "couldn't record the failure", { id, error: recordErr instanceof Error ? maskPII(recordErr.message).slice(0, 300) : null })
     }
     return "failed"
   }
@@ -270,11 +273,14 @@ async function applyEvent(tx: Queryable, event: BillingEvent, now: Date): Promis
 
   const subscriptionId = event.type === "subscription.updated" ? event.subscription.providerSubscriptionId : event.type === "customer.updated" ? null : event.subscriptionId
   const customerId = event.type === "subscription.updated" ? event.subscription.customerId : event.customerId
-  // custom_data from the checkout; failing that, the workspace we already store the subscription or customer for
+  // custom_data from the checkout; failing that, the workspace we already store the subscription for,
+  // or (payments and customer updates only) the customer. A subscription we don't store needs our
+  // signature: Paddle matches customers by email, so anyone typing an owner's email into a Paddle.js
+  // checkout of their own would otherwise attach a subscription to that workspace.
   const organizationId =
     event.organizationId ??
     (subscriptionId ? await organizationForSubscription(tx, event.provider, subscriptionId) : null) ??
-    (customerId ? await organizationForCustomer(tx, event.provider, customerId) : null)
+    (customerId && event.type !== "subscription.updated" ? await organizationForCustomer(tx, event.provider, customerId) : null)
   if (!organizationId) return { outcome: "unknown_organization", error: "unknown_organization: no valid custom_data.organization_id and no stored subscription" }
 
   const result = await applyBillingEvent(tx, toApplicable(event, organizationId), now)

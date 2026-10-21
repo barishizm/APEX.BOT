@@ -3,6 +3,7 @@ import Link from "next/link"
 import { AlertTriangle, CircleCheck, Info, RefreshCw } from "lucide-react"
 import {
   KNOWLEDGE_REFRESH_JOB,
+  BILLING_RECONCILE_JOB,
   OVERAGE_BILLING_JOB,
   RETENTION_SWEEP_JOB,
   listBillingEventIssues,
@@ -18,6 +19,7 @@ import {
 import { Empty, Section, Table, tag, td } from "@/components/admin/detail-ui"
 import { requirePlatformAdmin } from "@/lib/auth"
 import { BILLING_ENV_KEYS, billingStatus } from "@/lib/billing"
+import type { ReconcileResult } from "@/lib/billing/reconcile"
 import { db } from "@/lib/db"
 import { format } from "@/lib/i18n"
 import { getAdminDictionary } from "@/lib/i18n/app"
@@ -174,7 +176,7 @@ export default async function AdminSystemPage() {
   const [system, runtime] = await Promise.all([checkSystem(), load(readApiRuntime(db()))])
   const api = system.api.state === "ok" ? system.api.data : null
   const embeddingModel = api?.runtime ? api.runtime.embeddings : runtime.ok ? (runtime.value?.embeddings ?? null) : null
-  const [migrations, queues, refreshRuns, sweepRuns, mail, webhooks, overageRuns, overageIssues] = await Promise.all([
+  const [migrations, queues, refreshRuns, sweepRuns, mail, webhooks, overageRuns, overageIssues, reconcileRuns] = await Promise.all([
     load(migrationStatus(db())),
     load(systemQueues(db(), embeddingModel)),
     load(recentJobRuns(db(), KNOWLEDGE_REFRESH_JOB, 8)),
@@ -183,6 +185,7 @@ export default async function AdminSystemPage() {
     load(listBillingEventIssues(db())),
     load(recentJobRuns(db(), OVERAGE_BILLING_JOB, 8)),
     load(listOverageIssues(db())),
+    load(recentJobRuns(db(), BILLING_RECONCILE_JOB, 8)),
   ])
 
   const pending = migrations.ok ? migrations.value.pending : []
@@ -198,6 +201,14 @@ export default async function AdminSystemPage() {
       ? format(t.billing.overage.result, { due: num(v.due), billed: num(v.billed ?? 0), blocks: num(v.blocks ?? 0), failed: num(v.failed ?? 0) })
       : null
   }
+  const reconcileResult = (r: JobRun) => {
+    const v = (r.result ?? {}) as Partial<ReconcileResult>
+    return typeof v.providerLive === "number"
+      ? format(t.billing.reconcile.result, { live: num(v.providerLive), stored: num(v.storedLive ?? 0), fixed: num(v.fixed ?? 0), unresolved: num(v.unresolved ?? 0) })
+      : null
+  }
+  const lastReconcile = reconcileRuns.ok ? reconcileRuns.value.find((r) => r.finishedAt) : undefined
+  const drifts = ((lastReconcile?.result ?? {}) as Partial<ReconcileResult>).drifts ?? []
   const sweepResult = (r: JobRun) => {
     const v = (r.result ?? {}) as { deleted?: number }
     return typeof v.deleted === "number" ? format(t.jobs.retention.deleted, { n: num(v.deleted) }) : null
@@ -410,6 +421,38 @@ export default async function AdminSystemPage() {
           <RunsTable runs={overageRuns.value} result={overageResult} />
         ) : (
           <Empty>{t.billing.overage.none}</Empty>
+        )}
+        <h3 className="m-0 text-sm font-semibold">{t.billing.reconcile.title}</h3>
+        <p className="m-0 -mt-2 text-sm text-[var(--color-muted)]">{t.billing.reconcile.description}</p>
+        {drifts.length > 0 && lastReconcile && (
+          <>
+            <Alert tone={drifts.some((d) => d.outcome !== "fixed") ? "bad" : "info"}>{format(t.billing.reconcile.found, { n: num(drifts.length), when: at(lastReconcile.startedAt) })}</Alert>
+            <Table head={[t.billing.reconcile.columns.workspace, t.billing.reconcile.columns.subscription, t.billing.reconcile.columns.fields, t.billing.reconcile.columns.outcome]}>
+              {drifts.map((d) => (
+                <tr key={`${d.subscriptionId}:${d.organizationId}`} className="border-t border-[var(--color-line)]">
+                  <td className={td}>{d.organizationId ? <Link href={`/admin/workspaces/${d.organizationId}`}><Mono>{d.organizationId}</Mono></Link> : "—"}</td>
+                  <td className={td}>
+                    <Mono>{d.subscriptionId}</Mono>
+                    {d.change && <span className="block text-xs text-[var(--color-muted)]">{d.change}</span>}
+                  </td>
+                  <td className={td}>{d.fields.join(", ") || "—"}</td>
+                  <td className={td}>
+                    <span className="flex flex-col items-start gap-0.5">
+                      <Badge tone={d.outcome === "fixed" ? OK : d.outcome === "stale" ? MUTED : BAD}>{t.billing.reconcile.outcomes[d.outcome]}</Badge>
+                      {d.detail && <ErrorText>{maskPII(d.detail)}</ErrorText>}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </Table>
+          </>
+        )}
+        {!reconcileRuns.ok ? (
+          <Alert tone="bad">{format(t.jobs.unavailable, { error: reconcileRuns.error })}</Alert>
+        ) : reconcileRuns.value.length ? (
+          <RunsTable runs={reconcileRuns.value} result={reconcileResult} />
+        ) : (
+          <Empty>{t.billing.reconcile.none}</Empty>
         )}
       </Section>
 

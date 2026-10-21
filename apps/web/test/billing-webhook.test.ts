@@ -86,6 +86,24 @@ test("an unsigned custom_data.organization_id doesn't credit a workspace", async
   assert.equal(await getSubscription(db, org), null)
 })
 
+test("an unsigned subscription isn't attached to a workspace through its customer alone", async () => {
+  const org = await workspace()
+  const raw = fixture("subscription-created")
+  // the owner's customer, as Paddle finds it when someone types the owner's email into their own checkout
+  await db.query("insert into app.billing_customers (organization_id, provider, provider_customer_id) values ($1, 'paddle', $2)", [org, raw.data.customer_id])
+  raw.data.custom_data = null
+  assert.equal((await (await deliver(raw)).json()).outcome, "unknown_organization")
+  assert.equal(await getSubscription(db, org), null)
+})
+
+test("the inbox keeps no card or billing details", async () => {
+  const org = await workspace()
+  await deliver(forOrg("transaction-completed", org))
+  const { rows } = await db.query<{ payload: unknown }>("select payload from app.billing_events")
+  const stored = JSON.stringify(rows[0]!.payload)
+  assert.ok(rows.length === 1 && !/method_details|cardholder_name|last4|billing_details/.test(stored))
+})
+
 const inbox = () =>
   db.query<{ event_id: string; processed: boolean; attempts: number; error: string | null }>(
     "select event_id, processed_at is not null as processed, attempts, error from app.billing_events order by id",

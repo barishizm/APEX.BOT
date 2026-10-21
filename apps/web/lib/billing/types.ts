@@ -141,6 +141,16 @@ export interface NormalizedSubscription {
   providerUpdatedAt: Date
 }
 
+/** A subscription as the provider holds it now (reconciliation, lib/billing/reconcile.ts). */
+export interface ProviderSubscription {
+  providerSubscriptionId: string
+  /** From the subscription's signed custom data; null when it carries none of ours. */
+  organizationId: string | null
+  customerId: string | null
+  /** Null when none of its items is one of our plan prices. Its providerUpdatedAt is when it was read. */
+  subscription: NormalizedSubscription | null
+}
+
 interface EventBase {
   provider: BillingProviderId
   eventId: string
@@ -205,10 +215,16 @@ export interface BillingProvider {
    * lock (e.g. the usage window's row) around it.
    */
   createOneTimeCharge(sub: SubscriptionRef, items: OneTimeItem[], idempotencyKey: string): Promise<OneTimeChargeResult>
+  /** Every subscription in one of `statuses`, as the provider holds it now. */
+  listSubscriptions(statuses: SubscriptionStatus[]): Promise<ProviderSubscription[]>
+  /** One subscription as the provider holds it now; null when the provider has no such subscription. */
+  fetchSubscription(providerSubscriptionId: string): Promise<ProviderSubscription | null>
   /** Paid and billed invoices, newest first. */
   listInvoices(customerId: string): Promise<Invoice[]>
   /** A link to an invoice's PDF that expires within the hour. */
   invoicePdfUrl(invoiceId: string): Promise<string>
+  /** A verified webhook body without the personal and payment data nothing reads, as it is stored. */
+  redactPayload(payload: unknown): unknown
   /** Whether the webhook body was signed by the provider with our secret, recently. */
   verifyWebhook(rawBody: string, headers: WebhookHeaders, now?: Date): boolean
   /** Reads a verified webhook body (parsed JSON) into our event type. Throws BillingError("invalid_payload"). */

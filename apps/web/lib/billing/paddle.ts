@@ -13,6 +13,7 @@ import {
   type PaidPlan,
   type PaymentKind,
   type PlanTarget,
+  type ProviderSubscription,
   type SubscriptionRef,
   type WebhookHeaders,
 } from "./types.ts"
@@ -29,16 +30,20 @@ import {
 const API_BASE = { sandbox: "https://sandbox-api.paddle.com", production: "https://api.paddle.com" } as const
 /** How old a webhook signature may be. Paddle signs every delivery afresh; replays inside it are absorbed by the event-id inbox. */
 export const SIGNATURE_TOLERANCE_SECONDS = 300
+/** Subscriptions per page of a list (Paddle's maximum), and the pages read before giving up. */
+const LIST_PAGE_SIZE = 200
+const MAX_LIST_PAGES = 50
 /** Paddle's default for a non-catalog price's quantity; larger quantities are split over several lines. */
 const MAX_LINE_QUANTITY = 100
 
 // custom_data keys we own. organization_id comes from the checkout, with apex_org_sig vouching for it;
-// the other two hold a downgrade's paid plan until the period it was paid for ends (Paddle can't
-// schedule an item change).
+// the other three hold a downgrade's paid plan until the period it was paid for ends (Paddle can't
+// schedule an item change), with apex_paid_sig vouching for them.
 const ORG_KEY = "organization_id"
 const ORG_SIG_KEY = "apex_org_sig"
 const PAID_PLAN_KEY = "apex_paid_plan"
 const PAID_UNTIL_KEY = "apex_paid_until"
+const PAID_SIG_KEY = "apex_paid_sig"
 const CHARGE_MARK = "apex-charge:"
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -95,10 +100,50 @@ export function signOrganization(organizationId: string, secret: string): string
   return createHmac("sha256", secret).update(`apex-org:v1:${organizationId.toLowerCase()}`, "utf8").digest("base64url")
 }
 
+/**
+ * An HMAC of a downgrade's paid plan and paid-until, bound to the subscription. Without it a payer
+ * could open a checkout for a cheap plan with custom_data claiming a higher one was paid for.
+ */
+export function signPaidPlan(providerSubscriptionId: string, plan: PaidPlan, paidUntil: string, secret: string): string {
+  return createHmac("sha256", secret).update(`apex-paid:v1:${providerSubscriptionId}:${plan}:${paidUntil}`, "utf8").digest("base64url")
+}
+
+function paidPlanSigned(custom: Json, providerSubscriptionId: string, secret: string): boolean {
+  const [plan, until, sig] = [str(custom[PAID_PLAN_KEY]), str(custom[PAID_UNTIL_KEY]), str(custom[PAID_SIG_KEY])]
+  if (!plan || !until || !sig || !PAID_PLANS.includes(plan as PaidPlan)) return false
+  const given = Buffer.from(sig)
+  const expected = Buffer.from(signPaidPlan(providerSubscriptionId, plan as PaidPlan, until, secret))
+  return given.length === expected.length && timingSafeEqual(given, expected)
+}
+
 /** The custom_data that ties a transaction or subscription to its workspace. */
 export const organizationData = (organizationId: string, secret: string) => ({ [ORG_KEY]: organizationId, [ORG_SIG_KEY]: signOrganization(organizationId, secret) })
 
 // --- Normalising webhooks ---
+
+// Personal and payment data a webhook carries that nothing here reads: the card (cardholder name,
+// last4, expiry), billing details, addresses, and a customer event's name and email. Removed before
+// the event is stored, so app.billing_events holds ids, amounts and states only.
+const PERSONAL_KEYS = new Set(["method_details", "billing_details", "address", "business", "customer", "email", "name", "phone"])
+// names that are ours, not a person's: the catalog's price and product names
+const CATALOG_PARENTS = new Set(["price", "product"])
+
+function stripPersonal(v: unknown, parent: string | null): unknown {
+  if (Array.isArray(v)) return v.map((x) => stripPersonal(x, parent))
+  if (!isObj(v)) return v
+  const out: Json = {}
+  for (const [k, x] of Object.entries(v)) {
+    if (PERSONAL_KEYS.has(k) && !(k === "name" && parent && CATALOG_PARENTS.has(parent))) continue
+    out[k] = parent === null && k === "custom_data" ? x : stripPersonal(x, k)
+  }
+  return out
+}
+
+/** The webhook body as it is stored: everything normalizePaddleEvent reads, without personal data. */
+export function redactPaddlePayload(payload: unknown): unknown {
+  if (!isObj(payload) || !isObj(payload.data)) return payload
+  return { ...payload, data: stripPersonal(payload.data, null) }
+}
 
 type Json = Record<string, unknown>
 const isObj = (v: unknown): v is Json => typeof v === "object" && v !== null && !Array.isArray(v)
@@ -163,7 +208,7 @@ export function normalizePaddleEvent(payload: unknown, prices: PriceMap, secret:
 
   const reason = SUBSCRIPTION_REASONS[providerType]
   if (reason) {
-    const subscription = normalizeSubscription(data, prices, base.occurredAt)
+    const subscription = normalizeSubscription(data, prices, base.occurredAt, secret)
     if (!subscription) return { ...base, type: "ignored", reason: "unknown_price" }
     return { ...base, type: "subscription.updated", reason, subscription }
   }
@@ -200,7 +245,7 @@ export function normalizePaddleEvent(payload: unknown, prices: PriceMap, secret:
   return { ...base, type: "ignored", reason: "unhandled_type" }
 }
 
-function normalizeSubscription(data: Json, prices: PriceMap, occurredAt: Date): NormalizedSubscription | null {
+function normalizeSubscription(data: Json, prices: PriceMap, occurredAt: Date, secret: string): NormalizedSubscription | null {
   const id = str(data.id)
   const customerId = str(data.customer_id)
   const status = data.status as SubscriptionStatus
@@ -218,11 +263,12 @@ function normalizeSubscription(data: Json, prices: PriceMap, occurredAt: Date): 
   let plan = sold.plan
   let scheduledChange: ScheduledChange | null = null
   // a downgrade made by changePlan: the items already carry the lower plan, the paid one runs on
-  // until the period it was paid for ends
+  // until the period it was paid for ends; only when we signed it for this subscription
   const custom = isObj(data.custom_data) ? data.custom_data : {}
+  const signed = paidPlanSigned(custom, id, secret)
   const paidPlan = custom[PAID_PLAN_KEY] as PaidPlan
-  const paidUntil = optDate(str(custom[PAID_UNTIL_KEY]), PAID_UNTIL_KEY)
-  if (PAID_PLANS.includes(paidPlan) && rank(paidPlan) > rank(plan) && paidUntil && (currentPeriodStart ?? occurredAt) < paidUntil) {
+  const paidUntil = signed ? optDate(str(custom[PAID_UNTIL_KEY]), PAID_UNTIL_KEY) : null
+  if (signed && rank(paidPlan) > rank(plan) && paidUntil && (currentPeriodStart ?? occurredAt) < paidUntil) {
     scheduledChange = { action: "change", plan, interval: sold.interval, effectiveAt: paidUntil.toISOString() }
     plan = paidPlan
   }
@@ -278,7 +324,7 @@ export function createPaddleProvider(config: PaddleConfig): BillingProvider {
   // catalog prices don't change once created; one lookup per instance
   const priceCache = new Map<string, Promise<PaddlePrice>>()
 
-  async function call<T>(method: string, path: string, body?: unknown, timeoutMs = 15_000): Promise<T> {
+  async function send<T>(method: string, path: string, body?: unknown, timeoutMs = 15_000): Promise<{ data: T; next: string | null }> {
     let res: Response
     try {
       res = await fetch(base + path, {
@@ -290,7 +336,11 @@ export function createPaddleProvider(config: PaddleConfig): BillingProvider {
     } catch (err) {
       throw new BillingError("provider_error", `Paddle ${method} ${path.split("?")[0]} failed: ${err instanceof Error ? err.message : String(err)}`)
     }
-    const json = (await res.json().catch(() => null)) as { data?: T; error?: { code?: string; detail?: string }; meta?: { request_id?: string } } | null
+    const json = (await res.json().catch(() => null)) as {
+      data?: T
+      error?: { code?: string; detail?: string }
+      meta?: { request_id?: string; pagination?: { next?: string; has_more?: boolean } }
+    } | null
     if (!res.ok || !json || !("data" in json)) {
       throw new BillingError("provider_error", `Paddle ${method} ${path.split("?")[0]}: ${json?.error?.detail ?? `HTTP ${res.status}`}`, {
         status: res.status,
@@ -298,12 +348,34 @@ export function createPaddleProvider(config: PaddleConfig): BillingProvider {
         requestId: json?.meta?.request_id,
       })
     }
-    return json.data as T
+    // a list's next page, as a path on the same API; anything else ends the list
+    const next = json.meta?.pagination?.has_more && json.meta.pagination.next?.startsWith(base + "/") ? json.meta.pagination.next.slice(base.length) : null
+    return { data: json.data as T, next }
+  }
+
+  const call = async <T>(method: string, path: string, body?: unknown, timeoutMs?: number) => (await send<T>(method, path, body, timeoutMs)).data
+
+  /**
+   * A subscription as we read it. Stamped with Paddle's own updated_at (when the request was sent,
+   * failing that), so it orders against webhooks by Paddle's clock, as their occurred_at does.
+   */
+  const readSubscription = (data: Json, asOf: Date): ProviderSubscription => {
+    const updatedAt = typeof data.updated_at === "string" ? new Date(data.updated_at) : null
+    return {
+      providerSubscriptionId: String(data.id),
+      organizationId: organizationFrom(data.custom_data, config.webhookSecret),
+      customerId: str(data.customer_id),
+      subscription: normalizeSubscription(data, config.prices, updatedAt && !Number.isNaN(updatedAt.getTime()) ? updatedAt : asOf, config.webhookSecret),
+    }
   }
 
   const priceFor = (t: PlanTarget) => config.prices[t.plan][t.interval]
   // Paddle replaces custom_data on every update, so each write carries the signed workspace again
   const orgData = (organizationId: string) => organizationData(organizationId, config.webhookSecret)
+  const paidData = (sub: SubscriptionRef) => {
+    const until = sub.currentPeriodEnd.toISOString()
+    return { [PAID_PLAN_KEY]: sub.plan, [PAID_UNTIL_KEY]: until, [PAID_SIG_KEY]: signPaidPlan(sub.providerSubscriptionId, sub.plan, until, config.webhookSecret) }
+  }
 
   /** The PATCH body for moving `sub` to `target`, and when it takes effect. */
   function changeBody(sub: SubscriptionRef, target: PlanTarget) {
@@ -319,7 +391,7 @@ export function createPaddleProvider(config: PaddleConfig): BillingProvider {
         body: {
           items,
           proration_billing_mode: "full_next_billing_period",
-          custom_data: { ...orgData(sub.organizationId), [PAID_PLAN_KEY]: sub.plan, [PAID_UNTIL_KEY]: sub.currentPeriodEnd.toISOString() },
+          custom_data: { ...orgData(sub.organizationId), ...paidData(sub) },
         },
       }
     }
@@ -461,6 +533,29 @@ export function createPaddleProvider(config: PaddleConfig): BillingProvider {
       return { transactionId: created?.id ?? null, duplicate: false }
     },
 
+    async listSubscriptions(statuses) {
+      const found: ProviderSubscription[] = []
+      let path: string | null = `/subscriptions?${new URLSearchParams({ status: statuses.join(","), per_page: String(LIST_PAGE_SIZE), order_by: "id[ASC]" })}`
+      for (let page = 0; path; page++) {
+        if (page === MAX_LIST_PAGES) throw new BillingError("provider_error", `Paddle lists more than ${MAX_LIST_PAGES * LIST_PAGE_SIZE} subscriptions`)
+        const asOf = new Date()
+        const res: { data: Json[]; next: string | null } = await send<Json[]>("GET", path)
+        for (const data of res.data) found.push(readSubscription(data, asOf))
+        path = res.next
+      }
+      return found
+    },
+
+    async fetchSubscription(providerSubscriptionId) {
+      const asOf = new Date()
+      try {
+        return readSubscription(await call<Json>("GET", `/subscriptions/${encodeURIComponent(providerSubscriptionId)}`), asOf)
+      } catch (err) {
+        if (err instanceof BillingError && err.details.status === 404) return null
+        throw err
+      }
+    },
+
     async listInvoices(customerId) {
       const q = new URLSearchParams({ customer_id: customerId, status: "billed,paid,completed,past_due", order_by: "billed_at[DESC]", per_page: "50" })
       const txns = await call<PaddleTransaction[]>("GET", `/transactions?${q}`)
@@ -482,6 +577,8 @@ export function createPaddleProvider(config: PaddleConfig): BillingProvider {
       const { url } = await call<{ url: string }>("GET", `/transactions/${encodeURIComponent(invoiceId)}/invoice?disposition=inline`)
       return url
     },
+
+    redactPayload: redactPaddlePayload,
 
     verifyWebhook: (rawBody, headers, now) => verifyPaddleSignature(rawBody, headers, config.webhookSecret, now),
 

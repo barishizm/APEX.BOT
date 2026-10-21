@@ -1015,3 +1015,14 @@ export async function listOverageIssues(q: Queryable, limit = 20): Promise<{ tot
   ])
   return { total: count.rows[0]!.total, windows: list.rows.map((r) => ({ ...r, overageFifths: Number(r.overageFifths) })) }
 }
+
+// --- Reconciliation ---
+
+/** The nightly reconciliation (/api/cron/billing-reconcile), as named in app.job_runs. */
+export const BILLING_RECONCILE_JOB = "billing.reconcile"
+
+/** Every subscription stored for `provider`, the canceled ones included. */
+export async function listStoredSubscriptions(q: Queryable, provider: BillingProviderId): Promise<Subscription[]> {
+  const { rows } = await q.query<Subscription>(`select ${SUBSCRIPTION_COLUMNS} from app.subscriptions where provider = $1 order by organization_id`, [provider])
+  return rows
+}
