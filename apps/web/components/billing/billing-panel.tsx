@@ -232,17 +232,26 @@ function CurrentPlan({
   }
 
   const pastDue = subscription?.status === "past_due"
+  // the grace ran out (expireGrace): the subscription is still past_due, but the workspace is on another plan now
+  const graceEnded = pastDue && plan !== subscription!.plan
   return (
     <Group title={t.currentPlan}>
       <div className="flex flex-col gap-1.5 text-sm">
         <p className="text-base font-semibold">{t.plans[plan]}</p>
         {subscription && (
           <>
-            <p>
-              {format(t.subscribed, { plan: t.plans[subscription.plan], interval: t.intervals[subscription.interval].toLowerCase() })}{" "}
-              {priceLine(t, subscription.plan, subscription.interval, locale)}
-            </p>
-            {pastDue ? (
+            {!graceEnded && (
+              <p>
+                {format(t.subscribed, { plan: t.plans[subscription.plan], interval: t.intervals[subscription.interval].toLowerCase() })}{" "}
+                {priceLine(t, subscription.plan, subscription.interval, locale)}
+              </p>
+            )}
+            {graceEnded ? (
+              <p role="alert" className="flex items-start gap-2 text-red-600 dark:text-red-400">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+                {format(t.pastDueEnded, { plan: t.plans[subscription.plan] })}
+              </p>
+            ) : pastDue ? (
               <p role="alert" className="flex items-start gap-2 text-amber-700 dark:text-amber-400">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
                 {format(t.pastDue, { date: date(subscription.graceUntil ?? subscription.periodEnd), plan: t.plans[subscription.plan] })}
