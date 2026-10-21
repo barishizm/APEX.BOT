@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { Home } from "@/components/landing/home";
 import { LOCALE_META } from "@/lib/i18n";
 import { absoluteUrl, getMarketingDictionary, jsonLd, pageMetadata, resolveLocale } from "@/lib/i18n/server";
-import { organization, organizationId } from "@/lib/structured-data";
+import { billingLive } from "@/lib/billing/live";
+import { organization, organizationId, softwareApplication } from "@/lib/structured-data";
 
 export async function generateMetadata({ params }: PageProps<"/[lang]">): Promise<Metadata> {
   return pageMetadata({ locale: await resolveLocale(params), path: "/" });
@@ -25,27 +26,8 @@ async function structuredData(locale: Awaited<ReturnType<typeof resolveLocale>>)
         inLanguage: language,
         publisher: { "@id": organizationId() },
       },
-      {
-        "@type": "SoftwareApplication",
-        "@id": `${url}/#software`,
-        name: t.meta.siteName,
-        url,
-        description: t.meta.description,
-        applicationCategory: "BusinessApplication",
-        operatingSystem: "Web",
-        inLanguage: language,
-        featureList: t.landing.features.items.map((item) => item.title),
-        // Free for everyone admitted to the closed beta; the paid plans on /pricing start at launch
-        offers: {
-          "@type": "Offer",
-          name: t.hero.note.split(" · ")[0],
-          price: "0",
-          priceCurrency: "USD",
-          availability: "https://schema.org/LimitedAvailability",
-          url: absoluteUrl("/pricing", locale),
-        },
-        publisher: { "@id": organizationId() },
-      },
+      // its plans, priced from @apex/db/plans
+      softwareApplication(locale, await billingLive(), { featureList: t.landing.features.items.map((item) => item.title) }),
       {
         "@type": "FAQPage",
         "@id": `${url}/#faq`,

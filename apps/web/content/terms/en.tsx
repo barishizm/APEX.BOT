@@ -1,15 +1,20 @@
 import { TERMS_VERSION } from "@apex/db";
 import { CONTACT_EMAIL } from "@/components/site-nav";
+import { billingTerms } from "../legal";
 import type { ProseContent } from "../types";
 
+const PRICING = "/pricing";
+const PADDLE_TERMS = "https://www.paddle.com/legal/checkout-buyer-terms";
+
 function Body() {
+  const n = billingTerms("en");
   return (
     <>
       <h2>1. The service</h2>
       <p>
         Apex Bot (“Apex”, “we”) provides an AI assistant that answers your website visitors' questions using content you
-        provide, together with a dashboard to configure it. Apex is currently in beta: features may change, and we may limit
-        or pause access while we improve the service.
+        provide, together with a dashboard to configure it. Features may change as we improve the service, and while Apex is
+        in beta we may limit or pause access.
       </p>
 
       <h2>2. Your account</h2>
@@ -47,26 +52,91 @@ function Body() {
         assistant, you are the data controller for their data and we process it on your behalf.
       </p>
 
-      <h2>7. Fees</h2>
+      <h2>7. Plans and fees</h2>
       <p>
-        Apex is free during the beta. Before paid plans start we will tell you in advance, and you can choose whether to
-        continue.
+        Apex has a free plan and paid plans (Starter, Pro and Business) with the AI replies, websites and features listed on
+        the <a href={PRICING}>pricing page</a>. Paid plans are billed in advance, monthly or yearly, in US dollars.
+      </p>
+      <p>
+        Apex is free during the beta. Paid plans start on a launch date we announce by email at least {n.noticeDays} days
+        ahead. At launch, each beta workspace gets the paid plan that covers its recent use free of charge for {n.betaDays}{" "}
+        days, without a card; unless you subscribe before then, it moves to the free plan afterwards. Moving to a smaller plan
+        never deletes anything: websites over its limit are paused and features above it stop applying until you upgrade again.
       </p>
 
-      <h2>8. Ending your use</h2>
+      <h2>8. Payment through Paddle</h2>
+      <p>
+        Our order process is conducted by our online reseller Paddle.com. Paddle.com is the Merchant of Record for all our
+        orders: Paddle sells you the subscription, takes the payment, issues the invoice and handles billing questions and
+        refunds, under its own <a href={PADDLE_TERMS}>Buyer Terms</a>. Your card or other payment details go to Paddle, not to
+        us. Your use of Apex itself stays under these terms.
+      </p>
+
+      <h2>9. Taxes</h2>
+      <p>
+        Prices on the pricing page don't include tax. As the merchant of record, Paddle works out the VAT, sales tax or GST
+        that applies where you are, adds it at checkout, and pays it to the tax authorities. If you buy for a business and give
+        a valid VAT number, the reverse charge may apply instead. Paddle's invoice shows the tax charged.
+      </p>
+
+      <h2>10. Renewal, changes and cancellation</h2>
+      <ul>
+        <li>
+          A subscription renews automatically at the end of each monthly or yearly period, and Paddle charges the payment
+          method on file, until you cancel.
+        </li>
+        <li>
+          Upgrades apply at once and you pay the difference for the rest of the period. Downgrades apply at the end of the
+          period you paid for. Switching from yearly to monthly billing applies at once, with the unused time credited to
+          your Paddle balance.
+        </li>
+        <li>
+          You can cancel at any time in the dashboard under Settings → Billing. The plan then runs to the end of the period
+          you paid for and isn't renewed; after that the workspace is on the free plan.
+        </li>
+        <li>
+          If a payment fails, the workspace keeps its plan for {n.graceDays} days while the payment is retried. If it still
+          hasn't gone through, the workspace moves to the free plan.
+        </li>
+        <li>
+          We tell you at least {n.noticeDays} days before a price change reaches your subscription. It applies from your
+          next renewal after that, and you can cancel before then.
+        </li>
+      </ul>
+
+      <h2>11. Refunds</h2>
+      <p>
+        If Apex isn't right for you, you can ask for a full refund of a subscription's first payment, or of a yearly renewal,
+        within {n.refundDays} days of the payment. Other payments, including monthly renewals, the rest of a period after you
+        cancel and extra replies already used, aren't refunded, except for a billing mistake or where the law gives you the
+        right to one (such as a consumer's right of withdrawal). Paddle makes refunds to the original payment method; ask
+        through the link on Paddle's receipt or by email to us.
+      </p>
+
+      <h2>12. Extra replies</h2>
+      <p>
+        Each plan includes a number of AI replies per monthly period; a reply on a fast model counts as a fifth, on Claude
+        Opus 5.5 as two and on Claude Fable 5.1 as five. When they run out, your assistant offers the hand-off form instead of
+        answering, and nothing more is charged. On a paid plan you can turn on extra replies in billing settings: they cost{" "}
+        {n.blockPrice} per {n.blockReplies} replies, in whole blocks, up to a monthly cap you set. Paddle charges them to your
+        subscription's payment method at the end of each monthly period, never more than your cap. You can turn them off or
+        change the cap at any time; the change applies from then on.
+      </p>
+
+      <h2>13. Ending your use</h2>
       <p>
         You can stop using Apex at any time by removing the widget from your site and asking us to delete your account. We may
         suspend accounts that break these terms or put the service or other customers at risk.
       </p>
 
-      <h2>9. Liability</h2>
+      <h2>14. Liability</h2>
       <p>
         The service is provided “as is” during the beta. To the extent the law allows, we are not liable for indirect or
         consequential losses, and our total liability is limited to the amount you paid us in the twelve months before the
         claim.
       </p>
 
-      <h2>10. Changes and contact</h2>
+      <h2>15. Changes and contact</h2>
       <p>
         We may update these terms; for material changes we'll notify you before they take effect. Questions:{" "}
         <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.

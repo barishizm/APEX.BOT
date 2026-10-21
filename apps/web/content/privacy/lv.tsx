@@ -76,6 +76,10 @@ function Body() {
             <td>E-pasta adrese (un lapas valoda), ja pievienojaties gaidīšanas sarakstam</td>
             <td>Lai vienreiz jums paziņotu, kad atvērsim reģistrāciju. Citiem nolūkiem mēs to neizmantojam</td>
           </tr>
+          <tr>
+            <td>Norēķini: darbvietas plāns, abonementa statuss un atjaunošanas datumi, Paddle klienta un abonementa ID, Paddle izrakstītie rēķini un MI atbilžu skaits mēnesī katrai darbvietai. Kartes un citi maksājuma dati tiek ievadīti Paddle; mēs tos nekad neredzam un neglabājam</td>
+            <td>Lai piemērotu jūsu apmaksāto plānu, iekasētu maksu par jūsu ieslēgtajām papildu atbildēm, rādītu rēķinus un sūtītu norēķinu e-pastus</td>
+          </tr>
         </tbody>
       </table>
 
@@ -123,6 +127,7 @@ function Body() {
         <li>Lai sniegtu pakalpojumu: pieteiktu jūs, atbildētu apmeklētājiem, piegādātu nodošanas pieprasījumus un kontaktus, rādītu sarunas.</li>
         <li>Lai uzturētu pakalpojuma drošību: pieprasījumu ierobežojumi, robotu pārbaudes, ļaunprātīgas izmantošanas atklāšana un incidentu izmeklēšana.</li>
         <li>Lai sūtītu jums e-pastus: apstiprinājuma un paroles atiestatīšanas kodus, nodošanas un kontaktu paziņojumus un drošības paziņojumus.</li>
+        <li>Lai iekasētu maksu par maksas plāniem: piemērotu plānu, skaitītu MI atbildes atbilstoši tam, iekasētu maksu par jūsu ieslēgtajām papildu atbildēm un sūtītu īpašniekiem e-pastus par maksājumiem, atjaunošanu, beta plāna beigām un lietojumu.</li>
         <li>Lai uzlabotu savus modeļus – tikai ja esat tam piekrituši (skatīt tālāk).</li>
         <li>Lai izpildītu juridiskās saistības.</li>
       </ul>
@@ -185,6 +190,11 @@ function Body() {
             <td>Google un GitHub</td>
             <td>Pogas “Pieteikties ar”, tikai ja tās izmantojat</td>
             <td>Tas, ko pakalpojuma sniedzējs atgriež (skatīt iepriekš)</td>
+          </tr>
+          <tr>
+            <td>Paddle (Paddle.com Market Ltd, Apvienotā Karaliste)</td>
+            <td>Maksas plānu tālākpārdevējs un pārdevējs (Merchant of Record): apmaksas logs, maksājumi, rēķini, nodokļi, atmaksas un krāpšanas pārbaudes</td>
+            <td>Vārds, e-pasta adrese, norēķinu valsts un adrese, PVN numurs, ja to norādāt, maksājuma dati (glabā tikai Paddle), kas iegādāts un darbvietas ID. Kā pārdevējs Paddle ir arī neatkarīgs pārzinis datiem, ko tas vāc apmaksas laikā, saskaņā ar savu <a href="https://www.paddle.com/legal/privacy">privātuma paziņojumu</a></td>
           </tr>
         </tbody>
       </table>
@@ -250,6 +260,10 @@ function Body() {
           <tr>
             <td>Lietotņu žurnāli</td>
             <td>Ierobežotu laiku; e-pasta adreses, tālruņu numuri, karšu numuri un IBAN tiek maskēti pirms ierakstīšanas</td>
+          </tr>
+          <tr>
+            <td>Norēķinu ieraksti (abonementi, rēķini, maksājumi)</td>
+            <td>Tik ilgi, cik to prasa nodokļu un grāmatvedības tiesību akti, arī pēc konta dzēšanas. MI atbilžu skaits mēnesī tiek glabāts kopā ar darbvietu</td>
           </tr>
         </tbody>
       </table>

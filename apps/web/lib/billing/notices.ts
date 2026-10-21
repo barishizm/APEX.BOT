@@ -5,6 +5,7 @@ import {
   expireGrace,
   finishBillingNotice,
   maskPII,
+  refreshOverridePlans,
   releaseBillingNotice,
   type BillingNoticeKind,
   type Db,
@@ -13,9 +14,10 @@ import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/config"
 import { sendBillingNotice } from "@/lib/mail"
 import { siteUrl } from "@/lib/site"
 
-// Billing emails and the end of grace (docs/adr/0003-billing.md (c), (f)), run daily by
+// Billing emails and the end of grace (docs/adr/0003-billing.md (c), (f), (g)), run daily by
 // /api/cron/billing-notices and, for one workspace, right after a webhook changed its billing. A run
-// first moves every workspace whose grace ran out to Free (expireGrace), then sends what
+// first moves every workspace whose grace ran out to Free (expireGrace), recomputes the plans of the
+// rest (an override that ended, such as a beta placement or a comp, leaves its plan), then sends what
 // dueBillingNotices finds: each notice is claimed before its mail goes out and given back when none
 // did, so it goes out once per workspace, kind and period however many runs see it.
 
@@ -27,6 +29,8 @@ export interface NoticeRunResult {
   graceExpired: number
   /** Grace expiries that failed; tried again next run. */
   graceFailed: number
+  /** Workspaces whose plan changed on recomputing it, e.g. because an override ended; -1 when that failed. */
+  plansChanged: number
   due: number
   sent: number
   /** Sent by another run since they were listed. */
@@ -37,13 +41,13 @@ export interface NoticeRunResult {
   failures: { organizationId: string; kind: BillingNoticeKind; error: string }[]
 }
 
-type NoticeSendResult = Omit<NoticeRunResult, "graceExpired" | "graceFailed">
+type NoticeSendResult = Omit<NoticeRunResult, "graceExpired" | "graceFailed" | "plansChanged">
 
 const errorText = (err: unknown) => maskPII(err instanceof Error ? err.message : String(err)).slice(0, 300)
 
 type Send = typeof sendBillingNotice
 
-/** The daily run: grace expiries, then every notice due. Never throws for one workspace. */
+/** The daily run: grace expiries, ended overrides, then every notice due. Never throws for one workspace. */
 export async function runBillingNotices(db: Db, now = new Date(), send: Send = sendBillingNotice): Promise<NoticeRunResult> {
   let graceExpired = 0
   let graceFailed = 0
@@ -56,8 +60,14 @@ export async function runBillingNotices(db: Db, now = new Date(), send: Send = s
       console.error("[billing] couldn't end the grace of a workspace:", errorText(err))
     }
   }
+  let plansChanged = -1
+  try {
+    plansChanged = (await refreshOverridePlans(db, now)).length
+  } catch (err) {
+    console.error("[billing] couldn't recompute plans:", errorText(err))
+  }
   // the downgrade emails for these go out in the same run
-  return { graceExpired, graceFailed, ...(await sendNotices(db, now, null, send)) }
+  return { graceExpired, graceFailed, plansChanged, ...(await sendNotices(db, now, null, send)) }
 }
 
 /** Sends what is due for these workspaces now (after a webhook), instead of waiting for the cron. */

@@ -109,6 +109,8 @@ describe("billing emails", () => {
     { kind: "subscription_started", plan: "starter", interval: "month", renewsAt: until, monthlyReplies: 600 },
     { kind: "subscription_renewed", plan: "starter", interval: "year", renewsAt: until, monthlyReplies: 600 },
     { kind: "cancel_confirmed", plan: "pro", endsAt: until },
+    { kind: "beta_ending_30", plan: "pro", endsAt: until, freeReplies: 100 },
+    { kind: "beta_ending_7", plan: "starter", endsAt: until, freeReplies: 100 },
     ...(["on", "off", "none"] as const).flatMap((overage) =>
       (["quota_80", "quota_100"] as const).map(
         (kind): BillingNoticeData => ({ kind, plan: "pro", usedReplies: 1250, allowanceReplies: 1500, resetsAt: until, overage, capCents: overage === "on" ? 5000 : null }),
@@ -133,6 +135,13 @@ describe("billing emails", () => {
         if ((data.kind === "quota_80" || data.kind === "quota_100") && data.overage === "on") assert.match(mail.text, /50/, `${locale} ${data.kind}: has the cap`)
       }
     })
+
+  test("the beta reminders name the plan, the end date and Free's replies", () => {
+    const mail = billingMail({ workspace: "Kahve", data: { kind: "beta_ending_7", plan: "pro", endsAt: until, freeReplies: 100 } }, "en", "L")
+    assert.equal(mail.subject, "Reminder: Kahve moves to Free on January 18, 2027")
+    assert.match(mail.text, /^The free Pro plan Kahve got for the beta ends on January 18, 2027, in a week\./)
+    assert.match(mail.text, /100 AI replies a month/)
+  })
 
   test("English reads as written", () => {
     const mail = billingMail({ workspace: "Kahve", data: { kind: "quota_100", plan: "pro", usedReplies: 1500, allowanceReplies: 1500, resetsAt: until, overage: "on", capCents: 5000 } }, "en", "L")

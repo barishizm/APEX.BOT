@@ -150,6 +150,20 @@ export async function refreshEffectivePlans(db: Db, now = new Date()): Promise<E
   return changed
 }
 
+/**
+ * Recomputes every workspace with a plan override, so one that ended (a comp, a beta placement)
+ * stops granting its plan. Subscriptions are left to their own events and expireGrace.
+ */
+export async function refreshOverridePlans(db: Db, now = new Date()): Promise<EffectivePlanResult[]> {
+  const { rows } = await db.query<{ id: string }>("select distinct organization_id as id from app.plan_overrides")
+  const changed: EffectivePlanResult[] = []
+  for (const { id } of rows) {
+    const result = await db.transaction((tx) => refreshEffectivePlan(tx, id, now))
+    if (result?.changed) changed.push(result)
+  }
+  return changed
+}
+
 export async function upsertBillingCustomer(q: Queryable, input: { organizationId: string; provider: BillingProviderId; providerCustomerId: string }) {
   await q.query(
     `insert into app.billing_customers (organization_id, provider, provider_customer_id) values ($1, $2, $3)

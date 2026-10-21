@@ -77,6 +77,10 @@ function Body() {
             <td>El. pašto adresas (ir puslapio kalba), jei prisijungiate prie laukiančiųjų sąrašo</td>
             <td>Vieną kartą jums pranešti, kai atidarysime registraciją. Kitiems tikslams jo nenaudojame</td>
           </tr>
+          <tr>
+            <td>Atsiskaitymas: darbo srities planas, prenumeratos būsena ir atnaujinimo datos, Paddle kliento ir prenumeratos ID, Paddle išrašytos sąskaitos faktūros ir mėnesinis DI atsakymų skaičius kiekvienai darbo sričiai. Kortelės ir kiti mokėjimo duomenys įvedami Paddle; mes jų niekada nematome ir nesaugome</td>
+            <td>Taikyti jūsų apmokamą planą, apmokestinti jūsų įjungtus papildomus atsakymus, rodyti sąskaitas faktūras ir siųsti atsiskaitymo laiškus</td>
+          </tr>
         </tbody>
       </table>
 
@@ -124,6 +128,7 @@ function Body() {
         <li>Paslaugai teikti: jus prijungti, atsakyti lankytojams, pristatyti perdavimus ir kontaktus, rodyti pokalbius.</li>
         <li>Paslaugos saugumui užtikrinti: užklausų ribos, robotų patikra, piktnaudžiavimo aptikimas ir incidentų tyrimas.</li>
         <li>Siųsti jums el. laiškus: patvirtinimo ir slaptažodžio atkūrimo kodus, perdavimo ir kontaktų pranešimus bei saugumo pranešimus.</li>
+        <li>Mokamiems planams apmokestinti: taikyti planą, skaičiuoti pagal jį DI atsakymus, apmokestinti jūsų įjungtus papildomus atsakymus ir siųsti savininkams laiškus apie mokėjimus, atnaujinimus, beta plano pabaigą ir naudojimą.</li>
         <li>Savo modeliams tobulinti – tik jei tam pritarėte (žr. toliau).</li>
         <li>Teisinėms prievolėms vykdyti.</li>
       </ul>
@@ -186,6 +191,11 @@ function Body() {
             <td>Google ir GitHub</td>
             <td>Mygtukai „Prisijungti per“, tik jei juos naudojate</td>
             <td>Tai, ką grąžina paslaugų teikėjas (žr. aukščiau)</td>
+          </tr>
+          <tr>
+            <td>Paddle (Paddle.com Market Ltd, Jungtinė Karalystė)</td>
+            <td>Mokamų planų perpardavėjas ir pardavėjas (Merchant of Record): mokėjimo langas, mokėjimai, sąskaitos faktūros, mokesčiai, grąžinimai ir sukčiavimo patikros</td>
+            <td>Vardas, el. pašto adresas, atsiskaitymo šalis ir adresas, PVM mokėtojo kodas, jei jį nurodote, mokėjimo duomenys (saugomi tik Paddle), kas nupirkta ir darbo srities ID. Kaip pardavėjas, Paddle taip pat yra savarankiškas duomenų valdytojas mokėjimo metu renkamiems duomenims pagal savo <a href="https://www.paddle.com/legal/privacy">privatumo pranešimą</a></td>
           </tr>
         </tbody>
       </table>
@@ -251,6 +261,10 @@ function Body() {
           <tr>
             <td>Programų žurnalai</td>
             <td>Ribotą laiką; el. pašto adresai, telefono numeriai, kortelių numeriai ir IBAN užmaskuojami prieš įrašant</td>
+          </tr>
+          <tr>
+            <td>Atsiskaitymo įrašai (prenumeratos, sąskaitos faktūros, mokėjimai)</td>
+            <td>Tiek, kiek reikalauja mokesčių ir apskaitos teisės aktai, net ir ištrynus paskyrą. Mėnesiniai DI atsakymų skaičiai saugomi kartu su darbo sritimi</td>
           </tr>
         </tbody>
       </table>

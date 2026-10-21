@@ -14,6 +14,7 @@
     "db:migrate": "npm run migrate -w @apex/db",
     "db:local": "npm run local -w @apex/db",
     "admin:bootstrap": "npm run admin:bootstrap -w @apex/db",
+    "billing:beta-placement": "npm run billing:beta-placement -w @apex/db --",
     "test": "npm test -w @apex/db && npm test -w @apex/knowledge && npm test -w @apex/api && npm test -w @apex/widget && npm test -w @apex/evals && npm test -w @apex/web",
     "typecheck": "npm run typecheck -w @apex/db && npm run typecheck -w @apex/knowledge && npm run typecheck -w @apex/api && npm run typecheck -w @apex/widget && npm run typecheck -w @apex/evals && npm run typecheck -w @apex/web",
     "eval": "npm run eval -w @apex/evals"

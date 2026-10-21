@@ -77,6 +77,10 @@ function Body() {
             <td>E-posti aadress (ja lehe keel), kui liitute ootenimekirjaga</td>
             <td>Et teile üks kord teada anda, kui registreerimine avatakse. Muuks me seda ei kasuta</td>
           </tr>
+          <tr>
+            <td>Arveldus: tööruumi pakett, tellimuse olek ja pikendamise kuupäevad, Paddle'i kliendi- ja tellimuse ID-d, Paddle'i väljastatud arved ning tööruumi tehisintellekti vastuste arv kuus. Kaardi- ja muud makseandmed sisestatakse Paddle'is; me ei näe ega salvesta neid kunagi</td>
+            <td>Teie makstud paketi rakendamiseks, sisse lülitatud lisavastuste eest arveldamiseks, arvete näitamiseks ja arvelduskirjade saatmiseks</td>
+          </tr>
         </tbody>
       </table>
 
@@ -124,6 +128,7 @@ function Body() {
         <li>Teenuse osutamiseks: teie sisselogimiseks, külastajatele vastamiseks, üleandmiste ja kontaktide edastamiseks, vestluste kuvamiseks.</li>
         <li>Teenuse turvalisuse tagamiseks: päringupiirangud, robotikontrollid, kuritarvitamise tuvastamine ja intsidentide uurimine.</li>
         <li>Teile e-kirjade saatmiseks: kinnitus- ja parooli lähtestamise koodid, üleandmis- ja kontaktiteavitused ning turvateated.</li>
+        <li>Tasuliste pakettide eest arveldamiseks: paketi rakendamine, tehisintellekti vastuste arvestamine selle järgi, sisse lülitatud lisavastuste eest tasu võtmine ning omanikele e-kirjade saatmine maksete, pikenduste, beetapaketi lõppemise ja kasutuse kohta.</li>
         <li>Oma mudelite täiustamiseks – ainult siis, kui olete selleks nõusoleku andnud (vt allpool).</li>
         <li>Seadusest tulenevate kohustuste täitmiseks.</li>
       </ul>
@@ -187,6 +192,11 @@ function Body() {
             <td>Google ja GitHub</td>
             <td>Nupud „Logi sisse teenusega“, ainult kui neid kasutate</td>
             <td>See, mille teenusepakkuja tagastab (vt eespool)</td>
+          </tr>
+          <tr>
+            <td>Paddle (Paddle.com Market Ltd, Ühendkuningriik)</td>
+            <td>Tasuliste pakettide edasimüüja ja müüja (Merchant of Record): maksevorm, maksed, arved, maksud, tagasimaksed ja pettusekontrollid</td>
+            <td>Nimi, e-posti aadress, arveldusriik ja -aadress, käibemaksukohustuslase number, kui selle esitate, makseandmed (ainult Paddle'is), mida osteti ja tööruumi ID. Müüjana on Paddle maksmisel kogutud andmete osas ka iseseisev vastutav töötleja oma <a href="https://www.paddle.com/legal/privacy">privaatsusteate</a> alusel</td>
           </tr>
         </tbody>
       </table>
@@ -252,6 +262,10 @@ function Body() {
           <tr>
             <td>Rakenduse logid</td>
             <td>Piiratud aja; e-posti aadressid, telefoninumbrid, kaardinumbrid ja IBAN-id maskeeritakse enne kirjutamist</td>
+          </tr>
+          <tr>
+            <td>Arveldusandmed (tellimused, arved, maksed)</td>
+            <td>Nii kaua, kui maksu- ja raamatupidamisseadused nõuavad, ka pärast konto kustutamist. Tehisintellekti vastuste kuised arvud säilitatakse koos tööruumiga</td>
           </tr>
         </tbody>
       </table>

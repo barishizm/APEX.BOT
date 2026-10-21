@@ -597,7 +597,7 @@ export function sendWaitlistInvite(email: string, link: string, locale: Locale) 
   return compose("waitlist_invite", email, locale, WAITLIST_EMAILS[locale]({ email, link }))
 }
 
-// --- Billing (docs/adr/0003-billing.md (c), (f)): to the workspace owners, from lib/billing/notices.ts ---
+// --- Billing (docs/adr/0003-billing.md (c), (f), (g)): to the workspace owners, from lib/billing/notices.ts ---
 
 interface BillingMail {
   workspace: string
@@ -607,6 +607,8 @@ interface BillingMail {
   link: string
 }
 type GraceMail = BillingMail & { until: string }
+/** A beta placement's plan, its end and Free's monthly replies. */
+type BetaMail = BillingMail & { endsAt: string; freeReplies: string }
 type PeriodMail = BillingMail & { renewsAt: string; replies: string }
 type QuotaMail = BillingMail & {
   used: string
@@ -630,6 +632,8 @@ const BILLING_EMAILS: Messages<{
   cancelConfirmed: (m: BillingMail & { endsAt: string }) => { subject: string; text: string }
   quota80: (m: QuotaMail) => { subject: string; text: string }
   quota100: (m: QuotaMail) => { subject: string; text: string }
+  betaEnding30: (m: BetaMail) => { subject: string; text: string }
+  betaEnding7: (m: BetaMail) => { subject: string; text: string }
 }> = {
   en: {
     paymentFailed: ({ workspace, plan, until, link }) => ({
@@ -675,6 +679,14 @@ const BILLING_EMAILS: Messages<{
           ? `Paid extra replies are on, so your assistants keep answering at ${m.price} per ${m.per} replies, up to your cap of ${m.cap}, until the count starts again on ${m.resetsAt}.`
           : `Until the count starts again on ${m.resetsAt}, your assistants offer visitors the hand-off form instead of answering. ${m.overage === "off" ? "To keep them answering, upgrade or turn on paid extra replies." : "Upgrade to keep them answering."}`
       }\n\nUsage and plans are in billing settings:\n${m.link}`,
+    }),
+    betaEnding30: ({ workspace, plan, endsAt, freeReplies, link }) => ({
+      subject: `${workspace} keeps ${plan} for free until ${endsAt}`,
+      text: `Thank you for using Apex Bot during the beta. As a beta workspace, ${workspace} has the ${plan} plan free of charge until ${endsAt}, a month from now.\n\nTo keep ${plan} after that, choose a plan in billing settings before then:\n${link}\n\nIf you don't, ${workspace} moves to Free on ${endsAt}. Nothing is deleted: websites beyond Free's limit are paused with their knowledge, settings and conversations kept, features above Free stop applying, and each month includes ${freeReplies} AI replies. Subscribing later restores everything as it was.`,
+    }),
+    betaEnding7: ({ workspace, plan, endsAt, freeReplies, link }) => ({
+      subject: `Reminder: ${workspace} moves to Free on ${endsAt}`,
+      text: `The free ${plan} plan ${workspace} got for the beta ends on ${endsAt}, in a week. To keep ${plan}, choose a plan in billing settings:\n${link}\n\nOtherwise the workspace moves to Free, with ${freeReplies} AI replies a month. Nothing is deleted: websites beyond its limit are paused and features above it stop applying until you subscribe.`,
     }),
   },
   tr: {
@@ -722,6 +734,14 @@ const BILLING_EMAILS: Messages<{
           : `Sayaç ${m.resetsAt} tarihinde sıfırlanana kadar asistanlarınız ziyaretçilere yanıt vermek yerine insana devir formunu sunar. ${m.overage === "off" ? "Yanıt vermeye devam etmeleri için planınızı yükseltin veya ücretli ek yanıtları açın." : "Yanıt vermeye devam etmeleri için planınızı yükseltin."}`
       }\n\nKullanımı ve planları faturalandırma ayarlarında görebilirsiniz:\n${m.link}`,
     }),
+    betaEnding30: ({ workspace, plan, endsAt, freeReplies, link }) => ({
+      subject: `${workspace}, ${endsAt} tarihine kadar ${plan} planında ücretsiz kalıyor`,
+      text: `Beta sürecinde Apex Bot'u kullandığınız için teşekkür ederiz. Beta çalışma alanı olarak ${workspace}, bir ay sonra, ${endsAt} tarihine kadar ${plan} planını ücretsiz kullanıyor.\n\nSonrasında ${plan} planında kalmak için bu tarihten önce faturalandırma ayarlarından bir plan seçin:\n${link}\n\nSeçmezseniz ${workspace}, ${endsAt} tarihinde Ücretsiz plana geçer. Hiçbir şey silinmez: Ücretsiz planın sınırını aşan web siteleri bilgi tabanları, ayarları ve sohbetleriyle birlikte duraklatılır, Ücretsiz planın üzerindeki özellikler uygulanmaz ve her ay ${freeReplies} yapay zekâ yanıtı dahildir. Daha sonra abone olduğunuzda her şey eskisi gibi geri gelir.`,
+    }),
+    betaEnding7: ({ workspace, plan, endsAt, freeReplies, link }) => ({
+      subject: `Hatırlatma: ${workspace}, ${endsAt} tarihinde Ücretsiz plana geçiyor`,
+      text: `${workspace} çalışma alanına beta için verilen ücretsiz ${plan} planı bir hafta sonra, ${endsAt} tarihinde sona eriyor. ${plan} planında kalmak için faturalandırma ayarlarından bir plan seçin:\n${link}\n\nAksi hâlde çalışma alanı ayda ${freeReplies} yapay zekâ yanıtıyla Ücretsiz plana geçer. Hiçbir şey silinmez: sınırı aşan web siteleri duraklatılır, planın üzerindeki özellikler ise abone olana kadar uygulanmaz.`,
+    }),
   },
   lt: {
     paymentFailed: ({ workspace, plan, until, link }) => ({
@@ -767,6 +787,14 @@ const BILLING_EMAILS: Messages<{
           ? `Mokami papildomi atsakymai įjungti, todėl jūsų asistentai toliau atsakinės už ${m.price} už ${m.per} atsakymų, iki jūsų ${m.cap} ribos, kol skaičiavimas prasidės iš naujo ${m.resetsAt}.`
           : `Kol skaičiavimas prasidės iš naujo ${m.resetsAt}, jūsų asistentai vietoj atsakymo lankytojams siūlys perdavimo formą. ${m.overage === "off" ? "Kad jie toliau atsakinėtų, pasirinkite didesnį planą arba įjunkite mokamus papildomus atsakymus." : "Kad jie toliau atsakinėtų, pasirinkite didesnį planą."}`
       }\n\nNaudojimą ir planus rasite atsiskaitymo nustatymuose:\n${m.link}`,
+    }),
+    betaEnding30: ({ workspace, plan, endsAt, freeReplies, link }) => ({
+      subject: `${workspace} nemokamai naudoja planą ${plan} iki ${endsAt}`,
+      text: `Dėkojame, kad beta laikotarpiu naudojotės Apex Bot. Kaip beta darbo sritis, ${workspace} nemokamai naudoja planą ${plan} iki ${endsAt}, t. y. dar mėnesį.\n\nKad ir po to išliktumėte plane ${plan}, iki tol pasirinkite planą atsiskaitymo nustatymuose:\n${link}\n\nJei nepasirinksite, ${endsAt} ${workspace} pereis į nemokamą planą. Niekas nebus ištrinta: nemokamo plano ribą viršijančios svetainės bus pristabdytos, išsaugant jų žinias, nustatymus ir pokalbius, aukštesnio plano funkcijos nebebus taikomos, o kiekvieną mėnesį bus įskaičiuota ${freeReplies} DI atsakymų. Vėliau užsiprenumeravus viskas bus atkurta.`,
+    }),
+    betaEnding7: ({ workspace, plan, endsAt, freeReplies, link }) => ({
+      subject: `Priminimas: ${endsAt} ${workspace} pereina į nemokamą planą`,
+      text: `Beta laikotarpiui ${workspace} suteiktas nemokamas planas ${plan} baigiasi ${endsAt}, po savaitės. Kad išliktumėte plane ${plan}, pasirinkite planą atsiskaitymo nustatymuose:\n${link}\n\nPriešingu atveju darbo sritis pereis į nemokamą planą su ${freeReplies} DI atsakymų per mėnesį. Niekas nebus ištrinta: ribą viršijančios svetainės bus pristabdytos, o aukštesnio plano funkcijos nebus taikomos, kol užsiprenumeruosite.`,
     }),
   },
   lv: {
@@ -814,6 +842,14 @@ const BILLING_EMAILS: Messages<{
           : `Līdz skaitīšana sāksies no jauna ${m.resetsAt}, jūsu asistenti atbildes vietā piedāvās apmeklētājiem nodošanas veidlapu. ${m.overage === "off" ? "Lai tie turpinātu atbildēt, izvēlieties lielāku plānu vai ieslēdziet maksas papildu atbildes." : "Lai tie turpinātu atbildēt, izvēlieties lielāku plānu."}`
       }\n\nLietojumu un plānus atradīsiet norēķinu iestatījumos:\n${m.link}`,
     }),
+    betaEnding30: ({ workspace, plan, endsAt, freeReplies, link }) => ({
+      subject: `${workspace} bez maksas izmanto plānu ${plan} līdz ${endsAt}`,
+      text: `Paldies, ka beta laikā izmantojāt Apex Bot. Kā beta darbvieta ${workspace} bez maksas izmanto plānu ${plan} līdz ${endsAt}, vēl mēnesi.\n\nLai arī pēc tam saglabātu plānu ${plan}, līdz tam izvēlieties plānu norēķinu iestatījumos:\n${link}\n\nJa neizvēlēsieties, ${endsAt} ${workspace} pāries uz bezmaksas plānu. Nekas netiks dzēsts: vietnes, kas pārsniedz bezmaksas plāna ierobežojumu, tiks apturētas, saglabājot to zināšanas, iestatījumus un sarunas, augstāka plāna funkcijas vairs netiks piemērotas, un katrā mēnesī būs iekļautas ${freeReplies} MI atbildes. Vēlāk abonējot, viss tiks atjaunots.`,
+    }),
+    betaEnding7: ({ workspace, plan, endsAt, freeReplies, link }) => ({
+      subject: `Atgādinājums: ${endsAt} ${workspace} pāriet uz bezmaksas plānu`,
+      text: `Beta laikam piešķirtais bezmaksas plāns ${plan} darbvietai ${workspace} beidzas ${endsAt}, pēc nedēļas. Lai saglabātu plānu ${plan}, izvēlieties plānu norēķinu iestatījumos:\n${link}\n\nPretējā gadījumā darbvieta pāries uz bezmaksas plānu ar ${freeReplies} MI atbildēm mēnesī. Nekas netiks dzēsts: vietnes virs ierobežojuma tiks apturētas, un augstāka plāna funkcijas netiks piemērotas, līdz abonēsiet.`,
+    }),
   },
   et: {
     paymentFailed: ({ workspace, plan, until, link }) => ({
@@ -860,6 +896,14 @@ const BILLING_EMAILS: Messages<{
           : `Kuni loendus algab uuesti ${m.resetsAt}, pakuvad teie assistendid külastajatele vastamise asemel üleandmisvormi. ${m.overage === "off" ? "Et nad vastaksid edasi, valige suurem pakett või lülitage sisse tasulised lisavastused." : "Et nad vastaksid edasi, valige suurem pakett."}`
       }\n\nKasutust ja pakette näete arveldusseadetes:\n${m.link}`,
     }),
+    betaEnding30: ({ workspace, plan, endsAt, freeReplies, link }) => ({
+      subject: `${workspace} kasutab paketti ${plan} tasuta kuni ${endsAt}`,
+      text: `Täname, et kasutasite Apex Botti beetaperioodil. Beetatööruumina kasutab ${workspace} paketti ${plan} tasuta kuni ${endsAt}, veel kuu aega.\n\nEt ka pärast seda paketti ${plan} jätkata, valige enne seda arveldusseadetes pakett:\n${link}\n\nKui te seda ei tee, läheb ${workspace} ${endsAt} üle tasuta paketile. Midagi ei kustutata: tasuta paketi piiri ületavad veebisaidid peatatakse koos nende teadmiste, seadete ja vestlustega, kõrgema paketi funktsioone enam ei rakendata ja igas kuus on ${freeReplies} tehisintellekti vastust. Hiljem tellides taastub kõik endisel kujul.`,
+    }),
+    betaEnding7: ({ workspace, plan, endsAt, freeReplies, link }) => ({
+      subject: `Meeldetuletus: ${workspace} läheb ${endsAt} üle tasuta paketile`,
+      text: `Beetaperioodiks antud tasuta pakett ${plan} lõpeb tööruumil ${workspace} ${endsAt}, nädala pärast. Paketi ${plan} säilitamiseks valige arveldusseadetes pakett:\n${link}\n\nVastasel juhul läheb tööruum üle tasuta paketile, kus on ${freeReplies} tehisintellekti vastust kuus. Midagi ei kustutata: piiri ületavad veebisaidid peatatakse ja kõrgema paketi funktsioone ei rakendata, kuni te tellite.`,
+    }),
   },
 }
 
@@ -873,6 +917,8 @@ const BILLING_TEMPLATE: Record<BillingNoticeKind, keyof (typeof BILLING_EMAILS)[
   cancel_confirmed: "cancelConfirmed",
   quota_80: "quota80",
   quota_100: "quota100",
+  beta_ending_30: "betaEnding30",
+  beta_ending_7: "betaEnding7",
 }
 
 /** The billing email for a notice, in `locale`, with dates and numbers written its way (dates in UTC). */
@@ -913,6 +959,9 @@ function billingTemplate(n: Pick<BillingNotice, "workspace" | "data">, locale: L
         price: usd(OVERAGE_BLOCK.priceCents),
         per: num(OVERAGE_BLOCK.replies),
       })
+    case "beta_ending_30":
+    case "beta_ending_7":
+      return t[BILLING_TEMPLATE[d.kind] as "betaEnding30"]({ ...base, endsAt: date(d.endsAt), freeReplies: num(d.freeReplies) })
   }
 }
 
