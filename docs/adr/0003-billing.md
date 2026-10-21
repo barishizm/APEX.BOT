@@ -187,6 +187,15 @@ interface BillingProvider {
   the signature. After the overlay completes, the page polls `GET /api/billing/checkout/<txn>` until the webhook
   has stored the subscription that transaction created (90 s, then a support link with the transaction as
   reference). The CSP's `frame-src` allows `buy.paddle.com` and `sandbox-buy.paddle.com`.
+- Implemented (2026-10-21): the billing page `/dashboard/settings/billing` (nav rail and command palette). It shows
+  the plan and period end, the current reply window (`workspaceReplyUsage`, the same window the chat API counts in)
+  with the model weights from (b), overage, and Paddle's invoices. Owners and admins act through
+  `lib/billing/manage.ts`: `POST /api/billing/subscription/{preview,change,cancel,resume}` (a change is refused while
+  a cancellation or a downgrade is scheduled), `POST /api/billing/overage` (`setOverage`: on needs a plan with
+  overage, a running subscription and `PADDLE_PRICE_OVERAGE`; cap in $5 blocks up to `OVERAGE_CAP_MAX_CENTS`,
+  audited as `billing.overage`), `POST /api/billing/portal` and `GET /api/billing/invoices/<txn>` (a PDF only for an
+  id on the workspace's own invoice list). Members see the page and the invoice list, read-only. The overview warns at
+  80% and 100% of the replies while `reply_quota` holds the workspace to them.
 - `BillingEvent` is our own normalised type (`subscription.activated | renewed | changed | past_due | canceled`,
   `payment.succeeded | failed`). Plan, quota and grace logic read only these and our tables, never provider payloads.
 - Webhooks are verified (Paddle's `Paddle-Signature` HMAC), stored by event id before processing (idempotent, replayable

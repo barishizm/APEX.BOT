@@ -88,6 +88,8 @@ export const PLAN_PRICES: Record<Plan, { monthly: number; annual: number }> = {
 
 /** Overage is sold in blocks of replies (ADR 0003 (c)). */
 export const OVERAGE_BLOCK = { replies: 100, priceCents: 500 }
+/** The highest monthly overage cap an owner can set themselves, in US cents; more goes through support. */
+export const OVERAGE_CAP_MAX_CENTS = 100_000
 
 /** A monthly AI reply window: [start, end). */
 export interface ReplyWindow {

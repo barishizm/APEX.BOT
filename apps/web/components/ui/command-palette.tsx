@@ -7,6 +7,7 @@ import {
   ChartColumn,
   Code2,
   Cpu,
+  CreditCard,
   CornerDownLeft,
   Globe,
   Languages,
@@ -31,6 +32,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { ADMIN_NAV } from "@/components/admin/nav"
 import { useAppI18n } from "@/components/i18n/app-provider"
 import { useSetLocale } from "@/components/i18n/use-set-locale"
+import { BILLING_PATH } from "@/lib/billing/intent"
 import { LOCALE_META, LOCALES, localizePath, type Locale } from "@/lib/i18n"
 import type { AdminDictionary, AppDictionary } from "@/lib/i18n/app"
 import { cn } from "@/lib/utils"
@@ -63,6 +65,13 @@ function buildCommands(t: Strings, locale: Locale, setLocale: (l: Locale) => voi
     { group: g.goTo, label: c.setup, icon: ListChecks, keywords: "onboarding progress kurulum", run: nav("/dashboard/onboarding/list") },
     { group: g.goTo, label: c.team, icon: Users, keywords: "team members invite roles people ekip üye davet rol kişi", run: nav("/dashboard/team") },
     { group: g.goTo, label: c.settings, icon: Settings, keywords: "password username profile email two-step 2fa authenticator şifre kullanıcı e-posta iki adımlı doğrulama", run: nav("/dashboard/settings") },
+    {
+      group: g.goTo,
+      label: c.billing,
+      icon: CreditCard,
+      keywords: "billing plan subscription upgrade invoice payment card usage quota overage cancel fatura plan abonelik yükselt ödeme kart kullanım kota iptal",
+      run: nav(BILLING_PATH),
+    },
     { group: g.widget, label: c.general, icon: Settings2, keywords: "name company language isim şirket dil", run: nav("/dashboard/widget?section=general") },
     { group: g.widget, label: c.appearance, icon: Palette, keywords: "color launcher theme font renk tema", run: nav("/dashboard/widget?section=appearance") },
     { group: g.widget, label: c.messages, icon: MessageSquareText, keywords: "greeting suggestions disclaimer karşılama öneri", run: nav("/dashboard/widget?section=messages") },
