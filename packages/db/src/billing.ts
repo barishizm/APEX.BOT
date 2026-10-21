@@ -100,7 +100,7 @@ export function effectivePlan(sub: Subscription | null, overrides: PlanOverride[
   return paid ? { plan: paid, source: "subscription" } : { plan: "free", source: "free" }
 }
 
-const SUBSCRIPTION_COLUMNS = `organization_id as "organizationId", provider, provider_subscription_id as "providerSubscriptionId",
+export const SUBSCRIPTION_COLUMNS = `organization_id as "organizationId", provider, provider_subscription_id as "providerSubscriptionId",
   plan, "interval", status, current_period_start as "currentPeriodStart", current_period_end as "currentPeriodEnd",
   cancel_at_period_end as "cancelAtPeriodEnd", scheduled_change as "scheduledChange", grace_until as "graceUntil",
   provider_updated_at as "providerUpdatedAt"`
@@ -221,6 +221,8 @@ export async function upsertSubscription(tx: Queryable, input: SubscriptionInput
        grace_until = case when excluded.status <> 'past_due' then null
                           when s.status = 'past_due' and s.provider_subscription_id = excluded.provider_subscription_id then s.grace_until
                           else excluded.grace_until end,
+       grace_expired_at = case when excluded.status = 'past_due' and s.status = 'past_due'
+                                 and s.provider_subscription_id = excluded.provider_subscription_id then s.grace_expired_at end,
        provider_updated_at = excluded.provider_updated_at
      where excluded.provider_updated_at > s.provider_updated_at
        and (s.provider_subscription_id = excluded.provider_subscription_id or s.status = 'canceled' or excluded.status <> 'canceled')
@@ -473,6 +475,64 @@ export async function applyBillingEvent(tx: Queryable, event: ApplicableBillingE
       after: auditState(effective.plan, subscription),
     })
   }
+  return { outcome: "applied", plan: effective, subscription, auditId }
+}
+
+// --- The end of a failed payment's grace ---
+
+export type GraceExpiryResult =
+  | { outcome: "applied"; plan: EffectivePlanResult; subscription: Subscription; auditId: string }
+  /** No past_due subscription whose grace has run out, or expireGrace already ran for it. */
+  | { outcome: "not_due" }
+  | { outcome: "unknown_organization" }
+
+/** Workspaces whose past_due subscription's grace has run out and that expireGrace hasn't moved yet. */
+export async function dueGraceExpiries(q: Queryable, now = new Date()): Promise<string[]> {
+  const { rows } = await q.query<{ id: string }>(
+    `select organization_id as id from app.subscriptions
+      where status = 'past_due' and grace_until <= $1 and grace_expired_at is null order by grace_until`,
+    [now],
+  )
+  return rows.map((r) => r.id)
+}
+
+/**
+ * The "grace_expired" transition (ADR 0003 (f)), our own counterpart of applyBillingEvent for when the
+ * grace of a failed payment runs out with the subscription still past_due (the backstop for a lost
+ * "canceled" webhook). In the caller's transaction:
+ *   - records it on the subscription (grace_expired_at), once: a second call is "not_due";
+ *   - recomputes the effective plan, which is Free unless an override runs, so (e) applies from here:
+ *     websites over Free's limit pause, features above it stop applying, nothing is deleted;
+ *   - when the plan changed, moves the reply window's usage onto calendar months (alignReplyUsage);
+ *   - records it in the audit log as BILLING_AUDIT_ACTOR.
+ * The subscription stays past_due: the provider may still collect, or cancel it, and either event
+ * applies on top of this as usual.
+ */
+export async function expireGrace(tx: Queryable, organizationId: string, now = new Date()): Promise<GraceExpiryResult> {
+  const org = await tx.query<{ plan: Plan }>("select plan from app.organizations where id = $1 for update", [organizationId])
+  if (!org.rows[0]) return { outcome: "unknown_organization" }
+  const previousPlan = org.rows[0].plan
+  const marked = await tx.query<{ id: string }>(
+    `update app.subscriptions set grace_expired_at = $2
+      where organization_id = $1 and status = 'past_due' and grace_until <= $2 and grace_expired_at is null
+      returning organization_id as id`,
+    [organizationId, now],
+  )
+  if (!marked.rows[0]) return { outcome: "not_due" }
+  const subscription = (await getSubscription(tx, organizationId))!
+  const effective = (await refreshEffectivePlan(tx, organizationId, now))!
+  // until the grace ran out the window counted from the subscription's period start
+  if (effective.changed) await alignReplyUsage(tx, organizationId, subscription.currentPeriodStart, quotaAnchor(subscription, now), now)
+  const auditId = await writeAudit(tx, {
+    actorId: null,
+    actorLabel: BILLING_AUDIT_ACTOR,
+    action: "billing.grace_expired",
+    targetType: "organization",
+    targetId: organizationId,
+    reason: `grace ended ${subscription.graceUntil!.toISOString()}`,
+    before: auditState(previousPlan, subscription),
+    after: auditState(effective.plan, subscription),
+  })
   return { outcome: "applied", plan: effective, subscription, auditId }
 }
 

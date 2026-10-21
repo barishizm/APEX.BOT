@@ -1,6 +1,7 @@
 "use client"
 
 import { AlertTriangle, Info, OctagonAlert, X } from "lucide-react"
+import Link from "next/link"
 import { useEffect, useState } from "react"
 import { useI18n } from "@/components/i18n/provider"
 import { cn } from "@/lib/utils"
@@ -10,7 +11,8 @@ import { cn } from "@/lib/utils"
 // are prerendered, so MarketingAnnouncements asks /api/announcements once they load.
 //
 // Closing one is remembered by this browser (localStorage), per announcement and version: when
-// staff change the text, it shows again.
+// staff change the text, it shows again. The dashboard also shows its own banners this way, such as a
+// failed payment (components/dashboard/frame.tsx); those can't be closed and may link somewhere.
 
 export interface AnnouncementJson {
   id: string
@@ -19,6 +21,8 @@ export interface AnnouncementJson {
   dismissible: boolean
   /** updatedAt, so an edited announcement comes back after being closed. */
   version: string
+  /** A link after the text, for the dashboard's own banners. */
+  action?: { label: string; href: string }
 }
 
 const STORAGE_KEY = "apex:dismissed-announcements"
@@ -77,7 +81,17 @@ export function AnnouncementBanners({ items, variant = "bar" }: { items: Announc
             )}
           >
             <Icon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-            <p className="m-0 min-w-0 flex-1 font-medium leading-snug">{a.text}</p>
+            <p className="m-0 min-w-0 flex-1 font-medium leading-snug">
+              {a.text}
+              {a.action && (
+                <>
+                  {" "}
+                  <Link href={a.action.href} className="whitespace-nowrap text-current underline underline-offset-2 hover:no-underline">
+                    {a.action.label}
+                  </Link>
+                </>
+              )}
+            </p>
             {a.dismissible && (
               <button
                 type="button"

@@ -1,12 +1,14 @@
 import type { ReactNode } from "react"
-import { announcementsFor, botPlan, liveAnnouncements } from "@apex/db"
+import { announcementsFor, botPlan, getSubscription, liveAnnouncements, rememberUserLocale } from "@apex/db"
 import type { AnnouncementJson } from "@/components/announcement-banner"
 import { DashboardShell, type NavLabel } from "@/components/ui/dashboard-shell"
 import { announcementJson } from "@/lib/announcements"
-import { requireVerifiedUser } from "@/lib/auth"
+import { isImpersonating, requireVerifiedUser } from "@/lib/auth"
 import { sitesJson } from "@/lib/bot"
 import { currentBot, currentSites, getSetup } from "@/lib/dashboard"
 import { db } from "@/lib/db"
+import { format } from "@/lib/i18n"
+import { getAppDictionary } from "@/lib/i18n/app"
 import { requestLocale } from "@/lib/i18n/server"
 
 // The banners staff published for this workspace (its plan, or it by name); none if they can't be read
@@ -20,12 +22,53 @@ async function announcements(bot: { id: string; organizationId: string }): Promi
   }
 }
 
+// A failed payment (ADR 0003 (f)), shown to every member of the workspace on every dashboard page until
+// the subscription leaves past_due: it can't be closed, and links to the billing page to fix it
+async function billingBanners(organizationId: string): Promise<AnnouncementJson[]> {
+  try {
+    const [sub, locale] = await Promise.all([getSubscription(db(), organizationId), requestLocale()])
+    if (sub?.status !== "past_due" || !sub.graceUntil) return []
+    const t = getAppDictionary(locale).billing
+    const plan = t.plans[sub.plan]
+    const inGrace = Date.now() < sub.graceUntil.getTime()
+    const date = new Intl.DateTimeFormat(locale, { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(sub.graceUntil)
+    return [
+      {
+        id: "billing-past-due",
+        level: inGrace ? "warn" : "critical",
+        text: inGrace ? format(t.pastDue, { date, plan }) : format(t.pastDueEnded, { plan }),
+        dismissible: false,
+        version: sub.graceUntil.toISOString(),
+        action: { label: t.manage.updatePayment, href: "/dashboard/settings/billing" },
+      },
+    ]
+  } catch (err) {
+    console.error("[billing] banner:", err instanceof Error ? err.message : err)
+    return []
+  }
+}
+
+// The language billing emails from the cron go out in; never while staff view the app as this user
+async function rememberLocale(userId: string) {
+  try {
+    if (!(await isImpersonating())) await rememberUserLocale(db(), userId, await requestLocale())
+  } catch (err) {
+    console.error("[locale]", err instanceof Error ? err.message : err)
+  }
+}
+
 // Server wrapper: every dashboard page gets the signed-in user, their websites and real setup progress
 export async function DashboardFrame({ active, intro, children }: { active?: NavLabel; intro?: boolean; children: ReactNode }) {
   const user = await requireVerifiedUser()
   // the bot first: a first visit creates it, and the site list must include it
   const bot = await currentBot(user.id)
-  const [steps, sites, banners] = await Promise.all([getSetup(user.id), currentSites(user.id), announcements(bot)])
+  const [steps, sites, billing, banners] = await Promise.all([
+    getSetup(user.id),
+    currentSites(user.id),
+    billingBanners(bot.organizationId),
+    announcements(bot),
+    rememberLocale(user.id),
+  ])
   const setup = Object.values(steps)
   return (
     <DashboardShell
@@ -34,7 +77,7 @@ export async function DashboardFrame({ active, intro, children }: { active?: Nav
       active={active}
       intro={intro}
       setup={{ done: setup.filter(Boolean).length, total: setup.length }}
-      announcements={banners}
+      announcements={[...billing, ...banners]}
     >
       {children}
     </DashboardShell>
