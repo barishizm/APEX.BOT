@@ -3,8 +3,10 @@ import Link from "next/link"
 import { AlertTriangle, CircleCheck, Info, RefreshCw } from "lucide-react"
 import {
   KNOWLEDGE_REFRESH_JOB,
+  OVERAGE_BILLING_JOB,
   RETENTION_SWEEP_JOB,
   listBillingEventIssues,
+  listOverageIssues,
   maskPII,
   migrationStatus,
   readApiRuntime,
@@ -172,13 +174,15 @@ export default async function AdminSystemPage() {
   const [system, runtime] = await Promise.all([checkSystem(), load(readApiRuntime(db()))])
   const api = system.api.state === "ok" ? system.api.data : null
   const embeddingModel = api?.runtime ? api.runtime.embeddings : runtime.ok ? (runtime.value?.embeddings ?? null) : null
-  const [migrations, queues, refreshRuns, sweepRuns, mail, webhooks] = await Promise.all([
+  const [migrations, queues, refreshRuns, sweepRuns, mail, webhooks, overageRuns, overageIssues] = await Promise.all([
     load(migrationStatus(db())),
     load(systemQueues(db(), embeddingModel)),
     load(recentJobRuns(db(), KNOWLEDGE_REFRESH_JOB, 8)),
     load(recentJobRuns(db(), RETENTION_SWEEP_JOB, 8)),
     load(recentEmailFailures(db())),
     load(listBillingEventIssues(db())),
+    load(recentJobRuns(db(), OVERAGE_BILLING_JOB, 8)),
+    load(listOverageIssues(db())),
   ])
 
   const pending = migrations.ok ? migrations.value.pending : []
@@ -187,6 +191,12 @@ export default async function AdminSystemPage() {
   const refreshResult = (r: JobRun) => {
     const v = (r.result ?? {}) as { due?: number; started?: number; busy?: number; failed?: number }
     return typeof v.due === "number" ? format(t.jobs.refresh.result, { due: num(v.due), started: num(v.started ?? 0), busy: num(v.busy ?? 0), failed: num(v.failed ?? 0) }) : null
+  }
+  const overageResult = (r: JobRun) => {
+    const v = (r.result ?? {}) as { due?: number; billed?: number; blocks?: number; failed?: number }
+    return typeof v.due === "number"
+      ? format(t.billing.overage.result, { due: num(v.due), billed: num(v.billed ?? 0), blocks: num(v.blocks ?? 0), failed: num(v.failed ?? 0) })
+      : null
   }
   const sweepResult = (r: JobRun) => {
     const v = (r.result ?? {}) as { deleted?: number }
@@ -365,6 +375,41 @@ export default async function AdminSystemPage() {
               ))}
             </Table>
           </>
+        )}
+        <h3 className="m-0 text-sm font-semibold">{t.billing.overage.title}</h3>
+        {!overageIssues.ok ? (
+          <Alert tone="bad">{format(t.jobs.unavailable, { error: overageIssues.error })}</Alert>
+        ) : (
+          overageIssues.value.total > 0 && (
+            <>
+              <Alert tone="bad">{format(t.billing.overage.failing, { n: num(overageIssues.value.total) })}</Alert>
+              <Table head={[t.billing.overage.columns.workspace, t.billing.overage.columns.window, t.billing.overage.columns.replies, t.billing.overage.columns.attempts, t.billing.overage.columns.error]}>
+                {overageIssues.value.windows.map((w) => (
+                  <tr key={`${w.organizationId}:${w.periodStart.toISOString()}`} className="border-t border-[var(--color-line)]">
+                    <td className={td}>
+                      <Link href={`/admin/workspaces/${w.organizationId}`} className="block font-medium">
+                        {w.organizationName}
+                      </Link>
+                      <Mono>{w.organizationId}</Mono>
+                    </td>
+                    <td className={cn(td, "whitespace-nowrap")}>{at(w.periodStart)}</td>
+                    <td className={cn(td, "tabular-nums")}>{num(w.overageFifths / 5)}</td>
+                    <td className={cn(td, "tabular-nums")}>{num(w.attempts)}</td>
+                    <td className={td}>
+                      <ErrorText>{maskPII(w.error)}</ErrorText>
+                    </td>
+                  </tr>
+                ))}
+              </Table>
+            </>
+          )
+        )}
+        {!overageRuns.ok ? (
+          <Alert tone="bad">{format(t.jobs.unavailable, { error: overageRuns.error })}</Alert>
+        ) : overageRuns.value.length ? (
+          <RunsTable runs={overageRuns.value} result={overageResult} />
+        ) : (
+          <Empty>{t.billing.overage.none}</Empty>
         )}
       </Section>
 
