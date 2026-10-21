@@ -1332,6 +1332,13 @@ const en = {
         columns: { event: "Event", received: "Received", attempts: "Attempts", error: "Why" },
         waiting: "Waiting",
       },
+      overage: {
+        title: "Overage charges (daily cron)",
+        none: "No run recorded yet.",
+        result: "{due} due · {billed} billed · {blocks} blocks · {failed} failed",
+        failing: "{n} closed windows couldn't be billed. Each run tries them again; the reason is the last attempt's.",
+        columns: { workspace: "Workspace", window: "Window from", replies: "Overage replies", attempts: "Attempts", error: "Why" },
+      },
     },
   },
   workspacePicker: {
@@ -2744,6 +2751,13 @@ const tr: AdminMessages = {
         unavailable: "Webhook gelen kutusu okunamadı: {error}",
         columns: { event: "Olay", received: "Geliş", attempts: "Deneme", error: "Neden" },
         waiting: "Bekliyor",
+      },
+      overage: {
+        title: "Aşım tahsilatları (günlük cron)",
+        none: "Henüz kayıtlı çalıştırma yok.",
+        result: "{due} bekleyen · {billed} tahsil edildi · {blocks} paket · {failed} hatalı",
+        failing: "Kapanmış {n} dönem tahsil edilemedi. Her çalıştırma bunları yeniden dener; neden, son denemeninkidir.",
+        columns: { workspace: "Çalışma alanı", window: "Dönem başı", replies: "Aşım yanıtı", attempts: "Deneme", error: "Neden" },
       },
     },
   },

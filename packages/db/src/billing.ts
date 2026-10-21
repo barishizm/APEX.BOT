@@ -795,3 +795,149 @@ export async function setOverage(
     })
   return { ok: true }
 }
+
+// --- Overage charges ---
+
+/** The overage cron (/api/cron/billing-overage), as named in app.job_runs. */
+export const OVERAGE_BILLING_JOB = "billing.overage"
+
+/**
+ * Blocks of OVERAGE_BLOCK.replies to bill for `overageFifths` used past the allowance: a block is
+ * billed once it is opened (rounded up), never past the owner's cap or OVERAGE_CAP_MAX_CENTS.
+ * `capped` when the usage asked for more than that.
+ */
+export function overageBlocks(overageFifths: number, capUnits: number | null): { blocks: number; capped: boolean } {
+  const used = Math.ceil(overageFifths / (OVERAGE_BLOCK.replies * 5))
+  const capBlocks = Math.min(Math.floor((capUnits ?? 0) / OVERAGE_BLOCK.replies), Math.floor(OVERAGE_CAP_MAX_CENTS / OVERAGE_BLOCK.priceCents))
+  return { blocks: Math.min(used, capBlocks), capped: used > capBlocks }
+}
+
+/** A closed reply window with overage not billed yet. */
+export interface OverageWindowRef {
+  organizationId: string
+  periodStart: Date
+}
+
+/**
+ * Windows with overage that isn't billed and that the workspace no longer counts in, oldest first.
+ * A window closes when the workspace's current one (the same as listWorkspaceQuotas reads) starts
+ * elsewhere: at its end, or earlier when a plan change moved the count (alignReplyUsage).
+ */
+export async function closedOverageWindows(q: Queryable, now = new Date(), limit = 100): Promise<OverageWindowRef[]> {
+  const { rows } = await q.query<OverageWindowRef & { sub: (GrantFields & Pick<Subscription, "currentPeriodStart">) | null }>(
+    `select u.organization_id as "organizationId", u.period_start as "periodStart",
+            case when s.organization_id is not null then json_build_object(
+              'plan', s.plan, 'status', s.status, 'graceUntil', s.grace_until, 'cancelAtPeriodEnd', s.cancel_at_period_end,
+              'currentPeriodStart', s.current_period_start, 'currentPeriodEnd', s.current_period_end, 'scheduledChange', s.scheduled_change) end as sub
+       from app.reply_usage u
+       left join app.subscriptions s on s.organization_id = u.organization_id
+      where u.overage_units > 0 and u.overage_billed_at is null
+      order by u.period_start, u.organization_id`,
+  )
+  const date = (v: unknown) => (v === null || v === undefined ? null : new Date(v as string))
+  return rows
+    .filter(({ periodStart, sub: raw }) => {
+      const sub = raw && {
+        ...raw,
+        graceUntil: date(raw.graceUntil),
+        currentPeriodStart: date(raw.currentPeriodStart)!,
+        currentPeriodEnd: date(raw.currentPeriodEnd)!,
+      }
+      return replyWindow(quotaAnchor(sub, now), now).start.getTime() !== new Date(periodStart).getTime()
+    })
+    .slice(0, limit)
+    .map(({ organizationId, periodStart }) => ({ organizationId, periodStart: new Date(periodStart) }))
+}
+
+/** A window locked for billing, with what the charge needs. */
+export interface LockedOverageWindow {
+  /** Used past the allowance in the window, in fifths. */
+  overageFifths: number
+  /** The owner's cap now, in replies; null when none was ever set. */
+  capUnits: number | null
+  /** The workspace's subscription now; null when it has none. */
+  subscription: Subscription | null
+}
+
+/**
+ * Locks an unbilled window until the transaction ends, so no other run charges it meanwhile. Null when
+ * it is billed already, has no overage, or another run holds it. Must run in a transaction.
+ */
+export async function lockOverageWindow(tx: Queryable, w: OverageWindowRef): Promise<LockedOverageWindow | null> {
+  const { rows } = await tx.query<{ fifths: string; cap: number | null }>(
+    `select (u.overage_units * 5)::int::text as fifths, o.overage_cap_units as cap
+       from app.reply_usage u join app.organizations o on o.id = u.organization_id
+      where u.organization_id = $1 and u.period_start = $2 and u.overage_units > 0 and u.overage_billed_at is null
+        for update of u skip locked`,
+    [w.organizationId, w.periodStart],
+  )
+  if (!rows[0]) return null
+  return { overageFifths: Number(rows[0].fifths), capUnits: rows[0].cap, subscription: await getSubscription(tx, w.organizationId) }
+}
+
+/** Records the window's charge, once: later runs skip it. Audited as BILLING_AUDIT_ACTOR. */
+export async function markOverageBilled(
+  tx: Queryable,
+  w: OverageWindowRef,
+  charge: { blocks: number; transactionId: string | null; capped: boolean; duplicate: boolean },
+  now = new Date(),
+): Promise<void> {
+  const { rows } = await tx.query(
+    `update app.reply_usage set overage_billed_at = $3, overage_billed_blocks = $4, overage_transaction_id = $5,
+            overage_error = null, overage_attempts = overage_attempts + 1
+      where organization_id = $1 and period_start = $2 and overage_billed_at is null returning 1`,
+    [w.organizationId, w.periodStart, now, charge.blocks, charge.transactionId],
+  )
+  if (!rows[0]) throw new Error(`overage window ${w.organizationId} ${w.periodStart.toISOString()} is billed already`)
+  await writeAudit(tx, {
+    actorId: null,
+    actorLabel: BILLING_AUDIT_ACTOR,
+    action: "billing.overage_charged",
+    targetType: "organization",
+    targetId: w.organizationId,
+    reason: charge.transactionId ?? null,
+    after: {
+      periodStart: w.periodStart.toISOString(),
+      blocks: charge.blocks,
+      cents: charge.blocks * OVERAGE_BLOCK.priceCents,
+      capped: charge.capped,
+      duplicate: charge.duplicate,
+    },
+  })
+}
+
+/** Records why the window couldn't be billed; the next run tries again. */
+export async function markOverageFailed(q: Queryable, w: OverageWindowRef, error: string): Promise<void> {
+  await q.query(
+    `update app.reply_usage set overage_error = left($3, 1000), overage_attempts = overage_attempts + 1
+      where organization_id = $1 and period_start = $2 and overage_billed_at is null`,
+    [w.organizationId, w.periodStart, error],
+  )
+}
+
+/** A window whose overage charge failed, for /admin/system. */
+export interface OverageIssue extends OverageWindowRef {
+  organizationName: string
+  overageFifths: number
+  attempts: number
+  error: string
+  updatedAt: Date
+}
+
+/** Windows whose last charge attempt failed, newest first, and how many there are in all. */
+export async function listOverageIssues(q: Queryable, limit = 20): Promise<{ total: number; windows: OverageIssue[] }> {
+  const [count, list] = await Promise.all([
+    q.query<{ total: number }>(`select count(*)::int as total from app.reply_usage u
+        where u.overage_billed_at is null and u.overage_units > 0 and u.overage_error is not null`),
+    q.query<OverageIssue & { overageFifths: string }>(
+      `select u.organization_id as "organizationId", o.name as "organizationName", u.period_start as "periodStart",
+              (u.overage_units * 5)::int::text as "overageFifths", u.overage_attempts as attempts, u.overage_error as error,
+              u.updated_at as "updatedAt"
+         from app.reply_usage u join app.organizations o on o.id = u.organization_id
+        where u.overage_billed_at is null and u.overage_units > 0 and u.overage_error is not null
+        order by u.updated_at desc limit $1`,
+      [limit],
+    ),
+  ])
+  return { total: count.rows[0]!.total, windows: list.rows.map((r) => ({ ...r, overageFifths: Number(r.overageFifths) })) }
+}

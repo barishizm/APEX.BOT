@@ -94,6 +94,19 @@ model that actually answered (after any fallback):
   overage `price_id` and quantity = blocks opened, charged immediately (so annual subscribers are not billed a year
   late). A failed overage charge follows (f).
 - Free has no overage; it upgrades instead.
+- Implemented (2026-10-21): the daily cron `/api/cron/billing-overage` (`apps/web/lib/billing/overage.ts`,
+  `CRON_SECRET` like the knowledge refresh). A window is charged once the workspace counts in another one (its end,
+  or a plan change, `alignReplyUsage`): `ceil(overage / 100)` blocks, held again to the owner's cap and
+  `OVERAGE_CAP_MAX_CENTS` (`overageBlocks`), through `createOneTimeCharge` with the key
+  `overage:<organization>:<window start>`. The window row stays locked (`for update skip locked`) from the check
+  to `overage_billed_at`, so a second or concurrent run bills nothing, and a run that died after Paddle took the
+  charge finds it by the key on the next one. Only a trialing or active subscription is charged; a canceled,
+  past_due or paused one, a missing cap or a provider error leaves the window unbilled with the reason
+  (migration 0037: `overage_error`, `overage_attempts`; `overage_billed_blocks` and `overage_transaction_id`
+  once billed), retried every run, and listed with the runs (`app.job_runs`, `billing.overage`) on
+  `/admin/system`. Each charge is audited as `billing.overage_charged`. Still open: the last window of a
+  subscription that cancels at its period end can't be charged to it (Paddle charges only a running
+  subscription), and switching overage off while a charge is unpaid ((f)) is not built.
 
 ### (d) The daily token budget stays, separate from the quota
 
