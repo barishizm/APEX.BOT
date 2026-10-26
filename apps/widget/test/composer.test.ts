@@ -76,6 +76,7 @@ Object.assign(globalThis, {
   document: win.document,
   location: win.location,
   sessionStorage: win.sessionStorage,
+  localStorage: win.localStorage,
   requestAnimationFrame: win.requestAnimationFrame.bind(win),
   cancelAnimationFrame: win.cancelAnimationFrame.bind(win),
   speechSynthesis: synth,
@@ -145,7 +146,7 @@ describe("composer", () => {
     assert.ok(notice.classList.contains("gone"), "collapses");
     assert.ok($(".dock")!.classList.contains("bare"));
     await until(() => !$(".notice"), "notice removed");
-    assert.ok(win.sessionStorage.getItem(`apex:${A.key}:conversation:notice`));
+    assert.ok(win.localStorage.getItem(`apex:${A.key}:conversation:notice`), "dismissal outlives the visit");
   });
 });
 
