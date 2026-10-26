@@ -291,7 +291,7 @@ export class Widget {
 
     // The privacy policy in one short line, dismissible for the rest of the visit
     const privacy = webUrl(cfg.privacyUrl);
-    if (privacy && !this.flag("notice")) {
+    if (privacy && !this.flag("notice", false, true)) {
       const line = h("p", {}, t.privacyPre, h("a", { href: privacy, target: "_blank", rel: "noopener noreferrer" }, t.privacyLink), t.privacyPost);
       // a narrow panel or a long translation can still cut it; the full sentence stays on hover
       line.title = line.textContent!;
@@ -475,12 +475,13 @@ export class Widget {
     setTimeout(() => teaser.remove(), still() ? 0 : 180);
   }
 
-  /** Once-per-visit markers (teaser dismissed, auto-open done, lead form handled). */
-  private flag(name: string, set?: boolean): boolean {
+  /** Once-per-visit markers (teaser dismissed, auto-open done, lead form handled); `lasting` ones survive the visit. */
+  private flag(name: string, set?: boolean, lasting?: boolean): boolean {
     const key = `${this.storageKey}:${name}`;
     try {
-      if (set) sessionStorage.setItem(key, "1");
-      return !!sessionStorage.getItem(key);
+      const store = lasting ? localStorage : sessionStorage;
+      if (set) store.setItem(key, "1");
+      return !!store.getItem(key);
     } catch {
       return !!set;
     }
@@ -590,6 +591,7 @@ export class Widget {
     this.input.value = "";
     this.autogrow();
     this.suggest.replaceChildren();
+    this.hideNotice(false);
 
     const userBubble = this.addUser(text, true, files);
     const bubble = this.addBot("", true);
@@ -1039,15 +1041,16 @@ export class Widget {
     this.errorTimer = setTimeout(() => (this.composeError.textContent = ""), 5000);
   }
 
-  private hideNotice(): void {
+  private hideNotice(refocus = true): void {
     const notice = this.notice;
     this.notice = null;
-    this.flag("notice", true);
+    // once seen and dismissed (or the visitor chatted on) it never comes back
+    this.flag("notice", true, true);
     if (!notice) return;
     notice.classList.add("gone");
     this.dock.classList.add("bare");
     setTimeout(() => notice.remove(), still() ? 0 : 260);
-    this.input.focus();
+    if (refocus) this.input.focus();
   }
 
   // ----- voice -----
