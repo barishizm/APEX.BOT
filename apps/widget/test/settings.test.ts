@@ -4,6 +4,8 @@ import { before, describe, it } from "node:test";
 import { JSDOM } from "jsdom";
 import { parseSettings, publicWidgetSettings } from "@apex/db/bot-settings";
 import { A, setup } from "../../api/test/helpers.ts";
+import { HANDOFF_LABELS } from "../../api/src/prompt.ts";
+import { strings } from "../src/i18n.ts";
 import { hiddenHere } from "../src/ui.ts";
 
 const { app, store, mailer, model, tenants } = setup();
@@ -220,5 +222,11 @@ describe("hiddenHere", () => {
     assert.equal(hiddenHere(ui, "/account/orders"), true);
     assert.equal(hiddenHere(ui, "/"), false);
     assert.equal(hiddenHere(undefined, "/checkout"), false);
+  });
+});
+
+describe("hand-off label", () => {
+  it("is the one the assistant's replies name, in every language", () => {
+    for (const [lang, t] of Object.entries(strings)) assert.equal(t.human, HANDOFF_LABELS[lang as keyof typeof HANDOFF_LABELS], lang);
   });
 });

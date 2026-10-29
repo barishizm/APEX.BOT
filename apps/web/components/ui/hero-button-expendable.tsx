@@ -4,8 +4,8 @@ import { useState, useEffect, useRef } from "react"
 import { Turnstile, TURNSTILE_SITE_KEY } from "@/components/ui/turnstile"
 import { useRouter } from "next/navigation"
 import { X, Check, ArrowRight, Clock, Languages, LifeBuoy, Eye, EyeOff } from "lucide-react"
-import { motion, AnimatePresence } from "framer-motion"
-import { GodRays, MeshGradient } from "@paper-design/shaders-react"
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion"
+import dynamic from "next/dynamic"
 import { useI18n } from "@/components/i18n/provider"
 import { format } from "@/lib/i18n"
 import { inviteTokenFromPath, safeNextPath } from "@/lib/next-path"
@@ -103,6 +103,13 @@ function PasswordInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
   )
 }
 
+// The sign-up card's moving gradient is WebGL; its code loads only when the card opens.
+const MeshGradient = dynamic(() => import("@/components/ui/mesh-gradient").then((m) => m.MeshGradient), { ssr: false })
+
+// That gradient is soft enough to draw at a fraction of the screen's pixels
+// and scale up: the shader's cost is per pixel, and the visitor is typing on top of it.
+const MESH_PIXELS = 480 * 270
+
 export default function Hero({
   modalOnly = false,
   initialAuth,
@@ -119,6 +126,7 @@ export default function Hero({
   const returnFocus = useRef<HTMLElement | null>(null)
   const [isExpanded, setIsExpanded] = useState(false)
   const [meshReady, setMeshReady] = useState(false)
+  const reduceMotion = useReducedMotion()
   const [accountType, setAccountType] = useState<"business" | "personal">("business")
   const isBusiness = accountType === "business"
   const [formStep, setFormStep] = useState<"idle" | "submitting" | "success">("idle")
@@ -375,36 +383,21 @@ export default function Hero({
       {!modalOnly && (
       <div className="relative flex min-h-[100svh] flex-col items-center justify-center overflow-hidden bg-[var(--color-surface)] px-4 sm:px-6 pb-12 pt-28 sm:pb-20 sm:pt-32">
 
-        {/* GodRays Background - Adjusted to be subtle in both modes */}
-        <div className="absolute inset-0 pointer-events-none">
-          <GodRays
-            colorBack="#00000000"
-            // Using slightly transparent grays/whites to work on both dark/light backgrounds
-            colors={["#a1a1aa40", "#e4e4e740", "#71717a40", "#52525b40"]}
-            colorBloom="#a1a1aa"
-            offsetX={0.85}
-            offsetY={-1}
-            intensity={0.5}
-            spotty={0.45}
-            midSize={10}
-            midIntensity={0}
-            density={0.38}
-            bloom={0.3}
-            speed={0.5}
-            scale={1.6}
-            frame={3332042.8159981333}
-            style={{
-              height: "100%",
-              width: "100%",
-              position: "absolute",
-              top: 0,
-              left: 0,
-            }}
-          />
-        </div>
+        {/*
+          Light rays: a still frame of @paper-design/shaders' GodRays (colorBack transparent, colors
+          #a1a1aa40 #e4e4e740 #71717a40 #52525b40, bloom #a1a1aa, offset 0.85/-1, intensity 0.5,
+          spotty 0.45, midSize 10, midIntensity 0, density 0.38, bloom 0.3, scale 1.6, frame
+          3332042.8), saved with its alpha so it sits on both themes. Drawn live, the shader cost a
+          mid-range phone most of every frame (Lighthouse mobile 40) and kept running behind the
+          sign-up card; as an image it is ~30 KB and no script.
+        */}
+        <picture aria-hidden="true">
+          <source media="(orientation: portrait)" srcSet="/marketing/hero-rays-tall.webp" />
+          <img src="/marketing/hero-rays-wide.webp" alt="" decoding="async" className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover" />
+        </picture>
 
         <div className="relative z-10 flex flex-col items-center gap-6 sm:gap-8 text-center">
-          {/* CSS-animated, not framer-motion: the headline must paint before hydration (LCP) */}
+          {/* CSS-animated, not framer-motion: the headline must paint before hydration (LCP; globals.css .hero-rise) */}
           <div
             className="hero-in inline-flex items-center rounded-full border border-zinc-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/50 px-3 py-1 text-sm font-medium text-zinc-800 dark:text-zinc-200 backdrop-blur-sm"
           >
@@ -414,7 +407,7 @@ export default function Hero({
 
           <h1
             style={{ animationDelay: "0.1s" }}
-            className="hero-in text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 max-w-4xl"
+            className="hero-rise text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 max-w-4xl"
           >
             {t.hero.titleStart}{" "}
             <span className="text-transparent bg-clip-text bg-gradient-to-br from-zinc-900 to-zinc-500 dark:from-zinc-100 dark:to-zinc-500">
@@ -424,7 +417,7 @@ export default function Hero({
 
           <p
             style={{ animationDelay: "0.2s" }}
-            className="hero-in text-base sm:text-lg md:text-xl text-zinc-600 dark:text-zinc-400 max-w-4xl px-4 leading-relaxed text-balance"
+            className="hero-rise text-base sm:text-lg md:text-xl text-zinc-600 dark:text-zinc-400 max-w-4xl px-4 leading-relaxed text-balance"
           >
             {t.hero.lede1}{" "}
             <br className="hidden md:block" />
@@ -502,7 +495,9 @@ export default function Hero({
               >
                 {meshReady && (<>
                 <MeshGradient
-                  speed={0.6}
+                  speed={reduceMotion ? 0 : 0.6}
+                  minPixelRatio={1}
+                  maxPixelCount={MESH_PIXELS}
                   colors={["#f4f4f5", "#e4e4e7", "#fafafa", "#d4d4d8"]}
                   distortion={0.8}
                   swirl={0.1}
@@ -511,7 +506,9 @@ export default function Hero({
                   className="dark:hidden" style={{ height: "100%", width: "100%" }}
                 />
                 <MeshGradient
-                  speed={0.6}
+                  speed={reduceMotion ? 0 : 0.6}
+                  minPixelRatio={1}
+                  maxPixelCount={MESH_PIXELS}
                   colors={["#3f3f46", "#27272a", "#18181b", "#52525b"]} // Zinc palette
                   distortion={0.8}
                   swirl={0.1}
