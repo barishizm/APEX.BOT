@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { geminiContent, openAIInput } from "../src/model.ts";
 import { maskPII } from "../src/pii.ts";
-import { NO_ANSWER, ReplyMarkerFilter, buildMessages, buildSystem, neutralizeTags } from "../src/prompt.ts";
+import { HANDOFF_LABELS, NO_ANSWER, ReplyMarkerFilter, buildMessages, buildSystem, neutralizeTags } from "../src/prompt.ts";
 import { KnowledgeBase } from "../src/retrieval.ts";
 import { ConversationStore } from "../src/store.ts";
 import { callerKey } from "../src/limits.ts";
@@ -123,6 +123,22 @@ describe("prompt", () => {
     const t = tenant("t", "apex_pk_t", "https://t.example");
     t.settings.blockedTopics = ["politics"];
     assert.match(buildSystem(t)[1].text, /politics/);
+  });
+
+  it("names the hand-off button by its label in each language", () => {
+    // apps/widget/test/settings.test.ts checks these against the widget's own strings
+    const rules = buildSystem(tenant("t", "apex_pk_t", "https://t.example"))[0].text;
+    for (const label of Object.values(HANDOFF_LABELS)) assert.ok(rules.includes(`"${label}"`), label);
+    // the Turkish example teaches the Turkish label, not the English one
+    const turkish = rules.split("\n").find((l) => l.includes("Bu sitede iade politikası"))!;
+    assert.match(turkish, /"Bir insanla konuş"/);
+    assert.doesNotMatch(turkish, /Talk to a human/);
+  });
+
+  it("drops every mention of the hand-off button when hand-off is off", () => {
+    const t = tenant("t", "apex_pk_t", "https://t.example");
+    t.settings.handoffEnabled = false;
+    assert.match(buildSystem(t)[1].text, /never mention a hand-off option or button/);
   });
 
   it("neutralizes our tags inside data", () => {
