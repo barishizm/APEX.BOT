@@ -5,6 +5,7 @@ import { maskPII } from "../src/pii.ts";
 import { NO_ANSWER, ReplyMarkerFilter, buildMessages, buildSystem, neutralizeTags } from "../src/prompt.ts";
 import { KnowledgeBase } from "../src/retrieval.ts";
 import { ConversationStore } from "../src/store.ts";
+import { callerKey } from "../src/limits.ts";
 import { detectLang, tokenize } from "../src/text.ts";
 import { RateLimiter } from "../src/limits.ts";
 import { OutboxMailer, ResendMailer, mailerFromEnv } from "../src/mailer.ts";
@@ -142,6 +143,14 @@ describe("prompt", () => {
 });
 
 describe("store and limits", () => {
+  it("holds a bounded number of conversations in memory, dropping the oldest", () => {
+    const store = new ConversationStore({ maxInMemory: 3 });
+    const made = [1, 2, 3, 4, 5].map(() => store.create("tn_a"));
+    assert.equal(store.get("tn_a", made[0].id), undefined);
+    assert.equal(store.get("tn_a", made[1].id), undefined);
+    for (const c of made.slice(2)) assert.equal(store.get("tn_a", c.id), c);
+  });
+
   it("sweeps conversations past retention", () => {
     let now = 0;
     const store = new ConversationStore({ now: () => now });
@@ -311,5 +320,19 @@ describe("visitor context", () => {
     assert.deepEqual(visitorContext({ page: 42, locale: "<script>", timeZone: "UTC" }, undefined), {});
     assert.deepEqual(visitorContext("nonsense", undefined), {});
     assert.equal(visitorContext({ title: "x".repeat(500) }, undefined).pageTitle!.length, 200);
+  });
+});
+
+describe("callerKey", () => {
+  it("groups an IPv6 /64 into one caller and leaves IPv4 alone", () => {
+    assert.equal(callerKey("203.0.113.9"), "203.0.113.9");
+    assert.equal(callerKey("::ffff:203.0.113.9"), "203.0.113.9");
+    const a = callerKey("2001:db8:1:2:aaaa:bbbb:cccc:dddd");
+    assert.equal(a, "2001:0db8:0001:0002::/64");
+    assert.equal(callerKey("2001:db8:1:2::1"), a);
+    assert.equal(callerKey("2001:DB8:1:2:ffff:ffff:ffff:ffff"), a);
+    assert.notEqual(callerKey("2001:db8:1:3::1"), a);
+    assert.equal(callerKey("::1"), "0000:0000:0000:0000::/64");
+    assert.equal(callerKey("unknown"), "unknown");
   });
 });

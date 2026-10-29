@@ -37,6 +37,7 @@ import { BillingError, type BillingEvent, type BillingProvider } from "./types.t
 export const MAX_BODY_BYTES = 256 * 1024
 /** Per sending address; Paddle sends from a handful of addresses, a few events per change. */
 export const WEBHOOK_RATE_LIMIT: RateLimit = { max: 300, windowSeconds: 60 }
+export const INVALID_SIGNATURE_RATE_LIMIT: RateLimit = { max: 30, windowSeconds: 60 }
 /** Paddle wants an answer within 5 seconds; the rest of the work moves after the response. */
 export const PROCESS_BUDGET_MS = 4000
 
@@ -119,12 +120,6 @@ export async function handleBillingWebhook(request: Request, deps: WebhookDeps):
   if (request.method !== "POST") return json(405, { error: "method_not_allowed" }, { Allow: "POST" })
   if (Number(request.headers.get("content-length") ?? 0) > MAX_BODY_BYTES) return json(413, { error: "too_large" })
 
-  const over = await hitRateLimit(deps.db, `billing-webhook:${deps.ip ?? "unknown"}`, deps.rateLimit ?? WEBHOOK_RATE_LIMIT)
-  if (over) {
-    log("warn", "rate limited", { ip: deps.ip })
-    return json(429, { error: "rate_limited" }, { "Retry-After": String(over.retryAfterSeconds) })
-  }
-
   // without the secret nothing can be verified; a 5xx makes the provider retry once billing is on
   const provider = deps.provider
   if (!provider) return json(503, { error: "billing_disabled" })
@@ -133,7 +128,20 @@ export async function handleBillingWebhook(request: Request, deps: WebhookDeps):
   if (raw === null) return json(413, { error: "too_large" })
   if (!provider.verifyWebhook(raw, request.headers, now())) {
     log("warn", "invalid signature", { ip: deps.ip })
+    // Unsigned traffic is counted on its own, per address, so it can never use up the limit for
+    // Paddle's signed deliveries (and with no known address there is no shared bucket to fill)
+    if (deps.ip) {
+      const over = await hitRateLimit(deps.db, `billing-webhook-invalid:${deps.ip}`, INVALID_SIGNATURE_RATE_LIMIT)
+      if (over) return json(429, { error: "rate_limited" }, { "Retry-After": String(over.retryAfterSeconds) })
+    }
     return json(401, { error: "invalid_signature" })
+  }
+
+  // signed deliveries share one limit, so a misbehaving sender can't flood the inbox
+  const over = await hitRateLimit(deps.db, `billing-webhook:${deps.ip ?? "paddle"}`, deps.rateLimit ?? WEBHOOK_RATE_LIMIT)
+  if (over) {
+    log("warn", "rate limited", { ip: deps.ip })
+    return json(429, { error: "rate_limited" }, { "Retry-After": String(over.retryAfterSeconds) })
   }
 
   let payload: unknown

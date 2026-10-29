@@ -219,7 +219,9 @@ export async function requestMeta(): Promise<RequestMeta> {
   const h = await headers()
   // Only the rightmost X-Forwarded-For entries (added by our proxies) are trustworthy; the rest
   // is client-supplied. TRUST_PROXY is the number of proxy hops in front of the app.
-  const trusted = Number(process.env.TRUST_PROXY === "true" ? 1 : process.env.TRUST_PROXY ?? 0)
+  // On Vercel the edge is one hop and replaces a client's X-Forwarded-For, so it is trusted without being
+  // configured; leaving TRUST_PROXY unset there would otherwise turn every per-IP limit and block off.
+  const trusted = Number(process.env.TRUST_PROXY === "true" ? 1 : process.env.TRUST_PROXY ?? (process.env.VERCEL ? 1 : 0))
   const hops = (h.get("x-forwarded-for") ?? "").split(",").map((v) => v.trim()).filter(Boolean)
   const forwarded = Number.isInteger(trusted) && trusted > 0 ? hops[hops.length - trusted] : undefined
   // Vercel's edge sets this header itself (a client's copy is replaced); elsewhere it would be client-supplied

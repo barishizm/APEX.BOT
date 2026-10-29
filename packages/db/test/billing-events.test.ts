@@ -212,6 +212,16 @@ describe("applyBillingEvent: when plan changes take effect", () => {
     assert.equal(await planOf(org), "starter")
   })
 
+  test("a downgrade that also switches the billing interval applies at once (Paddle prorates and credits it)", async () => {
+    const org = await workspaceIn("active", "business")
+    await apply(subEvent(org, "subscription.updated", at(5), { plan: "starter", interval: "year", currentPeriodStart: at(5), currentPeriodEnd: at(370) }))
+    const stored = await getSubscription(db, org)
+    assert.equal(stored?.plan, "starter")
+    assert.equal(stored?.interval, "year")
+    assert.equal(stored?.scheduledChange, null)
+    assert.equal(await planOf(org), "starter")
+  })
+
   test("a due downgrade applies even when the renewal's webhook is lost", async () => {
     const org = await workspaceIn("active", "business")
     await apply(subEvent(org, "subscription.updated", at(5), { plan: "pro" }))

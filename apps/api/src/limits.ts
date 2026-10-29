@@ -1,6 +1,24 @@
 // Abuse and cost guards: fixed-window rate limits and a daily token budget per tenant.
 // shortcut: in-process counters; move to Redis once the API runs on more than one instance.
 
+/**
+ * What a rate limit counts as one caller: an IPv4 address as is, an IPv6 address as its /64 (one
+ * subscriber holds a whole /64, so per-address counting would give an attacker endless keys).
+ * IPv4-mapped IPv6 addresses count as the IPv4 address.
+ */
+export function callerKey(ip: string): string {
+  const mapped = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i.exec(ip);
+  if (mapped) return mapped[1];
+  if (!ip.includes(":")) return ip;
+  const zone = ip.split("%")[0].toLowerCase();
+  const [head, tail] = zone.split("::");
+  const front = head ? head.split(":") : [];
+  const back = tail !== undefined && tail ? tail.split(":") : [];
+  const groups = tail === undefined ? front : [...front, ...Array(Math.max(0, 8 - front.length - back.length)).fill("0"), ...back];
+  if (groups.length !== 8 || groups.some((g) => !/^[0-9a-f]{1,4}$/.test(g))) return ip;
+  return `${groups.slice(0, 4).map((g) => g.padStart(4, "0")).join(":")}::/64`;
+}
+
 export class RateLimiter {
   private windows = new Map<string, { start: number; count: number }>();
 

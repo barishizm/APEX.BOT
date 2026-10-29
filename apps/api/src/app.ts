@@ -9,7 +9,7 @@ import type { Limits } from "./config.ts";
 import { FEATURE_FLAGS, type FeatureFlag } from "@apex/db/flags";
 import { replyFifths } from "@apex/db/bot-settings";
 import { replyWindow } from "@apex/db/plans";
-import { RateLimiter, ReplyQuota, TokenBudget, type ReplyUsageStore, type TokenUsageStore } from "./limits.ts";
+import { callerKey, RateLimiter, ReplyQuota, TokenBudget, type ReplyUsageStore, type TokenUsageStore } from "./limits.ts";
 import { log } from "./log.ts";
 import type { Mailer } from "./mailer.ts";
 import type { ChatModel } from "./model.ts";
@@ -206,7 +206,7 @@ export function createApp(deps: AppDeps) {
 
   /** Rate limit for routes addressed by a conversation id. */
   const lookup = (c: Context<Env>) => {
-    const check = lookupLimiter.hit(`lookup:${deps.clientIp(c)}`);
+    const check = lookupLimiter.hit(`lookup:${callerKey(deps.clientIp(c))}`);
     return check.ok ? null : fail(c, "rate_limited", 429, check.retryAfter);
   };
 
@@ -226,7 +226,7 @@ export function createApp(deps: AppDeps) {
     if (!message && !attachments.length) return fail(c, "bad_request", 400);
     if (message.length > (tenant.limits?.maxMessageChars ?? limits.maxMessageChars)) return fail(c, "message_too_long", 413);
 
-    const ip = deps.clientIp(c);
+    const ip = callerKey(deps.clientIp(c));
     // a tenant's own per-visitor limit is counted under its own key
     const ipCheck = tenant.limits?.ipMessagesPerMinute
       ? ipLimiter.hit(`ip:${tenant.id}:${ip}`, tenant.limits.ipMessagesPerMinute)
@@ -291,6 +291,15 @@ export function createApp(deps: AppDeps) {
       await stream.writeSSE({ event: "meta", data: JSON.stringify({ conversationId: conv.id, messageId: userMessage.id }) });
 
       let answer = "";
+      // The provider's usage arrives with the last event, which an aborted or failed stream never sends.
+      // Providers still bill that work, so the budget takes a ~4 characters per token estimate instead.
+      let charged = false;
+      const chargeEstimate = () => {
+        if (charged) return;
+        charged = true;
+        const input = Math.ceil((JSON.stringify(request.system).length + JSON.stringify(request.messages).length) / 4);
+        budget.record(tenant.id, { input, output: Math.ceil(answer.length / 4) });
+      };
       const markers = new ReplyMarkerFilter();
       const emit = async (text: string) => {
         if (!text) return;
@@ -303,6 +312,7 @@ export function createApp(deps: AppDeps) {
             await emit(markers.push(event.text));
             continue;
           }
+          charged = true;
           budget.record(tenant.id, { input: event.inputTokens, output: event.outputTokens });
           if (event.refused) {
             log("warn", "model refused", { tenant: tenant.id, conversation: conv.id });
@@ -315,12 +325,14 @@ export function createApp(deps: AppDeps) {
           if (quota) replies.record(quota.organizationId, quota.period, replyFifths(by?.provider ?? "", by?.id ?? ""), quota.overage);
         }
       } catch (error) {
+        chargeEstimate();
         if (abort.signal.aborted) return;
         log("error", "model stream failed", { tenant: tenant.id, conversation: conv.id, error });
         await stream.writeSSE({ event: "error", data: JSON.stringify({ code: "upstream" satisfies ErrorCode }) });
         return;
       }
 
+      if (abort.signal.aborted) chargeEstimate();
       await emit(markers.flush());
       // Retrieval passes whatever is close to the message; only the model knows whether it answered,
       // and from which excerpts. So the gap is reported by its marker, and the sources are the pages
@@ -359,7 +371,7 @@ export function createApp(deps: AppDeps) {
     const note = text(body.message, 2000);
     if (!address) return fail(c, "bad_request", 400);
 
-    const limit = handoffLimiter.hit(`handoff:${deps.clientIp(c)}`);
+    const limit = handoffLimiter.hit(`handoff:${callerKey(deps.clientIp(c))}`);
     if (!limit.ok) return fail(c, "rate_limited", 429, limit.retryAfter);
     const mailLimit = mailAllowed(tenant);
     if (!mailLimit.ok) {
@@ -396,7 +408,7 @@ export function createApp(deps: AppDeps) {
     if (!address) return fail(c, "bad_request", 400);
     if (phone && !PHONE.test(phone)) return fail(c, "bad_request", 400);
 
-    const limit = handoffLimiter.hit(`lead:${deps.clientIp(c)}`);
+    const limit = handoffLimiter.hit(`lead:${callerKey(deps.clientIp(c))}`);
     if (!limit.ok) return fail(c, "rate_limited", 429, limit.retryAfter);
 
     const conversationId = idOf(body.conversationId);

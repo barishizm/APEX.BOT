@@ -54,7 +54,11 @@ export interface StoreOptions {
   /** Which tenants are persisted (dashboard bots); JSON-file tenants stay in memory. */
   persists?: (tenantId: string) => boolean;
   onError?: (error: unknown, conversationId: string) => void;
+  /** Most conversations held in memory at once; past it the oldest go (persisted ones reload on demand). */
+  maxInMemory?: number;
 }
+
+const DEFAULT_MAX_IN_MEMORY = 50_000;
 
 export class ConversationStore {
   private items = new Map<string, Conversation>();
@@ -108,9 +112,20 @@ export class ConversationStore {
       ...(origin ? { origin } : {}),
       ...(context && Object.keys(context).length ? { context } : {}),
     };
+    this.makeRoom();
     this.items.set(this.key(tenantId, conversation.id), conversation);
     this.write(conversation, (p) => p.created(conversation));
     return conversation;
+  }
+
+  // Anonymous callers can start conversations faster than retention sweeps them, so memory has a ceiling:
+  // the oldest entries (Map order is insertion order) make room. Persisted ones come back via getOrLoad.
+  private makeRoom(): void {
+    const max = this.options.maxInMemory ?? DEFAULT_MAX_IN_MEMORY;
+    for (const key of this.items.keys()) {
+      if (this.items.size < max) break;
+      this.items.delete(key);
+    }
   }
 
   /** In memory only. */
@@ -129,6 +144,7 @@ export class ConversationStore {
     // another request may have loaded it meanwhile
     const again = this.get(tenantId, id);
     if (again) return again;
+    this.makeRoom();
     this.items.set(this.key(tenantId, id), loaded);
     return loaded;
   }

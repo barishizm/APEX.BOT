@@ -34,6 +34,7 @@ export const LOGIN_FAIL_LIMIT = { emailAndIp: 10, email: 100, ip: 50 }
 // Outbound verification mail caps, so register/resend can't be used to mail arbitrary addresses
 const SIGNUP_LIMIT = { perIp: 5, windowMinutes: 60 }
 const CODE_SEND_LIMIT = { perUser: 5, perIp: 15, windowMinutes: 60 }
+const RESET_SEND_LIMIT = { perUser: 5, perIp: 15, windowMinutes: 60 }
 export const TERMS_VERSION = "2026-10"
 export const COMPANY_SIZES = ["1-50", "51-200", "201-1000", "1000+"] as const
 
@@ -224,7 +225,7 @@ async function assertCodeGuessesLeft(q: Queryable, userId: string, event: "verif
 // Throws when the caller (by IP, and by account for code mail) has triggered too many events recently.
 async function assertEventBudget(
   q: Queryable,
-  event: "register" | "code_sent",
+  event: "register" | "code_sent" | "reset_requested",
   ip: string | null,
   userId: string | null,
   limit: { perIp: number; perUser?: number; windowMinutes: number },
@@ -247,6 +248,13 @@ async function assertEventBudget(
     const secs = limit.windowMinutes * 60
     throw new AuthError("too_many_attempts", "Too many requests. Try again later", secs)
   }
+}
+
+/** Throws while the last code to this account is younger than the resend cooldown. */
+function assertResendCooldown(lastCodeAt: Date | null) {
+  if (!lastCodeAt) return
+  const wait = Math.ceil(CODE_RESEND_SECONDS - (Date.now() - lastCodeAt.getTime()) / 1000)
+  if (wait > 0) throw new AuthError("too_many_attempts", `Wait ${wait}s before requesting another code`, wait)
 }
 
 function uniqueViolation(err: unknown): string | null {
@@ -437,6 +445,10 @@ export async function login(
   }
 
   return db.transaction(async (tx) => {
+    // A reset or takeover may have landed while the password was being checked: the hash that
+    // was verified must still be the account's, or the session would outlive the credential change
+    const current = await tx.query<{ password_hash: string | null }>("select password_hash from app.users where id = $1 for update", [row.id])
+    if (current.rows[0]?.password_hash !== row.password_hash) throw new AuthError("invalid_credentials", "Incorrect email or password")
     const result = await signIn(tx, toUser(row), input.remember === true, meta)
     if (result.session) await tx.query("update app.users set last_login_at = now() where id = $1", [row.id])
     return result
@@ -555,27 +567,24 @@ export async function issueEmailCode(
   input: { email?: unknown } = {},
   meta: RequestMeta = {},
 ): Promise<{ code: string; email: string }> {
-  const { rows } = await db.query<UserRow & { last_code_at: Date | null }>(
-    `select ${USER_COLUMNS},
-            (select max(created_at) from app.verification_codes c where c.user_id = u.id and c.purpose = 'email_verify') as last_code_at
-       from app.users u where u.id = $1`,
-    [userId],
-  )
+  const { rows } = await db.query<UserRow>(`select ${USER_COLUMNS} from app.users u where u.id = $1`, [userId])
   const row = rows[0]
   if (!row) throw new AuthError("unauthorized", "Log in again")
   const target = input.email === undefined || input.email === "" ? row.email : normalizeEmail(input.email)
   const verified = row.email_verified_at !== null
   if (verified && target === row.email) throw new AuthError("already_verified", "This email is already verified")
 
-  if (row.last_code_at) {
-    const wait = Math.ceil(CODE_RESEND_SECONDS - (Date.now() - row.last_code_at.getTime()) / 1000)
-    if (wait > 0) throw new AuthError("too_many_attempts", `Wait ${wait}s before requesting another code`, wait)
-  }
-
-  await assertEventBudget(db, "code_sent", cleanIp(meta.ip), userId, CODE_SEND_LIMIT)
-
   return db
     .transaction(async (tx) => {
+      // The user row is the lock for this account's mail budget: parallel requests queue here and
+      // see each other's code, so the cooldown and the hourly cap hold under a burst
+      await tx.query("select 1 from app.users where id = $1 for update", [userId])
+      const last = await tx.query<{ at: Date | null }>(
+        "select max(created_at) as at from app.verification_codes where user_id = $1 and purpose = 'email_verify'",
+        [userId],
+      )
+      assertResendCooldown(last.rows[0].at)
+      await assertEventBudget(tx, "code_sent", cleanIp(meta.ip), userId, CODE_SEND_LIMIT)
       if (target !== row.email) {
         if (verified) {
           const taken = await tx.query("select 1 from app.users where email = $1", [target])
@@ -764,19 +773,18 @@ export async function oauthLogin(
 export async function requestPasswordReset(db: Db, rawEmail: unknown, meta: RequestMeta = {}): Promise<{ email: string; code: string } | null> {
   const email = normalizeEmail(rawEmail)
   await assertNotBlocked(db, meta, email)
-  const { rows } = await db.query<{ id: string; last_code_at: Date | null }>(
-    `select u.id,
-            (select max(created_at) from app.verification_codes c where c.user_id = u.id and c.purpose = 'password_reset') as last_code_at
-       from app.users u where u.email = $1`,
-    [email],
-  )
+  const { rows } = await db.query<{ id: string }>("select u.id from app.users u where u.email = $1", [email])
   const row = rows[0]
   if (!row) return null
-  if (row.last_code_at) {
-    const wait = Math.ceil(CODE_RESEND_SECONDS - (Date.now() - row.last_code_at.getTime()) / 1000)
-    if (wait > 0) throw new AuthError("too_many_attempts", `Wait ${wait}s before requesting another code`, wait)
-  }
   return db.transaction(async (tx) => {
+    // the user row serializes this account's requests, so the cooldown and hourly caps hold under a burst
+    await tx.query("select 1 from app.users where id = $1 for update", [row.id])
+    const last = await tx.query<{ at: Date | null }>(
+      "select max(created_at) as at from app.verification_codes where user_id = $1 and purpose = 'password_reset'",
+      [row.id],
+    )
+    assertResendCooldown(last.rows[0].at)
+    await assertEventBudget(tx, "reset_requested", cleanIp(meta.ip), row.id, RESET_SEND_LIMIT)
     const code = await insertCode(tx, row.id, email, "password_reset")
     await logEvent(tx, "reset_requested", meta, row.id, email)
     return { email, code }
@@ -799,7 +807,7 @@ async function unproven(tx: Queryable, userId: string): Promise<boolean> {
   return rows[0]?.unproven ?? false
 }
 
-/** The owner just proved the address: drop the registrant's sessions and authenticator, so they can't lock the owner out. */
+/** The owner just proved the address: drop the registrant's sessions, authenticator, added people and open invitations, so they can't lock the owner out. */
 async function dropRegistrantAccess(tx: Queryable, userId: string) {
   await tx.query(
     "update app.users set email_verified_by_staff_at = null, totp_secret = null, totp_enabled_at = null, totp_last_step = null where id = $1",
@@ -808,6 +816,27 @@ async function dropRegistrantAccess(tx: Queryable, userId: string) {
   await tx.query("delete from app.sessions where user_id = $1", [userId])
   await tx.query("delete from app.recovery_codes where user_id = $1", [userId])
   await tx.query("delete from app.login_challenges where user_id = $1", [userId])
+  // the registrant's added people and open invitations go too (owners stay: their say is the owner's to revoke)
+  const removed = await tx.query<{ user_id: string; organization_id: string }>(
+    `delete from app.organization_members m
+      where m.user_id <> $1 and m.role <> 'owner'
+        and exists (select 1 from app.organization_members me where me.organization_id = m.organization_id and me.user_id = $1 and me.role = 'owner')
+      returning m.user_id, m.organization_id`,
+    [userId],
+  )
+  for (const r of removed.rows) {
+    await tx.query("update app.users set active_organization_id = null where id = $1 and active_organization_id = $2", [r.user_id, r.organization_id])
+  }
+  // people leaving change which hand-off addresses are verified: the chat API reloads these workspaces' bots
+  for (const orgId of new Set(removed.rows.map((r) => r.organization_id))) {
+    await tx.query("update app.bots set updated_at = now() where organization_id = $1", [orgId])
+  }
+  await tx.query(
+    `delete from app.organization_invitations i
+      where i.accepted_at is null
+        and exists (select 1 from app.organization_members me where me.organization_id = i.organization_id and me.user_id = $1 and me.role = 'owner')`,
+    [userId],
+  )
 }
 
 export async function resetPassword(
@@ -1146,6 +1175,9 @@ export async function completeTwoFactorLogin(
       await tx.query("delete from app.login_challenges where id = $1", [challenge.id])
       return { error: new AuthError("too_many_attempts", "Too many incorrect codes. Log in again") }
     }
+    // challenges are locked one by one, so the account's guess budget is counted under the user row:
+    // parallel challenges queue here and each sees the failures of the ones before it
+    await tx.query("select 1 from app.users where id = $1 for update", [challenge.user_id])
     try {
       await assertCodeGuessesLeft(tx, challenge.user_id, "two_factor_failed")
     } catch (error) {

@@ -90,6 +90,15 @@ describe("safeFetch", () => {
 });
 
 describe("robots.txt and sitemaps", () => {
+  it("caps the rules it reads so matching stays cheap", () => {
+    const many = Array.from({ length: 5000 }, (_, i) => `Disallow: /r${i}/`).join("\n");
+    const robots = parseRobots(`User-agent: *\n${many}`);
+    assert.equal(robots.isAllowed("/r0/x"), false);
+    assert.equal(robots.isAllowed("/r4999/x"), true, "rules past the cap are ignored");
+    const longAllow = parseRobots(`User-agent: *\nDisallow: /a\nAllow: /a${"b".repeat(600)}`);
+    assert.equal(longAllow.isAllowed(`/a${"b".repeat(600)}`), false, "an over-long Allow does not open a Disallow");
+  });
+
   it("matches wildcard rules and sitemap locs in linear time", () => {
     const start = Date.now();
     const robots = parseRobots("User-agent: *\nDisallow: /*a*a*a*a*a*ab\nDisallow: /*.pdf$");

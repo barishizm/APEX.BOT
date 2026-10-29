@@ -1,6 +1,6 @@
 import type { Db, Queryable } from "./db.ts"
 import { AuthError, normalizeEmail } from "./auth.ts"
-import { canEditBot, membership, type MemberRole } from "./bots.ts"
+import { canEditBot, membership, touchWorkspaceBots, type MemberRole } from "./bots.ts"
 import { newSessionToken, sha256 } from "./crypto.ts"
 
 export const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000
@@ -108,6 +108,21 @@ async function memberActor(q: Queryable, userId: string): Promise<TeamActor> {
   return { organizationId: me.organization_id, workspaceName: me.name, role: me.role, userId }
 }
 
+/**
+ * Locks the workspace and reads the actor's role again under the lock: the role a request started
+ * with may be gone by the time it is this actor's turn (a concurrent demotion or removal).
+ */
+async function lockWorkspace(tx: Queryable, actor: TeamActor): Promise<TeamActor> {
+  await tx.query("select 1 from app.organizations where id = $1 for update", [actor.organizationId])
+  if (actor.userId === null) return actor
+  const { rows } = await tx.query<{ role: MemberRole }>("select role from app.organization_members where organization_id = $1 and user_id = $2", [
+    actor.organizationId,
+    actor.userId,
+  ])
+  if (!rows[0]) throw new AuthError("forbidden", "You are no longer in this workspace")
+  return { ...actor, role: rows[0].role }
+}
+
 /** Platform staff acting on a workspace. Staff only: check the caller's platform role first. */
 async function staffActor(q: Queryable, organizationId: unknown): Promise<TeamActor> {
   if (typeof organizationId !== "string" || !UUID.test(organizationId)) throw new AuthError("not_found", "Workspace not found")
@@ -145,7 +160,10 @@ async function issueInvite(
 ): Promise<{ invite: TeamInvite; token: string; workspaceName: string }> {
   return db.transaction(async (tx) => {
     // serializes invitations so the limits hold
-    await tx.query("select 1 from app.organizations where id = $1 for update", [actor.organizationId])
+    const now = await lockWorkspace(tx, actor)
+    if (!canEditBot(now.role) || (role === "admin" && now.role !== "owner")) {
+      throw new AuthError("forbidden", "Only workspace owners and admins can invite people")
+    }
     const { rows } = await tx.query<{ member: boolean; people: number; today: number }>(
       `select exists (select 1 from app.organization_members m join app.users u on u.id = m.user_id
                        where m.organization_id = $1 and u.email = $2) as member,
@@ -337,13 +355,15 @@ async function changeMemberRoleAs(db: Db, actor: TeamActor, targetUserId: unknow
   const role = rawRole as MemberRole
   if (actor.role !== "owner") throw new AuthError("forbidden", "Only owners can change roles")
   return db.transaction(async (tx) => {
-    await tx.query("select 1 from app.organizations where id = $1 for update", [actor.organizationId])
+    if ((await lockWorkspace(tx, actor)).role !== "owner") throw new AuthError("forbidden", "Only owners can change roles")
     const current = await memberRole(tx, actor.organizationId, targetUserId)
     if (current === role) return { before: current, after: role }
     if (current === "owner" && (await otherOwners(tx, actor.organizationId, targetUserId as string)) === 0) {
       throw new AuthError("conflict", "A workspace needs an owner. Make someone else an owner first")
     }
     await tx.query("update app.organization_members set role = $3 where organization_id = $1 and user_id = $2", [actor.organizationId, targetUserId, role])
+    // a demoted admin's address stops being a verified hand-off address: the chat API must reload the bots
+    await touchWorkspaceBots(tx, actor.organizationId)
     return { before: current, after: role }
   })
 }
@@ -360,7 +380,9 @@ export async function removeMember(db: Db, userId: string, targetUserId: unknown
 async function removeMemberAs(db: Db, actor: TeamActor, targetUserId: unknown): Promise<{ left: boolean; role: MemberRole }> {
   const left = actor.userId !== null && targetUserId === actor.userId
   return db.transaction(async (tx) => {
-    await tx.query("select 1 from app.organizations where id = $1 for update", [actor.organizationId])
+    // a member leaving needs no authority beyond their own row, which memberRole checks below
+    if (!left) actor = await lockWorkspace(tx, actor)
+    else await tx.query("select 1 from app.organizations where id = $1 for update", [actor.organizationId])
     const target = await memberRole(tx, actor.organizationId, targetUserId)
     const id = targetUserId as string
     if (!left && !(actor.role === "owner" || (actor.role === "admin" && target === "member"))) {
@@ -378,6 +400,8 @@ async function removeMemberAs(db: Db, actor: TeamActor, targetUserId: unknown): 
     }
     await tx.query("delete from app.organization_members where organization_id = $1 and user_id = $2", [actor.organizationId, id])
     await tx.query("update app.users set active_organization_id = null where id = $1 and active_organization_id = $2", [id, actor.organizationId])
+    // the chat API mails hand-offs to a verified member's address: it must reload the bots to stop using this one
+    await touchWorkspaceBots(tx, actor.organizationId)
     return { left, role: target }
   })
 }
@@ -386,7 +410,7 @@ async function removeMemberAs(db: Db, actor: TeamActor, targetUserId: unknown): 
 async function transferOwnershipAs(db: Db, actor: TeamActor, targetUserId: unknown): Promise<{ previousOwners: string[]; owner: string; before: MemberRole }> {
   if (actor.role !== "owner") throw new AuthError("forbidden", "Only owners can hand over the workspace")
   return db.transaction(async (tx) => {
-    await tx.query("select 1 from app.organizations where id = $1 for update", [actor.organizationId])
+    if ((await lockWorkspace(tx, actor)).role !== "owner") throw new AuthError("forbidden", "Only owners can hand over the workspace")
     const before = await memberRole(tx, actor.organizationId, targetUserId)
     const id = targetUserId as string
     const owners = await tx.query<{ user_id: string }>(

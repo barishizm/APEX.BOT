@@ -48,6 +48,24 @@ export function makeDocx(paragraphs: { text: string; style?: string; list?: bool
   });
 }
 
+describe("document extraction limits", () => {
+  it("reads a .docx full of unclosed paragraph tags in linear time", async () => {
+    const xml = `<?xml version="1.0"?><w:document xmlns:w="w"><w:body>${"<w:p ".repeat(60_000)}</w:body></w:document>`;
+    const docx = zipSync({ "word/document.xml": strToU8(xml), "docProps/core.xml": strToU8("<cp:coreProperties/>") });
+    const started = Date.now();
+    const page = await extractDocument(docx, "docx", "", "x");
+    assert.deepEqual(page.sections, []);
+    assert.ok(Date.now() - started < 1000, `took ${Date.now() - started} ms`);
+  });
+
+  it("still finds paragraphs next to look-alike tags", async () => {
+    const xml = `<w:document><w:body><w:pPr/><w:p><w:r><w:t>one</w:t></w:r></w:p><w:p w:rsid="1"><w:r><w:t>two</w:t></w:r></w:p></w:body></w:document>`;
+    const docx = zipSync({ "word/document.xml": strToU8(xml) });
+    const page = await extractDocument(docx, "docx", "", "x");
+    assert.equal(page.sections[0].text, "one\ntwo");
+  });
+});
+
 describe("documents", () => {
   it("tells documents apart by content, not just by name", () => {
     assert.equal(documentKind(makePdf([["x"]]), "anything.bin"), "pdf");
