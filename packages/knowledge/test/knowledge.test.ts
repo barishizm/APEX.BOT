@@ -175,6 +175,66 @@ describe("extractPage", () => {
     assert.ok(!page.links.some((l) => l.startsWith("mailto:")));
     assert.equal(page.noindex, false);
   });
+
+  const text = (html: string) => extractPage(`<html><body><main>${html}</main></body></html>`, "https://shop.example/faq").sections;
+  const all = (html: string) => text(html).map((s) => s.text).join("\n");
+
+  it("keeps collapsed accordion and tab panels with their questions", () => {
+    const sections = text(`
+      <h2>Shipping</h2>
+      <h3><button aria-expanded="false" aria-controls="a1">How long does delivery take?<svg></svg></button></h3>
+      <div id="a1" role="region" hidden>Orders arrive within 3-5 business days across Europe.</div>
+      <h3><button aria-expanded="false" aria-controls="a2">Can I return an item?</button></h3>
+      <div id="a2" aria-hidden="true">Returns are free within 30 days of delivery.</div>
+      <div role="tablist"><button role="tab" aria-controls="t1">Care</button></div>
+      <div id="t1" role="tabpanel" hidden>Wash the cover at 30 degrees.</div>
+      <div hidden="until-found">Our phone line is open 9-18 on weekdays.</div>`);
+    const delivery = sections.find((s) => s.text.includes("3-5 business days"));
+    assert.equal(delivery?.heading, "How long does delivery take?");
+    assert.equal(sections.find((s) => s.text.includes("30 days"))?.heading, "Can I return an item?");
+    const body = sections.map((s) => s.text).join("\n");
+    assert.match(body, /Care Wash the cover at 30 degrees\./);
+    assert.match(body, /open 9-18 on weekdays/);
+  });
+
+  it("keeps the questions of accordions whose panels are open in the markup", () => {
+    const sections = text(`<h2 class="accordion-header"><button class="accordion-button" aria-expanded="true" aria-controls="c1">Do you ship to Norway?</button></h2>
+      <div id="c1" class="accordion-collapse collapse show">Yes, with a 10 € surcharge.</div>`);
+    assert.equal(sections.find((s) => s.text.includes("10 €"))?.heading, "Do you ship to Norway?");
+  });
+
+  it("still drops hidden menus, dialogs, carousel clones, decorative text and plain buttons", () => {
+    const body = all(`
+      <p>Handmade mugs, glazed and fired in our studio in Izmir.</p>
+      <button aria-expanded="false" aria-controls="m">Menu</button>
+      <div id="m" hidden><a href="/a">Mugs</a> <a href="/b">Plates</a> <a href="/c">Bowls</a></div>
+      <button aria-expanded="false" aria-controls="d">Size guide</button>
+      <div id="d" role="dialog" hidden>Secret dialog text</div>
+      <div role="tabpanel" class="slick-slide slick-cloned" aria-hidden="true">Cloned quote</div>
+      <span aria-hidden="true">Decorative marquee</span>
+      <div hidden>Something went wrong</div>
+      <button>Add to cart</button>`);
+    assert.match(body, /Handmade mugs/);
+    assert.doesNotMatch(body, /Menu|Mugs|Plates|Size guide|Secret|Cloned|Decorative|went wrong|Add to cart/);
+  });
+
+  it("writes data tables one row per line, keyed by column header", () => {
+    const body = all(`<table><caption>Plans</caption><thead><tr><th>Plan</th><th>Price</th><th>Replies</th></tr></thead>
+      <tbody><tr><td>Starter</td><td>€19/month</td><td>1,000</td></tr><tr><td>Pro</td><td>€49/month</td><td></td></tr></tbody></table>
+      <table><tr><th>Weight</th><td>2 kg</td></tr><tr><th>Colour</th><td>Blue</td></tr></table>
+      <table><tr><td>A</td><td>B</td><td>C</td></tr></table>
+      <dl><dt>Delivery</dt><dd>3-5 days</dd><dt>Returns</dt><dt>Exchanges</dt><dd>30 days</dd></dl>`);
+    assert.match(body, /Plans\n- Plan: Starter; Price: €19\/month; Replies: 1,000\n- Plan: Pro; Price: €49\/month\n/);
+    assert.match(body, /- Weight: 2 kg\n- Colour: Blue/);
+    assert.match(body, /- A \| B \| C/);
+    assert.match(body, /- Delivery: 3-5 days\n- Returns, Exchanges: 30 days/);
+  });
+
+  it("walks layout tables like any other container", () => {
+    const sections = text(`<table><tr><td><h2>About us</h2><p>Family run since 1982.</p></td><td><h2>Visit</h2><p>Open Monday to Saturday.</p></td></tr></table>`);
+    assert.equal(sections.find((s) => s.text.includes("1982"))?.heading, "About us");
+    assert.equal(sections.find((s) => s.text.includes("Saturday"))?.heading, "Visit");
+  });
 });
 
 describe("chunking", () => {
