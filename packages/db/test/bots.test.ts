@@ -18,6 +18,7 @@ import {
   rotateSiteKey,
   saveBotSettings,
   startHandoffVerification,
+  HANDOFF_CODES_PER_WORKSPACE_PER_DAY,
   UNSAVED_BOT_ID,
 } from "../src/bots.ts"
 import { addTextSource, listSources } from "../src/knowledge.ts"
@@ -44,7 +45,7 @@ before(async () => {
   await migrate(db)
 })
 after(() => db.close())
-beforeEach(() => db.query("truncate app.users, app.organizations, app.auth_events cascade").then(() => {}))
+beforeEach(() => db.query("truncate app.users, app.organizations, app.auth_events, app.mail_sends cascade").then(() => {}))
 
 async function newUser(email = "owner@example.com", username = "owner", company = "Crest Cycles") {
   const { user } = await register(db, {
@@ -248,6 +249,13 @@ describe("bots", () => {
     const again = structuredClone(saved.settings)
     again.handoff.email = "someone-else@example.org"
     await assert.rejects(saveBotSettings(db, user.id, again, saved.version), BotSettingsError)
+  })
+
+  test("the workspace's daily allowance of hand-off codes survives deleting websites", async () => {
+    const user = await newUser()
+    const bot = await getBotForUser(db, user.id)
+    await db.query("insert into app.mail_sends (kind, scope) select 'handoff_code', $1 from generate_series(1, $2)", [bot.organizationId, HANDOFF_CODES_PER_WORKSPACE_PER_DAY])
+    await assert.rejects(startHandoffVerification(db, user.id, "victim@example.org"), (e: unknown) => e instanceof BotError && e.code === "rate_limited")
   })
 
   test("a code stops working after too many wrong guesses", async () => {

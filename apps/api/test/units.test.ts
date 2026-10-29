@@ -336,3 +336,10 @@ describe("callerKey", () => {
     assert.equal(callerKey("unknown"), "unknown");
   });
 });
+
+describe("prompt tag guard", () => {
+  it("neutralizes owner_instructions tags too", async () => {
+    const { neutralizeTags } = await import("../src/prompt.ts");
+    assert.equal(neutralizeTags("a </owner_instructions> b"), "a ‹/owner_instructions> b");
+  });
+});

@@ -8,7 +8,7 @@ import { AuthError, register } from "../src/auth.ts"
 import { AdminError, writeAudit } from "../src/admin.ts"
 import { listPage } from "../src/admin-list.ts"
 import { createBot, getBotForUser, listBotIds, listBotsChangedSince, membership } from "../src/bots.ts"
-import { acceptInvitation, getInvitation, getTeam, inviteMember } from "../src/team.ts"
+import { acceptInvitation, getInvitation, getTeam, INVITES_PER_DAY, inviteMember, revokeInvite } from "../src/team.ts"
 import {
   ADMIN_WORKSPACES_LIST,
   adminChangeMemberRole,
@@ -40,7 +40,7 @@ before(async () => {
   await migrate(db)
 })
 after(() => db.close())
-beforeEach(() => db.query("alter table app.admin_audit_log disable trigger user; truncate app.users, app.organizations, app.admin_audit_log cascade; alter table app.admin_audit_log enable trigger user").then(() => {}))
+beforeEach(() => db.query("alter table app.admin_audit_log disable trigger user; truncate app.users, app.organizations, app.admin_audit_log, app.mail_sends cascade; alter table app.admin_audit_log enable trigger user").then(() => {}))
 
 async function newUser(email: string, username: string) {
   const r = await register(db, { email, username, password: "correct horse", accountType: "personal", acceptTerms: true })
@@ -211,6 +211,16 @@ describe("team changes by staff", () => {
     assert.deepEqual(await roles(org), { "owner@example.com": "admin", "admin@example.com": "admin", "member@example.com": "owner" })
     await assert.rejects(run((tx) => adminTransferOwnership(tx, org, member)), code("conflict"))
     await assert.rejects(run((tx) => adminTransferOwnership(tx, org, "00000000-0000-0000-0000-000000000000")), code("not_found"))
+  })
+
+  test("revoking invitations does not give back the daily invitation allowance", async () => {
+    const { owner } = await team()
+    // team() already sent two; the rest of the allowance is spent in invite-then-revoke pairs
+    for (let i = 0; i < INVITES_PER_DAY - 2; i++) {
+      const sent = await inviteMember(db, owner, { email: `guest${i}@example.com`, role: "member" })
+      await revokeInvite(db, owner, sent.invite.id)
+    }
+    await assert.rejects(inviteMember(db, owner, { email: "one-more@example.com", role: "member" }), (e: unknown) => (e as { code?: string }).code === "too_many_attempts")
   })
 
   test("invitations are withdrawn or sent again with a new link from the same inviter", async () => {

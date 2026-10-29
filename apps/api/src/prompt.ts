@@ -168,7 +168,7 @@ const oneLine = (text: string) => text.replace(/\s+/g, " ").replace(/"/g, "'").t
 
 /** Stops content from closing our tags early (a basic prompt-injection guard). */
 export function neutralizeTags(text: string): string {
-  return text.replace(/<(\/?)(documents|document|visitor_message|reply_language|attachments|attachment)\b/gi, "‹$1$2");
+  return text.replace(/<(\/?)(documents|document|visitor_message|reply_language|attachments|attachment|owner_instructions)\b/gi, "‹$1$2");
 }
 
 function attr(value: string): string {
@@ -206,7 +206,7 @@ export function renderAttachments(attachments: Attachment[]): string {
 export function buildMessages(history: StoredMessage[], message: string, hits: Hit[], attachments: Attachment[] = []): Anthropic.Beta.BetaMessageParam[] {
   const messages: Anthropic.Beta.BetaMessageParam[] = [];
   for (const m of history) {
-    const content = m.role === "user" ? visitorTurn(m.content) : m.content;
+    const content = m.role === "user" ? visitorTurn(m.content) : neutralizeTags(m.content);
     const last = messages[messages.length - 1];
     // Merge same-role neighbours (e.g. a user turn whose answer failed) to keep turns alternating.
     if (last && last.role === m.role && typeof last.content === "string") last.content += `\n\n${content}`;

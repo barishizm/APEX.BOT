@@ -170,8 +170,8 @@ async function issueInvite(
               (select count(*)::int from app.organization_members where organization_id = $1)
                 + (select count(*)::int from app.organization_invitations
                     where organization_id = $1 and accepted_at is null and expires_at > now() and email <> $2) as people,
-              (select count(*)::int from app.organization_invitations
-                where organization_id = $1 and created_at > now() - interval '24 hours') as today`,
+              (select count(*)::int from app.mail_sends
+                where kind = 'invite' and scope = $1 and created_at > now() - interval '24 hours') as today`,
       [actor.organizationId, email],
     )
     if (rows[0].member) throw new AuthError("conflict", "This person is already in the workspace")
@@ -179,6 +179,9 @@ async function issueInvite(
     if (rows[0].today >= INVITES_PER_DAY) throw new AuthError("too_many_attempts", "Too many invitations today. Try again tomorrow", 24 * 60 * 60)
 
     const token = newSessionToken()
+    // counted in a log that revoking or replacing an invitation doesn't touch
+    await tx.query("insert into app.mail_sends (kind, scope) values ('invite', $1)", [actor.organizationId])
+    await tx.query("delete from app.mail_sends where created_at < now() - interval '3 days'")
     await tx.query("delete from app.organization_invitations where organization_id = $1 and email = $2 and accepted_at is null", [
       actor.organizationId,
       email,
