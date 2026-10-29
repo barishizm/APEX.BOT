@@ -89,6 +89,11 @@ function text(value: unknown, max: number): string {
   return typeof value === "string" ? value.replace(CONTROL, "").trim().slice(0, max) : "";
 }
 
+/** A single-line field (name, phone): line breaks and runs of whitespace collapse to one space. */
+function line(value: unknown, max: number): string {
+  return text(value, max * 2).replace(/\s+/g, " ").trim().slice(0, max);
+}
+
 /** A conversation or message id from a body or path, or undefined when it can't be one of ours. */
 export function idOf(value: unknown): string | undefined {
   return typeof value === "string" && UUID.test(value) ? value : undefined;
@@ -367,7 +372,7 @@ export function createApp(deps: AppDeps) {
     if (tenant.settings.handoffEnabled === false || !tenant.handoffEmail) return fail(c, "not_found", 404);
     const body = await readJson(c);
     const address = email(body.email);
-    const name = text(body.name, 100);
+    const name = line(body.name, 100);
     const note = text(body.message, 2000);
     if (!address) return fail(c, "bad_request", 400);
 
@@ -403,8 +408,8 @@ export function createApp(deps: AppDeps) {
     if (tenant.leadCaptureLocked) return fail(c, "not_found", 404);
     const body = await readJson(c);
     const address = email(body.email);
-    const name = text(body.name, 100);
-    const phone = typeof body.phone === "string" ? body.phone.trim() : "";
+    const name = line(body.name, 100);
+    const phone = typeof body.phone === "string" ? body.phone.replace(/\s+/g, " ").trim() : "";
     if (!address) return fail(c, "bad_request", 400);
     if (phone && !PHONE.test(phone)) return fail(c, "bad_request", 400);
 

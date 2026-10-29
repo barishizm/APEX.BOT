@@ -12,6 +12,8 @@ export type BotErrorCode = "not_found" | "forbidden" | "conflict" | "invalid_cod
 
 /** Confirmation codes the dashboard may send per bot in 24 hours, whatever the address. */
 export const HANDOFF_CODES_PER_DAY = 10
+/** Per workspace, whatever its websites: deleting and re-creating one doesn't start a new allowance. */
+export const HANDOFF_CODES_PER_WORKSPACE_PER_DAY = 30
 
 /** Websites (bots) one workspace may have, whatever its plan. */
 export const BOTS_PER_WORKSPACE = 10
@@ -536,6 +538,13 @@ export async function startHandoffVerification(db: Db, who: BotScope, rawEmail: 
   const code = newVerificationCode()
   const day = 24 * 60 * 60 * 1000
   return db.transaction(async (tx) => {
+    // the workspace row serializes this workspace's code mail, so the caps below hold under a burst
+    await tx.query("select 1 from app.organizations where id = $1 for update", [bot.organizationId])
+    const sent = await tx.query<{ n: number }>(
+      "select count(*)::int as n from app.mail_sends where kind = 'handoff_code' and scope = $1 and created_at > now() - interval '24 hours'",
+      [bot.organizationId],
+    )
+    if (sent.rows[0].n >= HANDOFF_CODES_PER_WORKSPACE_PER_DAY) throw new BotError("rate_limited", "Too many codes requested today. Try again tomorrow")
     const { rows } = await tx.query<{ created_at: Date; window_start: Date; sends: number }>(
       "select created_at, window_start, sends from app.handoff_verifications where bot_id = $1 for update",
       [bot.id],
@@ -559,6 +568,8 @@ export async function startHandoffVerification(db: Db, who: BotScope, rawEmail: 
          sends = case when $5 then 1 else app.handoff_verifications.sends + 1 end`,
       [bot.id, email, sha256(code), new Date(at + CODE_TTL_MS), fresh],
     )
+    await tx.query("insert into app.mail_sends (kind, scope) values ('handoff_code', $1)", [bot.organizationId])
+    await tx.query("delete from app.mail_sends where created_at < now() - interval '3 days'")
     return { email, code }
   })
 }

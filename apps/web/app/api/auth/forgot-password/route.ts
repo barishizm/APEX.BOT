@@ -1,3 +1,4 @@
+import { after } from "next/server"
 import { requestLocale } from "@/lib/i18n/server"
 import { AuthError, requestPasswordReset } from "@apex/db"
 import { db } from "@/lib/db"
@@ -13,7 +14,11 @@ export async function POST(request: Request) {
     await requireHuman(turnstileToken, meta.ip)
     try {
       const sent = await requestPasswordReset(db(), email, meta)
-      if (sent) await sendPasswordResetCode(sent.email, sent.code, await requestLocale())
+      // mailed after the response, so how long it takes doesn't tell an existing account from an unknown one
+      if (sent) {
+        const locale = await requestLocale()
+        after(() => sendPasswordResetCode(sent.email, sent.code, locale).catch((error) => console.error("password reset mail failed", error)))
+      }
     } catch (err) {
       // only existing accounts are rate limited, so saying so would reveal the account
       if (!(err instanceof AuthError && err.code === "too_many_attempts")) throw err
