@@ -190,6 +190,16 @@ describe("POST /v1/chat", () => {
     assert.equal(((await res.json()) as { error: string }).error, "budget_exhausted");
   });
 
+  it("charges an estimate when the stream fails before the provider reports usage", async () => {
+    const added: { input: number; output: number }[] = [];
+    const tokenUsage = { load: async () => 0, add: async (_id: string, _day: string, u: { input: number; output: number }) => void added.push(u) };
+    const { app, model } = setup({}, { tokenUsage });
+    model.fail = true;
+    await readSSE(await chat(app, { message: "iade" }));
+    assert.equal(added.length, 1);
+    assert.ok(added[0].input > 0, "the prompt that was sent is counted");
+  });
+
   it("keeps the daily token count across a restart when a usage store is wired", async () => {
     const rows = new Map<string, number>();
     const split: { input: number; output: number }[] = [];

@@ -81,6 +81,11 @@ describe("admin lists", () => {
     assert.deepEqual(await walk({ filters: { role: "none", status: "" } }), ["customer@example.com"])
     await assert.rejects(listPage(db, ADMIN_USERS_LIST, { filters: { role: "1=1" } }), invalid)
     await assert.rejects(listPage(db, ADMIN_USERS_LIST, { filters: { nope: "staff" } }), invalid)
+    for (const key of ["constructor", "__proto__", "toString"]) {
+      await assert.rejects(listPage(db, ADMIN_USERS_LIST, { filters: { [key]: "x" } }), invalid, `filter ${key}`)
+      await assert.rejects(listPage(db, ADMIN_USERS_LIST, { filters: { role: key } }), invalid, `filter value ${key}`)
+      await assert.rejects(listPage(db, ADMIN_USERS_LIST, { sort: key }), invalid, `sort ${key}`)
+    }
   })
 
   test("rejects unknown sorts and cursors from another sort order", async () => {

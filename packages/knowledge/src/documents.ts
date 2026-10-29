@@ -11,6 +11,10 @@ export const DOCUMENT_LIMITS = {
   pdfPages: 300,
   /** Unpacked size of a .docx's text part, so a zip bomb stops here. */
   docxXmlBytes: 30_000_000,
+  /** Characters of text read from one PDF before the rest is ignored (a page can expand far past its file size). */
+  pdfChars: 5_000_000,
+  /** Milliseconds a PDF may take; checked between pages. */
+  pdfMillis: 30_000,
 } as const;
 
 export class DocumentError extends Error {}
@@ -34,7 +38,10 @@ async function readPdf(bytes: Uint8Array): Promise<{ title: string; sections: Se
   try {
     const info = ((await pdf.getMetadata().catch(() => null))?.info ?? {}) as { Title?: unknown };
     const sections: Section[] = [];
+    const started = Date.now();
+    let chars = 0;
     for (let n = 1; n <= Math.min(pdf.numPages, DOCUMENT_LIMITS.pdfPages); n++) {
+      if (chars > DOCUMENT_LIMITS.pdfChars || Date.now() - started > DOCUMENT_LIMITS.pdfMillis) break;
       const page = await pdf.getPage(n);
       const content = await page.getTextContent();
       let text = "";
@@ -45,6 +52,7 @@ async function readPdf(bytes: Uint8Array): Promise<{ title: string; sections: Se
         else if (item.str && !/\s$/.test(item.str)) text += " ";
       }
       page.cleanup();
+      chars += text.length;
       const lines = text
         .split("\n")
         .map(clean)
@@ -78,6 +86,27 @@ const decodeXml = (s: string) =>
     e[0] === "#" ? String.fromCodePoint(e[1] === "x" || e[1] === "X" ? parseInt(e.slice(2), 16) : Number(e.slice(1))) : (XML_ENTITIES[e] ?? m),
   );
 
+/**
+ * The inner XML of each <w:p>…</w:p>, found in one pass. (A lazy regex retries from every unclosed
+ * "<w:p " to the end of the file, which is quadratic on a small file made of nothing else.)
+ */
+function* paragraphs(xml: string): Generator<string> {
+  let at = 0;
+  for (;;) {
+    const open = xml.indexOf("<w:p", at);
+    if (open === -1) return;
+    const after = xml[open + 4];
+    if (after !== " " && after !== ">") {
+      at = open + 4;
+      continue;
+    }
+    const close = xml.indexOf("</w:p>", open);
+    if (close === -1) return;
+    yield xml.slice(open + 5, close);
+    at = close + 6;
+  }
+}
+
 function readDocx(bytes: Uint8Array): { title: string; sections: Section[] } {
   let files: Record<string, Uint8Array>;
   try {
@@ -100,7 +129,7 @@ function readDocx(bytes: Uint8Array): { title: string; sections: Section[] } {
     if (buffer.length) sections.push({ heading, text: buffer.join("\n") });
     buffer = [];
   };
-  for (const [, inner] of body.matchAll(/<w:p[ >]([\s\S]*?)<\/w:p>/g)) {
+  for (const inner of paragraphs(body)) {
     const text = clean(
       decodeXml(
         inner

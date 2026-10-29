@@ -96,10 +96,13 @@ interface Resolved {
   params: unknown[]
 }
 
+// Keys come from the query string: "constructor" or "__proto__" must not find anything on Object.prototype
+const own = <T>(table: Record<string, T> | undefined, key: string): T | undefined => (table && Object.hasOwn(table, key) ? table[key] : undefined);
+
 /** Validates the params against the spec and builds the shared where clause. */
 function resolve(spec: ListSpec, input: ListParams): Resolved {
   const sortKey = input.sort || spec.defaultSort.key
-  if (!spec.sorts[sortKey]) throw invalid("This list can't be sorted that way")
+  if (!own(spec.sorts, sortKey)) throw invalid("This list can't be sorted that way")
   if (input.dir && input.dir !== "asc" && input.dir !== "desc") throw invalid("This list can't be sorted that way")
   const dir: SortDir = (input.dir as SortDir | null | undefined) || (sortKey === spec.defaultSort.key ? spec.defaultSort.dir : "asc")
 
@@ -115,14 +118,14 @@ function resolve(spec: ListSpec, input: ListParams): Resolved {
 
   for (const [key, value] of Object.entries(input.filters ?? {})) {
     if (value === undefined || value === null || value === "") continue
-    const byValue = spec.valueFilters?.[key]
+    const byValue = own(spec.valueFilters, key)
     if (byValue) {
       if (!VALUE_CHECKS[byValue.type](value)) throw invalid("Unknown filter")
       params.push(value)
       where.push(`(${byValue.sql.replaceAll("{}", `$${params.length}::${byValue.type}`)})`)
       continue
     }
-    const condition = spec.filters?.[key]?.[value]
+    const condition = own(own(spec.filters, key), String(value))
     if (!condition) throw invalid("Unknown filter")
     where.push(`(${condition})`)
   }

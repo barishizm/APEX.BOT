@@ -30,7 +30,11 @@ function preferredLocale(request: NextRequest) {
 
 function route(request: NextRequest, signedIn: boolean) {
   const { pathname, search, searchParams } = request.nextUrl
-  const to = (path: string, status: 307 | 308 = 307) => NextResponse.redirect(new URL(path, request.url), status)
+  // A path like "//host" (from "/en//host") would resolve to another origin; only same-origin targets are followed
+  const to = (path: string, status: 307 | 308 = 307) => {
+    const target = new URL(path.replace(/^[/\\]+/, "/"), request.url)
+    return NextResponse.redirect(target.origin === new URL(request.url).origin ? target : new URL("/", request.url), status)
+  }
 
   if (under(pathname, APP_PATHS)) {
     if (!signedIn && under(pathname, PROTECTED_PATHS)) {

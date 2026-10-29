@@ -213,19 +213,50 @@ describe("email verification", () => {
     await verifyEmail(db, user.id, code)
     const email = "jane@example.com"
     const reset = { email, password: "another horse 99" }
+    // this test is about the guess counter, so the hourly cap on reset mails is stepped around
+    const reissue = async () => {
+      await backdateCodes()
+      await db.query("delete from app.auth_events where event = 'reset_requested'")
+      return (await requestPasswordReset(db, email))!
+    }
     let issued = (await requestPasswordReset(db, email))!
     const wrong = issued.code === "000000" ? "111111" : "000000"
     for (let i = 0; i < CODE_FAIL_LIMIT.max; i++) {
       // a fresh code (fresh per-code counter) every round, as an attacker would request
       await rejects(resetPassword(db, { ...reset, code: wrong }), "invalid_code")
       if (i % 2 === 1 && i < CODE_FAIL_LIMIT.max - 1) {
-        await backdateCodes()
-        issued = (await requestPasswordReset(db, email))!
+        issued = await reissue()
       }
     }
-    await backdateCodes()
-    issued = (await requestPasswordReset(db, email))!
+    issued = await reissue()
     await rejects(resetPassword(db, { ...reset, code: issued.code }), "too_many_attempts")
+  })
+
+  test("password-reset mail is capped per account per hour, not only by the 30 s cooldown", async () => {
+    const { user, code } = await register(db, input())
+    await verifyEmail(db, user.id, code)
+    for (let i = 0; i < 5; i++) {
+      await backdateCodes()
+      assert.ok(await requestPasswordReset(db, "jane@example.com"))
+    }
+    await backdateCodes()
+    await rejects(requestPasswordReset(db, "jane@example.com"), "too_many_attempts")
+  })
+
+  test("an owner's reset of an unproven account also drops the people and invitations the registrant added", async () => {
+    const { user } = await register(db, input())
+    const other = await register(db, input({ email: "bob@example.com", username: "bobsmith" }))
+    const org = (await db.query<{ organization_id: string }>("select organization_id from app.organization_members where user_id = $1 and role = 'owner'", [user.id])).rows[0].organization_id
+    await db.query("insert into app.organization_members (organization_id, user_id, role) values ($1, $2, 'member')", [org, other.user.id])
+    await db.query(
+      "insert into app.organization_invitations (organization_id, email, role, token_hash, expires_at) values ($1, 'x@example.com', 'member', 'abc'::bytea, now() + interval '1 day')",
+      [org],
+    )
+    const issued = (await requestPasswordReset(db, "jane@example.com"))!
+    await resetPassword(db, { email: "jane@example.com", code: issued.code, password: "another horse 99" })
+    const members = await db.query<{ user_id: string }>("select user_id from app.organization_members where organization_id = $1", [org])
+    assert.deepEqual(members.rows.map((r) => r.user_id), [user.id])
+    assert.equal((await db.query("select 1 from app.organization_invitations where organization_id = $1", [org])).rows.length, 0)
   })
 
   test("expired code is rejected", async () => {

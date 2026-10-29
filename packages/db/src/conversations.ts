@@ -455,9 +455,16 @@ export const MASKED = { email: "[email]", phone: "[phone]", name: "[name]" } as 
 
 const maskField = (value: string | null, token: string) => (value ? token : null)
 
+/** Longest preview stored (conversation insert cuts the first visitor message here). */
+const PREVIEW_MAX = 200
+
+// The stored preview is cut at PREVIEW_MAX characters, which can split an email or phone number so the
+// pattern no longer matches. A cut preview loses its last (possibly partial) word before masking.
+const maskPreview = (preview: string) => maskPII(preview.length >= PREVIEW_MAX ? preview.replace(/\S*$/, "") : preview)
+
 /** The list row with the visitor's details hidden and personal data in the preview masked. */
 export function maskConversationSummary(c: ConversationSummary): ConversationSummary {
-  return { ...c, preview: maskPII(c.preview), visitorEmail: maskField(c.visitorEmail, MASKED.email), visitorName: maskField(c.visitorName, MASKED.name) }
+  return { ...c, preview: maskPreview(c.preview), visitorEmail: maskField(c.visitorEmail, MASKED.email), visitorName: maskField(c.visitorName, MASKED.name) }
 }
 
 /** The transcript with the visitor's details hidden and personal data in every message masked. */

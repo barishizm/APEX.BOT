@@ -280,6 +280,16 @@ test("deliveries past the rate limit get 429 with Retry-After", async () => {
   assert.ok(Number(res.headers.get("retry-after")) >= 1)
 })
 
+test("unsigned traffic cannot use up the limit for signed deliveries, even with no known address", async () => {
+  const org = await workspace()
+  const deps = { rateLimit: { max: 2, windowSeconds: 60 }, ip: null }
+  for (let i = 0; i < 5; i++) {
+    const res = await deliver(forOrg("subscription-created", org), { deps, signature: "ts=1;h1=bad" })
+    assert.equal(res.status, 401)
+  }
+  assert.equal((await deliver(forOrg("subscription-created", org), { deps })).status, 200)
+})
+
 test("billing off: 503, so Paddle retries once it is configured", async () => {
   const res = await deliver(fixture("subscription-created"), { deps: { provider: null } })
   assert.equal(res.status, 503)

@@ -14,6 +14,9 @@ interface Rule {
 }
 
 const AGENT = "apexbot";
+/** Rules read per file and the longest one kept: every link is matched against all of them, so both are capped. */
+const MAX_RULES = 1000;
+const MAX_RULE_LENGTH = 500;
 
 // Rules come from a customer-controlled site, so they are matched without a regex:
 // a wildcard regex like /*a*a*a*b backtracks exponentially.
@@ -47,6 +50,7 @@ export function parseRobots(text: string): Robots {
   const groups: { agents: string[]; rules: Rule[] }[] = [];
   let current: { agents: string[]; rules: Rule[] } | null = null;
   let lastWasAgent = false;
+  let ruleCount = 0;
 
   for (const rawLine of text.split(/\r?\n/)) {
     const line = rawLine.replace(/#.*/, "").trim();
@@ -70,8 +74,10 @@ export function parseRobots(text: string): Robots {
     lastWasAgent = false;
     if (!current || (key !== "allow" && key !== "disallow")) continue;
     // "Disallow:" with no path allows everything
-    if (!value) continue;
-    current.rules.push(compileRule(value, key === "allow"));
+    if (!value || ++ruleCount > MAX_RULES) continue;
+    // an over-long rule is cut, which only widens a Disallow; an Allow that long is dropped
+    if (value.length > MAX_RULE_LENGTH && key === "allow") continue;
+    current.rules.push(compileRule(value.slice(0, MAX_RULE_LENGTH), key === "allow"));
   }
 
   const own = groups.filter((g) => g.agents.some((a) => a !== "*" && AGENT.startsWith(a)));

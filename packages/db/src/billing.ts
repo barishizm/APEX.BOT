@@ -433,7 +433,9 @@ export async function applyBillingEvent(tx: Queryable, event: ApplicableBillingE
     if (!currentPeriodStart || !currentPeriodEnd) return { outcome: "ignored", reason: "no_period" }
 
     let { plan, interval, scheduledChange } = s
-    if (same && s.status !== "canceled" && rank(plan) < rank(stored!.plan) && currentPeriodStart < stored!.currentPeriodEnd) {
+    // A change of billing frequency can only be applied at once (Paddle prorates and credits the unused time),
+    // so it never leaves a paid plan running: only a same-interval downgrade is held until the period's end.
+    if (same && s.status !== "canceled" && rank(plan) < rank(stored!.plan) && interval === stored!.interval && currentPeriodStart < stored!.currentPeriodEnd) {
       // a downgrade inside the paid period: the paid plan runs on, the lower one starts at its end
       scheduledChange = { action: "change", plan, interval, effectiveAt: stored!.currentPeriodEnd.toISOString() }
       plan = stored!.plan

@@ -17,6 +17,7 @@ import {
   listConversations,
   loadConversation,
   markConversationHandoff,
+  maskConversationSummary,
   searchTerms,
   setConversationVisitor,
   setMessageFeedback,
@@ -204,4 +205,13 @@ describe("token usage", () => {
     assert.equal(await tokensUsedOn(db, bot.id, "2026-10-15"), 1500)
     assert.equal(await tokensUsedOn(db, bot.id, "2026-10-16"), 50)
   })
+})
+
+test("a preview cut mid-address does not leak half an email into the masked staff view", () => {
+  const preview = ("hello ".repeat(31) + "write me at jane.doe@exam").slice(0, 200)
+  assert.equal(preview.length, 200)
+  const masked = maskConversationSummary({ preview, visitorEmail: null, visitorName: null } as never).preview
+  assert.ok(!masked.includes("jane"), masked)
+  assert.ok(!masked.includes("@"), masked)
+  assert.equal(maskConversationSummary({ preview: "short mail a@b.co", visitorEmail: null, visitorName: null } as never).preview, "short mail [email]")
 })
