@@ -363,15 +363,25 @@ button:not(:focus-visible) {
     animation: sheet-in 0.2s ease-out;
   }
 }
-/* Hero copy fades in with CSS, not JS, so it paints (and counts for LCP) before hydration */
+/* Hero copy fades in with CSS, not JS, so it paints before hydration. The headline and lede
+   (.hero-rise) only slide: Chrome doesn't count text at opacity 0 for LCP, so a fade held the
+   page's LCP back until the scripts had run (5 s on Lighthouse's mobile profile). */
 @media (prefers-reduced-motion: no-preference) {
   .hero-in {
     animation: hero-in 0.6s ease-out both;
+  }
+  .hero-rise {
+    animation: hero-rise 0.6s ease-out both;
   }
 }
 @keyframes hero-in {
   from {
     opacity: 0;
+    transform: translateY(20px);
+  }
+}
+@keyframes hero-rise {
+  from {
     transform: translateY(20px);
   }
 }

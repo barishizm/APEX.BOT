@@ -44,9 +44,11 @@ export function LanguageSwitcher({ className = "" }: { className?: string }) {
 
   return (
     <details ref={ref} className={`lang ${className}`}>
-      <summary className="lang__toggle" aria-label={t.common.changeLanguage}>
+      {/* the visible code is part of the name ("Change language EN"), so voice control can say it */}
+      <summary className="lang__toggle">
         <Globe size={16} aria-hidden />
-        <span aria-hidden>{locale.toUpperCase()}</span>
+        <span className="sr-only">{t.common.changeLanguage} </span>
+        <span>{locale.toUpperCase()}</span>
       </summary>
       <ul className="lang__menu" aria-label={t.common.language}>
         {links.map((l) => (
