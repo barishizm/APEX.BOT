@@ -232,7 +232,7 @@ export function SourceDetail({
         role="dialog"
         aria-modal="true"
         aria-labelledby="source-detail-title"
-        className="relative flex h-full w-full max-w-2xl flex-col border-l border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-text)] shadow-2xl"
+        className="relative flex h-full w-full max-w-2xl flex-col border-l border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-text)] shadow-[var(--shadow-modal)]"
         style={{ paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
       >
         <header className="flex flex-col gap-3 border-b border-[var(--color-line)] px-4 pt-4 pb-3 sm:px-6">
@@ -304,7 +304,7 @@ export function SourceDetail({
         <div id="detail-panel" role="tabpanel" aria-labelledby={`detail-tab-${tab}`} className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">
           {loadError ? (
             <div className="flex flex-col items-center gap-3 py-10 text-center text-sm">
-              <p className="text-red-600 dark:text-red-400">{loadError}</p>
+              <p className="text-red-700 dark:text-red-300">{loadError}</p>
               <button type="button" onClick={load} className={outlineButton}>
                 <RefreshCw className="h-3.5 w-3.5" aria-hidden />
                 {t.retry}
@@ -408,7 +408,7 @@ export function SourceDetail({
           <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-[var(--color-line)] bg-[var(--color-raised)] px-4 py-3 sm:px-6" aria-live="polite">
             {confirmClose ? (
               <>
-                <span className="mr-auto text-sm text-amber-700 dark:text-amber-400">{t.unsaved}</span>
+                <span className="mr-auto text-sm text-amber-800 dark:text-amber-200">{t.unsaved}</span>
                 <button type="button" onClick={() => setConfirmClose(false)} className={outlineButton}>
                   {t.keepEditing}
                 </button>
@@ -427,7 +427,7 @@ export function SourceDetail({
                 </button>
               </>
             ) : (
-              <span className="mr-auto text-sm text-green-700 dark:text-green-400">{t.saved}</span>
+              <span className="mr-auto text-sm text-green-800 dark:text-green-300">{t.saved}</span>
             )}
           </footer>
         )}

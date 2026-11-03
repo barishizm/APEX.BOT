@@ -48,7 +48,7 @@ function Tile({ label, value, help, href, warn }: { label: string; value: string
         {href && <ChevronRight className="h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5 group-hover:text-[var(--color-text)]" aria-hidden />}
       </span>
       <span className="flex items-center gap-1.5 text-2xl font-semibold tracking-tight tabular-nums">
-        {warn && <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" aria-hidden />}
+        {warn && <AlertTriangle className="h-4 w-4 text-amber-800 dark:text-amber-200" aria-hidden />}
         {value}
       </span>
       <span className="mt-auto pt-1 text-xs leading-snug text-[var(--color-muted)]">{help}</span>

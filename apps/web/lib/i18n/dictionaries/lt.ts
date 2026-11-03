@@ -121,6 +121,7 @@ export const lt: Dictionary = {
       oauth_failed: "Nepavyko prisijungti per šį paslaugų teikėją. Bandykite dar kartą arba naudokite el. pašto adresą",
       oauth_signups_closed: "Naujų registracijų kol kas nepriimame. Prisijunkite prie laukiančiųjų sąrašo ir parašysime, kai atsidarysime",
       account_suspended: "Ši paskyra sustabdyta. Susisiekite su pagalbos tarnyba",
+      humanCheck: "Palaukite, kol baigsis žmogaus patikra, ir bandykite dar kartą",
       generic: "Kažkas nepavyko. Bandykite dar kartą",
       network: "Nepavyko pasiekti serverio. Patikrinkite interneto ryšį ir bandykite dar kartą",
     },

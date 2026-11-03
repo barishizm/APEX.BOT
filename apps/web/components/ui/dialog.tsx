@@ -58,7 +58,7 @@ function Dialog({
           aria-describedby={descriptionId}
           tabIndex={-1}
           className={cn(
-            "relative flex max-h-[90dvh] w-full max-w-lg flex-col gap-4 overflow-y-auto rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] p-5 text-[var(--color-text)] shadow-2xl outline-none",
+            "relative flex max-h-[90dvh] w-full max-w-lg flex-col gap-4 overflow-y-auto rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface)] p-5 text-[var(--color-text)] shadow-[var(--shadow-modal)] outline-none",
             className,
           )}
           style={{ marginBottom: "env(safe-area-inset-bottom, 0px)" }}

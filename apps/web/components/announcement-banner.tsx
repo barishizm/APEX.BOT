@@ -77,7 +77,7 @@ export function AnnouncementBanners({ items, variant = "bar" }: { items: Announc
             role={a.level === "critical" ? "alert" : "status"}
             className={cn(
               "flex items-start gap-3 text-sm",
-              variant === "floating" ? cn("w-full max-w-3xl rounded-xl border px-4 py-3 shadow-lg", tone.card) : cn("px-4 py-2 max-sm:px-3", tone.bar),
+              variant === "floating" ? cn("w-full max-w-3xl rounded-xl border px-4 py-3 shadow-[var(--shadow-pop)]", tone.card) : cn("px-4 py-2 max-sm:px-3", tone.bar),
             )}
           >
             <Icon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />

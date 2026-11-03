@@ -95,7 +95,7 @@ export function InstallGuide({ onClose }: { onClose: () => void }) {
         role="dialog"
         aria-labelledby="install-guide-title"
         aria-describedby="install-guide-body"
-        className="fixed z-50 flex flex-col gap-3 rounded-2xl border border-[var(--color-line)] bg-[var(--color-raised)] p-4 text-[var(--color-text)] shadow-2xl transition-[top,left] duration-200"
+        className="fixed z-50 flex flex-col gap-3 rounded-2xl border border-[var(--color-line)] bg-[var(--color-raised)] p-4 text-[var(--color-text)] shadow-[var(--shadow-pop)] transition-[top,left] duration-200"
         style={{ top, left, width }}
       >
         <span

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { Turnstile, TURNSTILE_SITE_KEY } from "@/components/ui/turnstile"
 import { useRouter } from "next/navigation"
-import { X, Check, ArrowRight, Clock, Languages, LifeBuoy, Eye, EyeOff } from "lucide-react"
+import { X, Check, ArrowRight, Clock, Languages, LifeBuoy, Eye, EyeOff, LoaderCircle } from "lucide-react"
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion"
 import dynamic from "next/dynamic"
 import { useI18n } from "@/components/i18n/provider"
@@ -34,10 +34,10 @@ function SocialButtons({ verb, accountType, next }: { verb: string; accountType?
   const { t, href } = useI18n()
   return (
     <>
-      <div className="flex items-center gap-3 text-xs uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-        <span className="h-px flex-1 bg-black/10 dark:bg-white/15" />
+      <div className="flex items-center gap-3 text-xs uppercase tracking-wider text-[var(--color-muted)]">
+        <span className="h-px flex-1 bg-[var(--color-line)]" />
         {t.auth.or}
-        <span className="h-px flex-1 bg-black/10 dark:bg-white/15" />
+        <span className="h-px flex-1 bg-[var(--color-line)]" />
       </div>
 
       <div className="space-y-2">
@@ -48,7 +48,7 @@ function SocialButtons({ verb, accountType, next }: { verb: string; accountType?
           <a
             key={name}
             href={`/api/auth/oauth/${slug}?${new URLSearchParams({ ...(accountType && { type: accountType }), ...(next && { next }) })}`}
-            className="w-full flex items-center justify-center gap-3 px-8 py-2.5 rounded-lg border border-zinc-300 dark:border-white/20 bg-white dark:bg-zinc-950 text-sm font-medium text-zinc-900 dark:text-white hover:bg-zinc-50 dark:hover:bg-zinc-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 transition-colors cursor-pointer"
+            className="w-full flex items-center justify-center gap-3 px-8 py-2.5 rounded-lg border border-[var(--color-line)] bg-[var(--color-raised)] text-sm font-medium text-[var(--color-text)] no-underline hover:border-[var(--color-muted)] focus:outline-none transition-colors cursor-pointer"
           >
             {logo}
             {format(t.auth.withProvider, { verb, provider: name })}
@@ -56,7 +56,7 @@ function SocialButtons({ verb, accountType, next }: { verb: string; accountType?
         ))}
       </div>
       {accountType && (
-        <p className="text-center text-xs text-zinc-500 dark:text-zinc-400">
+        <p className="text-center text-xs text-[var(--color-muted)]">
           {t.auth.oauthConsentPre}{" "}
           <a href={href("/terms")} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">{t.nav.terms}</a> {t.auth.and}{" "}
           <a href={href("/privacy")} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">{t.nav.privacy}</a>.
@@ -81,13 +81,13 @@ function PasswordInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
   const { t } = useI18n()
   const [visible, setVisible] = useState(false)
   return (
-    <div className="flex items-center rounded-lg bg-white dark:bg-zinc-950/40 border border-zinc-300 dark:border-zinc-400/20 focus-within:border-zinc-500 dark:focus-within:border-white/40 transition-all">
+    <div className="flex items-center rounded-lg bg-[var(--color-raised)] border border-[var(--color-line)] focus-within:border-[var(--color-secondary)] transition-colors">
       <input
         {...props}
         {...noExtensionUi}
         style={{ outline: "none", boxShadow: "none" }}
         type={visible ? "text" : "password"}
-        className="min-w-0 flex-1 appearance-none rounded-none border-0 bg-transparent shadow-none px-4 py-2.5 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-white/30 focus:outline-none"
+        className="min-w-0 flex-1 appearance-none rounded-none border-0 bg-transparent shadow-none px-4 py-2.5 text-sm text-[var(--color-text)] placeholder:text-[var(--color-muted)]/70 focus:outline-none"
       />
       <button
         type="button"
@@ -95,7 +95,7 @@ function PasswordInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
         aria-pressed={visible}
         onMouseDown={(e) => e.preventDefault()}
         onClick={() => setVisible((v) => !v)}
-        className="relative z-10 mr-1 flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-md border-0 bg-transparent text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
+        className="relative z-10 mr-1 flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-md border-0 bg-transparent text-[var(--color-muted)] hover:text-[var(--color-text)] focus:outline-none"
       >
         {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
       </button>
@@ -256,7 +256,7 @@ export default function Hero({
     e.preventDefault()
     const email = new FormData(e.currentTarget).get("email")
     if (TURNSTILE_SITE_KEY && !turnstileToken) {
-      setAuthError("Please wait for the human check to finish, then try again")
+      setAuthError(t.auth.errors.humanCheck)
       return
     }
     setAuthError(null)
@@ -301,7 +301,7 @@ export default function Hero({
             turnstileToken,
           }
     if (TURNSTILE_SITE_KEY && !turnstileToken) {
-      setAuthError("Please wait for the human check to finish, then try again")
+      setAuthError(t.auth.errors.humanCheck)
       return
     }
     setAuthError(null)
@@ -399,7 +399,7 @@ export default function Hero({
         <div className="relative z-10 flex flex-col items-center gap-6 sm:gap-8 text-center">
           {/* CSS-animated, not framer-motion: the headline must paint before hydration (LCP; globals.css .hero-rise) */}
           <div
-            className="hero-in inline-flex items-center rounded-full border border-zinc-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/50 px-3 py-1 text-sm font-medium text-zinc-800 dark:text-zinc-200 backdrop-blur-sm"
+            className="hero-in inline-flex items-center rounded-full border border-[var(--color-line)] bg-[var(--color-raised)]/60 px-3 py-1 text-sm font-medium text-[var(--color-text)] backdrop-blur-sm"
           >
             <span className="mr-2 flex h-2 w-2 rounded-full bg-[var(--color-secondary)]" aria-hidden="true"></span>
             {t.hero.badge}
@@ -407,17 +407,17 @@ export default function Hero({
 
           <h1
             style={{ animationDelay: "0.1s" }}
-            className="hero-rise text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 max-w-4xl"
+            className="hero-rise text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold leading-[1.08] tracking-[-0.035em] text-[var(--color-text)] max-w-4xl"
           >
             {t.hero.titleStart}{" "}
-            <span className="text-transparent bg-clip-text bg-gradient-to-br from-zinc-900 to-zinc-500 dark:from-zinc-100 dark:to-zinc-500">
+            <span className="text-[var(--color-muted)]">
               {t.hero.titleAccent}
             </span>
           </h1>
 
           <p
             style={{ animationDelay: "0.2s" }}
-            className="hero-rise text-base sm:text-lg md:text-xl text-zinc-600 dark:text-zinc-400 max-w-4xl px-4 leading-relaxed text-balance"
+            className="hero-rise text-base sm:text-lg md:text-xl text-[var(--color-muted)] max-w-4xl px-4 leading-relaxed text-balance"
           >
             {t.hero.lede1}{" "}
             <br className="hidden md:block" />
@@ -427,7 +427,7 @@ export default function Hero({
           {signedIn ? (
             <a
               href="/dashboard"
-              className="relative mt-4 inline-flex h-14 items-center gap-2 rounded-full bg-zinc-900 px-8 text-lg font-medium tracking-wide text-white no-underline transition-opacity hover:opacity-90 dark:bg-zinc-100 dark:text-zinc-900"
+              className="relative mt-4 inline-flex h-14 items-center gap-2 rounded-[var(--radius-md)] bg-[var(--color-primary)] px-8 text-lg font-semibold text-[var(--color-on-primary)] no-underline transition-opacity hover:opacity-85"
             >
               {t.hero.ctaSignedIn}
               <ArrowRight className="h-5 w-5" aria-hidden="true" />
@@ -438,9 +438,9 @@ export default function Hero({
               <motion.div className="inline-block relative mt-4">
                 {/* The expanding background element */}
                 <motion.div
-                  style={{ borderRadius: "100px" }}
+                  style={{ borderRadius: 8 }}
                   layoutId="cta-card"
-                  className="absolute inset-0 bg-zinc-900 dark:bg-zinc-100"
+                  className="absolute inset-0 bg-[var(--color-primary)]"
                 />
                 <motion.button
                   initial={{ opacity: 0, scale: 0.9 }}
@@ -449,7 +449,7 @@ export default function Hero({
                   exit={{ opacity: 0, scale: 0.8 }}
                   layout={false}
                   onClick={handleExpand}
-                  className="relative flex items-center gap-2 h-14 px-8 py-3 bg-transparent border-0 cursor-pointer text-lg font-medium text-white dark:text-zinc-900 tracking-wide hover:opacity-90 transition-opacity"
+                  className="relative flex items-center gap-2 h-14 px-8 py-3 bg-transparent border-0 cursor-pointer text-lg font-semibold text-[var(--color-on-primary)] hover:opacity-85 transition-opacity"
                 >
                   {t.hero.cta}
                   <ArrowRight className="w-5 h-5" aria-hidden="true" />
@@ -458,7 +458,7 @@ export default function Hero({
             )}
           </AnimatePresence>
           )}
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">{t.hero.note}</p>
+          <p className="text-sm text-[var(--color-muted)]">{t.hero.note}</p>
         </div>
       </div>
       )}
@@ -484,7 +484,7 @@ export default function Hero({
               style={{ borderRadius: "24px", willChange: "transform" }}
               onLayoutAnimationComplete={() => setMeshReady(true)}
               onAnimationComplete={() => { if (origin && isExpanded) setMeshReady(true) }}
-              className="relative flex h-full w-full overflow-hidden bg-zinc-100 dark:bg-zinc-800 sm:rounded-[24px] shadow-2xl"
+              className="relative flex h-full w-full overflow-hidden bg-[var(--color-surface)] sm:rounded-[24px]"
             >
               {/* Mesh Gradient Background inside Modal */}
               <motion.div
@@ -498,7 +498,7 @@ export default function Hero({
                   speed={reduceMotion ? 0 : 0.6}
                   minPixelRatio={1}
                   maxPixelCount={MESH_PIXELS}
-                  colors={["#f4f4f5", "#e4e4e7", "#fafafa", "#d4d4d8"]}
+                  colors={["#f4f4f1", "#e2e2dc", "#fbfbfa", "#d6d6cf"]}
                   distortion={0.8}
                   swirl={0.1}
                   grainMixer={0.15}
@@ -509,7 +509,7 @@ export default function Hero({
                   speed={reduceMotion ? 0 : 0.6}
                   minPixelRatio={1}
                   maxPixelCount={MESH_PIXELS}
-                  colors={["#3f3f46", "#27272a", "#18181b", "#52525b"]} // Zinc palette
+                  colors={["#26261f", "#171713", "#0c0c09", "#3a3a34"]} // site surface tones (globals.css)
                   distortion={0.8}
                   swirl={0.1}
                   grainMixer={0.15}
@@ -527,7 +527,7 @@ export default function Hero({
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.2, duration: 0.25 }}
                 onClick={handleClose}
-                className="absolute right-4 top-4 sm:right-8 sm:top-8 z-50 cursor-pointer flex h-11 w-11 items-center justify-center rounded-full border border-white/40 bg-white/30 text-zinc-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.6),0_4px_16px_rgba(0,0,0,0.08)] backdrop-blur-xl backdrop-saturate-150 transition-colors duration-200 hover:bg-white/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 dark:border-white/15 dark:bg-white/10 dark:text-white dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_4px_16px_rgba(0,0,0,0.35)] dark:hover:bg-white/20"
+                className="absolute right-4 top-4 sm:right-8 sm:top-8 z-50 cursor-pointer flex h-11 w-11 items-center justify-center rounded-full border border-white/40 bg-white/30 text-[var(--color-text)] backdrop-blur-xl transition-colors duration-200 hover:bg-white/50 focus:outline-none dark:border-white/15 dark:bg-white/10 dark:hover:bg-white/20"
               >
                 <X className="h-4 w-4" strokeWidth={2.25} />
               </motion.button>
@@ -548,7 +548,7 @@ export default function Hero({
                   aria-hidden={authMode !== "register"}
                   className={`flex min-w-0 flex-col overflow-hidden max-lg:!grow-0 lg:basis-0 ${authMode === "login" ? "max-lg:hidden pointer-events-none" : ""}`}
                 >
-                <div className={`flex flex-1 shrink-0 flex-col justify-center p-8 pb-0 sm:p-12 sm:pb-0 lg:pb-16 lg:w-full lg:max-w-[40rem] lg:py-16 lg:pl-16 lg:pr-6 gap-8 text-zinc-900 dark:text-white`}>
+                <div className={`flex flex-1 shrink-0 flex-col justify-center p-8 pb-0 sm:p-12 sm:pb-0 lg:pb-16 lg:w-full lg:max-w-[40rem] lg:py-16 lg:pl-16 lg:pr-6 gap-8 text-[var(--color-text)]`}>
                   {authMode === "register" && (
                     <span className="logo__mark block max-lg:mx-auto max-lg:[@media(max-height:700px)]:hidden" style={{ height: 28, width: 216 }} aria-label="Apex Bot" role="img" />
                   )}
@@ -557,41 +557,41 @@ export default function Hero({
                     <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold leading-tight tracking-tight">
                       {t.auth.pitch.title}
                     </h2>
-                    <p className="text-zinc-600 dark:text-zinc-200 text-lg max-w-md">
+                    <p className="text-[var(--color-muted)] text-lg max-w-md">
                       {t.auth.pitch.text}
                     </p>
                   </div>
 
                   <div className="space-y-6">
                     <div className="flex gap-4 items-start">
-                      <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-black/5 dark:bg-white/10 backdrop-blur-sm flex items-center justify-center border border-black/10 dark:border-white/10">
-                        <Clock className="w-6 h-6 text-zinc-600 dark:text-zinc-300" />
+                      <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-[var(--color-bubble)] flex items-center justify-center border border-[var(--color-line)]">
+                        <Clock className="w-6 h-6 text-[var(--color-text)]" aria-hidden="true" />
                       </div>
                       <div>
                         <h3 className="font-semibold text-lg">{t.auth.pitch.items[0].title}</h3>
-                        <p className="text-zinc-600 dark:text-zinc-200/80 text-sm leading-relaxed mt-1">
+                        <p className="text-[var(--color-muted)] text-sm leading-relaxed mt-1">
                           {t.auth.pitch.items[0].text}
                         </p>
                       </div>
                     </div>
                     <div className="flex gap-4 items-start">
-                      <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-black/5 dark:bg-white/10 backdrop-blur-sm flex items-center justify-center border border-black/10 dark:border-white/10">
-                        <Languages className="w-6 h-6 text-zinc-600 dark:text-zinc-300" />
+                      <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-[var(--color-bubble)] flex items-center justify-center border border-[var(--color-line)]">
+                        <Languages className="w-6 h-6 text-[var(--color-text)]" aria-hidden="true" />
                       </div>
                       <div>
                         <h3 className="font-semibold text-lg">{t.auth.pitch.items[1].title}</h3>
-                        <p className="text-zinc-600 dark:text-zinc-200/80 text-sm leading-relaxed mt-1">
+                        <p className="text-[var(--color-muted)] text-sm leading-relaxed mt-1">
                           {t.auth.pitch.items[1].text}
                         </p>
                       </div>
                     </div>
                     <div className="flex gap-4 items-start">
-                      <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-black/5 dark:bg-white/10 backdrop-blur-sm flex items-center justify-center border border-black/10 dark:border-white/10">
-                        <LifeBuoy className="w-6 h-6 text-zinc-600 dark:text-zinc-300" />
+                      <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-[var(--color-bubble)] flex items-center justify-center border border-[var(--color-line)]">
+                        <LifeBuoy className="w-6 h-6 text-[var(--color-text)]" aria-hidden="true" />
                       </div>
                       <div>
                         <h3 className="font-semibold text-lg">{t.auth.pitch.items[2].title}</h3>
-                        <p className="text-zinc-600 dark:text-zinc-200/80 text-sm leading-relaxed mt-1">
+                        <p className="text-[var(--color-muted)] text-sm leading-relaxed mt-1">
                           {t.auth.pitch.items[2].text}
                         </p>
                       </div>
@@ -599,18 +599,18 @@ export default function Hero({
                   </div>
                   </div>
 
-                  <div className="pt-8 border-t border-black/10 dark:border-white/20 max-lg:hidden [@media(max-height:820px)]:hidden">
+                  <div className="pt-8 border-t border-[var(--color-line)] max-lg:hidden [@media(max-height:820px)]:hidden">
                     <figure className="m-0">
                       <blockquote className="mx-0 mt-0 max-w-md text-base font-medium leading-relaxed mb-6">
                         “{t.auth.pitch.quote}”
                       </blockquote>
                       <figcaption className="flex items-center gap-4">
-                        <div className="h-12 w-12 rounded-full bg-gradient-to-tr from-orange-400 to-pink-500 flex items-center justify-center text-lg font-bold text-white">
+                        <div className="h-12 w-12 rounded-full border border-[var(--color-line)] bg-[var(--color-bubble)] flex items-center justify-center text-base font-semibold text-[var(--color-text)]">
                           MA
                         </div>
                         <div>
                           <div className="font-semibold">M. Barış Akıntı</div>
-                          <div className="text-sm text-zinc-600 dark:text-zinc-300">{t.auth.pitch.quoteRole}</div>
+                          <div className="text-sm text-[var(--color-muted)]">{t.auth.pitch.quoteRole}</div>
                         </div>
                       </figcaption>
                     </figure>
@@ -630,7 +630,7 @@ export default function Hero({
                         role="img"
                       />
                     )}
-                  <motion.div layout={meshReady ? "position" : false} transition={{ type: "spring", bounce: 0, duration: 0.5 }} className={`w-full max-w-sm rounded-2xl border border-black/10 dark:border-white/15 bg-white dark:bg-black p-5 sm:p-6 shadow-[0_1px_0_rgba(255,255,255,0.9)_inset,0_2px_4px_rgba(0,0,0,0.06),0_12px_24px_rgba(0,0,0,0.1),0_32px_64px_-12px_rgba(0,0,0,0.25)] dark:shadow-[0_1px_0_rgba(255,255,255,0.14)_inset,0_0_0_1px_rgba(255,255,255,0.04),0_2px_4px_rgba(0,0,0,0.5),0_16px_32px_rgba(0,0,0,0.55),0_40px_80px_-12px_rgba(0,0,0,0.9)]`}>
+                  <motion.div layout={meshReady ? "position" : false} transition={{ type: "spring", bounce: 0, duration: 0.5 }} className={`w-full max-w-sm rounded-2xl border border-[var(--color-line)] bg-[var(--color-raised)] p-5 sm:p-6 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_16px_40px_-16px_rgb(0_0_0/0.18)]`}>
 
                     <motion.div
                       initial={false}
@@ -651,30 +651,30 @@ export default function Hero({
                         animate={{ opacity: 1, scale: 1 }}
                         className="flex flex-col items-center justify-center text-center h-[400px] space-y-6"
                       >
-                        <div className={`w-20 h-20 rounded-full flex items-center justify-center shadow-lg ${needsVerify ? "bg-indigo-600 shadow-indigo-600/30" : "bg-green-500 shadow-green-500/30"}`}>
-                          {needsVerify ? <ArrowRight className="w-10 h-10 text-white" /> : <Check className="w-10 h-10 text-white" />}
+                        <div className={`w-20 h-20 rounded-full flex items-center justify-center ${needsVerify ? "bg-[var(--color-primary)] text-[var(--color-on-primary)]" : "bg-green-600 text-white"}`}>
+                          {needsVerify ? <ArrowRight className="w-10 h-10" aria-hidden="true" /> : <Check className="w-10 h-10" aria-hidden="true" />}
                         </div>
                         <div>
-                          <h3 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">{!needsVerify ? t.auth.success.welcomeBack : t.auth.success.verifyTitle}</h3>
-                          <p className="text-zinc-600 dark:text-zinc-200">{!needsVerify ? t.auth.success.loggedIn : t.auth.success.verifyText}</p>
+                          <h3 className="text-2xl font-bold text-[var(--color-text)] mb-2">{!needsVerify ? t.auth.success.welcomeBack : t.auth.success.verifyTitle}</h3>
+                          <p className="text-[var(--color-muted)]">{!needsVerify ? t.auth.success.loggedIn : t.auth.success.verifyText}</p>
                         </div>
                         <button
                           onClick={() => router.push(nextPath)}
-                          className="cursor-pointer px-6 py-2 bg-black/10 hover:bg-black/15 text-zinc-900 dark:bg-white/20 dark:hover:bg-white/30 dark:text-white rounded-lg transition-colors text-sm font-medium"
+                          className="cursor-pointer rounded-lg border border-[var(--color-line)] bg-transparent px-6 py-2 text-sm font-medium text-[var(--color-text)] transition-colors hover:border-[var(--color-muted)]"
                         >
                           {t.auth.success.continue}
                         </button>
                       </motion.div>
                     ) : authMode === "login" ? (
                       <form onSubmit={handleSubmit} className="space-y-4">
-                        <div className="space-y-1 pb-1 text-center text-zinc-900 dark:text-white">
+                        <div className="space-y-1 pb-1 text-center text-[var(--color-text)]">
                           <h2 className="text-3xl font-bold tracking-tight">{t.auth.login.title}</h2>
-                          <p className="text-lg text-zinc-600 dark:text-zinc-300">{t.auth.login.subtitle}</p>
+                          <p className="text-lg text-[var(--color-muted)]">{t.auth.login.subtitle}</p>
                         </div>
 
                         <div className="space-y-4">
                           <div>
-                            <label htmlFor="login-email" className="block text-xs font-medium text-zinc-600 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">
+                            <label htmlFor="login-email" className="block text-xs font-medium text-[var(--color-muted)] mb-1.5 uppercase tracking-wider">
                               {t.auth.login.email}
                             </label>
                             <input
@@ -684,43 +684,43 @@ export default function Hero({
                               name="email"
                               autoComplete="email"
                               placeholder={t.auth.login.emailPlaceholder}
-                              className="w-full px-4 py-2.5 rounded-lg bg-white dark:bg-zinc-950/40 border border-zinc-300 dark:border-zinc-400/20 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-white/30 focus:outline-none focus:border-zinc-500 dark:focus:border-white/40 transition-all text-sm"
+                              className="w-full px-4 py-2.5 rounded-lg bg-[var(--color-raised)] border border-[var(--color-line)] text-[var(--color-text)] placeholder:text-[var(--color-muted)]/70 focus:outline-none focus:border-[var(--color-secondary)] transition-colors text-sm"
                             />
                           </div>
                           <div>
-                            <label htmlFor="login-password" className="block text-xs font-medium text-zinc-600 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">
+                            <label htmlFor="login-password" className="block text-xs font-medium text-[var(--color-muted)] mb-1.5 uppercase tracking-wider">
                               {t.auth.login.password}
                             </label>
                             <PasswordInput required id="login-password" name="password" autoComplete="current-password" placeholder={t.auth.login.passwordPlaceholder} />
                           </div>
                           <div className="flex items-center justify-between gap-3">
-                          <label htmlFor="remember-me" className="flex items-center gap-3 text-xs text-zinc-800 dark:text-zinc-100 cursor-pointer">
+                          <label htmlFor="remember-me" className="flex items-center gap-3 text-xs text-[var(--color-text)] cursor-pointer">
                             <input
                               type="checkbox"
                               id="remember-me"
                               name="rememberMe"
-                              className="h-4 w-4 shrink-0 rounded border-zinc-300 dark:border-zinc-400/30 accent-zinc-900 dark:accent-white cursor-pointer"
+                              className="h-4 w-4 shrink-0 rounded cursor-pointer accent-[var(--color-primary)]"
                             />
                             {t.auth.login.remember}
                           </label>
-                          <a href="/forgot-password" className="text-xs text-zinc-600 dark:text-zinc-300 underline underline-offset-2 hover:text-zinc-900 dark:hover:text-white">{t.auth.login.forgot}</a>
+                          <a href="/forgot-password" className="text-xs text-[var(--color-muted)] underline underline-offset-2 hover:text-[var(--color-text)]">{t.auth.login.forgot}</a>
                           </div>
                         </div>
 
                         <Turnstile onToken={setTurnstileToken} resetKey={turnstileReset} />
 
                         {authError && (
-                          <p role="alert" className="text-sm text-red-600 dark:text-red-400">{authError}</p>
+                          <p role="alert" className="text-sm text-red-700 dark:text-red-300">{authError}</p>
                         )}
 
                         <button
                           disabled={formStep === "submitting"}
                           type="submit"
-                          className="w-full cursor-pointer flex items-center justify-center px-8 py-3 rounded-lg bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-800 dark:hover:bg-zinc-100 font-semibold transition-all disabled:opacity-70 disabled:cursor-not-allowed"
+                          className="w-full cursor-pointer flex items-center justify-center gap-2 px-8 py-3 rounded-lg border-0 bg-[var(--color-primary)] text-[var(--color-on-primary)] font-semibold transition-opacity hover:opacity-85 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {formStep === "submitting" ? (
                             <span className="flex items-center gap-2">
-                              <span className="h-4 w-4 border-2 border-white/70 dark:border-zinc-600 border-t-transparent rounded-full animate-spin"></span>
+                              <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
                               {t.auth.login.submitting}
                             </span>
                           ) : t.auth.login.submit}
@@ -728,12 +728,12 @@ export default function Hero({
 
                         <SocialButtons verb={t.auth.login.verb} next={afterAuth} />
 
-                        <p className="text-center text-sm text-zinc-600 dark:text-zinc-300">
+                        <p className="text-center text-sm text-[var(--color-muted)]">
                           {t.auth.login.noAccount}{" "}
                           <button
                             type="button"
                             onClick={() => switchMode("register")}
-                            className="cursor-pointer border-0 bg-transparent p-0 font-medium underline underline-offset-2 text-zinc-900 dark:text-white"
+                            className="cursor-pointer border-0 bg-transparent p-0 font-medium underline underline-offset-2 text-[var(--color-text)]"
                           >
                             {t.auth.login.createOne}
                           </button>
@@ -741,32 +741,32 @@ export default function Hero({
                       </form>
                     ) : showWaitlist ? (
                       waitlistDone ? (
-                        <div className="flex flex-col items-center space-y-5 py-6 text-center text-zinc-900 dark:text-white">
-                          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-500 shadow-lg shadow-green-500/30">
-                            <Check className="h-8 w-8 text-white" />
+                        <div className="flex flex-col items-center space-y-5 py-6 text-center text-[var(--color-text)]">
+                          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-600">
+                            <Check className="h-8 w-8 text-white" aria-hidden="true" />
                           </div>
                           <div>
                             <h3 className="mb-2 text-2xl font-bold">{t.auth.waitlist.doneTitle}</h3>
-                            <p className="text-zinc-600 dark:text-zinc-200">{signupsMode === "invite_only" ? t.auth.waitlist.doneInvite : t.auth.waitlist.doneText}</p>
+                            <p className="text-[var(--color-muted)]">{signupsMode === "invite_only" ? t.auth.waitlist.doneInvite : t.auth.waitlist.doneText}</p>
                           </div>
                           <button
                             type="button"
                             onClick={handleClose}
-                            className="cursor-pointer rounded-lg bg-black/10 px-6 py-2 text-sm font-medium text-zinc-900 transition-colors hover:bg-black/15 dark:bg-white/20 dark:text-white dark:hover:bg-white/30"
+                            className="cursor-pointer rounded-lg border border-[var(--color-line)] bg-transparent px-6 py-2 text-sm font-medium text-[var(--color-text)] transition-colors hover:border-[var(--color-muted)]"
                           >
                             {t.auth.waitlist.close}
                           </button>
                         </div>
                       ) : (
                         <form onSubmit={handleWaitlist} className="space-y-4">
-                          <div className="space-y-1 pb-1 text-center text-zinc-900 dark:text-white">
+                          <div className="space-y-1 pb-1 text-center text-[var(--color-text)]">
                             <h2 className="text-3xl font-bold tracking-tight">{t.auth.waitlist.title}</h2>
-                            <p className="text-lg text-zinc-600 dark:text-zinc-300">
+                            <p className="text-lg text-[var(--color-muted)]">
                               {signupsMode === "invite_only" ? t.auth.waitlist.inviteOnly : t.auth.waitlist.subtitle}
                             </p>
                           </div>
                           <div>
-                            <label htmlFor="waitlist-email" className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-zinc-600 dark:text-zinc-300">
+                            <label htmlFor="waitlist-email" className="block text-xs font-medium text-[var(--color-muted)] mb-1.5 uppercase tracking-wider">
                               {t.auth.waitlist.email}
                             </label>
                             <input
@@ -776,31 +776,31 @@ export default function Hero({
                               name="email"
                               autoComplete="email"
                               placeholder={t.auth.waitlist.emailPlaceholder}
-                              className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm text-zinc-900 transition-all placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none dark:border-zinc-400/20 dark:bg-zinc-950/40 dark:text-white dark:placeholder:text-white/30 dark:focus:border-white/40"
+                              className="w-full px-4 py-2.5 rounded-lg bg-[var(--color-raised)] border border-[var(--color-line)] text-[var(--color-text)] placeholder:text-[var(--color-muted)]/70 focus:outline-none focus:border-[var(--color-secondary)] transition-colors text-sm"
                             />
                           </div>
 
                           <Turnstile onToken={setTurnstileToken} resetKey={turnstileReset} />
 
                           {authError && (
-                            <p role="alert" className="text-sm text-red-600 dark:text-red-400">{authError}</p>
+                            <p role="alert" className="text-sm text-red-700 dark:text-red-300">{authError}</p>
                           )}
 
                           <button
                             disabled={formStep === "submitting"}
                             type="submit"
-                            className="flex w-full cursor-pointer items-center justify-center rounded-lg bg-zinc-900 px-8 py-3 font-semibold text-white transition-all hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-70 dark:bg-white dark:text-zinc-800 dark:hover:bg-zinc-100"
+                            className="w-full cursor-pointer flex items-center justify-center gap-2 px-8 py-3 rounded-lg border-0 bg-[var(--color-primary)] text-[var(--color-on-primary)] font-semibold transition-opacity hover:opacity-85 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             {formStep === "submitting" ? (
                               <span className="flex items-center gap-2">
-                                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/70 border-t-transparent dark:border-zinc-600"></span>
+                                <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
                                 {t.auth.waitlist.submitting}
                               </span>
                             ) : t.auth.waitlist.submit}
                           </button>
 
                           {signupsMode === "invite_only" && (
-                            <p className="text-center text-sm text-zinc-600 dark:text-zinc-300">
+                            <p className="text-center text-sm text-[var(--color-muted)]">
                               {t.auth.waitlist.haveInvite}{" "}
                               <button
                                 type="button"
@@ -808,19 +808,19 @@ export default function Hero({
                                   setAuthError(null)
                                   setHaveInvite(true)
                                 }}
-                                className="cursor-pointer border-0 bg-transparent p-0 font-medium text-zinc-900 underline underline-offset-2 dark:text-white"
+                                className="cursor-pointer border-0 bg-transparent p-0 font-medium underline underline-offset-2 text-[var(--color-text)]"
                               >
                                 {t.auth.waitlist.haveInviteLink}
                               </button>
                             </p>
                           )}
 
-                          <p className="text-center text-sm text-zinc-600 dark:text-zinc-300">
+                          <p className="text-center text-sm text-[var(--color-muted)]">
                             {t.auth.register.haveAccount}{" "}
                             <button
                               type="button"
                               onClick={() => switchMode("login")}
-                              className="cursor-pointer border-0 bg-transparent p-0 font-medium text-zinc-900 underline underline-offset-2 dark:text-white"
+                              className="cursor-pointer border-0 bg-transparent p-0 font-medium underline underline-offset-2 text-[var(--color-text)]"
                             >
                               {t.auth.register.logIn}
                             </button>
@@ -829,9 +829,9 @@ export default function Hero({
                       )
                     ) : (
                       <form onSubmit={handleSubmit} className="space-y-4">
-                        <div className="space-y-1 pb-1 text-center text-zinc-900 dark:text-white">
+                        <div className="space-y-1 pb-1 text-center text-[var(--color-text)]">
                           <h2 className="text-3xl font-bold tracking-tight">{t.auth.register.title}</h2>
-                          <p className="text-lg text-zinc-600 dark:text-zinc-300">
+                          <p className="text-lg text-[var(--color-muted)]">
                             {t.auth.register.subtitle}
                           </p>
                         </div>
@@ -839,7 +839,7 @@ export default function Hero({
                         <div
                           role="tablist"
                           aria-label={t.auth.register.accountType}
-                          className="relative grid grid-cols-2 rounded-lg bg-black/5 dark:bg-white/10 p-1"
+                          className="relative grid grid-cols-2 rounded-lg bg-[var(--color-bubble)] p-1"
                         >
                           {(["personal", "business"] as const).map((type) => (
                             <button
@@ -848,16 +848,16 @@ export default function Hero({
                               role="tab"
                               aria-selected={accountType === type}
                               onClick={() => setAccountType(type)}
-                              className="relative z-10 cursor-pointer rounded-md border-0 bg-transparent py-2 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
+                              className="relative z-10 cursor-pointer rounded-md border-0 bg-transparent py-2 text-sm font-medium transition-colors focus:outline-none"
                             >
                               {accountType === type && (
                                 <motion.span
                                   layoutId="account-type-pill"
                                   transition={{ type: "spring", bounce: 0.15, duration: 0.35 }}
-                                  className="absolute inset-0 -z-10 rounded-md bg-white dark:bg-zinc-900 shadow-sm"
+                                  className="absolute inset-0 -z-10 rounded-md border border-[var(--color-line)] bg-[var(--color-raised)]"
                                 />
                               )}
-                              <span className={accountType === type ? "text-zinc-900 dark:text-white" : "text-zinc-500 dark:text-zinc-400"}>
+                              <span className={accountType === type ? "text-[var(--color-text)]" : "text-[var(--color-muted)]"}>
                                 {type === "business" ? t.auth.register.business : t.auth.register.personal}
                               </span>
                             </button>
@@ -866,7 +866,7 @@ export default function Hero({
 
                         <div className="space-y-4">
                           <div>
-                            <label htmlFor="username" className="block text-xs font-medium text-zinc-600 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">
+                            <label htmlFor="username" className="block text-xs font-medium text-[var(--color-muted)] mb-1.5 uppercase tracking-wider">
                               {t.auth.register.username}
                             </label>
                             <input
@@ -880,12 +880,12 @@ export default function Hero({
                               pattern="[A-Za-z0-9_.\-]{3,32}"
                               title={t.auth.register.usernameHint}
                               placeholder={t.auth.register.usernamePlaceholder}
-                              className="w-full px-4 py-2.5 rounded-lg bg-white dark:bg-zinc-950/40 border border-zinc-300 dark:border-zinc-400/20 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-white/30 focus:outline-none focus:border-zinc-500 dark:focus:border-white/40 transition-all text-sm"
+                              className="w-full px-4 py-2.5 rounded-lg bg-[var(--color-raised)] border border-[var(--color-line)] text-[var(--color-text)] placeholder:text-[var(--color-muted)]/70 focus:outline-none focus:border-[var(--color-secondary)] transition-colors text-sm"
                             />
                           </div>
 
                           <div>
-                            <label htmlFor="email" className="block text-xs font-medium text-zinc-600 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">
+                            <label htmlFor="email" className="block text-xs font-medium text-[var(--color-muted)] mb-1.5 uppercase tracking-wider">
                               {isBusiness ? t.auth.register.workEmail : t.auth.register.personalEmail}
                             </label>
                             <input
@@ -895,14 +895,14 @@ export default function Hero({
                               name="email"
                               autoComplete="email"
                               placeholder={isBusiness ? t.auth.register.workEmailPlaceholder : t.auth.register.personalEmailPlaceholder}
-                              className="w-full px-4 py-2.5 rounded-lg bg-white dark:bg-zinc-950/40 border border-zinc-300 dark:border-zinc-400/20 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-white/30 focus:outline-none focus:border-zinc-500 dark:focus:border-white/40 transition-all text-sm"
+                              className="w-full px-4 py-2.5 rounded-lg bg-[var(--color-raised)] border border-[var(--color-line)] text-[var(--color-text)] placeholder:text-[var(--color-muted)]/70 focus:outline-none focus:border-[var(--color-secondary)] transition-colors text-sm"
                             />
                           </div>
 
                           {isBusiness && (
                           <div className="grid grid-cols-2 gap-4">
                             <div>
-                              <label htmlFor="company" className="block text-xs font-medium text-zinc-600 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">
+                              <label htmlFor="company" className="block text-xs font-medium text-[var(--color-muted)] mb-1.5 uppercase tracking-wider">
                                 {t.auth.register.company}
                               </label>
                               <input
@@ -910,17 +910,17 @@ export default function Hero({
                                 id="company"
                                 name="company"
                                 placeholder={t.auth.register.companyPlaceholder}
-                                className="w-full px-4 py-2.5 rounded-lg bg-white dark:bg-zinc-950/40 border border-zinc-300 dark:border-zinc-400/20 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-white/30 focus:outline-none focus:border-zinc-500 dark:focus:border-white/40 transition-all text-sm"
+                                className="w-full px-4 py-2.5 rounded-lg bg-[var(--color-raised)] border border-[var(--color-line)] text-[var(--color-text)] placeholder:text-[var(--color-muted)]/70 focus:outline-none focus:border-[var(--color-secondary)] transition-colors text-sm"
                               />
                             </div>
                             <div>
-                              <label htmlFor="size" className="block text-xs font-medium text-zinc-600 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">
+                              <label htmlFor="size" className="block text-xs font-medium text-[var(--color-muted)] mb-1.5 uppercase tracking-wider">
                                 {t.auth.register.size}
                               </label>
                               <select
                                 id="size"
                                 name="companySize"
-                                className="w-full px-4 py-2.5 rounded-lg bg-white dark:bg-zinc-950/40 border border-zinc-300 dark:border-zinc-400/20 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-white/30 focus:outline-none focus:border-zinc-500 dark:focus:border-white/40 transition-all text-sm appearance-none cursor-pointer"
+                                className="w-full px-4 py-2.5 rounded-lg bg-[var(--color-raised)] border border-[var(--color-line)] text-[var(--color-text)] placeholder:text-[var(--color-muted)]/70 focus:outline-none focus:border-[var(--color-secondary)] transition-colors text-sm appearance-none cursor-pointer"
                               >
                                 <option>1-50</option>
                                 <option>51-200</option>
@@ -932,7 +932,7 @@ export default function Hero({
                           )}
 
                           <div>
-                            <label htmlFor="password" className="block text-xs font-medium text-zinc-600 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">
+                            <label htmlFor="password" className="block text-xs font-medium text-[var(--color-muted)] mb-1.5 uppercase tracking-wider">
                               {t.auth.register.password}
                             </label>
                             <PasswordInput required id="password" name="password" minLength={8} autoComplete="new-password" placeholder={t.auth.register.passwordPlaceholder} />
@@ -940,23 +940,23 @@ export default function Hero({
                         </div>
 
                         <div className="space-y-3">
-                          <div className="flex items-start gap-3 text-xs leading-relaxed text-zinc-800 dark:text-zinc-100">
+                          <div className="flex items-start gap-3 text-xs leading-relaxed text-[var(--color-text)]">
                             <input
                               required
                               type="checkbox"
                               name="acceptTerms"
                               aria-labelledby="accept-terms-label"
-                              className="mt-0.5 h-4 w-4 shrink-0 rounded border-zinc-300 dark:border-zinc-400/30 accent-zinc-900 dark:accent-white cursor-pointer"
+                              className="mt-0.5 h-4 w-4 shrink-0 rounded cursor-pointer accent-[var(--color-primary)]"
                             />
-                            <span id="accept-terms-label">{t.auth.register.acceptPre} <a href={href("/terms")} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-zinc-900 dark:hover:text-white">{t.nav.terms}</a> {t.auth.and} <a href={href("/privacy")} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-zinc-900 dark:hover:text-white">{t.nav.privacy}</a>.</span>
+                            <span id="accept-terms-label">{t.auth.register.acceptPre} <a href={href("/terms")} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-[var(--color-text)]">{t.nav.terms}</a> {t.auth.and} <a href={href("/privacy")} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-[var(--color-text)]">{t.nav.privacy}</a>.</span>
                           </div>
-                          <div className="flex items-start gap-3 text-xs leading-relaxed text-zinc-800 dark:text-zinc-100">
+                          <div className="flex items-start gap-3 text-xs leading-relaxed text-[var(--color-text)]">
                             <input
                               type="checkbox"
                               name="allowTraining"
                               aria-labelledby="allow-training-label"
                               defaultChecked
-                              className="mt-0.5 h-4 w-4 shrink-0 rounded border-zinc-300 dark:border-zinc-400/30 accent-zinc-900 dark:accent-white cursor-pointer"
+                              className="mt-0.5 h-4 w-4 shrink-0 rounded cursor-pointer accent-[var(--color-primary)]"
                             />
                             <span id="allow-training-label">{t.auth.register.allowTraining}</span>
                           </div>
@@ -965,17 +965,17 @@ export default function Hero({
                         <Turnstile onToken={setTurnstileToken} resetKey={turnstileReset} />
 
                         {authError && (
-                          <p role="alert" className="text-sm text-red-600 dark:text-red-400">{authError}</p>
+                          <p role="alert" className="text-sm text-red-700 dark:text-red-300">{authError}</p>
                         )}
 
                         <button
                           disabled={formStep === "submitting"}
                           type="submit"
-                          className="w-full cursor-pointer flex items-center justify-center px-8 py-3 rounded-lg bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-800 dark:hover:bg-zinc-100 font-semibold transition-all disabled:opacity-70 disabled:cursor-not-allowed mt-2"
+                          className="w-full cursor-pointer flex items-center justify-center gap-2 px-8 py-3 rounded-lg border-0 bg-[var(--color-primary)] text-[var(--color-on-primary)] font-semibold transition-opacity hover:opacity-85 disabled:opacity-50 disabled:cursor-not-allowed mt-2"
                         >
                           {formStep === "submitting" ? (
                              <span className="flex items-center gap-2">
-                               <span className="h-4 w-4 border-2 border-white/70 dark:border-zinc-600 border-t-transparent rounded-full animate-spin"></span>
+                               <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
                                {t.auth.register.submitting}
                              </span>
                           ) : t.auth.register.submit}
@@ -983,12 +983,12 @@ export default function Hero({
 
                         <SocialButtons verb={t.auth.register.verb} accountType={accountType} next={afterAuth} />
 
-                        <p className="text-center text-sm text-zinc-600 dark:text-zinc-300">
+                        <p className="text-center text-sm text-[var(--color-muted)]">
                           {t.auth.register.haveAccount}{" "}
                           <button
                             type="button"
                             onClick={() => switchMode("login")}
-                            className="cursor-pointer border-0 bg-transparent p-0 font-medium underline underline-offset-2 text-zinc-900 dark:text-white"
+                            className="cursor-pointer border-0 bg-transparent p-0 font-medium underline underline-offset-2 text-[var(--color-text)]"
                           >
                             {t.auth.register.logIn}
                           </button>

@@ -339,7 +339,7 @@ function Notes({ detail, onAdded }: { detail: UserDetailJson; onAdded: () => voi
           className={`${field} min-h-20 resize-y py-2`}
         />
         {error && (
-          <p role="alert" className="m-0 text-sm text-red-600 dark:text-red-400">
+          <p role="alert" className="m-0 text-sm text-red-700 dark:text-red-300">
             {error}
           </p>
         )}
@@ -442,7 +442,7 @@ function ActionDialog({ action, detail, onClose, onDone }: { action: ActionKey; 
         aria-modal="true"
         aria-labelledby={titleId}
         onSubmit={submit}
-        className="relative flex max-h-[90dvh] w-full max-w-lg flex-col gap-4 overflow-y-auto rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] p-5 text-[var(--color-text)] shadow-2xl"
+        className="relative flex max-h-[90dvh] w-full max-w-lg flex-col gap-4 overflow-y-auto rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface)] p-5 text-[var(--color-text)] shadow-[var(--shadow-modal)]"
         style={{ marginBottom: "env(safe-area-inset-bottom, 0px)" }}
       >
         <div className="flex flex-col gap-1">
@@ -543,7 +543,7 @@ function ActionDialog({ action, detail, onClose, onDone }: { action: ActionKey; 
         )}
 
         {error && (
-          <p role="alert" className="m-0 text-sm text-red-600 dark:text-red-400">
+          <p role="alert" className="m-0 text-sm text-red-700 dark:text-red-300">
             {error}
           </p>
         )}

@@ -6,9 +6,9 @@ import { cn } from "@/lib/utils"
 
 // The state's word is set in this color too: the 700 shades are the lightest that keep 4.5:1 on white
 const STATE: Record<ServiceState, { icon: typeof CircleCheck; color: string }> = {
-  operational: { icon: CircleCheck, color: "text-green-700 dark:text-green-400" },
-  degraded: { icon: CircleAlert, color: "text-amber-700 dark:text-amber-400" },
-  down: { icon: CircleX, color: "text-red-700 dark:text-red-400" },
+  operational: { icon: CircleCheck, color: "text-green-800 dark:text-green-300" },
+  degraded: { icon: CircleAlert, color: "text-amber-800 dark:text-amber-200" },
+  down: { icon: CircleX, color: "text-red-700 dark:text-red-300" },
 }
 
 export function SystemStatus({ locale, checks, checkedAt }: { locale: Locale; checks: ServiceCheck[]; checkedAt: Date }) {

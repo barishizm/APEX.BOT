@@ -233,7 +233,7 @@ export function WidgetStudio({
         {t.saving}
       </span>
     ) : save.kind === "error" ? (
-      <span className="text-red-500">{save.message}</span>
+      <span className="text-red-700 dark:text-red-300">{save.message}</span>
     ) : dirty ? (
       t.unsaved
     ) : save.kind === "saved" ? (
@@ -279,7 +279,7 @@ export function WidgetStudio({
             type="button"
             onClick={discard}
             disabled={!dirty || save.kind === "saving"}
-            className="h-9 cursor-pointer rounded-lg border border-[var(--color-line)] bg-transparent px-4 text-sm font-semibold text-[var(--color-text)] transition-colors hover:border-[var(--color-muted)] disabled:cursor-not-allowed disabled:opacity-40"
+            className="h-9 cursor-pointer rounded-lg border border-[var(--color-line)] bg-transparent px-4 text-sm font-semibold text-[var(--color-text)] transition-colors hover:border-[var(--color-muted)] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {t.discard}
           </button>
@@ -289,7 +289,7 @@ export function WidgetStudio({
             disabled={!dirty || save.kind === "saving" || !bot.canEdit}
             data-tour="save"
             title={t.saveTitle}
-            className="h-9 cursor-pointer rounded-lg border-0 bg-[var(--color-primary)] px-4 text-sm font-semibold text-[var(--color-on-primary)] transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40"
+            className="h-9 cursor-pointer rounded-lg border-0 bg-[var(--color-primary)] px-4 text-sm font-semibold text-[var(--color-on-primary)] transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {save.kind === "saving" ? t.saving : t.save}
           </button>

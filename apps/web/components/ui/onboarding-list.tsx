@@ -76,7 +76,7 @@ export function OnboardingList({ stages }: { stages: { label: string; steps: Ste
                     stage === i ? "bg-[var(--color-bubble)] text-[var(--color-text)]" : "bg-transparent text-[var(--color-muted)] hover:text-[var(--color-text)]"
                   }`}
                 >
-                  {finished && <Check className="h-3.5 w-3.5 text-green-600" strokeWidth={3} aria-label={t.done} />}
+                  {finished && <Check className="h-3.5 w-3.5 text-green-800 dark:text-green-300" strokeWidth={3} aria-label={t.done} />}
                   {s.label}
                 </button>
               );

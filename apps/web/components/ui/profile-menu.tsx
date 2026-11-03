@@ -130,7 +130,7 @@ export function ProfileMenu({
             exit={{ opacity: 0, scale: 0.96, x: -8, y: 8 }}
             transition={{ type: "spring", stiffness: 420, damping: 32, mass: 0.8 }}
             style={{ transformOrigin: "bottom left" }}
-            className="absolute bottom-0 left-full z-30 ml-4 w-80 rounded-2xl border border-[var(--color-line)] bg-[var(--color-raised)] p-4 shadow-2xl max-sm:w-[calc(100vw-5.5rem)]"
+            className="absolute bottom-0 left-full z-30 ml-4 w-80 rounded-2xl border border-[var(--color-line)] bg-[var(--color-raised)] p-4 shadow-[var(--shadow-pop)] max-sm:w-[calc(100vw-5.5rem)]"
           >
             <div className="flex items-center gap-4 px-2 pb-4 pt-2">
               <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[var(--color-secondary)] text-lg font-semibold text-[var(--color-surface)]">
@@ -140,7 +140,7 @@ export function ProfileMenu({
                 <p className="truncate font-semibold">{name}</p>
                 <p className="truncate text-sm text-[var(--color-muted)]">{email}</p>
                 {platformRole && (
-                  <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-300">
+                  <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:text-amber-200">
                     <ShieldCheck className="h-3.5 w-3.5" />
                     {t[platformRole]}
                   </span>

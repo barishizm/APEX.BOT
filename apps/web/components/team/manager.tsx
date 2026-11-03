@@ -21,8 +21,8 @@ const secondary =
   "inline-flex h-9 cursor-pointer items-center justify-center rounded-lg border border-[var(--color-line)] bg-transparent px-3 text-sm font-semibold text-[var(--color-text)] transition-colors hover:border-[var(--color-muted)] disabled:cursor-not-allowed disabled:opacity-50"
 const danger =
   "inline-flex h-9 cursor-pointer items-center justify-center rounded-lg border-0 bg-red-600 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-const errorText = "m-0 text-sm text-red-600 dark:text-red-400"
-const okText = "m-0 text-sm text-green-700 dark:text-green-400"
+const errorText = "m-0 text-sm text-red-700 dark:text-red-300"
+const okText = "m-0 text-sm text-green-800 dark:text-green-300"
 
 async function call(path: string, method: string, offline: string, body?: object) {
   try {
@@ -256,7 +256,7 @@ export function TeamManager({ initial, me }: { initial: TeamJson; me: string }) 
             {invite.invitedBy && ` · ${format(t.invitedBy, { name: invite.invitedBy })}`}
             {" · "}
             {expired ? (
-              <span className="text-amber-600 dark:text-amber-400">{t.expired}</span>
+              <span className="text-amber-800 dark:text-amber-200">{t.expired}</span>
             ) : (
               format(t.expires, { date: formatDate(invite.expiresAt, locale) })
             )}

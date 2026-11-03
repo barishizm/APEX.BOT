@@ -142,11 +142,11 @@ export function DashboardShell({
         <button
           type="button"
           onClick={() => setPaletteOpen(true)}
-          className="mx-auto flex h-9 w-full max-w-[28rem] cursor-pointer items-center gap-2 rounded-full border border-[var(--color-line)] bg-[var(--color-raised)] px-4 text-sm text-[var(--color-muted)] transition-colors hover:border-[var(--color-muted)]/60"
+          className="mx-auto flex h-9 w-full max-w-[28rem] cursor-pointer items-center gap-2 rounded-full border border-[var(--color-line)] bg-[var(--color-raised)] px-4 text-sm text-[var(--color-muted)] transition-colors hover:border-[var(--color-muted)]"
         >
           <Search className="h-4 w-4" aria-hidden />
           <span className="truncate">{t.search}</span>
-          <kbd className="ml-auto font-sans text-xs max-sm:hidden">⌘ K</kbd>
+          <kbd className="ml-auto rounded border border-[var(--color-line)] bg-[var(--color-surface)] px-1.5 font-sans text-[0.6875rem] text-[var(--color-muted)] max-sm:hidden">⌘ K</kbd>
         </button>
 
         <a href={href("/docs")} target="_blank" rel="noopener noreferrer" className={`${pill} ml-auto text-[var(--color-text)] no-underline max-md:hidden`}>

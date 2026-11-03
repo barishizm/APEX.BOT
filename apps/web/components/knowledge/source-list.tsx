@@ -230,7 +230,7 @@ export function SourceList({
               {kinds.map(([key, label]) => (
                 <button key={key} type="button" aria-pressed={kind === key} onClick={() => onKind(key)} className={segment(kind === key)}>
                   {label}
-                  <span className={cn("text-xs tabular-nums", key === "attention" ? "text-amber-600 dark:text-amber-400" : "text-[var(--color-muted)]")}>
+                  <span className={cn("text-xs tabular-nums", key === "attention" ? "text-amber-800 dark:text-amber-200" : "text-[var(--color-muted)]")}>
                     {counts[key]}
                   </span>
                 </button>

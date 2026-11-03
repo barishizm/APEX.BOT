@@ -64,7 +64,7 @@ export function WorkspacePicker({ onPick, exclude = [], disabled }: { onPick: (w
         <ul
           id={listId}
           role="listbox"
-          className="absolute inset-x-0 top-full z-20 m-0 mt-1 max-h-64 list-none overflow-y-auto rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] p-1 shadow-lg"
+          className="absolute inset-x-0 top-full z-20 m-0 mt-1 max-h-64 list-none overflow-y-auto rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] p-1 shadow-[var(--shadow-pop)]"
         >
           {!shown.length && <li className="px-3 py-2 text-sm text-[var(--color-muted)]">{t.none}</li>}
           {shown.map((w) => (

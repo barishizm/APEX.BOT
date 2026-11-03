@@ -23,7 +23,7 @@ function Meter({ label, value, max }: { label: string; value: number; max?: numb
     <div className="flex min-w-0 flex-col gap-1.5 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-3">
       <dt className="flex items-center justify-between gap-2 text-xs text-[var(--color-muted)]">
         {label}
-        {near && <span className="font-semibold text-amber-600 dark:text-amber-400">{t.nearFull}</span>}
+        {near && <span className="font-semibold text-amber-800 dark:text-amber-200">{t.nearFull}</span>}
       </dt>
       <dd className="m-0 flex items-baseline gap-1.5">
         <span className="text-xl font-semibold tabular-nums">{formatNumber(value, locale)}</span>
@@ -145,7 +145,7 @@ export function KnowledgeManager({
           </p>
         )}
         {attention > 0 && kind !== "attention" && (
-          <p className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-300">
+          <p className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-200">
             <CircleAlert className="h-4 w-4 shrink-0" aria-hidden />
             <span className="flex-1">{plural(attention, t.attention, locale)}</span>
             <button type="button" onClick={() => setKind("attention")} className="cursor-pointer border-0 bg-transparent p-0 text-xs font-semibold text-inherit underline">

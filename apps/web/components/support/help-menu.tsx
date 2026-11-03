@@ -73,7 +73,7 @@ export function HelpMenu({ site, active }: { site: { id: string; name: string } 
         <div
           role="menu"
           aria-label={t.open}
-          className="absolute bottom-0 left-full z-30 ml-4 flex w-64 flex-col gap-0.5 rounded-xl border border-[var(--color-line)] bg-[var(--color-raised)] p-1.5 shadow-2xl"
+          className="absolute bottom-0 left-full z-30 ml-4 flex w-64 flex-col gap-0.5 rounded-xl border border-[var(--color-line)] bg-[var(--color-raised)] p-1.5 shadow-[var(--shadow-pop)]"
         >
           <button
             type="button"

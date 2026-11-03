@@ -223,7 +223,7 @@ export function AddPanel({
               if (!full && !uploading) upload(e.dataTransfer.files[0])
             }}
             className={cn(
-              "flex min-h-36 cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-[var(--color-line)] bg-transparent p-6 text-center text-[var(--color-text)] transition-colors hover:border-[var(--color-muted)] disabled:cursor-not-allowed disabled:opacity-60",
+              "flex min-h-36 cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-[var(--color-line)] bg-transparent p-6 text-center text-[var(--color-text)] transition-colors hover:border-[var(--color-muted)] disabled:cursor-not-allowed disabled:opacity-50",
               dragging && "border-[var(--color-secondary)] bg-[var(--color-secondary)]/5",
             )}
           >

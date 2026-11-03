@@ -77,7 +77,7 @@ export function StatusLine({ source }: { source: SourceJson }) {
   const { t: app, locale } = useAppI18n()
   const t = app.knowledge.status
   if (source.status === "pending") {
-    return <span className="text-amber-700 dark:text-amber-400">{t.pending}</span>
+    return <span className="text-amber-800 dark:text-amber-200">{t.pending}</span>
   }
   if (source.status === "syncing") {
     return (
@@ -89,7 +89,7 @@ export function StatusLine({ source }: { source: SourceJson }) {
   }
   if (source.status === "failed") {
     return (
-      <span className="flex items-start gap-1.5 text-red-600 dark:text-red-400">
+      <span className="flex items-start gap-1.5 text-red-700 dark:text-red-300">
         <CircleAlert className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden />
         <span>
           {source.error ?? t.failed}
@@ -100,11 +100,11 @@ export function StatusLine({ source }: { source: SourceJson }) {
   }
   return (
     <span className="flex flex-wrap items-center gap-x-1.5 text-[var(--color-muted)]">
-      <CircleCheck className="h-3.5 w-3.5 text-green-600" aria-hidden />
+      <CircleCheck className="h-3.5 w-3.5 text-green-800 dark:text-green-300" aria-hidden />
       {source.kind === "website" ? `${plural(source.pages, t.pages, locale)} · ` : ""}
       {plural(source.chunks, t.excerpts, locale)}
       {source.syncedAt && ` · ${format(t.updated, { when: timeAgo(source.syncedAt, locale) })}`}
-      {source.error && <span className="text-amber-600 dark:text-amber-400">· {source.error}</span>}
+      {source.error && <span className="text-amber-800 dark:text-amber-200">· {source.error}</span>}
     </span>
   )
 }
