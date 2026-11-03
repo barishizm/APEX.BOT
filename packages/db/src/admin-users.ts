@@ -1,8 +1,9 @@
 import { inTransaction, type Queryable } from "./db.ts"
 import { AdminError, type PlatformRole } from "./admin.ts"
-import { deleteAccount, issueEmailCode, requestPasswordReset, type AccountType, type OAuthProvider, type RequestMeta } from "./auth.ts"
+import { cleanDisplayName, deleteAccount, issueEmailCode, normalizeEmail, requestPasswordReset, type AccountType, type OAuthProvider, type RequestMeta } from "./auth.ts"
 import type { Plan } from "./plans.ts"
 import { maskEmail } from "./admin-bots.ts"
+import { workspacePlanLocked } from "./admin-billing.ts"
 
 // One account in the admin area (/admin/users/[id]): everything staff see about it, and the actions
 // they can take on it. Each action runs in the caller's transaction (withAdminAction) and returns the
@@ -40,6 +41,8 @@ export interface AdminUserMembership {
   otherOwners: number
   suspendedAt: Date | null
   joinedAt: Date
+  /** A subscription decides the plan, so staff can't set it here (adminSetWorkspacePlan). */
+  planLocked: boolean
 }
 
 export interface AdminUserSession {
@@ -150,7 +153,7 @@ export async function getAdminUserDetail(q: Queryable, userId: string): Promise<
   if (!profile.rows[0]) return null
 
   const [memberships, sessions, oauth, events, notes, audit, deletion] = await Promise.all([
-    q.query<AdminUserMembership>(
+    q.query<Omit<AdminUserMembership, "planLocked">>(
       `select o.id as "organizationId", o.name, o.plan, me.role,
               (select count(*)::int from app.organization_members c where c.organization_id = o.id) as members,
               (select count(*)::int from app.organization_members c where c.organization_id = o.id and c.role = 'owner' and c.user_id <> $1) as "otherOwners",
@@ -195,9 +198,10 @@ export async function getAdminUserDetail(q: Queryable, userId: string): Promise<
     deletionImpact(q, userId),
   ])
 
+  const planLocked = await Promise.all(memberships.rows.map((m) => workspacePlanLocked(q, m.organizationId)))
   return {
     profile: profile.rows[0],
-    memberships: memberships.rows,
+    memberships: memberships.rows.map((m, i) => ({ ...m, planLocked: planLocked[i]! })),
     sessions: sessions.rows,
     oauth: oauth.rows,
     events: events.rows,
@@ -397,6 +401,109 @@ export async function adminDeleteUser(
     after: null,
     extra: { email: target.email },
   }
+}
+
+const USERNAME_RE = /^[A-Za-z0-9_.-]{3,32}$/
+const ACCOUNT_TYPES: readonly AccountType[] = ["personal", "business"]
+
+export interface ProfileEdit {
+  username?: unknown
+  /** null or "" clears it. */
+  displayName?: unknown
+  email?: unknown
+  accountType?: unknown
+}
+
+/**
+ * Edits the account's profile: username, display name, email and account type. Only the fields that
+ * differ from what is stored change; at least one must. A new email counts as verified by staff
+ * (like adminVerifyEmail): if its real owner proves it later, they take the account over. Codes still
+ * out for the old address stop working. `extra.previousEmail` is set when the email changed, so the
+ * caller can tell the old address.
+ */
+export async function adminUpdateProfile(
+  tx: Queryable,
+  actor: AdminActor,
+  userId: string,
+  input: ProfileEdit,
+  meta: RequestMeta = {},
+): Promise<ActionChange<{ previousEmail: string | null; email: string }>> {
+  const target = await lockTarget(tx, actor, userId)
+  const { rows } = await tx.query<{ username: string; display_name: string | null; account_type: AccountType }>(
+    "select username, display_name, account_type from app.users where id = $1",
+    [userId],
+  )
+  const current = rows[0]!
+  const before: Record<string, unknown> = {}
+  const after: Record<string, unknown> = {}
+  const sets: string[] = []
+  const params: unknown[] = [userId]
+  const set = (column: string, value: unknown) => {
+    params.push(value)
+    sets.push(`${column} = $${params.length}`)
+  }
+
+  if (input.username !== undefined) {
+    const username = typeof input.username === "string" ? input.username.trim() : ""
+    if (!USERNAME_RE.test(username)) throw new AdminError("invalid_input", "Username must be 3-32 letters, numbers, dots, dashes or underscores")
+    if (username !== current.username) {
+      const taken = await tx.query("select 1 from app.users where lower(username) = lower($1) and id <> $2", [username, userId])
+      if (taken.rows.length) throw new AdminError("invalid_input", "This username is taken")
+      set("username", username)
+      before.username = current.username
+      after.username = username
+    }
+  }
+
+  if (input.displayName !== undefined) {
+    if (input.displayName !== null && typeof input.displayName !== "string") throw new AdminError("invalid_input", "Enter a name")
+    const displayName = cleanDisplayName(input.displayName)
+    if (displayName !== current.display_name) {
+      set("display_name", displayName)
+      before.displayName = current.display_name
+      after.displayName = displayName
+    }
+  }
+
+  if (input.accountType !== undefined) {
+    if (!ACCOUNT_TYPES.includes(input.accountType as AccountType)) throw new AdminError("invalid_input", "Choose an account type")
+    if (input.accountType !== current.account_type) {
+      set("account_type", input.accountType)
+      before.accountType = current.account_type
+      after.accountType = input.accountType
+    }
+  }
+
+  let previousEmail: string | null = null
+  let email = target.email
+  if (input.email !== undefined) {
+    let next: string
+    try {
+      next = normalizeEmail(input.email)
+    } catch {
+      throw new AdminError("invalid_input", "Enter a valid email address")
+    }
+    if (next !== target.email) {
+      const taken = await tx.query("select 1 from app.users where email = $1 and id <> $2", [next, userId])
+      if (taken.rows.length) throw new AdminError("invalid_input", "An account with this email already exists")
+      set("email", next)
+      sets.push("email_verified_at = now()", "email_verified_by_staff_at = now()")
+      // the audit log outlives the account: keep the addresses masked
+      before.email = maskEmail(target.email)
+      after.email = maskEmail(next)
+      previousEmail = target.email
+      email = next
+    }
+  }
+
+  if (!sets.length) throw new AdminError("invalid_input", "Nothing to change")
+  await tx.query(`update app.users set ${sets.join(", ")} where id = $1`, params)
+  if (previousEmail) {
+    // codes sent to the old address (or to a change still pending) stop working
+    await tx.query("update app.verification_codes set consumed_at = now() where user_id = $1 and consumed_at is null", [userId])
+  }
+  await logEvent(tx, "profile_updated", userId, email, meta)
+  return { before, after, extra: { previousEmail, email } }
 }
 
 /** Adds an internal note to the account. Any staff member may, on any account. */

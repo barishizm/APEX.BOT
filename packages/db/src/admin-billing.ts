@@ -351,6 +351,44 @@ export async function adminGrantComp(
   }
 }
 
+/**
+ * Sets the workspace's plan by hand (PLAN_AUDIT_ACTION): a paid plan is a comp until `endsAt`
+ * (adminGrantComp); Free ends every running comp and drops a plan placed by hand (beta workspaces).
+ * Refused while a subscription decides the plan: a paying workspace's plan changes in Paddle only.
+ */
+export async function adminSetWorkspacePlan(
+  tx: Queryable,
+  organizationId: string,
+  input: { plan: unknown; endsAt: unknown; reason: string; by: string },
+  now = new Date(),
+): Promise<ActionChange<{ plan: Plan }>> {
+  if (!PLANS.includes(input.plan as Plan)) throw new AdminError("invalid_input", "Choose a plan")
+  if (input.plan !== "free") return adminGrantComp(tx, organizationId, { plan: input.plan, endsAt: input.endsAt, reason: input.reason, grantedBy: input.by }, now)
+
+  if (!isUuid(organizationId) || !(await lockOrganization(tx, organizationId))) throw new AdminError("not_found", "Workspace not found")
+  if (subscriptionLive(await getSubscription(tx, organizationId), now))
+    throw new AdminError("invalid_input", "This workspace has a subscription; change its plan in Paddle")
+  const before = (await tx.query<{ plan: Plan }>("select plan from app.organizations where id = $1", [organizationId])).rows[0]!.plan
+  const ended = await tx.query<RunningComp>(
+    `update app.plan_overrides set revoked_at = $2, revoked_by = $3
+      where organization_id = $1 and revoked_at is null and ends_at > $2 returning id, plan, ends_at`,
+    [organizationId, now, input.by],
+  )
+  if (before === "free" && !ended.rows.length) throw new AdminError("invalid_input", "This workspace is already on Free")
+  // nothing else grants a plan now: no live subscription, no comp left running
+  await tx.query("update app.organizations set plan = 'free' where id = $1", [organizationId])
+  return {
+    before: { plan: before, comps: ended.rows.map(compState) },
+    after: { plan: "free" },
+    extra: { plan: "free" },
+  }
+}
+
+/** Whether a subscription decides the workspace's plan now, so staff can't set it by hand. */
+export async function workspacePlanLocked(q: Queryable, organizationId: string, now = new Date()): Promise<boolean> {
+  return subscriptionLive(await getSubscription(q, organizationId), now)
+}
+
 /** Ends a running comp now and recomputes the plan (what the subscription grants, or Free). */
 export async function adminRevokeComp(
   tx: Queryable,

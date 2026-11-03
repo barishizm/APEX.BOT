@@ -15,6 +15,7 @@ import {
   adminSendPasswordReset,
   adminSuspendUser,
   adminUnsuspendUser,
+  adminUpdateProfile,
   adminVerifyEmail,
   getAdminUserDetail,
   type AdminActor,
@@ -75,6 +76,52 @@ describe("who may act on whom", () => {
 })
 
 describe("actions", () => {
+  test("editing the profile changes only what differs, and a new email counts as verified by staff", async () => {
+    const { boss, support } = await staff()
+    const jane = await newUser("jane@example.com", "jane")
+    await newUser("taken@example.com", "taken")
+    const change = await run((tx) =>
+      adminUpdateProfile(tx, support, jane.id, { username: "jane_doe", displayName: "  Jane   Doe ", email: " Jane.New@Example.com ", accountType: "business" }),
+    )
+    assert.deepEqual(change.before, { username: "jane", displayName: null, accountType: "personal", email: "j***@example.com" })
+    assert.deepEqual(change.after, { username: "jane_doe", displayName: "Jane Doe", accountType: "business", email: "j***@example.com" })
+    assert.deepEqual(change.extra, { previousEmail: "jane@example.com", email: "jane.new@example.com" })
+    const { rows } = await db.query<Record<string, unknown>>(
+      `select email, username, display_name, account_type, email_verified_at is not null as verified, email_verified_by_staff_at is not null as by_staff,
+              (select count(*)::int from app.verification_codes where user_id = $1 and consumed_at is null) as live
+         from app.users where id = $1`,
+      [jane.id],
+    )
+    assert.deepEqual(rows[0], {
+      email: "jane.new@example.com",
+      username: "jane_doe",
+      display_name: "Jane Doe",
+      account_type: "business",
+      verified: true,
+      by_staff: true,
+      live: 0,
+    })
+    // she still signs in, with the new address
+    await login(db, { email: "jane.new@example.com", password: PASSWORD })
+
+    // unchanged fields alone are nothing to save; an empty name clears it
+    await assert.rejects(run((tx) => adminUpdateProfile(tx, support, jane.id, { username: "jane_doe", email: "jane.new@example.com" })), code("invalid_input"))
+    const cleared = await run((tx) => adminUpdateProfile(tx, support, jane.id, { displayName: "" }))
+    assert.deepEqual([cleared.before, cleared.after, cleared.extra.previousEmail], [{ displayName: "Jane Doe" }, { displayName: null }, null])
+
+    // taken and malformed values are refused
+    await assert.rejects(run((tx) => adminUpdateProfile(tx, support, jane.id, { email: "TAKEN@example.com" })), code("invalid_input"))
+    await assert.rejects(run((tx) => adminUpdateProfile(tx, support, jane.id, { username: "Taken" })), code("invalid_input"))
+    await assert.rejects(run((tx) => adminUpdateProfile(tx, support, jane.id, { username: "a b" })), code("invalid_input"))
+    await assert.rejects(run((tx) => adminUpdateProfile(tx, support, jane.id, { email: "nope" })), code("invalid_input"))
+    await assert.rejects(run((tx) => adminUpdateProfile(tx, support, jane.id, { accountType: "admin" })), code("invalid_input"))
+
+    // the same who-may-act rules as every other action
+    await assert.rejects(run((tx) => adminUpdateProfile(tx, support, boss.id, { username: "boss2" })), code("forbidden"))
+    await assert.rejects(run((tx) => adminUpdateProfile(tx, support, support.id, { username: "help2" })), code("forbidden"))
+    await run((tx) => adminUpdateProfile(tx, boss, support.id, { username: "help2" }))
+  })
+
   test("verifying the email by hand voids the code that was out", async () => {
     const { support } = await staff()
     const jane = await newUser("jane@example.com", "jane")

@@ -5,7 +5,7 @@ import { inSavepoints, type Db } from "../src/db.ts"
 import { migrate } from "../src/migrate.ts"
 import { AdminError } from "../src/admin.ts"
 import { recordBillingEvent, upsertSubscription, type SubscriptionInput } from "../src/billing.ts"
-import { adminGrantComp, adminRevokeComp, getAdminBillingOverview, getAdminWorkspaceBilling, getBillingEvent, monthlyCents } from "../src/admin-billing.ts"
+import { adminGrantComp, adminRevokeComp, adminSetWorkspacePlan, workspacePlanLocked, getAdminBillingOverview, getAdminWorkspaceBilling, getBillingEvent, monthlyCents } from "../src/admin-billing.ts"
 
 let pg: PGlite
 let db: Db
@@ -109,6 +109,40 @@ describe("comps", () => {
     assert.equal((await getAdminWorkspaceBilling(db, org, T0))!.mayComp, true)
     await grant(org, user, "business", at(30).toISOString())
     assert.equal(await planOf(org), "business")
+  })
+})
+
+describe("setting the plan by hand", () => {
+  const setPlan = (org: string, user: string, plan: unknown, endsAt?: unknown) =>
+    db.transaction((tx) => adminSetWorkspacePlan(tx, org, { plan, endsAt, reason: "support", by: user }, T0))
+
+  test("a paid plan is a comp until the date; Free ends it and a plan placed by hand", async () => {
+    const { org, user } = await workspace()
+    await assert.rejects(setPlan(org, user, "free"), code("invalid_input"))
+    await assert.rejects(setPlan(org, user, "gold", at(30).toISOString()), code("invalid_input"))
+    await assert.rejects(setPlan(org, user, "pro"), code("invalid_input"))
+
+    const up = await setPlan(org, user, "business", at(30).toISOString())
+    assert.equal(up.extra.plan, "business")
+    assert.equal(await planOf(org), "business")
+    const down = await setPlan(org, user, "free")
+    assert.deepEqual([(down.before as { plan: string }).plan, down.after], ["business", { plan: "free" }])
+    assert.equal(await planOf(org), "free")
+    const live = await db.query<{ n: number }>("select count(*)::int as n from app.plan_overrides where organization_id = $1 and revoked_at is null", [org])
+    assert.equal(live.rows[0]!.n, 0)
+
+    // a beta workspace placed on a paid plan by hand, with no comp
+    const beta = await workspace("pro")
+    await setPlan(beta.org, beta.user, "free")
+    assert.equal(await planOf(beta.org), "free")
+  })
+
+  test("refused while a subscription decides the plan", async () => {
+    const { org, user } = await workspace()
+    await subscribe(org)
+    assert.equal(await workspacePlanLocked(db, org, T0), true)
+    await assert.rejects(setPlan(org, user, "free"), code("invalid_input"))
+    await assert.rejects(setPlan(org, user, "business", at(30).toISOString()), code("invalid_input"))
   })
 })
 

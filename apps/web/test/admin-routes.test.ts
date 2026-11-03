@@ -323,7 +323,7 @@ test("workspace, site and source actions check for staff in the workspace first"
 // (a reason, a step-up from the last 10 minutes, the audit entry in the same transaction).
 const BILLING_ACTIONS: Record<string, string[]> = {
   "billing/[action]/route.ts": ["webhook-replay"],
-  "workspaces/[id]/[action]/route.ts": ["comp", "comp-revoke"],
+  "workspaces/[id]/[action]/route.ts": ["comp", "comp-revoke", "plan"],
 }
 const BILLING_PAGES = ["billing/page.tsx", "workspaces/[id]/page.tsx"]
 
@@ -350,10 +350,15 @@ test("billing routes and pages exist, are checked above, and keep a reason and a
   const pages = sourceFiles(ADMIN_PAGES, /^page\.tsx$/).map((p) => relative(ADMIN_PAGES, p))
   for (const page of BILLING_PAGES) assert.ok(pages.includes(page), `admin page ${page} is missing`)
 
-  // staff no longer set a plan by hand: a comp, with an end date, is the only plan change
-  const workspaces = readFileSync(join(API_ADMIN, "workspaces/[id]/[action]/route.ts"), "utf8")
+  // staff never place a paid plan by hand for good: the "plan" action goes through adminSetWorkspacePlan,
+  // where a paid plan is a comp with an end date (adminGrantComp) and only Free applies at once
+  const workspaces = codeOnly(readFileSync(join(API_ADMIN, "workspaces/[id]/[action]/route.ts"), "utf8"), "workspaces")
   assert.doesNotMatch(workspaces, /\badminSetPlan\b/)
-  assert.doesNotMatch(codeOnly(workspaces, "workspaces"), /(?:^|\n)\s*plan\s*:\s*withAdminAction/)
+  assert.doesNotMatch(workspaces, /update\s+app\.organizations\s+set\s+plan/i)
+  const planAction = /(?:^|\n)\s*plan\s*:\s*withAdminAction[\s\S]*?\n {2}\}\),/.exec(workspaces)
+  assert.ok(planAction, "the workspace plan action moved; update this test")
+  assert.match(planAction[0], /\badminSetWorkspacePlan\(/)
+  assert.match(planAction[0], /\bmayChange\(/)
 
   const ADMIN = `import { withAdminAction } from "@/lib/admin"\n`
   const bad: Record<string, string> = {
