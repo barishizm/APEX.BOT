@@ -7,6 +7,7 @@ import {
   adminSendPasswordReset,
   adminSuspendUser,
   adminUnsuspendUser,
+  adminUpdateProfile,
   adminVerifyEmail,
   AuthError,
   changePlatformRole,
@@ -17,7 +18,7 @@ import { withAdminAction, type AdminActionContext } from "@/lib/admin"
 import { errorJson, setImpersonationCookie, type AdminSession } from "@/lib/auth"
 import { isLocale, type Locale } from "@/lib/i18n/config"
 import { requestLocale } from "@/lib/i18n/server"
-import { sendStaffNotice, sendStaffPasswordReset, sendVerificationCode } from "@/lib/mail"
+import { sendEmailChangedNotice, sendStaffNotice, sendStaffPasswordReset, sendVerificationCode } from "@/lib/mail"
 
 // POST /api/admin/users/<id>/<action>, body { reason, locale?, … }. Every action is audited with its
 // reason (see lib/admin.ts); the destructive ones also need a recent step-up. `locale` is the
@@ -37,6 +38,28 @@ const ACTIONS: Record<string, ReturnType<typeof withAdminAction<Params>>> = {
   "verify-email": withAdminAction<Params>({ action: "user.verify_email", targetType: "user" }, async ({ tx, admin, params, meta }: Ctx) => {
     const c = await adminVerifyEmail(tx, actor(admin), params.id, meta)
     return { targetId: params.id, before: c.before, after: c.after }
+  }),
+
+  // body { username?, displayName?, email?, accountType?, notify? }: only what differs changes. A new
+  // email is a trust decision (whoever holds it can reset the password), so this needs a step-up; the
+  // old address is told unless notify is false
+  profile: withAdminAction<Params>({ action: "user.profile", targetType: "user" }, async ({ tx, admin, params, body, meta }: Ctx) => {
+    const c = await adminUpdateProfile(
+      tx,
+      actor(admin),
+      params.id,
+      { username: body.username, displayName: body.displayName, email: body.email, accountType: body.accountType },
+      meta,
+    )
+    const { previousEmail, email } = c.extra
+    const notify = previousEmail !== null && body.notify !== false
+    const locale = await mailLocale(body)
+    return {
+      targetId: params.id,
+      before: c.before,
+      after: previousEmail ? { ...(c.after as object), notified: notify } : c.after,
+      afterCommit: notify ? () => sendEmailChangedNotice(previousEmail!, email, locale) : undefined,
+    }
   }),
 
   "resend-verification": withAdminAction<Params>(

@@ -19,6 +19,8 @@ import { button, dangerButton, Empty, field, fill, postJson, primaryButton, Sect
 export type UserDetailJson = Jsonify<AdminUserDetail>
 
 type ActionKey =
+  | "editProfile"
+  | "changePlan"
   | "verifyEmail"
   | "resendVerification"
   | "passwordReset"
@@ -43,6 +45,10 @@ interface ActionSpec {
 }
 
 const ACTIONS: Record<ActionKey, ActionSpec> = {
+  // the email the old address gets when the email changes (a checkbox, shown only then)
+  editProfile: { path: "profile", stepUp: true },
+  // posts to /api/admin/workspaces/<id>/plan instead
+  changePlan: { path: "plan", stepUp: true },
   verifyEmail: { path: "verify-email", stepUp: true },
   resendVerification: { path: "resend-verification", stepUp: false, mail: true },
   passwordReset: { path: "password-reset", stepUp: false, mail: true },
@@ -56,6 +62,10 @@ const ACTIONS: Record<ActionKey, ActionSpec> = {
   impersonate: { path: "impersonate", stepUp: true },
 }
 
+type Membership = UserDetailJson["memberships"][number]
+const PLANS = ["free", "starter", "pro", "business"] as const
+type PlanKey = (typeof PLANS)[number]
+
 export function UserDetail({ detail, viewer }: { detail: UserDetailJson; viewer: { id: string; role: PlatformRole } }) {
   const { t: app, locale } = useAppI18n()
   const t = app.admin!.users.detail
@@ -63,6 +73,7 @@ export function UserDetail({ detail, viewer }: { detail: UserDetailJson; viewer:
   const router = useRouter()
   const { profile: p } = detail
   const [open, setOpen] = useState<ActionKey | null>(null)
+  const [planOf, setPlanOf] = useState<Membership | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
   // the same rules the server enforces (admin-users.ts lockTarget); this only hides what would be refused
@@ -71,6 +82,7 @@ export function UserDetail({ detail, viewer }: { detail: UserDetailJson; viewer:
   const available: ActionKey[] = locked
     ? []
     : ([
+        "editProfile",
         !p.emailVerifiedAt && "verifyEmail",
         !p.emailVerifiedAt && "resendVerification",
         "passwordReset",
@@ -89,6 +101,7 @@ export function UserDetail({ detail, viewer }: { detail: UserDetailJson; viewer:
       router.push("/admin/users")
       return
     }
+    setPlanOf(null)
     setNotice(t.done[action as Exclude<ActionKey, "delete" | "impersonate">])
     router.refresh()
   }
@@ -157,7 +170,7 @@ export function UserDetail({ detail, viewer }: { detail: UserDetailJson; viewer:
 
           <Section title={t.sections.workspaces} count={detail.memberships.length}>
             {detail.memberships.length ? (
-              <Table head={[t.workspaceColumns.name, t.workspaceColumns.plan, t.workspaceColumns.role, t.workspaceColumns.members, t.workspaceColumns.joined]}>
+              <Table head={[t.workspaceColumns.name, t.workspaceColumns.plan, t.workspaceColumns.role, t.workspaceColumns.members, t.workspaceColumns.joined, t.workspaceColumns.actions]}>
                 {detail.memberships.map((m) => (
                   <tr key={m.organizationId} className="border-t border-[var(--color-line)]">
                     <td className={td}>
@@ -173,6 +186,26 @@ export function UserDetail({ detail, viewer }: { detail: UserDetailJson; viewer:
                     </td>
                     <td className={`${td} tabular-nums`}>{formatNumber(m.members, locale)}</td>
                     <td className={td}>{formatDate(m.joinedAt, locale)}</td>
+                    <td className={`${td} whitespace-nowrap text-right`}>
+                      {m.planLocked ? (
+                        <span className="text-xs text-[var(--color-muted)]">{t.planLocked}</span>
+                      ) : (
+                        // the server refuses support on a workspace with staff in it (assertMayChangeWorkspace)
+                        (viewer.role === "superadmin" || !p.platformRole) && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setNotice(null)
+                              setPlanOf(m)
+                              setOpen("changePlan")
+                            }}
+                            className={cn(button, "h-8 px-2.5 text-xs")}
+                          >
+                            {t.changePlan}
+                          </button>
+                        )
+                      )}
+                    </td>
                   </tr>
                 ))}
               </Table>
@@ -302,7 +335,18 @@ export function UserDetail({ detail, viewer }: { detail: UserDetailJson; viewer:
         </aside>
       </div>
 
-      {open && <ActionDialog action={open} detail={detail} onClose={() => setOpen(null)} onDone={() => done(open)} />}
+      {open && (
+        <ActionDialog
+          action={open}
+          detail={detail}
+          workspace={planOf}
+          onClose={() => {
+            setOpen(null)
+            setPlanOf(null)
+          }}
+          onDone={() => done(open)}
+        />
+      )}
     </div>
   )
 }
@@ -366,7 +410,23 @@ function Notes({ detail, onAdded }: { detail: UserDetailJson; onAdded: () => voi
   )
 }
 
-function ActionDialog({ action, detail, onClose, onDone }: { action: ActionKey; detail: UserDetailJson; onClose: () => void; onDone: () => void }) {
+/** A date `days` from today as YYYY-MM-DD, for a date input. */
+const dayInput = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10)
+
+function ActionDialog({
+  action,
+  detail,
+  workspace,
+  onClose,
+  onDone,
+}: {
+  action: ActionKey
+  detail: UserDetailJson
+  /** The workspace whose plan "changePlan" sets. */
+  workspace: Membership | null
+  onClose: () => void
+  onDone: () => void
+}) {
   const { t: app, locale } = useAppI18n()
   const t = app.admin!.users.detail
   const spec = ACTIONS[action]
@@ -378,6 +438,12 @@ function ActionDialog({ action, detail, onClose, onDone }: { action: ActionKey; 
   const [confirmEmail, setConfirmEmail] = useState("")
   const [minutes, setMinutes] = useState("30")
   const [code, setCode] = useState("")
+  const [username, setUsername] = useState(p.username)
+  const [displayName, setDisplayName] = useState(p.displayName ?? "")
+  const [email, setEmail] = useState(p.email)
+  const [accountType, setAccountType] = useState(p.accountType)
+  const [plan, setPlan] = useState<PlanKey>((workspace?.plan as PlanKey | undefined) ?? "free")
+  const [freeUntil, setFreeUntil] = useState(dayInput(365))
   // null until the step-up check answers; true when a code must be typed first
   const [needCode, setNeedCode] = useState<boolean | null>(spec.stepUp ? null : false)
   const [busy, setBusy] = useState(false)
@@ -402,7 +468,13 @@ function ActionDialog({ action, detail, onClose, onDone }: { action: ActionKey; 
   }, [busy, onClose])
 
   const emailMatches = action !== "delete" || confirmEmail.trim().toLowerCase() === p.email
-  const ready = reason.trim() && emailMatches && needCode !== null && (!needCode || /^\d{6}$/.test(code.replace(/\s/g, "")))
+  const emailChanged = action === "editProfile" && email.trim().toLowerCase() !== p.email
+  const profileChanged =
+    action !== "editProfile" || emailChanged || username.trim() !== p.username || displayName.trim() !== (p.displayName ?? "") || accountType !== p.accountType
+  const planReady = action !== "changePlan" || (plan === "free" ? workspace?.plan !== "free" : Boolean(freeUntil))
+  const mails = Boolean(spec.mail) || emailChanged
+  const ready =
+    reason.trim() && emailMatches && profileChanged && planReady && needCode !== null && (!needCode || /^\d{6}$/.test(code.replace(/\s/g, "")))
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -417,11 +489,18 @@ function ActionDialog({ action, detail, onClose, onDone }: { action: ActionKey; 
         setCode("")
       }
       const body: Record<string, unknown> = { reason, ...spec.body }
-      if (spec.mail) body.locale = mailLocale
-      if (spec.notify) body.notify = notify
+      if (mails) body.locale = mailLocale
+      if (spec.notify || emailChanged) body.notify = notify
       if (action === "delete") body.confirmEmail = confirmEmail
       if (action === "impersonate") body.minutes = Number(minutes)
-      const res = await postJson(`/api/admin/users/${p.id}/${spec.path}`, body)
+      if (action === "editProfile") Object.assign(body, { username: username.trim(), displayName: displayName.trim() || null, email: email.trim(), accountType })
+      if (action === "changePlan") {
+        body.plan = plan
+        // the end of the chosen day, in the staff member's time zone
+        if (plan !== "free") body.endsAt = new Date(`${freeUntil}T23:59:59`).toISOString()
+      }
+      const url = action === "changePlan" && workspace ? `/api/admin/workspaces/${workspace.organizationId}/plan` : `/api/admin/users/${p.id}/${spec.path}`
+      const res = await postJson(url, body)
       // a full load into the app as the user, under the view's own cookie
       if (res.ok && action === "impersonate") return window.location.assign((res.data as { next?: string } | null)?.next ?? "/dashboard")
       if (res.ok) return onDone()
@@ -480,20 +559,74 @@ function ActionDialog({ action, detail, onClose, onDone }: { action: ActionKey; 
           </div>
         )}
 
+        {action === "editProfile" && (
+          <div className="flex flex-col gap-3">
+            <label className={label}>
+              {t.dialog.username}
+              <input value={username} onChange={(e) => setUsername(e.target.value)} maxLength={32} autoComplete="off" spellCheck={false} className={`${field} h-10`} />
+            </label>
+            <label className={label}>
+              {t.dialog.displayName}
+              <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} maxLength={64} autoComplete="off" className={`${field} h-10`} />
+              <span className="text-xs font-normal text-[var(--color-muted)]">{t.dialog.displayNameHint}</span>
+            </label>
+            <label className={label}>
+              {t.dialog.email}
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={254} autoComplete="off" spellCheck={false} className={`${field} h-10`} />
+              {emailChanged && <span className="text-xs font-normal text-[var(--color-muted)]">{t.dialog.emailHint}</span>}
+            </label>
+            <label className={label}>
+              {t.dialog.accountType}
+              <select value={accountType} onChange={(e) => setAccountType(e.target.value as typeof accountType)} className={`${field} h-10 cursor-pointer`}>
+                {(["personal", "business"] as const).map((a) => (
+                  <option key={a} value={a}>
+                    {app.admin!.users.accountTypes[a]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {!profileChanged && <span className="text-xs text-[var(--color-muted)]">{t.dialog.nothingChanged}</span>}
+          </div>
+        )}
+
+        {action === "changePlan" && workspace && (
+          <div className="flex flex-col gap-3">
+            <p className="m-0 text-sm">
+              <span className="text-[var(--color-muted)]">{t.dialog.workspace}:</span> <span className="font-medium">{workspace.name}</span>
+            </p>
+            <label className={label}>
+              {t.dialog.plan}
+              <select value={plan} onChange={(e) => setPlan(e.target.value as PlanKey)} className={`${field} h-10 cursor-pointer`}>
+                {PLANS.map((pl) => (
+                  <option key={pl} value={pl}>
+                    {app.admin!.workspaces.plans[pl]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {plan !== "free" && (
+              <label className={label}>
+                {t.dialog.freeUntil}
+                <input type="date" value={freeUntil} min={dayInput(1)} max={dayInput(730)} onChange={(e) => setFreeUntil(e.target.value)} className={`${field} h-10`} />
+              </label>
+            )}
+          </div>
+        )}
+
         <label className={label}>
           {t.dialog.reason}
-          <textarea value={reason} onChange={(e) => setReason(e.target.value)} maxLength={1000} rows={3} required autoFocus className={`${field} resize-y py-2`} />
+          <textarea value={reason} onChange={(e) => setReason(e.target.value)} maxLength={1000} rows={3} required autoFocus={action !== "editProfile" && action !== "changePlan"} className={`${field} resize-y py-2`} />
           <span className="text-xs font-normal text-[var(--color-muted)]">{t.dialog.reasonHint}</span>
         </label>
 
-        {spec.notify && (
+        {(spec.notify || emailChanged) && (
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={notify} onChange={(e) => setNotify(e.target.checked)} className="h-4 w-4 accent-[var(--color-text)]" />
-            {t.dialog.notify}
+            {emailChanged ? t.dialog.notifyEmail : t.dialog.notify}
           </label>
         )}
 
-        {spec.mail && (!spec.notify || notify) && (
+        {mails && (!(spec.notify || emailChanged) || notify) && (
           <label className={label}>
             {t.dialog.language}
             <select value={mailLocale} onChange={(e) => setMailLocale(e.target.value as Locale)} className={`${field} h-10 cursor-pointer`}>

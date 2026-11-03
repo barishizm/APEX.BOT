@@ -187,9 +187,9 @@ function readTemplate(src: string, start: number): { end: number; holes: string[
 }
 
 // Module constants built only from literals (SCREAMING_CASE), plus reviewed exceptions: the list
-// filter picked from a fixed map, and the profile update's "column = $n" pairs.
+// filter picked from a fixed map, and the profile updates' "column = $n" pairs (auth.ts, admin-users.ts).
 const SAFE_HOLE = /^[A-Z][A-Z0-9_]*$/
-const ALLOWED_HOLES: Record<string, string[]> = { "conversations.ts": ["filter"], "auth.ts": ['sets.join(", ")'] }
+const ALLOWED_HOLES: Record<string, string[]> = { "conversations.ts": ["filter"], "auth.ts": ['sets.join(", ")'], "admin-users.ts": ['sets.join(", ")'] }
 
 describe("every query is parameterized", () => {
   const files = readdirSync(SRC).filter((f) => f.endsWith(".ts"))

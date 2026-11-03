@@ -27,6 +27,13 @@ Yazma işlemleri yalnızca `withAdminAction` (`apps/web/lib/admin.ts`) ile yapı
 
 Bunların unutulmaması testlerle korunur: `apps/web/test/admin-routes.test.ts`, `app/api/admin` altındaki her route dosyasını okur ve oturum kontrolü olmayan, JSON dışı gövde okuyan ya da (çalışma alanı, bot ve kaynak işlemlerinde) personel kontrolünü atlayan bir handler'da başarısız olur.
 
+### Profili düzenlemek
+
+`/admin/users/<id>` → **Profili düzenle**: kullanıcı adı, görünen ad, e-posta ve hesap tipi (bireysel/kurumsal). Yalnızca değişen alanlar kaydedilir; gerekçe ve step-up ister, audit'e `user.profile` olarak (e-postalar maskeli) düşer. Diğer işlemlerle aynı kural geçerlidir: kendi hesabın ve superadmin değiştirilemez, personel hesabını yalnızca superadmin değiştirir.
+
+- Yeni e-posta **personelce doğrulanmış** sayılır (`email_verified_by_staff_at`): adresin gerçek sahibi daha sonra kanıtlarsa hesabı devralır. Eski adrese gönderilmiş kodlar geçersiz olur. İşaretli bırakılırsa eski adrese "e-postanız değişti" bildirimi gider.
+- E-posta değiştirmek, şifre sıfırlamanın gideceği yeri değiştirir: yalnızca kimliği doğrulanmış bir talep üzerine yap.
+
 ### "Kullanıcı olarak görüntüle" (impersonation)
 
 - Yalnızca superadmin, step-up ve gerekçeyle; en fazla 30 dakika. Personel, askıdaki hesaplar ve kendi hesabı görüntülenemez.
@@ -118,10 +125,11 @@ Hesap ele geçirildiyse eski hesabın oturumlarını da sil (`delete from app.se
 
 ### Ücretsiz plan tanımak (comp)
 
-Personelin elle yapabildiği tek plan değişikliği budur: `/admin/workspaces/<id>` → **Ücretsiz plan tanı (comp)** → plan, bitiş tarihi (en fazla 2 yıl) ve gerekçe; step-up ister, audit'e `organization.comp` olarak düşer. Bitiş günü çalışma alanı kendiliğinden Free'ye döner. Yeni bir comp, süren comp'un yerini alır; **Şimdi bitir** onu hemen sonlandırır (`organization.comp_revoke`).
+Ücretli bir planı elle vermenin tek yolu budur: `/admin/workspaces/<id>` → **Ücretsiz plan tanı (comp)** → plan, bitiş tarihi (en fazla 2 yıl) ve gerekçe; step-up ister, audit'e `organization.comp` olarak düşer. Bitiş günü çalışma alanı kendiliğinden Free'ye döner. Yeni bir comp, süren comp'un yerini alır; **Şimdi bitir** onu hemen sonlandırır (`organization.comp_revoke`).
 
 - **Aboneliği olan bir çalışma alanına comp verilemez** (iptal edilmiş ama dönemi bitmemiş abonelik dahil): planı abonelik belirler ve Paddle'da değişir. Abonelik bittikten sonra comp verilebilir.
-- Comp'lar öncesinde elle plan verilmiş (beta) çalışma alanları "Elle atanmış" görünür ve planlarını korur. Bitiş tarihi vermek için aynı plandan bir comp tanı. Hemen Free'ye düşürmek için bir comp tanıyıp **Şimdi bitir** de.
+- Comp'lar öncesinde elle plan verilmiş (beta) çalışma alanları "Elle atanmış" görünür ve planlarını korur. Bitiş tarihi vermek için aynı plandan bir comp tanı.
+- **Kullanıcı sayfasından plan değiştirmek:** `/admin/users/<id>` → Çalışma alanları tablosunda **Planı değiştir**. Ücretli bir plan seçmek, seçilen tarihe kadar bir comp tanır (yukarıdakiyle aynı kurallar); **Free** seçmek süren her comp'u/yerleştirmeyi bitirir ve elle atanmış planı hemen Free yapar. Audit'e `organization.plan` olarak düşer, step-up ister. Aboneliği olan alanlarda düğme yerine "Paddle'dan değiştirin" yazar.
 - Destek personeli, içinde personel olan bir çalışma alanına comp veremez (kendi alanı dahil); bunu superadmin yapar.
 
 ### Lansman: beta çalışma alanlarını plana yerleştirmek

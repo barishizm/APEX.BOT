@@ -7,12 +7,14 @@ import {
   adminRevokeComp,
   adminRevokeInvite,
   adminSetWorkspaceNote,
+  adminSetWorkspacePlan,
   adminSuspendWorkspace,
   adminTransferOwnership,
   adminUnsuspendWorkspace,
   assertMayChangeWorkspace,
   COMP_AUDIT_ACTION,
   COMP_REVOKE_AUDIT_ACTION,
+  PLAN_AUDIT_ACTION,
 } from "@apex/db"
 import { withAdminAction, type AdminActionContext } from "@/lib/admin"
 import { errorJson, type AdminSession } from "@/lib/auth"
@@ -35,11 +37,19 @@ const mayChange = (tx: Ctx["tx"], admin: AdminSession, id: string) =>
   assertMayChangeWorkspace(tx, { id: admin.user.id, role: admin.user.platformRole }, id)
 
 const ACTIONS: Record<string, ReturnType<typeof withAdminAction<Params>>> = {
-  // the only plan change staff make: a paid plan for free until `endsAt`, never on a workspace that
+  // a paid plan for free until `endsAt`, never on a workspace that
   // pays (admin-billing.ts). The plan timeline on the detail page reads these entries back.
   comp: withAdminAction<Params>({ action: COMP_AUDIT_ACTION, targetType: "organization" }, async ({ tx, params, body, reason, admin }: Ctx) => {
     await mayChange(tx, admin, params.id)
     const c = await adminGrantComp(tx, params.id, { plan: body.plan, endsAt: body.endsAt, reason, grantedBy: admin.user.id })
+    return { targetId: params.id, before: c.before, after: c.after, result: c.extra }
+  }),
+
+  // body { plan, endsAt? }: any plan by hand. A paid one is a comp until endsAt; Free ends every comp
+  // and a plan placed by hand. Never on a workspace whose subscription decides its plan.
+  plan: withAdminAction<Params>({ action: PLAN_AUDIT_ACTION, targetType: "organization" }, async ({ tx, params, body, reason, admin }: Ctx) => {
+    await mayChange(tx, admin, params.id)
+    const c = await adminSetWorkspacePlan(tx, params.id, { plan: body.plan, endsAt: body.endsAt, reason, by: admin.user.id })
     return { targetId: params.id, before: c.before, after: c.after, result: c.extra }
   }),
 
