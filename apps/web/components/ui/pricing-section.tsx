@@ -34,9 +34,9 @@ export const Component = ({ billing = false }: { billing?: boolean }) => {
       <div className="mx-auto max-w-7xl px-6 md:px-8">
         <div className="mb-14 flex flex-col items-center text-center">
           <p className="eyebrow mb-4">{t.eyebrow}</p>
-          <h1 className="mb-4 max-w-2xl text-balance text-4xl font-semibold tracking-tight sm:text-5xl">
+          <h1 className="mb-4 max-w-2xl text-balance text-4xl font-bold leading-[1.08] tracking-[-0.035em] sm:text-5xl">
             {t.titleA} <br className="hidden sm:block" />
-            <span className="text-[color-mix(in_srgb,var(--color-text)_45%,transparent)]">{t.titleB}</span>
+            <span className="text-[var(--color-muted)]">{t.titleB}</span>
           </h1>
           <p className="max-w-xl text-balance text-base text-[var(--color-muted)] sm:text-lg">
             {t.lede}
@@ -84,10 +84,10 @@ export const Component = ({ billing = false }: { billing?: boolean }) => {
             };
             const checkout = billing && id !== "free" ? billingPath({ plan: id, interval: annual ? "year" : "month" }) : null;
             const ctaClass = cn(
-              "mb-8 flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-md text-sm font-medium no-underline transition-opacity hover:opacity-90 active:scale-[0.98]",
+              "mb-8 flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-lg text-sm font-semibold no-underline transition-[opacity,border-color] active:scale-[0.98]",
               featured
-                ? "border-0 bg-[var(--color-text)] text-[var(--color-surface)]"
-                : "border border-[var(--color-line)] bg-transparent text-[var(--color-text)]",
+                ? "border-0 bg-[var(--color-primary)] text-[var(--color-on-primary)] hover:opacity-85"
+                : "border border-[var(--color-line)] bg-transparent text-[var(--color-text)] hover:border-[var(--color-muted)]",
             );
             return (
               <article
@@ -95,7 +95,7 @@ export const Component = ({ billing = false }: { billing?: boolean }) => {
                 className={cn(
                   "relative flex flex-col rounded-xl border p-7",
                   featured
-                    ? "border-[color-mix(in_srgb,var(--color-text)_30%,transparent)] bg-[var(--color-raised)] shadow-xl"
+                    ? "border-[color-mix(in_srgb,var(--color-text)_30%,transparent)] bg-[var(--color-raised)] shadow-[var(--shadow-pop)]"
                     : "border-[var(--color-line)] bg-[var(--color-raised)]",
                 )}
               >

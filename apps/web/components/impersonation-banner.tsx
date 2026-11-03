@@ -56,7 +56,7 @@ export function ImpersonationBanner({ name, email, expiresAt }: { name: string; 
         type="button"
         onClick={exit}
         disabled={exiting}
-        className="inline-flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-white/60 bg-white px-2.5 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-70"
+        className="inline-flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-white/60 bg-white px-2.5 text-xs font-semibold text-red-700 dark:text-red-300 hover:bg-red-50 disabled:opacity-50"
       >
         {exiting ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <LogOut className="h-3.5 w-3.5" aria-hidden />}
         {exiting ? t.exiting : t.exit}

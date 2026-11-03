@@ -121,6 +121,7 @@ export const tr: Dictionary = {
       oauth_failed: "Bu sağlayıcıyla giriş yapılamadı. Tekrar deneyin veya e-posta adresinizi kullanın",
       oauth_signups_closed: "Henüz yeni kayıt almıyoruz. Bekleme listesine katılın, açıldığında size e-posta gönderelim",
       account_suspended: "Bu hesap askıya alındı. Destek ekibiyle iletişime geçin",
+      humanCheck: "İnsan doğrulamasının bitmesini bekleyin, sonra tekrar deneyin",
       generic: "Bir şeyler ters gitti. Tekrar deneyin",
       network: "Sunucuya ulaşılamadı. Bağlantınızı kontrol edip tekrar deneyin",
     },

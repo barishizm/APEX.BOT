@@ -192,7 +192,7 @@ export function BotDetail({
                 <p className="m-0 text-xs text-[var(--color-muted)]">{t.issuesHint}</p>
               </div>
             ) : (
-              <p className="m-0 text-sm text-green-700 dark:text-green-300">{t.issuesNone}</p>
+              <p className="m-0 text-sm text-green-800 dark:text-green-300">{t.issuesNone}</p>
             )}
             <p className="m-0 text-xs text-[var(--color-muted)]">{t.settingsHint}</p>
             <pre className="m-0 max-h-[32rem] overflow-auto rounded-lg border border-[var(--color-line)] bg-[var(--color-raised)] p-3 text-xs leading-relaxed">

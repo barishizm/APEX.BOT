@@ -42,7 +42,7 @@ function Kpi({ label, value, help, tone }: { label: string; value: string; help:
 function Alert({ tone, children }: { tone: "bad" | "warn"; children: React.ReactNode }) {
   return (
     <div role="alert" className={cn("flex gap-3 rounded-xl border px-4 py-3 text-sm", tone === "bad" ? "border-red-500/50 bg-red-500/10" : "border-amber-500/50 bg-amber-500/10")}>
-      <AlertTriangle className={cn("mt-0.5 h-4 w-4 shrink-0", tone === "bad" ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400")} aria-hidden />
+      <AlertTriangle className={cn("mt-0.5 h-4 w-4 shrink-0", tone === "bad" ? "text-red-700 dark:text-red-300" : "text-amber-800 dark:text-amber-200")} aria-hidden />
       <div className="min-w-0">{children}</div>
     </div>
   )

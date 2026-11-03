@@ -470,7 +470,7 @@ function Badge({ children, tone = "muted" }: { children: ReactNode; tone?: "mute
       className={cn(
         "rounded-full px-2 py-px text-[0.6875rem] font-semibold",
         tone === "accent" && "bg-[var(--color-secondary)] text-[var(--color-surface)]",
-        tone === "warn" && "bg-amber-500/15 text-amber-600 dark:text-amber-400",
+        tone === "warn" && "bg-amber-500/15 text-amber-800 dark:text-amber-200",
         tone === "muted" && "bg-[var(--color-bubble)] text-[var(--color-muted)]",
       )}
     >
@@ -542,7 +542,7 @@ export function ModelSection({ s, set, err }: SectionProps) {
                 disabled={locked}
                 onClick={() => set("model", { id: m.id })}
                 className={cn(
-                  "flex cursor-pointer items-start gap-3 rounded-xl border bg-[var(--color-raised)] p-3.5 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60",
+                  "flex cursor-pointer items-start gap-3 rounded-xl border bg-[var(--color-raised)] p-3.5 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50",
                   on ? "border-[var(--color-secondary)] ring-1 ring-[var(--color-secondary)]" : "border-[var(--color-line)] hover:border-[var(--color-muted)]/60",
                 )}
               >
@@ -578,7 +578,7 @@ export function ModelSection({ s, set, err }: SectionProps) {
         {served && <PlanNote>{format(app.studio.plan.model, { model: current?.label ?? mo.id, served: served.label })}</PlanNote>}
         {plan.ent && !served && list.some(lockedModel) && <PlanNote>{app.studio.plan.notInPlan}</PlanNote>}
         {current?.preview && (
-          <p className="flex items-start gap-2 rounded-lg bg-amber-500/10 p-3 text-xs leading-relaxed text-amber-700 dark:text-amber-300">
+          <p className="flex items-start gap-2 rounded-lg bg-amber-500/10 p-3 text-xs leading-relaxed text-amber-800 dark:text-amber-200">
             <TriangleAlert className="mt-px h-4 w-4 shrink-0" aria-hidden />
             {t.previewWarning}
           </p>
@@ -1005,7 +1005,7 @@ Apex.on("message", (m) => console.log(m.text))`
           <CodeBlock label={t.embed} code={snippet} />
         </div>
         {sec.allowedOrigins.length === 0 && (
-          <p className="flex items-start gap-2 rounded-lg bg-amber-500/10 p-3 text-xs leading-relaxed text-amber-700 dark:text-amber-300">
+          <p className="flex items-start gap-2 rounded-lg bg-amber-500/10 p-3 text-xs leading-relaxed text-amber-800 dark:text-amber-200">
             <TriangleAlert className="mt-px h-4 w-4 shrink-0" aria-hidden />
             {t.noOrigins}
           </p>

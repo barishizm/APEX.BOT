@@ -201,7 +201,7 @@ export function CommandPalette({
         aria-modal="true"
         aria-label={t.dialog}
         onMouseDown={(e) => e.stopPropagation()}
-        className="flex max-h-[70vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-[var(--color-line)] bg-[var(--color-raised)] text-[var(--color-text)] shadow-2xl"
+        className="flex max-h-[70vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-[var(--color-line)] bg-[var(--color-raised)] text-[var(--color-text)] shadow-[var(--shadow-modal)]"
       >
         <div className="flex items-center gap-3 border-b border-[var(--color-line)] px-4">
           <Search className="h-4 w-4 shrink-0 text-[var(--color-muted)]" aria-hidden />
@@ -217,7 +217,7 @@ export function CommandPalette({
             aria-activedescendant={results[index] ? `command-${index}` : undefined}
             className="h-12 min-w-0 flex-1 border-0 bg-transparent text-[0.9375rem] text-[var(--color-text)] outline-none placeholder:text-[var(--color-muted)]"
           />
-          <kbd className="rounded border border-[var(--color-line)] px-1.5 font-sans text-[0.6875rem] text-[var(--color-muted)]">Esc</kbd>
+          <kbd className="rounded border border-[var(--color-line)] bg-[var(--color-surface)] px-1.5 font-sans text-[0.6875rem] text-[var(--color-muted)]">Esc</kbd>
         </div>
         <ul ref={listRef} id="command-results" role="listbox" className="overflow-y-auto p-2">
           {results.length === 0 && <li className="px-3 py-8 text-center text-sm text-[var(--color-muted)]">{t.noMatches.replace("{query}", query)}</li>}

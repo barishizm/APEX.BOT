@@ -32,9 +32,9 @@ function Progress({ state, children }: { state: "done" | "active" | "todo" | "fa
       <Icon
         className={cn(
           "h-4 w-4 shrink-0",
-          state === "done" && "text-green-600",
+          state === "done" && "text-green-800 dark:text-green-300",
           state === "active" && "animate-spin",
-          state === "failed" && "text-red-500",
+          state === "failed" && "text-red-700 dark:text-red-300",
           state === "todo" && "opacity-50",
         )}
         aria-hidden="true"
@@ -181,7 +181,7 @@ export default function Onboarding() {
                   )}
                 />
                 {(error || (phase === "failed" && source?.error)) && (
-                  <p id="website-url-error" role="alert" style={{ marginTop: 8 }} className="flex items-center gap-2 text-sm text-red-500">
+                  <p id="website-url-error" role="alert" style={{ marginTop: 8 }} className="flex items-center gap-2 text-sm text-red-700 dark:text-red-300">
                     <CircleAlert className="h-4 w-4 shrink-0" aria-hidden="true" />
                     {error ?? source?.error}
                   </p>

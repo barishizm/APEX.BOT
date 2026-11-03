@@ -12,7 +12,7 @@ import { bake, ImageEditor, type Adjust } from "./image-editor"
 // so spacing here comes from flex gaps, never margin utilities.
 
 export const inputClass =
-  "w-full rounded-lg border bg-[var(--color-raised)] px-3 text-sm text-[var(--color-text)] outline-none transition-colors placeholder:text-[var(--color-muted)]/70 disabled:cursor-not-allowed disabled:opacity-60"
+  "w-full rounded-lg border bg-[var(--color-raised)] px-3 text-sm text-[var(--color-text)] outline-none transition-colors placeholder:text-[var(--color-muted)]/70 disabled:cursor-not-allowed disabled:opacity-50"
 const borderFor = (error?: string) =>
   error ? "border-red-500" : "border-[var(--color-line)] hover:border-[var(--color-muted)]/60 focus:border-[var(--color-secondary)]"
 
@@ -53,7 +53,7 @@ export function Field({
           {label}
         </label>
         {counter && (
-          <span className={cn("text-xs tabular-nums", counter.value > counter.max ? "text-red-500" : "text-[var(--color-muted)]")}>
+          <span className={cn("text-xs tabular-nums", counter.value > counter.max ? "text-red-700 dark:text-red-300" : "text-[var(--color-muted)]")}>
             {counter.value}/{counter.max}
           </span>
         )}
@@ -66,7 +66,7 @@ export function Field({
 
 export function ErrorText({ children }: { children: ReactNode }) {
   return (
-    <p role="alert" className="flex items-center gap-1.5 text-xs text-red-500">
+    <p role="alert" className="flex items-center gap-1.5 text-xs text-red-700 dark:text-red-300">
       <CircleAlert className="h-3.5 w-3.5 shrink-0" aria-hidden />
       {children}
     </p>

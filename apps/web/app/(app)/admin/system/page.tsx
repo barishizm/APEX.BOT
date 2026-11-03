@@ -113,7 +113,7 @@ function Alert({ tone, title, children }: { tone: "bad" | "warn" | "info"; title
       )}
     >
       <Icon
-        className={cn("mt-0.5 h-4 w-4 shrink-0", tone === "bad" && "text-red-600 dark:text-red-400", tone === "warn" && "text-amber-600 dark:text-amber-400")}
+        className={cn("mt-0.5 h-4 w-4 shrink-0", tone === "bad" && "text-red-700 dark:text-red-300", tone === "warn" && "text-amber-800 dark:text-amber-200")}
         aria-hidden
       />
       <div className="flex min-w-0 flex-col gap-1.5">
@@ -290,7 +290,7 @@ export default async function AdminSystemPage() {
                 </td>
                 <td className={cn(td, "whitespace-nowrap text-right tabular-nums")}>
                   {c.latencyMs === null ? "—" : `${num(c.latencyMs)} ms`}
-                  {c.latencyMs !== null && c.latencyMs > 1500 && <span className="block text-xs text-amber-700 dark:text-amber-300">{t.services.slow}</span>}
+                  {c.latencyMs !== null && c.latencyMs > 1500 && <span className="block text-xs text-amber-800 dark:text-amber-200">{t.services.slow}</span>}
                 </td>
               </tr>
             ))}
@@ -338,7 +338,7 @@ export default async function AdminSystemPage() {
         {billing.enabled ? (
           <>
             <p className="m-0 flex items-center gap-2 text-sm">
-              <CircleCheck className="h-4 w-4 text-green-600 dark:text-green-400" aria-hidden />
+              <CircleCheck className="h-4 w-4 text-green-800 dark:text-green-300" aria-hidden />
               {format(t.billing.on, { environment: billing.environment })}
             </p>
             {!billing.overage && <Alert tone="info">{t.billing.noOverage}</Alert>}
@@ -463,7 +463,7 @@ export default async function AdminSystemPage() {
           <>
             {pending.length === 0 && (
               <p className="m-0 flex items-center gap-2 text-sm">
-                <CircleCheck className="h-4 w-4 text-green-600 dark:text-green-400" aria-hidden />
+                <CircleCheck className="h-4 w-4 text-green-800 dark:text-green-300" aria-hidden />
                 {format(t.migrations.upToDate, { n: num(migrations.value.applied.length) })}
               </p>
             )}
@@ -649,7 +649,7 @@ export default async function AdminSystemPage() {
               </Table>
             ) : (
               <p className="m-0 flex items-center gap-2 text-sm text-[var(--color-muted)]">
-                <CircleCheck className="h-4 w-4 text-green-600 dark:text-green-400" aria-hidden />
+                <CircleCheck className="h-4 w-4 text-green-800 dark:text-green-300" aria-hidden />
                 {t.email.none}
               </p>
             )}

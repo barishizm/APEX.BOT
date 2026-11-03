@@ -50,11 +50,11 @@ const SETTLE_MS = [2000, 5000, 10_000]
 const DEFAULT_CAP_CENTS = 5000
 
 const primary =
-  "inline-flex h-9 w-fit cursor-pointer items-center gap-2 rounded-lg border-0 bg-[var(--color-primary)] px-4 text-sm font-semibold text-[var(--color-on-primary)] no-underline transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40"
+  "inline-flex h-9 w-fit cursor-pointer items-center gap-2 rounded-lg border-0 bg-[var(--color-primary)] px-4 text-sm font-semibold text-[var(--color-on-primary)] no-underline transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-50"
 const ghost =
-  "inline-flex h-9 w-fit cursor-pointer items-center gap-2 rounded-lg border border-[var(--color-line)] bg-transparent px-4 text-sm font-semibold text-[var(--color-text)] no-underline transition-colors hover:border-[var(--color-muted)] disabled:cursor-not-allowed disabled:opacity-40"
+  "inline-flex h-9 w-fit cursor-pointer items-center gap-2 rounded-lg border border-[var(--color-line)] bg-transparent px-4 text-sm font-semibold text-[var(--color-text)] no-underline transition-colors hover:border-[var(--color-muted)] disabled:cursor-not-allowed disabled:opacity-50"
 const danger =
-  "inline-flex h-9 w-fit cursor-pointer items-center gap-2 rounded-lg border-0 bg-red-600 px-4 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+  "inline-flex h-9 w-fit cursor-pointer items-center gap-2 rounded-lg border-0 bg-red-600 px-4 text-sm font-semibold text-white transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-50"
 
 const usd = (cents: number, locale: Locale) =>
   new Intl.NumberFormat(LOCALE_META[locale].intl, { style: "currency", currency: "USD", currencyDisplay: "narrowSymbol", maximumFractionDigits: cents % 100 ? 2 : 0 }).format(cents / 100)
@@ -108,7 +108,7 @@ function useSettle() {
 
 function Notice({ tone, children }: { tone: "ok" | "error"; children: React.ReactNode }) {
   return tone === "error" ? (
-    <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+    <p role="alert" className="text-sm text-red-700 dark:text-red-300">
       {children}
     </p>
   ) : (
@@ -247,12 +247,12 @@ function CurrentPlan({
               </p>
             )}
             {graceEnded ? (
-              <p role="alert" className="flex items-start gap-2 text-red-600 dark:text-red-400">
+              <p role="alert" className="flex items-start gap-2 text-red-700 dark:text-red-300">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
                 {format(t.pastDueEnded, { plan: t.plans[subscription.plan] })}
               </p>
             ) : pastDue ? (
-              <p role="alert" className="flex items-start gap-2 text-amber-700 dark:text-amber-400">
+              <p role="alert" className="flex items-start gap-2 text-amber-800 dark:text-amber-200">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
                 {format(t.pastDue, { date: date(subscription.graceUntil ?? subscription.periodEnd), plan: t.plans[subscription.plan] })}
               </p>
@@ -673,7 +673,7 @@ function Invoices({ t, locale, canDownload }: { t: T; locale: Locale; canDownloa
                 <TableCell>{inv.billedAt ? formatDate(inv.billedAt, locale) : "–"}</TableCell>
                 <TableCell className="max-w-[8rem] truncate font-mono text-xs">{inv.number ?? i.pending}</TableCell>
                 <TableCell className="text-right tabular-nums">{money(inv.totalMinor, inv.currency, locale)}</TableCell>
-                <TableCell className={cn("max-sm:hidden", inv.status === "past_due" && "text-red-600 dark:text-red-400")}>{i.statuses[inv.status] ?? inv.status}</TableCell>
+                <TableCell className={cn("max-sm:hidden", inv.status === "past_due" && "text-red-700 dark:text-red-300")}>{i.statuses[inv.status] ?? inv.status}</TableCell>
                 {canDownload && (
                   <TableCell className="text-right">
                     {inv.number && (
@@ -786,7 +786,7 @@ function PlanPicker({ t, locale, initial }: { t: T; locale: Locale; initial: Pla
           {state.kind === "busy" ? t.opening : t.pay}
         </button>
         {state.kind === "error" && (
-          <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+          <p role="alert" className="text-sm text-red-700 dark:text-red-300">
             {state.message}
           </p>
         )}

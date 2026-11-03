@@ -58,7 +58,7 @@ export function ConversationBotsTable({ days, initialQuery }: { days: number; in
           muted(t.noReplies)
         ) : (
           <span className="flex flex-col items-end gap-0.5">
-            <span className={cn("font-medium", b.needs_knowledge && "text-amber-700 dark:text-amber-300")}>{formatPercent(b.unanswered / b.answers, locale)}</span>
+            <span className={cn("font-medium", b.needs_knowledge && "text-amber-800 dark:text-amber-200")}>{formatPercent(b.unanswered / b.answers, locale)}</span>
             <span className="text-xs text-[var(--color-muted)]">
               {fill(t.unansweredDetail, { n: num(b.unanswered), answers: num(b.answers) })}
               {b.open_questions > 0 && ` · ${fill(t.openDetail, { n: num(b.open_questions) })}`}

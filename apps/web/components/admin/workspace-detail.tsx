@@ -376,12 +376,12 @@ function Note({ workspaceId, initial, onSaved }: { workspaceId: string; initial:
           className={`${field} min-h-24 resize-y py-2`}
         />
         {error && (
-          <p role="alert" className="m-0 text-sm text-red-600 dark:text-red-400">
+          <p role="alert" className="m-0 text-sm text-red-700 dark:text-red-300">
             {error}
           </p>
         )}
         {saved && (
-          <p role="status" className="m-0 text-sm text-green-700 dark:text-green-300">
+          <p role="status" className="m-0 text-sm text-green-800 dark:text-green-300">
             {t.noteSaved}
           </p>
         )}
@@ -490,7 +490,7 @@ function ActionDialog({ dialog, detail, onClose, onDone }: { dialog: Dialog; det
                       {limitValue(l.from)}
                       {capped(l.from, l.effectiveFrom) && <span className="block text-xs text-[var(--color-muted)]">{fill(t.dialog.ceiling, { n: limitValue(l.effectiveFrom) })}</span>}
                     </td>
-                    <td className={cn(td, "tabular-nums font-medium", l.change < 0 && "text-red-700 dark:text-red-300", l.change > 0 && "text-green-700 dark:text-green-300")}>
+                    <td className={cn(td, "tabular-nums font-medium", l.change < 0 && "text-red-700 dark:text-red-300", l.change > 0 && "text-green-800 dark:text-green-300")}>
                       {limitValue(l.to)}
                       {capped(l.to, l.effectiveTo) && <span className="block text-xs font-normal text-[var(--color-muted)]">{fill(t.dialog.ceiling, { n: limitValue(l.effectiveTo) })}</span>}
                       {l.change === 0 && <span className="block text-xs font-normal text-[var(--color-muted)]">{t.dialog.unchanged}</span>}

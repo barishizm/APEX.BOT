@@ -82,7 +82,7 @@ function QuotaAlert({ usage, t, locale }: { usage: ReplyUsage; t: ReturnType<typ
         stopped ? "border-red-500/40 bg-red-500/10" : "border-amber-500/40 bg-amber-500/10"
       }`}
     >
-      <AlertTriangle className={`h-5 w-5 shrink-0 ${stopped ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400"}`} aria-hidden />
+      <AlertTriangle className={`h-5 w-5 shrink-0 ${stopped ? "text-red-700 dark:text-red-300" : "text-amber-800 dark:text-amber-200"}`} aria-hidden />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <h2 className="text-base font-semibold">{title}</h2>
         <p className="text-sm">{text}</p>
@@ -278,7 +278,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               <p className="text-sm text-[var(--color-muted)]">{t.embedHelp}</p>
               <CopySnippet code={embedSnippet(bot.siteKey)} />
               {!next && (
-                <p className="flex items-center gap-1.5 text-sm text-green-700 dark:text-green-400">
+                <p className="flex items-center gap-1.5 text-sm text-green-800 dark:text-green-300">
                   <CircleCheck className="h-4 w-4" aria-hidden />
                   {t.setupComplete}
                 </p>

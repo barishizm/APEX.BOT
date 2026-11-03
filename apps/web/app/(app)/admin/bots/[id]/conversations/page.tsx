@@ -28,7 +28,7 @@ export default async function AdminBotConversationsPage({ params, searchParams }
   if (!grant) {
     return (
       <div className="mx-auto flex max-w-xl flex-col items-start gap-3 px-6 py-16 max-sm:px-4">
-        <h1 className="m-0 text-xl font-semibold">{t.title}</h1>
+        <h1 className="m-0 text-2xl font-semibold tracking-tight">{t.title}</h1>
         <p className="m-0 text-sm text-[var(--color-muted)]">{t.noAccess}</p>
         <Link href={`/admin/bots/${id}`} className="text-sm font-semibold">
           {t.backToBot}

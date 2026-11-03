@@ -19,7 +19,7 @@ export interface AnswerLimits {
 type Notice = { tone: "ok"; text: string; sourceLink?: boolean } | { tone: "error"; text: string }
 
 const button =
-  "inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 text-sm font-semibold no-underline transition-colors disabled:cursor-default disabled:opacity-60"
+  "inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 text-sm font-semibold no-underline transition-colors disabled:cursor-default disabled:opacity-50"
 const quiet = `${button} border-0 bg-transparent text-[var(--color-muted)] hover:bg-[var(--color-bubble)] hover:text-[var(--color-text)]`
 const field =
   "w-full rounded-lg border border-[var(--color-line)] bg-[var(--color-raised)] px-3 py-2 font-[inherit] text-sm text-[var(--color-text)] outline-none transition-colors focus:border-[var(--color-muted)]"
@@ -189,7 +189,7 @@ export function UnansweredQuestions({
             {t.title}
             <BetaBadge />
             {open > 0 && (
-              <span className="rounded-full bg-amber-500/15 px-2 py-px text-xs font-semibold text-amber-700 dark:text-amber-300">{plural(open, t.open, locale)}</span>
+              <span className="rounded-full bg-amber-500/15 px-2 py-px text-xs font-semibold text-amber-800 dark:text-amber-200">{plural(open, t.open, locale)}</span>
             )}
           </h2>
           <p className="text-sm text-[var(--color-muted)]">{t.description}</p>
@@ -220,7 +220,7 @@ export function UnansweredQuestions({
 
       {groups.length === 0 ? (
         <div className="flex flex-col items-center gap-1 rounded-xl bg-[var(--color-raised)] px-4 py-8 text-center">
-          <CircleCheck className="h-6 w-6 text-green-600 dark:text-green-400" aria-hidden />
+          <CircleCheck className="h-6 w-6 text-green-800 dark:text-green-300" aria-hidden />
           <p className="font-semibold">{t.emptyTitle}</p>
           <p className="max-w-sm text-sm text-[var(--color-muted)]">{t.empty}</p>
         </div>
@@ -232,7 +232,7 @@ export function UnansweredQuestions({
                 <div className="flex min-w-0 flex-col gap-1">
                   <p className="m-0 break-words font-medium">{g.question}</p>
                   <p className="m-0 flex flex-wrap items-center gap-x-2 text-xs text-[var(--color-muted)]">
-                    <span className={cn(g.count > 1 && "font-semibold text-amber-700 dark:text-amber-300")}>{plural(g.count, t.asked, locale)}</span>
+                    <span className={cn(g.count > 1 && "font-semibold text-amber-800 dark:text-amber-200")}>{plural(g.count, t.asked, locale)}</span>
                     <span aria-hidden>·</span>
                     <span>{format(t.lastAsked, { when: timeAgo(g.lastAskedAt, locale) })}</span>
                   </p>

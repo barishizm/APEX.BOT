@@ -121,6 +121,7 @@ export const lv: Dictionary = {
       oauth_failed: "Neizdevās pieteikties ar šo pakalpojuma sniedzēju. Mēģiniet vēlreiz vai izmantojiet e-pasta adresi",
       oauth_signups_closed: "Jaunas reģistrācijas pagaidām nepieņemam. Pievienojieties gaidīšanas sarakstam, un mēs jums uzrakstīsim, kad atvērsimies",
       account_suspended: "Šis konts ir apturēts. Sazinieties ar atbalsta dienestu",
+      humanCheck: "Lūdzu, uzgaidiet, līdz cilvēka pārbaude beidzas, un mēģiniet vēlreiz",
       generic: "Radās kļūda. Mēģiniet vēlreiz",
       network: "Neizdevās sazināties ar serveri. Pārbaudiet savienojumu un mēģiniet vēlreiz",
     },

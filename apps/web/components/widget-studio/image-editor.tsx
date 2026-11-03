@@ -168,7 +168,7 @@ export function ImageEditor({
         e.preventDefault()
         onCancel()
       }}
-      className="m-auto w-[min(34rem,calc(100vw-2rem))] max-h-[calc(100dvh-2rem)] overflow-auto rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface)] p-0 text-[var(--color-text)] shadow-2xl backdrop:bg-black/60"
+      className="m-auto w-[min(34rem,calc(100vw-2rem))] max-h-[calc(100dvh-2rem)] overflow-auto rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface)] p-0 text-[var(--color-text)] shadow-[var(--shadow-modal)] backdrop:bg-black/60"
     >
       <div className="flex flex-col gap-5 p-5 sm:p-6">
         <div className="flex items-start justify-between gap-4">
@@ -189,7 +189,7 @@ export function ImageEditor({
         </div>
 
         {problem ? (
-          <p className="text-sm text-red-500">{translateMessage(problem, locale)}</p>
+          <p className="text-sm text-red-700 dark:text-red-300">{translateMessage(problem, locale)}</p>
         ) : (
           <div className="flex flex-wrap items-center justify-center gap-6">
             <div

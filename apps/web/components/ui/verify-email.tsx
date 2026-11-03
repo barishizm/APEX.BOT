@@ -237,7 +237,7 @@ export default function VerifyEmail({ initialEmail, next }: { initialEmail: stri
                     type="button"
                     onClick={saveEmail}
                     disabled={saving}
-                    className="h-11 cursor-pointer rounded-lg border-0 bg-[var(--color-primary)] px-5 text-sm font-semibold text-[var(--color-on-primary)] transition-opacity hover:opacity-85 disabled:cursor-wait disabled:opacity-60"
+                    className="h-11 cursor-pointer rounded-lg border-0 bg-[var(--color-primary)] px-5 text-sm font-semibold text-[var(--color-on-primary)] transition-opacity hover:opacity-85 disabled:cursor-wait disabled:opacity-50"
                   >
                     {saving ? t.sending : t.save}
                   </button>
@@ -250,7 +250,7 @@ export default function VerifyEmail({ initialEmail, next }: { initialEmail: stri
                   </button>
                 </div>
                 {emailError && (
-                  <p role="alert" className="mt-2 flex items-center gap-2 text-sm text-red-500">
+                  <p role="alert" className="mt-2 flex items-center gap-2 text-sm text-red-700 dark:text-red-300">
                     <CircleAlert className="h-4 w-4 shrink-0" aria-hidden="true" />
                     {emailError}
                   </p>
@@ -304,12 +304,12 @@ export default function VerifyEmail({ initialEmail, next }: { initialEmail: stri
             </motion.div>
             {notice && !error && (
               <p role="status" style={{ marginTop: 20 }} className="flex items-center gap-2 text-sm text-[var(--color-muted)]">
-                <Check className="h-4 w-4 shrink-0 text-green-600" aria-hidden="true" />
+                <Check className="h-4 w-4 shrink-0 text-green-800 dark:text-green-300" aria-hidden="true" />
                 {notice}
               </p>
             )}
             {error && (
-              <p role="alert" style={{ marginTop: 20 }} className="flex items-center gap-2 text-sm text-red-500">
+              <p role="alert" style={{ marginTop: 20 }} className="flex items-center gap-2 text-sm text-red-700 dark:text-red-300">
                 <CircleAlert className="h-4 w-4 shrink-0" aria-hidden="true" />
                 {error}
               </p>

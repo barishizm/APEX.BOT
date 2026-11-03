@@ -35,7 +35,7 @@ export function SupportAccessBar({ botId, botName, expiresAt, ticketRef }: { bot
       </Link>
       <div className="flex min-w-0 flex-1 flex-col">
         <span className="flex items-center gap-1.5 font-medium">
-          <ShieldAlert className="h-4 w-4 shrink-0 text-amber-700 dark:text-amber-300" aria-hidden />
+          <ShieldAlert className="h-4 w-4 shrink-0 text-amber-800 dark:text-amber-200" aria-hidden />
           <span className="truncate">
             {fill(t.banner, { bot: botName, time: formatDate(expiresAt, locale, { timeStyle: "short" }) })}
             {ticketRef && ` · ${fill(t.ticket, { ref: ticketRef })}`}

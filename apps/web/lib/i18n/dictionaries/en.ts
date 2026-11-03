@@ -121,6 +121,7 @@ export const en = {
       oauth_failed: "Couldn't sign you in with that provider. Try again or use your email",
       oauth_signups_closed: "We're not accepting new sign-ups yet. Join the waitlist and we'll email you when we open",
       account_suspended: "This account is suspended. Contact support",
+      humanCheck: "Please wait for the human check to finish, then try again",
       generic: "Something went wrong. Try again",
       network: "Couldn't reach the server. Check your connection and try again",
     },

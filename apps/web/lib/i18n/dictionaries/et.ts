@@ -121,6 +121,7 @@ export const et: Dictionary = {
       oauth_failed: "Selle teenusepakkujaga sisselogimine ebaõnnestus. Proovige uuesti või kasutage e-posti aadressi",
       oauth_signups_closed: "Uusi registreerimisi me veel vastu ei võta. Liituge ootenimekirjaga ja anname teile avamisest e-posti teel teada",
       account_suspended: "See konto on peatatud. Võtke ühendust toega",
+      humanCheck: "Oodake, kuni inimkontroll lõpeb, ja proovige siis uuesti",
       generic: "Midagi läks valesti. Proovige uuesti",
       network: "Serveriga ei saadud ühendust. Kontrollige internetiühendust ja proovige uuesti",
     },

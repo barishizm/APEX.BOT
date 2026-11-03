@@ -103,10 +103,10 @@ function Badge({ tone, children }: { tone: "amber" | "blue" | "red" | "green"; c
     <span
       className={cn(
         "inline-flex items-center gap-1 rounded-full px-2 py-px text-[0.6875rem] font-semibold",
-        tone === "amber" && "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+        tone === "amber" && "bg-amber-500/15 text-amber-800 dark:text-amber-200",
         tone === "blue" && "bg-[color-mix(in_srgb,var(--color-secondary)_16%,transparent)] text-[var(--color-secondary)]",
         tone === "red" && "bg-red-500/12 text-red-700 dark:text-red-300",
-        tone === "green" && "bg-green-600/12 text-green-700 dark:text-green-300",
+        tone === "green" && "bg-green-600/12 text-green-800 dark:text-green-300",
       )}
     >
       {children}
@@ -292,7 +292,7 @@ function Transcript({
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-6">
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-red-700 dark:text-red-300">{error}</p>}
         {!data && !error && (
           <p className="flex items-center gap-2 text-sm text-[var(--color-muted)]">
             <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden /> {t.loading}
@@ -334,8 +334,8 @@ function Transcript({
                         {s.title}
                       </a>
                     ))}
-                    {m.feedback === "up" && <ThumbsUp className="h-3.5 w-3.5 text-green-600" aria-label={t.helpful} />}
-                    {m.feedback === "down" && <ThumbsDown className="h-3.5 w-3.5 text-red-600" aria-label={t.unhelpful} />}
+                    {m.feedback === "up" && <ThumbsUp className="h-3.5 w-3.5 text-green-800 dark:text-green-300" aria-label={t.helpful} />}
+                    {m.feedback === "down" && <ThumbsDown className="h-3.5 w-3.5 text-red-700 dark:text-red-300" aria-label={t.unhelpful} />}
                   </div>
                 </div>
               ),

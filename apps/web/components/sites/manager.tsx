@@ -19,7 +19,7 @@ const secondary =
   "inline-flex h-10 cursor-pointer items-center justify-center rounded-lg border border-[var(--color-line)] bg-transparent px-3 text-sm font-semibold text-[var(--color-text)] transition-colors hover:border-[var(--color-muted)] disabled:cursor-not-allowed disabled:opacity-50"
 const danger =
   "inline-flex h-10 cursor-pointer items-center justify-center rounded-lg border-0 bg-red-600 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-const errorText = "m-0 text-sm text-red-600 dark:text-red-400"
+const errorText = "m-0 text-sm text-red-700 dark:text-red-300"
 
 export function SitesManager({ initial }: { initial: SitesJson }) {
   const { t: app } = useAppI18n()

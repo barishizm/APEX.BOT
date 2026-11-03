@@ -81,7 +81,7 @@ export function AdminShell({
         >
           <Search className="h-4 w-4" aria-hidden />
           <span className="truncate">{app.shell.search}</span>
-          <kbd className="ml-auto font-sans text-xs max-sm:hidden">⌘ K</kbd>
+          <kbd className="ml-auto rounded border border-[var(--color-line)] bg-[var(--color-surface)] px-1.5 font-sans text-[0.6875rem] text-[var(--color-muted)] max-sm:hidden">⌘ K</kbd>
         </button>
 
         <Link href="/dashboard" className={`${pill} ml-auto text-[var(--color-text)] no-underline max-md:hidden`}>

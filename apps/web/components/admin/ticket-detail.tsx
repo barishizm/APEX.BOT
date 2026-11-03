@@ -424,7 +424,7 @@ function Composer({
       <p className="m-0 text-xs text-[var(--color-muted)]">{note ? t.noteHint : fill(t.replyHint, { language: LOCALE_META[customerLocale].name })}</p>
 
       {error && (
-        <p role="alert" className="m-0 text-sm text-red-600 dark:text-red-400">
+        <p role="alert" className="m-0 text-sm text-red-700 dark:text-red-300">
           {error}
         </p>
       )}

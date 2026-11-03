@@ -99,7 +99,7 @@ export function SiteSwitcher({ sites }: { sites: SitesJson }) {
             exit={{ opacity: 0, scale: 0.97, y: -6 }}
             transition={{ type: "spring", stiffness: 420, damping: 32, mass: 0.8 }}
             style={{ transformOrigin: "top left" }}
-            className="absolute left-0 top-full z-30 mt-2 w-72 rounded-2xl border border-[var(--color-line)] bg-[var(--color-raised)] p-2 shadow-2xl max-sm:w-[calc(100vw-2rem)]"
+            className="absolute left-0 top-full z-30 mt-2 w-72 rounded-2xl border border-[var(--color-line)] bg-[var(--color-raised)] p-2 shadow-[var(--shadow-pop)] max-sm:w-[calc(100vw-2rem)]"
           >
             <p className="m-0 px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wider text-[var(--color-muted)]">{t.switcher.list}</p>
             <ul className="m-0 flex max-h-72 list-none flex-col overflow-auto p-0">
@@ -163,7 +163,7 @@ export function SiteSwitcher({ sites }: { sites: SitesJson }) {
               </Link>
             </div>
             {message && (
-              <p role="alert" className="m-0 px-3 pb-2 text-sm text-red-600 dark:text-red-400">
+              <p role="alert" className="m-0 px-3 pb-2 text-sm text-red-700 dark:text-red-300">
                 {message}
               </p>
             )}

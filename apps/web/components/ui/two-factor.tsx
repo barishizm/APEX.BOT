@@ -90,13 +90,13 @@ export default function TwoFactor({ next }: { next: string | null }) {
             className={cn(input, error ? "border-red-500" : "border-[var(--color-line)] focus:border-[var(--color-secondary)]")}
           />
           {error && (
-            <p role="alert" className="mt-2 flex items-center gap-2 text-sm text-red-500">
+            <p role="alert" className="mt-2 flex items-center gap-2 text-sm text-red-700 dark:text-red-300">
               <CircleAlert className="h-4 w-4 shrink-0" aria-hidden="true" />
               {error}
             </p>
           )}
           {notice && (
-            <p role="status" className="mt-2 text-sm text-green-700 dark:text-green-400">
+            <p role="status" className="mt-2 text-sm text-green-800 dark:text-green-300">
               {notice}
             </p>
           )}

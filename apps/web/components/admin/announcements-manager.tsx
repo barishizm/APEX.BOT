@@ -30,7 +30,7 @@ const LEVEL_TONE: Record<AnnouncementLevel, string> = {
 }
 const STATUS_TONE = {
   scheduled: "border border-[var(--color-line)] text-[var(--color-muted)]",
-  active: "bg-green-500/15 text-green-800 dark:text-green-200",
+  active: "bg-green-500/15 text-green-800 dark:text-green-300",
   ended: "bg-[var(--color-bubble)] text-[var(--color-muted)]",
 } as const
 

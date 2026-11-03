@@ -69,7 +69,7 @@ function Notice({ tone, title, children }: { tone: "warn" | "info"; title?: stri
         tone === "warn" ? "border-amber-500/50 bg-amber-500/10" : "border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-muted)]",
       )}
     >
-      <Icon className={cn("mt-0.5 h-4 w-4 shrink-0", tone === "warn" ? "text-amber-600 dark:text-amber-400" : "")} aria-hidden />
+      <Icon className={cn("mt-0.5 h-4 w-4 shrink-0", tone === "warn" ? "text-amber-800 dark:text-amber-200" : "")} aria-hidden />
       <div className="flex min-w-0 flex-col gap-1">
         {title && <strong className="font-semibold text-[var(--color-text)]">{title}</strong>}
         <p className="m-0">{children}</p>

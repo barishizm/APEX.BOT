@@ -38,20 +38,20 @@ async function call(path: string, method: string, offline: string, body?: object
 }
 
 const primary =
-  "inline-flex h-9 w-fit cursor-pointer items-center gap-2 rounded-lg border-0 bg-[var(--color-primary)] px-4 text-sm font-semibold text-[var(--color-on-primary)] transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40"
+  "inline-flex h-9 w-fit cursor-pointer items-center gap-2 rounded-lg border-0 bg-[var(--color-primary)] px-4 text-sm font-semibold text-[var(--color-on-primary)] transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-50"
 const ghost =
-  "inline-flex h-9 w-fit cursor-pointer items-center gap-2 rounded-lg border border-[var(--color-line)] bg-transparent px-4 text-sm font-semibold text-[var(--color-text)] transition-colors hover:border-[var(--color-muted)] disabled:cursor-not-allowed disabled:opacity-40"
+  "inline-flex h-9 w-fit cursor-pointer items-center gap-2 rounded-lg border border-[var(--color-line)] bg-transparent px-4 text-sm font-semibold text-[var(--color-text)] transition-colors hover:border-[var(--color-muted)] disabled:cursor-not-allowed disabled:opacity-50"
 
 function StatusText({ status }: { status: Status }) {
   if (status.kind === "ok")
     return (
-      <p role="status" className="flex items-center gap-1.5 text-sm text-green-700 dark:text-green-400">
+      <p role="status" className="flex items-center gap-1.5 text-sm text-green-800 dark:text-green-300">
         <Check className="h-4 w-4" aria-hidden /> {status.message}
       </p>
     )
   if (status.kind === "error")
     return (
-      <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+      <p role="alert" className="text-sm text-red-700 dark:text-red-300">
         {status.message}
       </p>
     )
@@ -286,13 +286,13 @@ function TwoFactorSection({
         <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
           <dt className="text-[var(--color-muted)]">{t.status}</dt>
           <dd className="m-0 flex items-center gap-1.5">
-            {enabled && <ShieldCheck className="h-4 w-4 text-green-600" aria-hidden />}
+            {enabled && <ShieldCheck className="h-4 w-4 text-green-800 dark:text-green-300" aria-hidden />}
             {enabled ? t.on : t.off}
           </dd>
           {enabled && (
             <>
               <dt className="text-[var(--color-muted)]">{t.recoveryLeft}</dt>
-              <dd className={`m-0 ${recoveryLeft <= 2 ? "font-semibold text-amber-600 dark:text-amber-400" : ""}`}>{recoveryLeft}</dd>
+              <dd className={`m-0 ${recoveryLeft <= 2 ? "font-semibold text-amber-800 dark:text-amber-200" : ""}`}>{recoveryLeft}</dd>
             </>
           )}
         </dl>
@@ -377,7 +377,7 @@ function TwoFactorSection({
           <div className="flex flex-wrap items-center gap-3">
             <button
               type="submit"
-              className={mode === "off" ? `${ghost} border-red-500/50 text-red-600 hover:border-red-500 dark:text-red-400` : primary}
+              className={mode === "off" ? `${ghost} border-red-500/40 text-red-700 hover:border-red-500 hover:bg-red-500/5 dark:text-red-300` : primary}
               disabled={busy || code.trim().length < 6}
             >
               {busy && <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />}
@@ -489,7 +489,7 @@ export function AccountSettings({ initial, adminTwoFactor = false }: { initial: 
       <div className="flex w-full max-w-2xl flex-col gap-6 p-4 sm:p-6">
         {adminTwoFactor && !account.twoFactor && (
           <p role="alert" className="flex items-start gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm">
-            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden />
+            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-amber-800 dark:text-amber-200" aria-hidden />
             {t.adminTwoFactor}
           </p>
         )}
@@ -636,7 +636,7 @@ export function AccountSettings({ initial, adminTwoFactor = false }: { initial: 
             <p className="text-sm text-[var(--color-muted)]">{t.deleteText}</p>
           </div>
           {!deleting ? (
-            <button type="button" onClick={() => setDeleting(true)} className={`${ghost} border-red-500/50 text-red-600 hover:border-red-500 dark:text-red-400`}>
+            <button type="button" onClick={() => setDeleting(true)} className={`${ghost} border-red-500/40 text-red-700 hover:border-red-500 hover:bg-red-500/5 dark:text-red-300`}>
               {t.deleteStart}
             </button>
           ) : (
@@ -655,7 +655,7 @@ export function AccountSettings({ initial, adminTwoFactor = false }: { initial: 
                   type="button"
                   onClick={deleteNow}
                   disabled={confirmEmail.trim().toLowerCase() !== account.email || danger.kind === "busy"}
-                  className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg border-0 bg-red-600 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
+                  className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg border-0 bg-red-600 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {danger.kind === "busy" && <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />}
                   {t.deleteNow}
