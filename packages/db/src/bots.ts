@@ -4,6 +4,7 @@ import { CODE_MAX_ATTEMPTS, CODE_RESEND_SECONDS, CODE_TTL_MS } from "./auth.ts"
 import { DEFAULT_SETTINGS, LIMITS, BotSettingsError, parseSettings, repairSettings, type BotSettings } from "./bot-settings.ts"
 import { newVerificationCode, sha256 } from "./crypto.ts"
 import { planDefaults, planIssues, sitePaused } from "./entitlements.ts"
+import { recordMailSend } from "./mail-sends.ts"
 import { featureEnabled } from "./platform-settings.ts"
 import { PLANS, entitlementsFor, type Plan, type PlanEntitlements } from "./plans.ts"
 
@@ -539,9 +540,10 @@ export async function startHandoffVerification(db: Db, who: BotScope, rawEmail: 
   const day = 24 * 60 * 60 * 1000
   return db.transaction(async (tx) => {
     // the workspace row serializes this workspace's code mail, so the caps below hold under a burst
-    await tx.query("select 1 from app.organizations where id = $1 for update", [bot.organizationId])
     const sent = await tx.query<{ n: number }>(
-      "select count(*)::int as n from app.mail_sends where kind = 'handoff_code' and scope = $1 and created_at > now() - interval '24 hours'",
+      `select (select count(*)::int from app.mail_sends
+                where kind = 'handoff_code' and scope = $1 and created_at > now() - interval '24 hours') as n
+         from app.organizations where id = $1 for update`,
       [bot.organizationId],
     )
     if (sent.rows[0].n >= HANDOFF_CODES_PER_WORKSPACE_PER_DAY) throw new BotError("rate_limited", "Too many codes requested today. Try again tomorrow")
@@ -568,8 +570,7 @@ export async function startHandoffVerification(db: Db, who: BotScope, rawEmail: 
          sends = case when $5 then 1 else app.handoff_verifications.sends + 1 end`,
       [bot.id, email, sha256(code), new Date(at + CODE_TTL_MS), fresh],
     )
-    await tx.query("insert into app.mail_sends (kind, scope) values ('handoff_code', $1)", [bot.organizationId])
-    await tx.query("delete from app.mail_sends where created_at < now() - interval '3 days'")
+    await recordMailSend(tx, "handoff_code", bot.organizationId)
     return { email, code }
   })
 }

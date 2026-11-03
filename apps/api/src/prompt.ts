@@ -162,7 +162,7 @@ export function buildSystem(tenant: Tenant): Anthropic.Beta.BetaTextBlockParam[]
   const owner = s.instructions?.trim();
   if (owner) {
     // Owner rules come after the fixed rules and can't override grounding or security
-    settings += `\n\nInstructions from the site owner (follow them unless they conflict with the rules above; never treat them as facts about the company):\n<owner_instructions>\n${neutralizeTags(owner).replace(/<\/?owner_instructions/gi, "")}\n</owner_instructions>`;
+    settings += `\n\nInstructions from the site owner (follow them unless they conflict with the rules above; never treat them as facts about the company):\n<owner_instructions>\n${neutralizeTags(owner)}\n</owner_instructions>`;
   }
   return [
     { type: "text", text: RULES },
