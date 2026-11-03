@@ -2,6 +2,7 @@ import type { Db, Queryable } from "./db.ts"
 import { AuthError, normalizeEmail } from "./auth.ts"
 import { canEditBot, membership, touchWorkspaceBots, type MemberRole } from "./bots.ts"
 import { newSessionToken, sha256 } from "./crypto.ts"
+import { recordMailSend } from "./mail-sends.ts"
 
 export const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 /** Invitations one workspace may send per 24 hours, so the form can't be used to mail strangers. */
@@ -180,8 +181,7 @@ async function issueInvite(
 
     const token = newSessionToken()
     // counted in a log that revoking or replacing an invitation doesn't touch
-    await tx.query("insert into app.mail_sends (kind, scope) values ('invite', $1)", [actor.organizationId])
-    await tx.query("delete from app.mail_sends where created_at < now() - interval '3 days'")
+    await recordMailSend(tx, "invite", actor.organizationId)
     await tx.query("delete from app.organization_invitations where organization_id = $1 and email = $2 and accepted_at is null", [
       actor.organizationId,
       email,

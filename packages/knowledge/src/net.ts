@@ -29,9 +29,7 @@ for (const [net, prefix] of [
   blocked.addSubnet(net, prefix, "ipv4");
 }
 for (const [net, prefix] of [
-  ["::", 128],
-  ["::1", 128],
-  ["::", 96], // IPv4-compatible
+  ["::", 96], // unspecified, loopback and IPv4-compatible
   ["64:ff9b::", 96],
   ["64:ff9b:1::", 48], // local-use NAT64
   ["2002::", 16], // 6to4: embeds an IPv4 address that could be internal

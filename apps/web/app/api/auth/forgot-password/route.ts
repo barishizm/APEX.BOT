@@ -17,7 +17,7 @@ export async function POST(request: Request) {
       // mailed after the response, so how long it takes doesn't tell an existing account from an unknown one
       if (sent) {
         const locale = await requestLocale()
-        after(() => sendPasswordResetCode(sent.email, sent.code, locale).catch((error) => console.error("password reset mail failed", error)))
+        after(() => sendPasswordResetCode(sent.email, sent.code, locale))
       }
     } catch (err) {
       // only existing accounts are rate limited, so saying so would reveal the account

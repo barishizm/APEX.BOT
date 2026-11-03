@@ -91,7 +91,7 @@ function text(value: unknown, max: number): string {
 
 /** A single-line field (name, phone): line breaks and runs of whitespace collapse to one space. */
 function line(value: unknown, max: number): string {
-  return text(value, max * 2).replace(/\s+/g, " ").trim().slice(0, max);
+  return text(value, max * 2).replace(/\s+/g, " ").slice(0, max).trimEnd();
 }
 
 /** A conversation or message id from a body or path, or undefined when it can't be one of ours. */
@@ -409,7 +409,7 @@ export function createApp(deps: AppDeps) {
     const body = await readJson(c);
     const address = email(body.email);
     const name = line(body.name, 100);
-    const phone = typeof body.phone === "string" ? body.phone.replace(/\s+/g, " ").trim() : "";
+    const phone = line(body.phone, 200); // longer than PHONE allows, so an over-long number is rejected, not cut
     if (!address) return fail(c, "bad_request", 400);
     if (phone && !PHONE.test(phone)) return fail(c, "bad_request", 400);
 
