@@ -1,14 +1,14 @@
 import { describe, test } from "node:test"
 import assert from "node:assert/strict"
-import { MODEL_TIER_OF, PLANS, PLAN_LIMITS, PLAN_PRICES, annualSaving, entitlementsFor, replyWindow, type Plan, type PlanEntitlements } from "../src/plans.ts"
+import { CRAWL_PAGE_CEILING, MODEL_TIER_OF, PLANS, PLAN_LIMITS, PLAN_PRICES, annualSaving, entitlementsFor, replyWindow, type Plan, type PlanEntitlements } from "../src/plans.ts"
 import { MODELS, replyFifths } from "../src/bot-settings.ts"
 
 // What each plan includes, as decided in docs/adr/0003-billing.md. A change here is a pricing change.
 const EXPECTED: Record<Plan, PlanEntitlements> = {
   free: { monthlyReplies: 100, websites: 1, websitePages: 50, allowedModelTiers: ["fast"], removeBranding: false, declineTopics: false, leadCapture: false, maxRetentionDays: 30, overageAllowed: false },
   starter: { monthlyReplies: 600, websites: 1, websitePages: 300, allowedModelTiers: ["fast", "standard", "premium"], removeBranding: false, declineTopics: false, leadCapture: true, maxRetentionDays: 90, overageAllowed: true },
-  pro: { monthlyReplies: 1500, websites: 3, websitePages: 1000, allowedModelTiers: ["fast", "standard", "premium"], removeBranding: true, declineTopics: true, leadCapture: true, maxRetentionDays: 180, overageAllowed: true },
-  business: { monthlyReplies: 5000, websites: 10, websitePages: 3000, allowedModelTiers: ["fast", "standard", "premium"], removeBranding: true, declineTopics: true, leadCapture: true, maxRetentionDays: 365, overageAllowed: true },
+  pro: { monthlyReplies: 1500, websites: 3, websitePages: 300, allowedModelTiers: ["fast", "standard", "premium"], removeBranding: true, declineTopics: true, leadCapture: true, maxRetentionDays: 180, overageAllowed: true },
+  business: { monthlyReplies: 5000, websites: 10, websitePages: 300, allowedModelTiers: ["fast", "standard", "premium"], removeBranding: true, declineTopics: true, leadCapture: true, maxRetentionDays: 365, overageAllowed: true },
 }
 
 const PRICES: Record<Plan, { monthly: number; annual: number }> = {
@@ -19,6 +19,10 @@ const PRICES: Record<Plan, { monthly: number; annual: number }> = {
 }
 
 describe("plan entitlements", () => {
+  test("no plan sells more website pages than one crawl can read", () => {
+    for (const plan of PLANS) assert.ok(PLAN_LIMITS[plan].websitePages <= CRAWL_PAGE_CEILING, plan)
+  })
+
   for (const plan of PLANS) {
     test(`${plan}: entitlements and prices`, () => {
       assert.deepEqual(entitlementsFor(plan), EXPECTED[plan])

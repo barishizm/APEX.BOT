@@ -73,8 +73,8 @@ describe("admin knowledge list", () => {
     const stuck = await website(bot.id, { status: "syncing", minutesAgo: 20 })
     const syncing = await website(other.id, { status: "syncing", minutesAgo: 2 })
     await db.query("update app.organizations set plan = 'pro' where id = $1", [other.organizationId])
-    const capped = await website(other.id, { pages: CRAWL_PAGE_CEILING })
-    // a starter site at 300 pages hit its plan limit, not the ceiling
+    const onPro = await website(other.id, { pages: CRAWL_PAGE_CEILING })
+    // a site at 300 pages hit its plan limit, not the ceiling: no plan sells more than a crawl reads
     const full = await website(bot.id, { pages: CRAWL_PAGE_CEILING })
     await db.query("update app.organizations set plan = 'starter' where id = $1", [bot.organizationId])
 
@@ -84,18 +84,18 @@ describe("admin knowledge list", () => {
     assert.equal(byId[ready]!.bot_name, bot.name)
     assert.equal(byId[stuck]!.stuck, true)
     assert.equal(byId[syncing]!.stuck, false)
-    assert.equal(byId[capped]!.at_ceiling, true)
-    assert.equal(byId[capped]!.plan_pages, 1000)
+    assert.equal(byId[onPro]!.at_ceiling, false)
+    assert.equal(byId[onPro]!.plan_pages, 300)
     assert.equal(byId[full]!.at_ceiling, false)
 
     assert.deepEqual((await list({ filters: { status: "stuck" } })).map((r) => r.id), [stuck])
     assert.deepEqual((await list({ filters: { status: "syncing" } })).map((r) => r.id), [syncing])
-    assert.deepEqual((await list({ filters: { ceiling: "yes" } })).map((r) => r.id), [capped])
+    assert.deepEqual((await list({ filters: { ceiling: "yes" } })).map((r) => r.id), [])
     assert.deepEqual((await list({ filters: { synced: "never" } })).length, 4)
-    assert.deepEqual((await list({ q: "cay" })).map((r) => r.id).sort(), [syncing, capped].sort())
+    assert.deepEqual((await list({ q: "cay" })).map((r) => r.id).sort(), [syncing, onPro].sort())
 
     const summary = await adminKnowledgeSummary(db)
-    assert.deepEqual({ ...summary }, { sources: 5, websites: 5, chunks: 0, pending: 0, syncing: 1, stuck: 1, failed: 0, atCeiling: 1 })
+    assert.deepEqual({ ...summary }, { sources: 5, websites: 5, chunks: 0, pending: 0, syncing: 1, stuck: 1, failed: 0, atCeiling: 0 })
   })
 })
 
@@ -147,9 +147,9 @@ describe("admin knowledge actions", () => {
     await db.query("update app.organizations set plan = 'business' where id = $1", [bot.organizationId])
     const id = await website(bot.id, { pages: CRAWL_PAGE_CEILING })
     const d = (await getAdminKnowledgeDetail(db, id))!
-    assert.equal(d.source.planPages, 3000)
+    assert.equal(d.source.planPages, 300)
     assert.equal(d.source.pageLimit, CRAWL_PAGE_CEILING)
-    assert.equal(d.source.atCeiling, true)
+    assert.equal(d.source.atCeiling, false)
     assert.equal(d.source.storedChunks, 0)
     assert.equal(await getAdminKnowledgeDetail(db, "nope"), null)
   })
