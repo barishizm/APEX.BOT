@@ -326,7 +326,7 @@ export const en = {
         },
         {
           q: "Is my data used to train AI models?",
-          a: "Not unless you opt in when you create your account. Messages are sent to the AI provider you choose only to generate answers.",
+          a: "We use your data to improve our own models only if you opt in when you create your account. Google is the exception for now: our search runs on its unpaid Gemini tier, whose terms let Google use your page text and visitors' messages to improve its products. The same applies to answers if you choose a Gemini model. See the privacy policy for details.",
         },
         {
           q: "How much does it cost?",

@@ -155,7 +155,7 @@ function Body() {
           <tr>
             <td>Anthropic, OpenAI arba Google (tas, kurį klientas pasirinko tam asistentui)</td>
             <td>Atsakymams generuoti</td>
-            <td>Lankytojo žinutė, naujausios pokalbio žinutės ir aktualios kliento turinio dalys</td>
+            <td>Lankytojo žinutė, naujausios pokalbio žinutės ir aktualios kliento turinio dalys. Jei klientas pasirenka Gemini modelį, kitos eilutės pastaba apie nemokamą Google planą taikoma ir šiems duomenims</td>
           </tr>
           <tr>
             <td>Google (Gemini API)</td>
@@ -211,6 +211,8 @@ function Body() {
         Kliento asistentus ir pokalbius savo modeliams tobulinti naudojame tik tuo atveju, jei klientas tam pritarė
         registruodamasis. Pagal numatytuosius nustatymus – ne. Šį pasirinkimą bet kada galite pakeisti valdymo skydelio
         skiltyje „Paskyros nustatymai“ arba susisiekę su mumis; tai taikoma nuo pakeitimo tvarkomiems duomenims.
+        Šis pasirinkimas susijęs su mūsų pačių modeliais; ką Google gali daryti su duomenimis savo nemokamame plane, aprašyta
+        pirmiau pateiktoje paslaugų teikėjų lentelėje.
       </p>
 
       <h2 id="retention">Kiek laiko saugome duomenis</h2>

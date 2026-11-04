@@ -150,7 +150,8 @@ function Body() {
         </li>
         <li>
           <strong>Training is opt-in.</strong> We use your content to improve our own models only if you said yes, and you can
-          change that at any time.
+          change that at any time. Google's unpaid tier, which runs our search, has its own terms: see the{" "}
+          <a href="/privacy">privacy policy</a>.
         </li>
         <li>
           <strong>Hosted in the EU where it matters.</strong> The chat API runs in Frankfurt, Germany. See the{" "}

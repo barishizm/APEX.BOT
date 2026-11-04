@@ -158,7 +158,8 @@ function Body() {
         </li>
         <li>
           <strong>Apmācība – tikai ar piekrišanu.</strong> Jūsu saturu savu modeļu uzlabošanai izmantojam tikai tad, ja esat
-          piekrituši, un šo izvēli varat mainīt jebkurā laikā.
+          piekrituši, un šo izvēli varat mainīt jebkurā laikā. Google bezmaksas līmenim, kurā darbojas mūsu meklēšana, ir savi
+          noteikumi: skatiet <a href="/lv/privacy">privātuma politiku</a>.
         </li>
         <li>
           <strong>Mitināts ES tur, kur tas ir svarīgi.</strong> Tērzēšanas API darbojas Frankfurtē, Vācijā. Visi datus apstrādājošie

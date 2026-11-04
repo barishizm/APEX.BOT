@@ -326,7 +326,7 @@ export const et: Dictionary = {
         },
         {
           q: "Kas minu andmeid kasutatakse TI mudelite treenimiseks?",
-          a: "Ei, kui te konto loomisel selleks nõusolekut ei anna. Sõnumid saadetakse teie valitud TI teenusepakkujale ainult vastuste koostamiseks.",
+          a: "Kasutame teie andmeid oma mudelite täiustamiseks ainult siis, kui andsite selleks konto loomisel nõusoleku. Praegu on erand Google: meie otsing töötab Gemini tasuta tasemel, mille tingimused lubavad Google'il kasutada teie lehtede teksti ja külastajate sõnumeid oma toodete täiustamiseks. Sama kehtib vastuste kohta, kui valite Gemini mudeli. Üksikasjad leiate privaatsuspoliitikast.",
         },
         {
           q: "Kui palju see maksab?",

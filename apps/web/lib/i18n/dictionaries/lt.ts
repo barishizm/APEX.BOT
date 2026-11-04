@@ -326,7 +326,7 @@ export const lt: Dictionary = {
         },
         {
           q: "Ar mano duomenys naudojami DI modeliams apmokyti?",
-          a: "Ne, nebent kurdami paskyrą tam pritarsite. Žinutės siunčiamos jūsų pasirinktam DI paslaugų teikėjui tik atsakymams generuoti.",
+          a: "Jūsų duomenis savo modeliams tobulinti naudojame tik tada, jei kurdami paskyrą tam pritarėte. Kol kas išimtis yra Google: mūsų paieška veikia nemokamu Gemini planu, kurio sąlygos leidžia Google naudoti jūsų puslapių tekstą ir lankytojų žinutes savo produktams tobulinti. Tas pats taikoma atsakymams, jei pasirenkate Gemini modelį. Daugiau informacijos rasite privatumo politikoje.",
         },
         {
           q: "Kiek tai kainuoja?",

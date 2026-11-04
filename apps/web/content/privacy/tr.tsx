@@ -157,7 +157,7 @@ function Body() {
           <tr>
             <td>Anthropic, OpenAI veya Google (müşterinin o asistan için seçtiği)</td>
             <td>Yanıt üretmek</td>
-            <td>Ziyaretçinin mesajı, konuşmanın son mesajları ve müşteri içeriğinin ilgili bölümleri</td>
+            <td>Ziyaretçinin mesajı, konuşmanın son mesajları ve müşteri içeriğinin ilgili bölümleri. Müşteri bir Gemini modeli seçerse sonraki satırdaki Google ücretsiz katmanı notu bu veriler için de geçerlidir</td>
           </tr>
           <tr>
             <td>Google (Gemini API)</td>
@@ -213,6 +213,8 @@ function Body() {
         Bir müşterinin asistanlarını ve konuşmalarını kendi modellerimizi geliştirmek için yalnızca müşteri kayıt sırasında buna
         izin verdiyse kullanırız. Varsayılan "hayır"dır. Bu tercihi panelde Ayarlar'dan ya da bizimle iletişime geçerek her
         zaman değiştirebilirsiniz; değişiklik bundan sonraki verileri etkiler.
+        Bu tercih kendi modellerimizle ilgilidir; Google'ın ücretsiz katmanındaki verilerle neler yapabileceği yukarıdaki hizmet
+        sağlayıcıları tablosunda açıklanmıştır.
       </p>
 
       <h2 id="retention">Verileri ne kadar süre saklıyoruz</h2>

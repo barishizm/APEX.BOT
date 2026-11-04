@@ -159,7 +159,8 @@ function Body() {
         </li>
         <li>
           <strong>Apmokymas – tik su sutikimu.</strong> Jūsų turinį savo modeliams tobulinti naudojame tik tada, jei sutikote, o
-          šį pasirinkimą galite bet kada pakeisti.
+          šį pasirinkimą galite bet kada pakeisti. Nemokamas Google planas, kuriuo veikia mūsų paieška, turi savo sąlygas: žr.{" "}
+          <a href="/lt/privacy">privatumo politiką</a>.
         </li>
         <li>
           <strong>Talpinama ES ten, kur tai svarbu.</strong> Pokalbių API veikia Frankfurte, Vokietijoje. Visi duomenis

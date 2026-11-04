@@ -134,8 +134,10 @@ function Body() {
       </p>
       <h3>Kas minu sisu kasutatakse TI mudelite treenimiseks?</h3>
       <p>
-        Ei, kui te selleks nõusolekut ei anna. Teie sisu ja külastajate sõnumid saadetakse teie valitud TI teenusepakkujale
-        ainult vastuste koostamiseks. Vaadake <a href="/et/privacy">privaatsuspoliitikat</a>.
+        Kasutame teie sisu oma mudelite täiustamiseks ainult siis, kui olete selleks nõusoleku andnud. Praegu on erand Google:
+        meie otsing töötab Gemini tasuta tasemel, mille tingimused lubavad Google'il kasutada teie lehtede teksti ja
+        külastajate sõnumeid oma toodete täiustamiseks. Sama kehtib vastuste kohta, kui valite Gemini mudeli. Vaadake{" "}
+        <a href="/et/privacy">privaatsuspoliitikat</a>.
       </p>
     </>
   );

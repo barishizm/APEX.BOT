@@ -326,7 +326,7 @@ export const lv: Dictionary = {
         },
         {
           q: "Vai mani dati tiek izmantoti MI modeļu apmācībai?",
-          a: "Nē, ja vien konta izveides laikā tam nepiekrītat. Ziņas tiek sūtītas jūsu izvēlētajam MI pakalpojuma sniedzējam tikai atbilžu ģenerēšanai.",
+          a: "Jūsu datus savu modeļu uzlabošanai izmantojam tikai tad, ja konta izveides laikā tam piekritāt. Pagaidām izņēmums ir Google: mūsu meklēšana darbojas Gemini bezmaksas līmenī, kura noteikumi ļauj Google izmantot jūsu lapu tekstu un apmeklētāju ziņas savu produktu uzlabošanai. Tas pats attiecas uz atbildēm, ja izvēlaties Gemini modeli. Sīkāka informācija ir privātuma politikā.",
         },
         {
           q: "Cik tas maksā?",

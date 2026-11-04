@@ -49,9 +49,10 @@ function Body() {
         </li>
         <li>
           <strong>Privātums pēc noklusējuma.</strong> Personas dati žurnālos tiek maskēti, sarunas tiek dzēstas pēc jūsu
-          izvēlētā perioda, un jūsu dati netiek izmantoti modeļu apmācībai, ja vien jūs tam nepiekrītat.{" "}
-          <a href="/lv/privacy">Privātuma politika</a> ir sagatavota atbilstoši ES Vispārīgajai datu aizsardzības regulai
-          (VDAR) un Turcijas KVKK.
+          izvēlētā perioda, un jūsu datus savu modeļu uzlabošanai izmantojam tikai tad, ja esat tam piekrituši. Google var
+          izmantot datus, kas tiek sūtīti caur tā bezmaksas līmeni, kurā darbojas mūsu meklēšana;{" "}
+          <a href="/lv/privacy">privātuma politika</a> to izskaidro un ir sagatavota atbilstoši ES Vispārīgajai datu aizsardzības
+          regulai (VDAR) un Turcijas KVKK.
         </li>
         <li>
           <strong>Vietējās valodas, ne tikai angļu.</strong> Latviešu, lietuviešu, igauņu, angļu un turku valoda tiek

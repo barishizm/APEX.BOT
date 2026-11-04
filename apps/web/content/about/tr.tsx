@@ -50,8 +50,9 @@ function Body() {
         </li>
         <li>
           <strong>Varsayılan olarak gizlilik.</strong> Kişisel veriler loglarda maskelenir, konuşmalar seçtiğiniz süre
-          sonunda silinir ve siz izin vermedikçe verileriniz model eğitiminde kullanılmaz.{" "}
-          <a href="/tr/privacy">Gizlilik politikamız</a> KVKK ve GDPR'a uygun olarak yazılmıştır.
+          sonunda silinir ve verilerinizi kendi modellerimizi geliştirmek için yalnızca izin verdiyseniz kullanırız. Google,
+          aramamızın çalıştığı ücretsiz katmanı üzerinden gönderilen verileri kullanabilir;{" "}
+          <a href="/tr/privacy">gizlilik politikamız</a> bunu açıklar ve KVKK ile GDPR'a uygun olarak yazılmıştır.
         </li>
         <li>
           <strong>Yalnızca İngilizce değil, yerel diller.</strong> Türkçe, İngilizce, Litvanca, Letonca ve Estonca hem

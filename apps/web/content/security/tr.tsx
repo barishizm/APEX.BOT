@@ -155,7 +155,8 @@ function Body() {
         </li>
         <li>
           <strong>Eğitim isteğe bağlıdır.</strong> İçeriğinizi kendi modellerimizi geliştirmek için yalnızca evet dediyseniz
-          kullanırız ve bunu istediğiniz zaman değiştirebilirsiniz.
+          kullanırız ve bunu istediğiniz zaman değiştirebilirsiniz. Aramamızın çalıştığı Google ücretsiz katmanının kendi
+          koşulları vardır: <a href="/tr/privacy">gizlilik politikasına</a> bakın.
         </li>
         <li>
           <strong>Önemli olan yerde AB'de barındırılır.</strong> Sohbet API'si Frankfurt, Almanya'da çalışır. Verilere erişen tüm
