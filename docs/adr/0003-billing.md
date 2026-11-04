@@ -37,8 +37,12 @@ As on the pricing page, in USD:
 |---|---|---|---|---|---|---|
 | Free | $0 | – | 100 | 1 | 50 | fast tier only |
 | Starter | $29 | $24 ($288/yr) | 600 | 1 | 300 | all tiers |
-| Pro | $79 | $65 ($780/yr) | 1,500 | 3 | 1,000 | all tiers, automatic fallback |
-| Business | $249 | $199 ($2,388/yr) | 5,000 | 10 | 3,000 | all tiers, automatic fallback |
+| Pro | $79 | $65 ($780/yr) | 1,500 | 3 | 300 | all tiers, automatic fallback |
+| Business | $249 | $199 ($2,388/yr) | 5,000 | 10 | 300 | all tiers, automatic fallback |
+
+Pro and Business were first listed at 1,000 and 3,000 knowledge pages, but one crawl can read only 300
+(`CRAWL_PAGE_CEILING`). They stay at 300 until crawls can continue across function calls; raising them also
+needs a look at the 5,000-excerpt limit per bot and the chat API's memory.
 
 Feature differences (branding removal, topics to decline, retention up to 365 days, DPA, onboarding call) are as listed
 in the dictionaries. Free needs no card and never has a Paddle subscription.

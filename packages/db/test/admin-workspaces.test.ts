@@ -112,16 +112,16 @@ describe("plans", () => {
     assert.deepEqual(detail.planPreviews.map((p) => p.plan), ["starter", "pro", "business"])
     assert.ok(detail.planPreviews.find((p) => p.plan === "pro")!.limits.every((l) => l.change === 0))
     const free = planLimitChanges("pro", "free")
-    assert.deepEqual(free.find((l) => l.key === "websitePages"), { key: "websitePages", from: 1000, to: 50, effectiveFrom: 300, effectiveTo: 50, change: -1 })
+    assert.deepEqual(free.find((l) => l.key === "websitePages"), { key: "websitePages", from: 300, to: 50, effectiveFrom: 300, effectiveTo: 50, change: -1 })
     // every entitlement is listed, switches and model tiers included
     assert.deepEqual(free.map((l) => l.key), Object.keys(PLAN_LIMITS.free))
     assert.deepEqual(free.find((l) => l.key === "removeBranding"), { key: "removeBranding", from: true, to: false, effectiveFrom: true, effectiveTo: false, change: -1 })
     assert.deepEqual(free.find((l) => l.key === "allowedModelTiers"), { key: "allowedModelTiers", from: ["fast", "standard", "premium"], to: ["fast"], effectiveFrom: ["fast", "standard", "premium"], effectiveTo: ["fast"], change: -1 })
     // every paid plan reads at least the crawl ceiling
     assert.deepEqual(detail.planPreviews.find((p) => p.plan === "starter")!.overLimit, [])
-    // above the crawl ceiling nothing changes in practice
+    // Pro and Business read the same number of pages
     const toBusiness = planLimitChanges("pro", "business")
-    assert.deepEqual(toBusiness.find((l) => l.key === "websitePages"), { key: "websitePages", from: 1000, to: 3000, effectiveFrom: 300, effectiveTo: 300, change: 0 })
+    assert.deepEqual(toBusiness.find((l) => l.key === "websitePages"), { key: "websitePages", from: 300, to: 300, effectiveFrom: 300, effectiveTo: 300, change: 0 })
     assert.equal(toBusiness.find((l) => l.key === "monthlyReplies")!.change, 1)
     assert.equal(toBusiness.find((l) => l.key === "declineTopics")!.change, 0)
   })

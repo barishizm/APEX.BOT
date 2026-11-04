@@ -55,7 +55,7 @@ export const PLAN_LIMITS: Record<Plan, PlanEntitlements> = {
   pro: {
     monthlyReplies: 1500,
     websites: 3,
-    websitePages: 1000,
+    websitePages: 300,
     allowedModelTiers: MODEL_TIERS,
     removeBranding: true,
     declineTopics: true,
@@ -66,7 +66,7 @@ export const PLAN_LIMITS: Record<Plan, PlanEntitlements> = {
   business: {
     monthlyReplies: 5000,
     websites: 10,
-    websitePages: 3000,
+    websitePages: 300,
     allowedModelTiers: MODEL_TIERS,
     removeBranding: true,
     declineTopics: true,
@@ -140,8 +140,8 @@ export function entitlementsFor(plan: Plan, overrides: Partial<PlanEntitlements>
 }
 
 /**
- * Pages one website crawl can read before its function call times out. Plans above this are
- * held to it until crawls can continue across calls.
+ * Pages one website crawl can read before its function call times out. No plan sells more than
+ * this until crawls can continue across calls (plans.test.ts holds that).
  */
 export const CRAWL_PAGE_CEILING = 300
 
