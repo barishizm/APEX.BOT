@@ -1,9 +1,10 @@
 // Everything lives inside the shadow root; `all: initial` keeps host-page CSS out.
 export const css = `
 :host{all:initial}
-*{box-sizing:border-box;margin:0}
+*{box-sizing:border-box;margin:0;touch-action:manipulation}
 .root{--bg:#fff;--surface:#f6f6f3;--text:#0c0c09;--muted:#64645c;--line:#e4e4de;--bubble:#f0f0eb;--err:#b42318;--err-bg:#fdf1f0;--ox:var(--cx,20px);--oy:var(--cy,20px);--ls:56px;--pw:384px;--r:16px;--ease:cubic-bezier(.2,.8,.2,1);--font:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
-position:fixed;z-index:2147483000;bottom:var(--oy);right:var(--ox);font:15px/1.5 var(--font);color:var(--text);-webkit-font-smoothing:antialiased}
+position:fixed;z-index:2147483000;bottom:var(--oy);right:var(--ox);font:15px/1.5 var(--font);color:var(--text);-webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+.root[data-fit]{bottom:auto;top:calc(var(--vt) + var(--vh) - var(--oy) - var(--ls))}
 .root[data-pos=left]{right:auto;left:var(--ox)}
 .root.dk{--bg:#171713;--surface:#0f0f0c;--text:#f4f4f1;--muted:#a3a39b;--line:#2c2c25;--bubble:#24241e;--err:#fda29b;--err-bg:#2a1714}
 button,input,textarea{font:inherit;color:inherit}
@@ -19,16 +20,17 @@ svg{display:block;width:20px;height:20px;fill:none;stroke:currentColor;stroke-wi
 .launcher svg{width:calc(var(--ls)*.43);height:calc(var(--ls)*.43)}
 .launcher img{width:calc(var(--ls)*.6);height:calc(var(--ls)*.6);object-fit:contain}
 .launcher.lbl{padding:0 calc(var(--ls)*.38)}
-.teaser{position:absolute;bottom:calc(var(--ls) + 12px);right:0;width:max-content;max-width:260px;padding:9px 32px 9px 13px;background:var(--bg);border:1px solid var(--line);border-radius:14px;box-shadow:0 8px 24px rgba(12,12,9,.14);font-size:14px;text-align:left;animation:pop .26s var(--ease)}
+.teaser{position:absolute;bottom:calc(var(--ls) + 12px);right:0;width:max-content;max-width:min(260px,calc(100vw - 2*var(--ox)));padding:9px 32px 9px 13px;background:var(--bg);border:1px solid var(--line);border-radius:14px;box-shadow:0 8px 24px rgba(12,12,9,.14);font-size:14px;text-align:left;animation:pop .26s var(--ease)}
 .teaser.out{animation:out .18s ease forwards}
 .root[data-pos=left] .teaser{right:auto;left:0}
 .teaser .x{position:absolute;top:5px;right:5px;width:22px;height:22px;display:grid;place-items:center;border-radius:6px;color:var(--muted)}
 .teaser .x svg{width:14px;height:14px}
 .root[data-pos=left] .panel{right:auto;left:0;transform-origin:bottom left}
-.panel{position:absolute;bottom:calc(var(--ls) + 16px);right:0;width:var(--pw);max-width:calc(100vw - 2*var(--ox));height:min(640px,calc(100vh - var(--ls) - var(--oy) - 40px));display:flex;flex-direction:column;background:var(--bg);border:1px solid var(--line);border-radius:var(--r);box-shadow:0 24px 64px rgba(12,12,9,.18),0 2px 8px rgba(12,12,9,.08);overflow:hidden;transform-origin:bottom right;
+.panel{position:absolute;bottom:calc(var(--ls) + 16px);right:0;width:var(--pw);max-width:calc(100vw - 2*var(--ox));height:min(640px,calc(var(--vh,100vh) - var(--ls) - var(--oy) - 40px));overscroll-behavior:contain;display:flex;flex-direction:column;background:var(--bg);border:1px solid var(--line);border-radius:var(--r);box-shadow:0 24px 64px rgba(12,12,9,.18),0 2px 8px rgba(12,12,9,.08);overflow:hidden;transform-origin:bottom right;
 opacity:0;transform:translateY(10px) scale(.96);pointer-events:none;transition:opacity .16s ease,transform .22s cubic-bezier(.4,0,1,1)}
 .root[data-open] .panel{opacity:1;transform:none;pointer-events:auto;transition:opacity .2s ease,transform .32s cubic-bezier(.2,.9,.3,1.04)}
 .panel[hidden]{display:none}
+.panel:focus-visible{outline:none}
 @keyframes pop{from{opacity:0;transform:translateY(8px) scale(.98)}}
 @keyframes rise{from{opacity:0;transform:translateY(8px) scale(.97)}}
 @keyframes fade{from{opacity:0}}
@@ -36,7 +38,7 @@ opacity:0;transform:translateY(10px) scale(.96);pointer-events:none;transition:o
 @keyframes up{from{transform:translateY(100%)}}
 @keyframes down{to{transform:translateY(100%)}}
 .view{flex:1;min-height:0;display:flex;flex-direction:column}
-.head{display:flex;align-items:center;gap:12px;min-height:58px;padding:10px 8px 10px 14px;background:var(--p);color:var(--on-p)}
+.head{flex:none;display:flex;align-items:center;gap:12px;min-height:58px;padding:10px 8px 10px 14px;background:var(--p);color:var(--on-p)}
 .avatar{display:grid;place-items:center;flex:none;width:32px;height:32px;border-radius:9px;overflow:hidden;background:var(--p-tint);font-weight:600;font-size:15px}
 .avatar.logo{background:none}
 .avatar img{width:100%;height:100%;object-fit:contain}
@@ -48,7 +50,7 @@ opacity:0;transform:translateY(10px) scale(.96);pointer-events:none;transition:o
 .head .icon:hover,.head .icon[aria-expanded=true]{background:var(--p-tint);color:inherit;opacity:1}
 .head :focus-visible{outline-color:var(--on-p)}
 .mw{position:relative}
-.menu{position:absolute;top:calc(100% + 6px);right:-38px;z-index:3;min-width:220px;padding:5px;display:flex;flex-direction:column;gap:1px;background:var(--bg);border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 36px rgba(12,12,9,.16),0 2px 6px rgba(12,12,9,.08);transform-origin:top right;opacity:0;visibility:hidden;transform:translateY(-4px) scale(.96);transition:opacity .12s ease,transform .14s ease,visibility 0s .14s}
+.menu{position:absolute;top:calc(100% + 6px);right:-38px;z-index:3;min-width:220px;padding:5px;display:flex;flex-direction:column;gap:1px;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 36px rgba(12,12,9,.16),0 2px 6px rgba(12,12,9,.08);transform-origin:top right;opacity:0;visibility:hidden;transform:translateY(-4px) scale(.96);transition:opacity .12s ease,transform .14s ease,visibility 0s .14s}
 .menu.on{opacity:1;visibility:visible;transform:none;transition:opacity .16s ease,transform .22s var(--ease),visibility 0s}
 .item{display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;border-radius:8px;font-size:14px;line-height:1.3;text-align:left;white-space:nowrap;transition:background-color .12s}
 .item svg{width:18px;height:18px;flex:none;color:var(--muted)}
@@ -189,12 +191,29 @@ textarea::placeholder,input::placeholder{color:var(--muted)}
 .sheet.out{animation:out .18s ease forwards}
 .sheet.out .card{animation:down .18s ease forwards}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-@media (max-width:480px){
+@media (pointer:coarse){
+.head .icon,.jump,.tool,.send{width:44px;height:44px}
+.rate button,.notice .x{width:40px;height:40px}
+.fchip .x,.teaser .x{width:32px;height:32px}
+.teaser .x{top:1px;right:1px}
+.item{padding:12px 10px}
+.menu{right:-48px}}
+@media (hover:none){.launcher:hover{transform:none}}
+@media (max-width:480px),(max-height:480px) and (pointer:coarse){
 .root{--ox:min(var(--cx,20px),16px);--oy:min(var(--cy,20px),16px)}
-.root:not([data-float]) .panel{position:fixed;inset:0;width:auto;max-width:none;height:auto;border:0;border-radius:0;padding-bottom:env(safe-area-inset-bottom);transform:translateY(24px)}
+.root:not([data-float]) .panel{position:fixed;top:var(--vt,0);left:var(--vl,0);right:auto;bottom:auto;width:var(--vw,100%);max-width:none;height:var(--vh,100%);border:0;border-radius:0;padding:0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);transform:translateY(24px)}
+.root[data-kb] .panel{padding-bottom:0}
 .root[data-open]:not([data-float]) .panel{transform:none}
-.root:not([data-float]) .head{padding-top:max(10px,env(safe-area-inset-top))}
+.root:not([data-float]) .head{gap:8px;margin:0 calc(-1*env(safe-area-inset-right)) 0 calc(-1*env(safe-area-inset-left));padding:max(10px,env(safe-area-inset-top)) calc(8px + env(safe-area-inset-right)) 10px calc(14px + env(safe-area-inset-left))}
 .root[data-open]:not([data-float]) .launcher{display:none}
+.notice p{white-space:normal}
 textarea,input{font-size:16px}}
+/* a keyboard on a short screen: only the header, the newest messages and the composer */
+.root[data-short] .foot,.root[data-short] .suggest,.root[data-short] .notice{display:none}
+.root[data-short] .head{min-height:0;padding-top:0;padding-bottom:0}
+.root[data-short] .dock{margin-bottom:6px}
+.root[data-short] textarea{max-height:72px}
+.root[data-float][data-short] .launcher{display:none}
+.root[data-float][data-short] .panel{bottom:calc(8px - var(--oy) - var(--ls));height:calc(var(--vh) - 16px)}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 `;
