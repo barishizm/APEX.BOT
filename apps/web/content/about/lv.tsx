@@ -67,7 +67,7 @@ function Body() {
       <h2 id="infrastructure">Kur tas darbojas</h2>
       <p>
         Tērzēšanas API darbojas Render platformā Frankfurtē, Vācijā. Vietni un vadības paneli nodrošina Vercel, bet konti un
-        iestatījumi tiek glabāti pārvaldītā PostgreSQL datubāzē Supabase platformā. Pilns pakalpojumu sniedzēju saraksts un
+        iestatījumi tiek glabāti pārvaldītā PostgreSQL datubāzē Neon platformā. Pilns pakalpojumu sniedzēju saraksts un
         tas, ko katrs no tiem redz, ir pieejams <a href="/lv/privacy">privātuma politikā</a>. Katra pakalpojuma statusu
         reāllaikā varat pārbaudīt <a href="/lv/status">statusa lapā</a>.
       </p>

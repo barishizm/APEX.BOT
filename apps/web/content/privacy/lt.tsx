@@ -163,7 +163,7 @@ function Body() {
             <td>Kliento puslapių ir pridėto turinio tekstas bei lankytojo žinutė (tolesniems klausimams kartu su ankstesne). Gautus vektorius saugome savo duomenų bazėje. Kol naudojame nemokamą Google planą, Google sąlygos leidžia jam naudoti šiuos duomenis savo produktams tobulinti</td>
           </tr>
           <tr>
-            <td>Supabase (valdoma PostgreSQL)</td>
+            <td>Neon (valdoma PostgreSQL)</td>
             <td>Duomenų bazė</td>
             <td>Viskas, ką saugome: paskyros, nustatymai, žinios, pokalbiai</td>
           </tr>

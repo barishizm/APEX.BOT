@@ -164,7 +164,7 @@ function Body() {
             <td>Kliendi lehtede ja lisatud sisu tekst ning külastaja sõnum (jätkuküsimuste puhul koos eelmisega). Saadud vektorid säilitame oma andmebaasis. Seni kuni kasutame Google'i tasuta taset, lubavad Google'i tingimused tal neid andmeid oma toodete täiustamiseks kasutada</td>
           </tr>
           <tr>
-            <td>Supabase (hallatud PostgreSQL)</td>
+            <td>Neon (hallatud PostgreSQL)</td>
             <td>Andmebaas</td>
             <td>Kõik, mida säilitame: kontod, seaded, teadmised, vestlused</td>
           </tr>

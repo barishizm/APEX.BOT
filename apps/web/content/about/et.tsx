@@ -67,7 +67,7 @@ function Body() {
       <h2 id="infrastructure">Kus see töötab</h2>
       <p>
         Vestluse API töötab Renderi platvormil Saksamaal Frankfurdis. Veebisaiti ja töölauda teenindab Vercel ning kontod ja
-        seaded salvestatakse hallatud PostgreSQL-i andmebaasi Supabase'i platvormil. Kõigi teenusepakkujate täielik loetelu ja
+        seaded salvestatakse hallatud PostgreSQL-i andmebaasi Neoni platvormil. Kõigi teenusepakkujate täielik loetelu ja
         see, mida igaüks neist näeb, on toodud <a href="/et/privacy">privaatsuspoliitikas</a>. Iga teenuse olekut reaalajas
         saate kontrollida <a href="/et/status">olekulehel</a>.
       </p>
