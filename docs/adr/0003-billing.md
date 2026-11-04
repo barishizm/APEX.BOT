@@ -44,8 +44,9 @@ Pro and Business were first listed at 1,000 and 3,000 knowledge pages, but one c
 (`CRAWL_PAGE_CEILING`). They stay at 300 until crawls can continue across function calls; raising them also
 needs a look at the 5,000-excerpt limit per bot and the chat API's memory.
 
-Feature differences (branding removal, topics to decline, retention up to 365 days, DPA, onboarding call) are as listed
-in the dictionaries. Free needs no card and never has a Paddle subscription.
+Feature differences (branding removal, topics to decline, retention up to 365 days, onboarding call) are as listed
+in the dictionaries. A DPA is not a plan feature: Apex is the processor on every plan, so a standard DPA should cover
+all of them once its text exists. Until then the pricing page does not offer one. Free needs no card and never has a Paddle subscription.
 
 - Each paid plan is one Paddle **product** with two **prices**: a monthly price and an annual price, each with its own
   `price_id`. Overage (c) is a third, non-recurring price. The six recurring `price_id`s and the overage `price_id` live

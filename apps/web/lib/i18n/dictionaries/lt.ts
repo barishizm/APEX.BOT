@@ -431,7 +431,6 @@ export const lt: Dictionary = {
           "Iki {websites} svetainių, {pages} puslapių žinių",
           "Viskas, kas yra Pro plane",
           "Saugojimas iki {retentionDays} dienų",
-          "Duomenų tvarkymo sutartis (BDAR ir KVKK)",
           "Pradžios pokalbis su mūsų komanda",
         ],
         cta: "Prašyti beta prieigos",

@@ -431,7 +431,6 @@ export const et: Dictionary = {
           "Kuni {websites} veebisaiti, {pages} lehekülge teadmisi",
           "Kõik, mis on Pro-paketis",
           "Säilitamine kuni {retentionDays} päeva",
-          "Andmetöötlusleping (isikuandmete kaitse üldmäärus ja KVKK)",
           "Tutvustuskõne meie meeskonnaga",
         ],
         cta: "Küsi beetaligipääsu",

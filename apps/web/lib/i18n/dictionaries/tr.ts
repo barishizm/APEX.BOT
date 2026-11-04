@@ -431,7 +431,6 @@ export const tr: Dictionary = {
           "{websites} web sitesine kadar, {pages} sayfa bilgi",
           "Pro'daki her şey",
           "{retentionDays} güne kadar saklama süresi",
-          "Veri işleme sözleşmesi (KVKK ve GDPR)",
           "Ekibimizle kurulum görüşmesi",
         ],
         cta: "Beta erişimi isteyin",
