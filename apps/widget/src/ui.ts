@@ -67,8 +67,9 @@ const media = (query: string) => (typeof matchMedia === "function" ? matchMedia(
 /** The visitor asked for less motion: transitions are skipped, not just shortened. */
 const still = () => !!media("(prefers-reduced-motion: reduce)")?.matches;
 /** Where the panel fills the screen (the same query as the stylesheet's). */
-const FULL_SCREEN = "(max-width: 480px), (max-height: 480px) and (pointer: coarse)";
-const touchOnly = () => !!media("(hover: none) and (pointer: coarse)")?.matches;
+const FULL_SCREEN = "(max-width: 480px), (max-height: 480px) and (hover: none)";
+// not pointer:coarse: phones with a stylus, and some touch screens, report a fine pointer
+const touchOnly = () => !!media("(hover: none)")?.matches;
 /** What the visitor actually sees: with a keyboard up, this is smaller than the area fixed elements are laid out in. */
 const viewport = () => (typeof visualViewport === "undefined" ? null : visualViewport);
 

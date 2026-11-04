@@ -191,7 +191,7 @@ textarea::placeholder,input::placeholder{color:var(--muted)}
 .sheet.out{animation:out .18s ease forwards}
 .sheet.out .card{animation:down .18s ease forwards}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-@media (pointer:coarse){
+@media (hover:none){
 .head .icon,.jump,.tool,.send{width:44px;height:44px}
 .rate button,.notice .x{width:40px;height:40px}
 .fchip .x,.teaser .x{width:32px;height:32px}
@@ -199,7 +199,7 @@ textarea::placeholder,input::placeholder{color:var(--muted)}
 .item{padding:12px 10px}
 .menu{right:-48px}}
 @media (hover:none){.launcher:hover{transform:none}}
-@media (max-width:480px),(max-height:480px) and (pointer:coarse){
+@media (max-width:480px),(max-height:480px) and (hover:none){
 .root{--ox:min(var(--cx,20px),16px);--oy:min(var(--cy,20px),16px)}
 .root:not([data-float]) .panel{position:fixed;top:var(--vt,0);left:var(--vl,0);right:auto;bottom:auto;width:var(--vw,100%);max-width:none;height:var(--vh,100%);border:0;border-radius:0;padding:0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);transform:translateY(24px)}
 .root[data-kb] .panel{padding-bottom:0}
