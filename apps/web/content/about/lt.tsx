@@ -68,7 +68,7 @@ function Body() {
       <h2 id="infrastructure">Kur jis veikia</h2>
       <p>
         Pokalbių API veikia Render platformoje Frankfurte, Vokietijoje. Svetainę ir valdymo skydelį teikia Vercel, o
-        paskyros ir nustatymai saugomi valdomoje PostgreSQL duomenų bazėje Supabase platformoje. Visas paslaugų teikėjų
+        paskyros ir nustatymai saugomi valdomoje PostgreSQL duomenų bazėje Neon platformoje. Visas paslaugų teikėjų
         sąrašas ir tai, ką kiekvienas iš jų mato, pateikti <a href="/lt/privacy">privatumo politikoje</a>. Kiekvienos
         paslaugos būseną realiuoju laiku galite patikrinti <a href="/lt/status">būsenos puslapyje</a>.
       </p>

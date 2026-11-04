@@ -67,7 +67,7 @@ function Body() {
       <h2 id="infrastructure">Nerede çalışıyor?</h2>
       <p>
         Sohbet API'si Almanya'nın Frankfurt kentinde, Render üzerinde çalışır. Web sitesi ve panel Vercel üzerinden sunulur;
-        hesaplar ve ayarlar Supabase'deki yönetilen bir PostgreSQL veritabanında saklanır. Tüm hizmet sağlayıcıların listesi
+        hesaplar ve ayarlar Neon'daki yönetilen bir PostgreSQL veritabanında saklanır. Tüm hizmet sağlayıcıların listesi
         ve her birinin neleri gördüğü <a href="/tr/privacy">gizlilik politikasında</a> yer alır. Her hizmetin canlı durumunu{" "}
         <a href="/tr/status">durum sayfasından</a> görebilirsiniz.
       </p>

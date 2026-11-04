@@ -160,7 +160,7 @@ function Body() {
             <td>The text of the customer's pages and added content, and the visitor's message (with the previous one for follow-up questions). We store the resulting vectors in our own database. While we use Google's unpaid tier, Google's terms allow it to use this data to improve its products</td>
           </tr>
           <tr>
-            <td>Supabase (managed PostgreSQL)</td>
+            <td>Neon (managed PostgreSQL)</td>
             <td>Database</td>
             <td>Everything we store: accounts, settings, knowledge, conversations</td>
           </tr>

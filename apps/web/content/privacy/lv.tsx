@@ -162,7 +162,7 @@ function Body() {
             <td>Klienta lapu un pievienotā satura teksts un apmeklētāja ziņa (papildjautājumiem kopā ar iepriekšējo). Iegūtos vektorus glabājam savā datubāzē. Kamēr izmantojam Google bezmaksas līmeni, Google noteikumi ļauj tam izmantot šos datus savu produktu uzlabošanai</td>
           </tr>
           <tr>
-            <td>Supabase (pārvaldīta PostgreSQL)</td>
+            <td>Neon (pārvaldīta PostgreSQL)</td>
             <td>Datubāze</td>
             <td>Viss, ko glabājam: konti, iestatījumi, zināšanas, sarunas</td>
           </tr>

@@ -65,7 +65,7 @@ function Body() {
       <h2 id="infrastructure">Where it runs</h2>
       <p>
         The chat API runs on Render in Frankfurt, Germany. The website and dashboard are served by Vercel, and accounts and
-        settings are stored in a managed PostgreSQL database on Supabase. The full list of providers, and what each one
+        settings are stored in a managed PostgreSQL database on Neon. The full list of providers, and what each one
         sees, is in the <a href="/privacy">privacy policy</a>. You can check the live state of each service on the{" "}
         <a href="/status">status page</a>.
       </p>

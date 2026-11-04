@@ -165,7 +165,7 @@ function Body() {
             <td>Müşterinin sayfalarının ve eklediği içeriğin metni ile ziyaretçinin mesajı (devam sorularında bir önceki mesajla birlikte). Ortaya çıkan vektörleri kendi veritabanımızda saklarız. Google'ın ücretsiz katmanını kullandığımız sürece Google'ın koşulları bu verileri kendi ürünlerini geliştirmek için kullanmasına izin verir</td>
           </tr>
           <tr>
-            <td>Supabase (yönetilen PostgreSQL)</td>
+            <td>Neon (yönetilen PostgreSQL)</td>
             <td>Veritabanı</td>
             <td>Sakladığımız her şey: hesaplar, ayarlar, bilgi tabanı, konuşmalar</td>
           </tr>
