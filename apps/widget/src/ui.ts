@@ -66,6 +66,11 @@ export function hiddenHere(ui: WidgetUi | undefined, path = location.pathname): 
 const media = (query: string) => (typeof matchMedia === "function" ? matchMedia(query) : null);
 /** The visitor asked for less motion: transitions are skipped, not just shortened. */
 const still = () => !!media("(prefers-reduced-motion: reduce)")?.matches;
+/** Where the panel fills the screen (the same query as the stylesheet's). */
+const FULL_SCREEN = "(max-width: 480px), (max-height: 480px) and (pointer: coarse)";
+const touchOnly = () => !!media("(hover: none) and (pointer: coarse)")?.matches;
+/** What the visitor actually sees: with a keyboard up, this is smaller than the area fixed elements are laid out in. */
+const viewport = () => (typeof visualViewport === "undefined" ? null : visualViewport);
 
 /** Runs a short entrance animation where the Web Animations API exists and motion is welcome. */
 function enter(el: Element, from: Keyframe, ms = 220): void {
@@ -220,6 +225,9 @@ export class Widget {
   private ui?: WidgetUi;
   private handoffOn: boolean;
   private teaser: HTMLElement | null = null;
+  /** Gives the host page its scrolling back; set while the full-screen panel holds it. */
+  private unlock: (() => void) | null = null;
+  private fitHeight = 0;
 
   constructor(
     private api: ApiClient,
@@ -409,10 +417,22 @@ export class Widget {
       h("button", { class: "icon", type: "button", "aria-label": t.close, title: t.close, onclick: () => this.close(true) }, icon("close")),
     );
 
-    this.panel = h("section", { class: "panel", id: "apex-panel", role: "dialog", "aria-label": `${cfg.botName}, ${t.ai}`, hidden: true }, this.head, this.chatView);
+    this.panel = h("section", { class: "panel", id: "apex-panel", role: "dialog", "aria-label": `${cfg.botName}, ${t.ai}`, tabindex: -1, hidden: true }, this.head, this.chatView);
     this.panel.addEventListener("keydown", (e) => {
       if (e.key === "Escape") this.close(true);
     });
+    // iOS still pans a locked page while the keyboard is up, so only what can scroll may move
+    this.panel.addEventListener(
+      "touchmove",
+      (e) => {
+        if (!this.unlock || e.touches.length > 1 || !e.cancelable) return;
+        for (let el = e.target as Element | null; el && el !== this.panel; el = el.parentElement) {
+          if (el.scrollHeight > el.clientHeight && /auto|scroll/.test(getComputedStyle(el).overflowY)) return;
+        }
+        e.preventDefault();
+      },
+      { passive: false },
+    );
 
     this.launcher = h("button", { class: "launcher", type: "button", "aria-label": t.open, "aria-expanded": "false", "aria-controls": "apex-panel", onclick: () => this.toggle() });
     this.paintLauncher();
@@ -502,7 +522,7 @@ export class Widget {
     document.body.append(this.host);
 
     const b = this.ui?.behavior;
-    if (b?.autoOpen === "delay" && !this.flag("auto") && (b.autoOpenOnMobile || !media("(max-width: 480px)")?.matches)) {
+    if (b?.autoOpen === "delay" && !this.flag("auto") && (b.autoOpenOnMobile || !media(FULL_SCREEN)?.matches)) {
       setTimeout(() => {
         // the visitor may have opened and closed it in the meantime
         if (!this.flag("auto")) this.open();
@@ -511,12 +531,69 @@ export class Widget {
     }
   }
 
+  // ----- fitting the screen -----
+
+  private track(on: boolean): void {
+    const v = viewport();
+    for (const type of ["resize", "scroll"]) {
+      if (on) v?.addEventListener(type, this.fit);
+      else v?.removeEventListener(type, this.fit);
+    }
+    if (on) return this.fit();
+    for (const attr of ["data-fit", "data-kb", "data-short"]) this.root.removeAttribute(attr);
+    this.lock(false);
+  }
+
+  /** Keeps the open panel on the visible part of the screen: above the keyboard, and with the page when iOS pans it. */
+  private fit = (): void => {
+    this.lock(!!media(FULL_SCREEN)?.matches && !this.root.hasAttribute("data-float"));
+    const v = viewport();
+    // a pinch zoom moves this viewport too; the panel holds still so the visitor can zoom into it
+    if (!v || v.scale > 1.01) return;
+    const style = this.root.style;
+    style.setProperty("--vt", `${v.offsetTop}px`);
+    style.setProperty("--vl", `${v.offsetLeft}px`);
+    style.setProperty("--vw", `${v.width}px`);
+    style.setProperty("--vh", `${v.height}px`);
+    this.root.toggleAttribute("data-fit", true);
+    // no room left for the home-indicator gap: the keyboard covers it
+    this.root.toggleAttribute("data-kb", window.innerHeight - v.height > 80);
+    const typing = (this.root.getRootNode() as ShadowRoot).activeElement?.matches("input,textarea");
+    this.root.toggleAttribute("data-short", v.height < 360 && !!typing);
+    if (v.height !== this.fitHeight) {
+      this.fitHeight = v.height;
+      this.scroll();
+    }
+  };
+
+  /** Stops the host page scrolling behind the full-screen panel, and puts it back where it was. */
+  private lock(on: boolean): void {
+    if (on === !!this.unlock) return;
+    if (!on) return this.unlock!();
+    const { documentElement: html, body } = document;
+    const before = [html.style.overflow, body.style.overflow];
+    const y = window.scrollY;
+    html.style.overflow = body.style.overflow = "hidden";
+    this.unlock = () => {
+      this.unlock = null;
+      [html.style.overflow, body.style.overflow] = before;
+      if (window.scrollY !== y) window.scrollTo({ top: y, behavior: "instant" });
+    };
+  }
+
+  /** Focus for the composer. On a touch screen that would open the keyboard over what the visitor came to read, so the dialog takes it until they tap the field. */
+  private focusComposer(): void {
+    if (!touchOnly()) this.input.focus();
+    else if ((this.root.getRootNode() as ShadowRoot).activeElement !== this.input) this.panel.focus({ preventScroll: true });
+  }
+
   // ----- public API -----
 
   open(): void {
     if (this.isOpen) return;
     this.isOpen = true;
     clearTimeout(this.hideTimer);
+    this.track(true);
     this.panel.hidden = false;
     // the closed state has to be laid out once, or the opening transition has nothing to start from
     void this.panel.offsetWidth;
@@ -527,7 +604,7 @@ export class Widget {
     this.flag("auto", true);
     if (this.teaser) this.hideTeaser();
     this.ready ??= this.hydrate();
-    if (this.view === this.chatView) this.input.focus();
+    if (this.view === this.chatView) this.focusComposer();
     this.emit("open");
   }
 
@@ -537,6 +614,7 @@ export class Widget {
     this.closeMenu();
     this.stopListening(true);
     this.hush();
+    this.track(false);
     this.root.toggleAttribute("data-open", false);
     this.launcher.setAttribute("aria-expanded", "false");
     this.launcher.setAttribute("aria-label", this.t.open);
@@ -703,7 +781,7 @@ export class Widget {
     this.backToChat();
     this.ready = this.hydrate();
     this.updateSend();
-    this.input.focus();
+    this.focusComposer();
     this.emit("reset");
   }
 
@@ -1019,7 +1097,7 @@ export class Widget {
       );
     }
     this.updateSend();
-    this.input.focus();
+    this.focusComposer();
   }
 
   private removeFile(entry: (typeof this.files)[number]): void {
@@ -1050,7 +1128,7 @@ export class Widget {
     notice.classList.add("gone");
     this.dock.classList.add("bare");
     setTimeout(() => notice.remove(), still() ? 0 : 260);
-    if (refocus) this.input.focus();
+    if (refocus) this.focusComposer();
   }
 
   // ----- voice -----
@@ -1378,7 +1456,7 @@ export class Widget {
   private backToChat(): void {
     if (this.leadPending()) return;
     this.show(this.chatView);
-    this.input.focus();
+    this.focusComposer();
     this.scroll(true);
   }
 
