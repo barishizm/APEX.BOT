@@ -138,7 +138,7 @@ describe("widget stylesheet", () => {
   });
 
   it("fills landscape phones too", () => {
-    assert.match(css, /@media \(max-width:480px\),\(max-height:480px\) and \(pointer:coarse\)\{/);
+    assert.match(css, /@media \(max-width:480px\),\(max-height:480px\) and \(hover:none\)\{/);
   });
 
   it("gives the menu its own text colour, not the header's", () => {
