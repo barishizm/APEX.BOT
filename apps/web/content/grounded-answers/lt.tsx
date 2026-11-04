@@ -134,8 +134,10 @@ function Body() {
       </p>
       <h3>Ar mano turinys naudojamas DI modeliams apmokyti?</h3>
       <p>
-        Ne, nebent tam pritarsite. Jūsų turinys ir lankytojų žinutės siunčiami jūsų pasirinktam DI paslaugų teikėjui tik
-        atsakymams generuoti. Žr. <a href="/lt/privacy">privatumo politiką</a>.
+        Jūsų turinį savo modeliams tobulinti naudojame tik tada, jei tam pritarėte. Kol kas išimtis yra Google: mūsų paieška
+        veikia nemokamu Gemini planu, kurio sąlygos leidžia Google naudoti jūsų puslapių tekstą ir lankytojų žinutes savo
+        produktams tobulinti. Tas pats taikoma atsakymams, jei pasirenkate Gemini modelį. Žr.{" "}
+        <a href="/lt/privacy">privatumo politiką</a>.
       </p>
     </>
   );

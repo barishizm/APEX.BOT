@@ -152,7 +152,7 @@ function Body() {
           <tr>
             <td>Anthropic, OpenAI or Google (the one the customer selected for that assistant)</td>
             <td>Generating answers</td>
-            <td>The visitor's message, recent messages of the conversation and the relevant parts of the customer's content</td>
+            <td>The visitor's message, recent messages of the conversation and the relevant parts of the customer's content. If the customer selects a Gemini model, the note on Google's unpaid tier in the next row applies to this data too</td>
           </tr>
           <tr>
             <td>Google (Gemini API)</td>
@@ -207,7 +207,8 @@ function Body() {
       <p>
         We only use a customer's assistants and conversations to improve our own models if the customer opted in at sign-up.
         The default is no. You can change this at any time in the dashboard under Settings, or by contacting us; it affects
-        data going forward.
+        data going forward. This choice covers our own models; what Google may do with data on its unpaid tier is described in
+        the table of service providers above.
       </p>
 
       <h2 id="retention">How long we keep data</h2>

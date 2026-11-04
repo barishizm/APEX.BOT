@@ -134,8 +134,10 @@ function Body() {
       </p>
       <h3>İçeriğim yapay zekâ modellerini eğitmek için kullanılır mı?</h3>
       <p>
-        Siz izin vermedikçe hayır. İçeriğiniz ve ziyaretçi mesajları seçtiğiniz yapay zekâ sağlayıcısına yalnızca yanıt
-        üretmek için gönderilir. Bkz. <a href="/tr/privacy">gizlilik politikası</a>.
+        İçeriğinizi kendi modellerimizi geliştirmek için yalnızca izin verdiyseniz kullanırız. Şimdilik istisna Google:
+        aramamız Gemini'ın ücretsiz katmanında çalışıyor ve bu katmanın koşulları Google'ın sayfa metinlerinizi ve ziyaretçi
+        mesajlarını kendi ürünlerini geliştirmek için kullanmasına izin veriyor. Gemini modeli seçerseniz aynısı yanıtlar için
+        de geçerlidir. Bkz. <a href="/tr/privacy">gizlilik politikası</a>.
       </p>
     </>
   );

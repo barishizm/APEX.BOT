@@ -326,7 +326,7 @@ export const tr: Dictionary = {
         },
         {
           q: "Verilerim yapay zekâ modellerini eğitmek için kullanılıyor mu?",
-          a: "Hesabınızı oluştururken izin vermediğiniz sürece hayır. Mesajlar yalnızca yanıt üretmek için seçtiğiniz yapay zekâ sağlayıcısına gönderilir.",
+          a: "Verilerinizi kendi modellerimizi geliştirmek için yalnızca hesabınızı oluştururken izin verdiyseniz kullanırız. Şimdilik istisna Google: aramamız Gemini'ın ücretsiz katmanında çalışıyor ve bu katmanın koşulları Google'ın sayfa metinlerinizi ve ziyaretçi mesajlarını kendi ürünlerini geliştirmek için kullanmasına izin veriyor. Gemini modeli seçerseniz aynısı yanıtlar için de geçerlidir. Ayrıntılar gizlilik politikasında.",
         },
         {
           q: "Ücreti ne kadar?",

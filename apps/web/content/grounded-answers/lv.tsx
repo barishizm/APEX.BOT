@@ -134,8 +134,10 @@ function Body() {
       </p>
       <h3>Vai mans saturs tiek izmantots MI modeļu apmācībai?</h3>
       <p>
-        Nē, ja vien jūs tam nepiekrītat. Jūsu saturs un apmeklētāju ziņas tiek sūtītas jūsu izvēlētajam MI pakalpojuma
-        sniedzējam tikai atbilžu ģenerēšanai. Skatiet <a href="/lv/privacy">privātuma politiku</a>.
+        Jūsu saturu savu modeļu uzlabošanai izmantojam tikai tad, ja esat tam piekrituši. Pagaidām izņēmums ir Google: mūsu
+        meklēšana darbojas Gemini bezmaksas līmenī, kura noteikumi ļauj Google izmantot jūsu lapu tekstu un apmeklētāju ziņas
+        savu produktu uzlabošanai. Tas pats attiecas uz atbildēm, ja izvēlaties Gemini modeli. Skatiet{" "}
+        <a href="/lv/privacy">privātuma politiku</a>.
       </p>
     </>
   );

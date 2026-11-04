@@ -154,7 +154,8 @@ function Body() {
         </li>
         <li>
           <strong>Treenimine ainult nõusolekul.</strong> Kasutame teie sisu oma mudelite täiustamiseks ainult siis, kui olete
-          nõustunud, ja seda valikut saate igal ajal muuta.
+          nõustunud, ja seda valikut saate igal ajal muuta. Google'i tasuta tasemel, millel meie otsing töötab, on oma
+          tingimused: vaadake <a href="/et/privacy">privaatsuspoliitikat</a>.
         </li>
         <li>
           <strong>Majutatud ELis seal, kus see on oluline.</strong> Vestluse API töötab Saksamaal Frankfurdis. Kõik andmeid

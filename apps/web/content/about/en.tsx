@@ -48,8 +48,9 @@ function Body() {
         </li>
         <li>
           <strong>Privacy by default.</strong> Personal data is masked in logs, conversations are deleted after the period
-          you choose, and your data isn't used to train models unless you opt in. The{" "}
-          <a href="/privacy">privacy policy</a> is written to meet Turkey's KVKK and the EU's GDPR.
+          you choose, and we use your data to improve our own models only if you opt in. Google may use data sent through its
+          unpaid tier, which runs our search; the <a href="/privacy">privacy policy</a> explains this and is written to meet
+          Turkey's KVKK and the EU's GDPR.
         </li>
         <li>
           <strong>Local languages, not just English.</strong> Turkish, English, Lithuanian, Latvian and Estonian are all fully

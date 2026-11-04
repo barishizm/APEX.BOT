@@ -156,7 +156,7 @@ function Body() {
           <tr>
             <td>Anthropic, OpenAI või Google (see, mille klient selle assistendi jaoks valis)</td>
             <td>Vastuste koostamine</td>
-            <td>Külastaja sõnum, vestluse viimased sõnumid ja kliendi sisu asjakohased osad</td>
+            <td>Külastaja sõnum, vestluse viimased sõnumid ja kliendi sisu asjakohased osad. Kui klient valib Gemini mudeli, kehtib järgmise rea märkus Google'i tasuta taseme kohta ka nende andmete suhtes</td>
           </tr>
           <tr>
             <td>Google (Gemini API)</td>
@@ -212,6 +212,8 @@ function Body() {
         Kasutame kliendi assistente ja vestlusi oma mudelite täiustamiseks ainult siis, kui klient andis selleks registreerumisel
         nõusoleku. Vaikimisi on vastus ei. Saate seda valikut igal ajal muuta töölaua jaotises „Konto seaded“ või meiega
         ühendust võttes; see mõjutab edaspidi töödeldavaid andmeid.
+        See valik puudutab meie enda mudeleid; mida Google võib tasuta tasemel olevate andmetega teha, on kirjeldatud ülaltoodud
+        teenusepakkujate tabelis.
       </p>
 
       <h2 id="retention">Kui kaua me andmeid säilitame</h2>

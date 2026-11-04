@@ -133,8 +133,9 @@ function Body() {
       </p>
       <h3>Is my content used to train AI models?</h3>
       <p>
-        Not unless you opt in. Your content and visitors' messages are sent to the AI provider you choose only to generate
-        answers. See the <a href="/privacy">privacy policy</a>.
+        We use your content to improve our own models only if you opt in. Google is the exception for now: our search runs
+        on its unpaid Gemini tier, whose terms let Google use your page text and visitors' messages to improve its products.
+        The same applies to answers if you choose a Gemini model. See the <a href="/privacy">privacy policy</a>.
       </p>
     </>
   );

@@ -154,7 +154,7 @@ function Body() {
           <tr>
             <td>Anthropic, OpenAI vai Google (tas, ko klients izvēlējies šim asistentam)</td>
             <td>Atbilžu ģenerēšana</td>
-            <td>Apmeklētāja ziņa, sarunas jaunākās ziņas un būtiskās klienta satura daļas</td>
+            <td>Apmeklētāja ziņa, sarunas jaunākās ziņas un būtiskās klienta satura daļas. Ja klients izvēlas Gemini modeli, nākamās rindas piezīme par Google bezmaksas līmeni attiecas arī uz šiem datiem</td>
           </tr>
           <tr>
             <td>Google (Gemini API)</td>
@@ -210,6 +210,8 @@ function Body() {
         Klienta asistentus un sarunas savu modeļu uzlabošanai izmantojam tikai tad, ja klients tam piekrita reģistrācijas
         laikā. Pēc noklusējuma – nē. Šo izvēli jebkurā laikā varat mainīt vadības paneļa sadaļā “Konta iestatījumi” vai
         sazinoties ar mums; tas attiecas uz turpmāk apstrādātajiem datiem.
+        Šī izvēle attiecas uz mūsu pašu modeļiem; ko Google var darīt ar datiem savā bezmaksas līmenī, ir aprakstīts iepriekš
+        sniegtajā pakalpojumu sniedzēju tabulā.
       </p>
 
       <h2 id="retention">Cik ilgi mēs glabājam datus</h2>

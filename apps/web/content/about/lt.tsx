@@ -50,9 +50,10 @@ function Body() {
         </li>
         <li>
           <strong>Privatumas pagal numatytuosius nustatymus.</strong> Asmens duomenys žurnaluose užmaskuojami, pokalbiai
-          ištrinami praėjus jūsų pasirinktam laikotarpiui, o jūsų duomenys nenaudojami modeliams apmokyti, nebent tam
-          pritarsite. <a href="/lt/privacy">Privatumo politika</a> parengta laikantis ES Bendrojo duomenų apsaugos reglamento
-          (BDAR) ir Turkijos KVKK.
+          ištrinami praėjus jūsų pasirinktam laikotarpiui, o jūsų duomenis savo modeliams tobulinti naudojame tik tada, jei tam
+          pritarėte. Google gali naudoti duomenis, siunčiamus per jo nemokamą planą, kuriuo veikia mūsų paieška;{" "}
+          <a href="/lt/privacy">privatumo politika</a> tai paaiškina ir yra parengta laikantis ES Bendrojo duomenų apsaugos
+          reglamento (BDAR) ir Turkijos KVKK.
         </li>
         <li>
           <strong>Vietinės kalbos, ne tik anglų.</strong> Lietuvių, latvių, estų, anglų ir turkų kalbos visiškai palaikomos –

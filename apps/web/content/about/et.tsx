@@ -49,9 +49,10 @@ function Body() {
         </li>
         <li>
           <strong>Vaikimisi privaatne.</strong> Isikuandmed maskeeritakse logides, vestlused kustutatakse pärast teie valitud
-          perioodi ja teie andmeid ei kasutata mudelite treenimiseks, kui te selleks nõusolekut ei anna.{" "}
-          <a href="/et/privacy">Privaatsuspoliitika</a> on koostatud vastavalt ELi isikuandmete kaitse üldmäärusele (GDPR) ja
-          Türgi KVKK-le.
+          perioodi ja kasutame teie andmeid oma mudelite täiustamiseks ainult siis, kui olete selleks nõusoleku andnud. Google
+          võib kasutada andmeid, mis saadetakse tema tasuta taseme kaudu, millel meie otsing töötab;{" "}
+          <a href="/et/privacy">privaatsuspoliitika</a> selgitab seda ning on koostatud vastavalt ELi isikuandmete kaitse
+          üldmäärusele (GDPR) ja Türgi KVKK-le.
         </li>
         <li>
           <strong>Kohalikud keeled, mitte ainult inglise.</strong> Eesti, läti, leedu, inglise ja türgi keel on täielikult
