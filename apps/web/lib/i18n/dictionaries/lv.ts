@@ -431,7 +431,6 @@ export const lv: Dictionary = {
           "Līdz {websites} vietnēm, {pages} lapas zināšanu",
           "Viss, kas ir Pro plānā",
           "Glabāšana līdz {retentionDays} dienām",
-          "Datu apstrādes līgums (VDAR un KVKK)",
           "Ievadsaruna ar mūsu komandu",
         ],
         cta: "Pieprasīt beta piekļuvi",

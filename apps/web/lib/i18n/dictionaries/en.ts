@@ -432,7 +432,6 @@ export const en = {
           "Up to {websites} websites, {pages} pages of knowledge",
           "Everything in Pro",
           "Retention up to {retentionDays} days",
-          "Data processing agreement (KVKK and GDPR)",
           "Onboarding call with our team",
         ],
         cta: "Request beta access",
