@@ -30,7 +30,7 @@ export const Component = ({ billing = false }: { billing?: boolean }) => {
   const signedIn = useSignedIn();
 
   return (
-    <section className="relative w-full bg-[var(--color-surface)] pb-24 pt-32 text-[var(--color-text)] sm:pb-32 sm:pt-40">
+    <section className="relative w-full bg-[var(--color-surface)] pb-24 pt-[var(--space-page-top)] text-[var(--color-text)] sm:pb-32">
       <div className="mx-auto max-w-7xl px-6 md:px-8">
         <div className="mb-14 flex flex-col items-center text-center">
           <p className="eyebrow mb-4">{t.eyebrow}</p>

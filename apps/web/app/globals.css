@@ -32,6 +32,10 @@
   --space-5: 24px;
   --space-6: 32px;
   --space-section: clamp(96px, 14vw, 176px);
+  /* Section heading to the content it introduces */
+  --space-head: clamp(32px, 4vw, 56px);
+  /* Clears the fixed header on pages that open without a hero */
+  --space-page-top: clamp(112px, 10vw, 140px);
 
   --radius-sm: 4px;
   --radius-md: 8px;
@@ -749,7 +753,7 @@ button:not(:focus-visible) {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-6);
-  margin-top: 56px;
+  margin-top: var(--space-head);
 }
 
 .grid3 h3,
@@ -792,7 +796,7 @@ button:not(:focus-visible) {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1px;
-  margin-top: 56px;
+  margin-top: var(--space-head);
   overflow: hidden;
   border: 1px solid var(--color-line);
   border-radius: var(--radius-lg);
@@ -934,7 +938,7 @@ button:not(:focus-visible) {
 
 .faq {
   display: grid;
-  margin-top: 40px;
+  margin-top: var(--space-head);
   border-top: 1px solid var(--color-line);
 }
 .faq__item {
@@ -1049,7 +1053,8 @@ button:not(:focus-visible) {
   gap: var(--space-4);
   text-align: center;
   width: min(calc(1200px - 2 * var(--gutter)), calc(100% - 2 * var(--gutter)));
-  margin: var(--space-section) auto;
+  /* Less below than above: the footer closes the page, it isn't another section */
+  margin: var(--space-section) auto clamp(48px, 6vw, 96px);
   padding: clamp(56px, 8vw, 112px) var(--gutter) clamp(160px, 22vw, 280px);
   border-radius: var(--radius-xl);
   background: #0c0c09;
@@ -1126,9 +1131,11 @@ button:not(:focus-visible) {
 /* ---------- Long-form pages (docs, legal) ---------- */
 
 .prose-page {
+  --toc-w: 13rem;
+  --toc-gap: clamp(32px, 5vw, 72px);
   max-width: 1200px;
   margin-inline: auto;
-  padding: 140px var(--gutter) 96px;
+  padding: var(--space-page-top) var(--gutter) 96px;
 }
 .prose-page__head {
   display: grid;
@@ -1136,6 +1143,13 @@ button:not(:focus-visible) {
   max-width: 44rem;
   padding-bottom: var(--space-6);
   border-bottom: 1px solid var(--color-line);
+}
+/* With a contents column the rule runs to the article's right edge; the text keeps its measure */
+.prose-page:has(.prose-page__body--toc) .prose-page__head {
+  max-width: calc(var(--toc-w) + var(--toc-gap) + 44rem);
+}
+.prose-page__head > * {
+  max-width: 44rem;
 }
 .prose-page__head h1 {
   font-size: clamp(2.25rem, 4vw + 0.5rem, 3.25rem);
@@ -1152,8 +1166,8 @@ button:not(:focus-visible) {
 }
 .prose-page__body--toc {
   display: grid;
-  grid-template-columns: 13rem minmax(0, 1fr);
-  gap: clamp(32px, 5vw, 72px);
+  grid-template-columns: var(--toc-w) minmax(0, 1fr);
+  gap: var(--toc-gap);
 }
 .toc {
   position: sticky;
@@ -1303,12 +1317,10 @@ button:not(:focus-visible) {
   .grid3 {
     grid-template-columns: minmax(0, 1fr);
     gap: var(--space-5);
-    margin-top: var(--space-6);
   }
   .feature-grid,
   .feature-grid--two {
     grid-template-columns: minmax(0, 1fr);
-    margin-top: var(--space-6);
   }
 }
 

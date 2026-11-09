@@ -19,7 +19,7 @@ export default async function StatusPage({ params }: PageProps<"/[lang]/status">
   return (
     <>
       <SiteHeader locale={locale} />
-      <main id="main" className="flex min-h-[80vh] justify-center bg-[var(--color-surface)] px-6 pb-24 pt-32 sm:pt-40">
+      <main id="main" className="flex min-h-[80vh] justify-center bg-[var(--color-surface)] px-[var(--gutter)] pb-24 pt-[var(--space-page-top)]">
         <SystemStatus locale={locale} checks={checks} checkedAt={checkedAt} />
       </main>
       <SiteFooter locale={locale} />
