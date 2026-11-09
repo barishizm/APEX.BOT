@@ -61,7 +61,7 @@ export const Component = ({ billing = false }: { billing?: boolean }) => {
             </button>
             <span className={cn("flex items-center gap-2", annual ? "text-[var(--color-text)]" : "text-[var(--color-muted)]")}>
               {t.annually}
-              <span className="rounded-full bg-[color-mix(in_srgb,var(--color-secondary)_16%,transparent)] px-2 py-0.5 font-mono text-[10px] uppercase tracking-widest text-[var(--color-secondary)]">
+              <span className="rounded-full bg-[color-mix(in_srgb,var(--color-secondary)_16%,transparent)] px-2 py-0.5 font-mono text-[0.6875rem] uppercase tracking-widest text-[var(--color-secondary)]">
                 {format(t.save, { percent: formatPercent(Math.max(...PLANS.map(annualSaving)), locale) })}
               </span>
             </span>
@@ -105,7 +105,7 @@ export const Component = ({ billing = false }: { billing?: boolean }) => {
                     <p className="mt-2 text-sm text-[var(--color-muted)]">{copy.blurb}</p>
                   </div>
                   {featured && (
-                    <span className="shrink-0 rounded-full bg-[var(--color-text)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-[var(--color-surface)]">
+                    <span className="shrink-0 rounded-full bg-[var(--color-text)] px-2 py-0.5 text-[0.6875rem] font-bold uppercase tracking-widest text-[var(--color-surface)]">
                       {t.popular}
                     </span>
                   )}

@@ -22,7 +22,7 @@ export function BetaBadge({ className }: { className?: string }) {
   return (
     <span
       title={app.analytics.beta}
-      className={cn("rounded-full border border-[var(--color-line)] bg-[var(--color-bubble)] px-2 py-px text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--color-muted)]", className)}
+      className={cn("rounded-full border border-[var(--color-line)] bg-[var(--color-bubble)] px-2 py-px text-[0.6875rem] font-semibold uppercase tracking-wide text-[var(--color-muted)]", className)}
     >
       Beta
     </span>
