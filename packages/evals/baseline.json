@@ -9,6 +9,7 @@
         "recallAtK": 1,
         "mrr": 1,
         "contextRecall": 1,
+        "contextPrecision": 0.7569,
         "falseAbstain": 0,
         "abstainAccuracy": 0,
         "passRate": 0.75
@@ -61,6 +62,7 @@
         "recallAtK": 0.963,
         "mrr": 0.7284,
         "contextRecall": 0.963,
+        "contextPrecision": 0.4753,
         "falseAbstain": 0,
         "abstainAccuracy": 0,
         "passRate": 0.7222
@@ -103,6 +105,7 @@
         "recallAtK": 1,
         "mrr": 0.9804,
         "contextRecall": 1,
+        "contextPrecision": 0.6389,
         "falseAbstain": 0,
         "abstainAccuracy": 0,
         "passRate": 0.85

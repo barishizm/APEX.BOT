@@ -6,7 +6,8 @@ the pages that answer them. CI fails when a metric drops or a case that passed i
 
 ```bash
 npm run eval                                   # from the repo root: run and compare with baseline.json
-npm run eval -w @apex/evals -- --verbose       # also list failing cases and what reached the model
+npm run eval -w @apex/evals -- --verbose       # also list failing cases, cases whose right page isn't first, and what reached the model
+npm run eval -w @apex/evals -- --suite=saas    # one suite only (compared with its own baseline)
 npm run eval:update -w @apex/evals             # accept the current numbers as the new baseline
 npm run eval -w @apex/evals -- --lexical       # BM25 only (production with APEX_EMBEDDINGS=off), for comparison
 ```
@@ -56,11 +57,14 @@ that aren't a gap in the site's content, `smalltalk` and `offtopic` (the live ru
 |---|---|---|
 | `passRate` | all | Headline: answerable cases reach the model with a relevant chunk, unanswerable ones abstain |
 | `contextRecall` | answerable | A relevant chunk survives the score floor and reaches the model |
+| `contextPrecision` | answerable, not abstained | Share of the excerpts reaching the model that come from a right page; the rest is noise the model must ignore |
 | `abstainAccuracy` | unanswerable | The bot correctly takes the "I don't know" path |
 | `falseAbstain` | answerable | Wrongly sent down the "I don't know" path (lower is better) |
 | `recallAtK`, `hitAt1`, `mrr` | answerable | Ranking quality before the score floor |
 
 ## Adding a case
 
-Add it to the suite file, run `npm run eval -w @apex/evals -- --verbose`, and if it changes the numbers on purpose,
+Each case needs exactly one of the tags `en`, `tr`; an unanswerable one (`expect: null`) also needs `unknown`,
+`smalltalk` or `offtopic`; `expect` lists pages that exist in the corpus; and no question may repeat (same `q` and `prev`).
+Loading a suite checks all of this. Add the case to the suite file, run `npm run eval -w @apex/evals -- --verbose`, and if it changes the numbers on purpose,
 `npm run eval:update -w @apex/evals` and commit `baseline.json` with the change that moved it.

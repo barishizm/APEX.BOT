@@ -105,6 +105,16 @@ API does, and reports citations.
   pages. Follow-ups keep their context by embedding the message both alone and joined to the previous one (best of the
   two), which costs nothing extra (one request).
 
+- **Fusion tweaks, measured 2026-11-09** (offline, all three suites; portfolio is the only one with room, hit@1 63.0%,
+  MRR 0.728). One chunk per page in the ranking: MRR 0.744, hit@1 unchanged. Lexical-only candidates below the BM25
+  floor getting no RRF credit: hit@1 drops to 51.8% (floor at 1×) or 59.3% (0.5×). Lexical weight 0.5–0.7: context recall
+  drops to 92.6% at 0.5, nothing gained at 0.7. RRF k 10–30: no change. A penalty for chunks in another language than the
+  message (0.95–0.6×): every suite worse (coffee hit@1 97.2%, saas 92.2%, portfolio context recall down to 88.9%), since
+  cross-lingual cases and short messages lose. The best combination (one chunk per page, the lexical gate, lexical
+  weight 0.7) gains one portfolio case: too little evidence on 27 answerable cases to change production. The misses are
+  near-ties in cosine (0.62 vs 0.63 for "What does he do?": the AI-agents post vs /about); a larger portfolio suite
+  or a reranker would be the next thing to try.
+
 ## Known gaps
 
 - "Ne iş yapıyor?" (no subject: "what does he/it do?") ranks the AI-agents post (0.617) just above the home page

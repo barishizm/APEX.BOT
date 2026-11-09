@@ -2,14 +2,14 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { Hit } from "@apex/knowledge/retrieval";
 import { pathOf, scoreCase, summarize, type GoldenCase } from "../src/metrics.ts";
-import { loadSuites, runSuite } from "../src/suite.ts";
+import { loadSuites, runSuite, validate } from "../src/suite.ts";
 
 const hit = (path: string, score: number): Hit => ({
   chunk: { id: path, tenantId: "t", url: `https://site.example${path}`, title: path, text: "" },
   score,
 });
 const answerable: GoldenCase = { id: "a", q: "?", expect: ["/b", "/b2"], tags: ["en"] };
-const unknown: GoldenCase = { id: "u", q: "?", expect: null, tags: ["en", "unknown"] };
+const unknown: GoldenCase = { id: "u", q: "??", expect: null, tags: ["en", "unknown"] };
 
 describe("scoreCase", () => {
   it("passes an answerable case only when a relevant chunk reaches the model", () => {
@@ -22,7 +22,11 @@ describe("scoreCase", () => {
       abstained: false,
       pass: true,
       used: ["/a", "/b"],
+      precision: 0.5,
     });
+    // nothing reached the model, or nothing could be right: no precision to speak of
+    assert.equal(scoreCase(answerable, ranked, []).precision, null);
+    assert.equal(scoreCase(unknown, ranked, ranked).precision, null);
     // retrieved, but cut by the score floor
     const cut = scoreCase(answerable, ranked, ranked.slice(0, 1));
     assert.equal(cut.rank, 2);
@@ -50,6 +54,8 @@ describe("summarize", () => {
     assert.equal(s.recallAtK, 0.6667);
     assert.equal(s.mrr, 0.5);
     assert.equal(s.contextRecall, 0.3333);
+    // a1 sent only its right page, a2 only a wrong one; a3 got nothing and doesn't count
+    assert.equal(s.contextPrecision, 0.5);
     assert.equal(s.falseAbstain, 0.3333);
     assert.equal(s.abstainAccuracy, 1);
     assert.equal(s.passRate, 0.5);
@@ -59,6 +65,27 @@ describe("summarize", () => {
   it("keeps non-URL sources (pasted text) comparable", () => {
     assert.equal(pathOf("https://a.example/x?y=1"), "/x");
     assert.equal(pathOf(""), "");
+  });
+});
+
+describe("validate", () => {
+  const corpus = [{ url: "https://site.example/b", title: "B", text: "" }];
+  const check = (...cases: GoldenCase[]) => () => validate("s", cases, corpus);
+
+  it("accepts well-formed cases", () => {
+    assert.doesNotThrow(check({ ...answerable, expect: ["/b"] }, unknown));
+  });
+
+  it("rejects cases that would skew the numbers silently", () => {
+    assert.throws(check({ ...answerable, expect: ["/typo"] }), /not in the corpus/);
+    assert.throws(check({ ...answerable, expect: [] }), /use null/);
+    assert.throws(check({ ...unknown, tags: ["en"] }), /unanswerable/);
+    assert.throws(check({ ...unknown, tags: ["unknown"] }), /en, tr/);
+    assert.throws(check({ ...unknown, tags: ["en", "tr", "unknown"] }), /en, tr/);
+    assert.throws(check(unknown, { ...unknown, id: "u2", q: " ?? " }), /same question as u/);
+    assert.throws(check(unknown, { ...unknown, q: "other" }), /duplicate case id/);
+    // the same words after a different previous message are a different question
+    assert.doesNotThrow(check(unknown, { ...unknown, id: "u2", prev: "earlier" }));
   });
 });
 

@@ -25,6 +25,8 @@ export interface CaseResult {
   pass: boolean;
   /** Paths of the chunks that would reach the model, best first (for reading failures). */
   used: string[];
+  /** Answerable and not abstained: share of the chunks reaching the model that come from a right page. */
+  precision: number | null;
 }
 
 export interface Summary {
@@ -39,6 +41,11 @@ export interface Summary {
   mrr: number;
   /** Share of answerable cases where a relevant chunk survives the score floor and reaches the model. */
   contextRecall: number;
+  /**
+   * Mean share of the excerpts reaching the model that come from a right page, over answerable cases
+   * that got any. The rest is noise the model has to ignore (and could cite or blend in).
+   */
+  contextPrecision: number;
   /** Share of answerable cases wrongly sent down the "I don't know" path. */
   falseAbstain: number;
   /** Share of unanswerable cases correctly sent down the "I don't know" path. */
@@ -61,6 +68,7 @@ export function scoreCase(c: GoldenCase, ranked: Hit[], used: Hit[]): CaseResult
   const index = ranked.findIndex(relevant);
   const abstained = used.length === 0;
   const answerable = c.expect !== null;
+  const usedRelevant = used.filter(relevant).length;
   return {
     id: c.id,
     tags: c.tags,
@@ -69,11 +77,13 @@ export function scoreCase(c: GoldenCase, ranked: Hit[], used: Hit[]): CaseResult
     abstained,
     pass: answerable ? used.some(relevant) : abstained,
     used: used.map((h) => pathOf(h.chunk.url)),
+    precision: answerable && used.length > 0 ? usedRelevant / used.length : null,
   };
 }
 
 const share = (n: number, of: number) => (of === 0 ? 0 : round(n / of));
 const round = (x: number) => Math.round(x * 10_000) / 10_000;
+const mean = (xs: number[]) => (xs.length === 0 ? 0 : round(xs.reduce((a, b) => a + b, 0) / xs.length));
 
 export function summarize(results: CaseResult[]): Summary {
   const answerable = results.filter((r) => r.answerable);
@@ -94,6 +104,7 @@ export function summarize(results: CaseResult[]): Summary {
       answerable.length,
     ),
     contextRecall: share(answerable.filter((r) => r.pass).length, answerable.length),
+    contextPrecision: mean(answerable.flatMap((r) => (r.precision === null ? [] : [r.precision]))),
     falseAbstain: share(answerable.filter((r) => r.abstained).length, answerable.length),
     abstainAccuracy: share(unknown.filter((r) => r.abstained).length, unknown.length),
     passRate: share(results.filter((r) => r.pass).length, results.length),
@@ -105,6 +116,7 @@ export function summarize(results: CaseResult[]): Summary {
 export const GATED: (keyof Omit<Summary, "byTag" | "cases" | "answerable" | "unknown">)[] = [
   "passRate",
   "contextRecall",
+  "contextPrecision",
   "abstainAccuracy",
   "recallAtK",
   "mrr",

@@ -70,14 +70,31 @@ export function loadSuites(dir = DATA_DIR): Suite[] {
     });
 }
 
-/** A typo in an expected path would silently turn a case into an unwinnable one. */
-function validate(name: string, cases: GoldenCase[], corpus: ChunkInput[]): void {
+/** Tags that mark a case the site can't answer; every unanswerable case carries one. */
+const UNANSWERABLE_TAGS = ["unknown", "smalltalk", "offtopic"];
+
+/**
+ * A typo in an expected path would silently turn a case into an unwinnable one; a missing language
+ * tag drops it from the per-language numbers; a repeated question weighs twice.
+ */
+export function validate(name: string, cases: GoldenCase[], corpus: ChunkInput[]): void {
   const paths = new Set(corpus.map((c) => new URL(c.url).pathname));
   const ids = new Set<string>();
+  const questions = new Map<string, string>();
   for (const c of cases) {
     if (ids.has(c.id)) throw new Error(`${name}: duplicate case id ${c.id}`);
     ids.add(c.id);
-    for (const p of c.expect ?? []) {
+    const question = `${c.prev ?? ""}\n${c.q.trim().toLowerCase()}`;
+    const twin = questions.get(question);
+    if (twin) throw new Error(`${name}/${c.id}: same question as ${twin}`);
+    questions.set(question, c.id);
+    if (c.tags.includes("en") === c.tags.includes("tr")) throw new Error(`${name}/${c.id}: needs exactly one of the tags en, tr`);
+    if (c.expect === null) {
+      if (!c.tags.some((t) => UNANSWERABLE_TAGS.includes(t))) throw new Error(`${name}/${c.id}: unanswerable, so needs one of the tags ${UNANSWERABLE_TAGS.join(", ")}`);
+      continue;
+    }
+    if (c.expect.length === 0) throw new Error(`${name}/${c.id}: expect lists no page; use null for an unanswerable case`);
+    for (const p of c.expect) {
       if (!paths.has(p)) throw new Error(`${name}/${c.id}: expected path ${p} is not in the corpus`);
     }
   }
