@@ -1,6 +1,7 @@
 {
   "name": "@apex/knowledge",
   "private": true,
+  "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "exports": {
     ".": "./src/index.ts",

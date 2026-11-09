@@ -1,6 +1,7 @@
 {
   "name": "apex-bot",
   "private": true,
+  "license": "SEE LICENSE IN LICENSE",
   "engines": {
     "node": "26.x"
   },

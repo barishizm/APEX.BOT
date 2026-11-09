@@ -1,0 +1,41 @@
+Apex Bot Personal Use License
+
+Copyright (c) 2026 barishizm. All rights reserved.
+
+1. Grant. Subject to these terms, the copyright holder ("Licensor") grants you a
+   non-exclusive, non-transferable, non-sublicensable, revocable license to
+   view, download, run and modify the source code in this repository
+   ("Software") solely for your own personal, non-commercial use: learning,
+   study, research and private experimentation.
+
+2. Restrictions. Without prior written permission from the Licensor, you may NOT:
+   a. use the Software, or anything derived from it, for any commercial
+      purpose, including use by or for a company, employer, client or
+      organization, or in any product or service that is sold, licensed,
+      subscribed to, or monetized in any way;
+   b. host or offer the Software, or a modified version, to third parties as a
+      service (including SaaS, managed or white-label offerings);
+   c. copy, publish, redistribute, sublicense, sell or otherwise make the
+      Software or substantial portions of it available to others, in source or
+      binary form, except that you may keep a private fork on your own account
+      for your personal use;
+   d. remove or alter this license or any copyright notice;
+   e. use the Apex Bot name, logo or branding to identify a derived work.
+
+3. Ownership. The Software is licensed, not sold. The Licensor retains all
+   right, title and interest, including all intellectual property rights. All
+   rights not expressly granted are reserved.
+
+4. Third-party components. Dependencies and bundled third-party material remain
+   under their own licenses, which are not changed by this license.
+
+5. Termination. This license ends automatically if you breach any term. On
+   termination you must stop using the Software and delete all copies.
+
+6. No warranty. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+   EXPRESS OR IMPLIED, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR
+   PURPOSE AND NON-INFRINGEMENT. IN NO EVENT SHALL THE LICENSOR BE LIABLE FOR
+   ANY CLAIM, DAMAGES OR OTHER LIABILITY ARISING FROM THE SOFTWARE OR ITS USE.
+
+For commercial licensing or other permissions, contact the Licensor through the
+repository owner's GitHub profile (https://github.com/barishizm).

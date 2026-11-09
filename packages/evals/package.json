@@ -1,6 +1,7 @@
 {
   "name": "@apex/evals",
   "private": true,
+  "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "scripts": {
     "eval": "tsx src/cli.ts",

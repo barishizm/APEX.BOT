@@ -377,4 +377,4 @@ Sitenin tamamı İngilizce ve Türkçedir: herkese açık sayfalar, giriş/kayı
 
 ## Lisans
 
-Tüm hakları saklıdır (proprietary). Bu depo açık kaynak değildir ve izinsiz kopyalanamaz, dağıtılamaz. Depoyu özel (private) tutun ve bağımlılık lisanslarını (özellikle AGPL/GPL) ticari kullanım açısından kontrol edin.
+Kaynak kodu herkesin okuması için görünür, ancak **açık kaynak değildir**. [Apex Bot Personal Use License](LICENSE) kapsamında yalnızca **kişisel, ticari olmayan** kullanım (inceleme, öğrenme, özel denemeler) serbesttir. Ticari kullanım, hizmet olarak sunma (SaaS), yeniden dağıtım ve türev ürünlerde Apex Bot markasının kullanımı yazılı izin gerektirir. Tüm hakları saklıdır.
