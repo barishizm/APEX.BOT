@@ -10,12 +10,12 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "0.5.8",
+    "@electric-sql/pglite": "^0.5.15",
     "@types/node": "^26.6.5",
     "tsx": "^4.23.15"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.133.0",
+    "@anthropic-ai/sdk": "^1.6.0",
     "@apex/db": "*",
     "@apex/knowledge": "*",
     "@hono/node-server": "^2.1.4",

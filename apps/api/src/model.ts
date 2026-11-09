@@ -42,13 +42,14 @@ export interface ChatModel {
 const systemText = (system: ChatRequest["system"]) => system.map((b) => b.text).join("\n\n");
 
 function contentText(content: Anthropic.Beta.BetaMessageParam["content"]): string {
+  if (content === undefined) return "";
   if (typeof content === "string") return content;
   return content.map((b) => (b.type === "text" ? b.text : "")).join("");
 }
 
 /** The base64 images in a turn (prompt.ts only ever adds base64 sources). */
 function contentImages(content: Anthropic.Beta.BetaMessageParam["content"]): { mediaType: string; data: string }[] {
-  if (typeof content === "string") return [];
+  if (content === undefined || typeof content === "string") return [];
   return content.flatMap((b) => (b.type === "image" && b.source.type === "base64" ? [{ mediaType: b.source.media_type, data: b.source.data }] : []));
 }
 
