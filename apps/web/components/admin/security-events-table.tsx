@@ -29,9 +29,9 @@ export function SecurityEventsTable({ initialQuery, events }: { initialQuery: Ta
           className={cn(
             tag,
             e.event === "access_blocked"
-              ? "bg-red-500/15 text-red-700 dark:text-red-300"
+              ? "bg-[var(--color-danger)]/15 text-[var(--color-danger)]"
               : FAILED.has(e.event)
-                ? "bg-amber-500/15 text-amber-800 dark:text-amber-200"
+                ? "bg-[var(--color-warning)]/15 text-[var(--color-warning)]"
                 : "bg-[var(--color-raised)] text-[var(--color-muted)]",
           )}
         >

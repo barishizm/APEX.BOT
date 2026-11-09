@@ -37,7 +37,7 @@ export function BillingWebhooks({ events, canReplay }: { events: Event[]; canRep
           role="status"
           className={cn(
             "m-0 break-words rounded-lg px-3 py-2 text-sm",
-            notice.ok ? "bg-green-500/10 text-green-800 dark:text-green-300" : "bg-red-500/10 text-red-700 dark:text-red-300",
+            notice.ok ? "bg-[var(--color-success)]/10 text-[var(--color-success)]" : "bg-[var(--color-danger)]/10 text-[var(--color-danger)]",
           )}
         >
           {notice.text}
@@ -56,7 +56,7 @@ export function BillingWebhooks({ events, canReplay }: { events: Event[]; canRep
             <td className={cn(td, "tabular-nums")}>{formatNumber(e.attempts, locale)}</td>
             <td className={cn(td, "max-w-sm")}>
               {e.error ? (
-                <span className="block break-words text-xs text-red-700 dark:text-red-300">{e.error}</span>
+                <span className="block break-words text-xs text-[var(--color-danger)]">{e.error}</span>
               ) : (
                 <span className={cn(tag, "bg-[var(--color-raised)] text-[var(--color-muted)]")}>{t.waiting}</span>
               )}

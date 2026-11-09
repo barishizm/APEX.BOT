@@ -236,7 +236,7 @@ export function CommandPalette({
                   onClick={() => run(c)}
                   className={cn(
                     "flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm",
-                    i === index ? "bg-[var(--color-bubble)] text-[var(--color-text)]" : "text-[var(--color-text)]",
+                    i === index ? "bg-[var(--color-select)] text-[var(--color-text)] [&>svg]:text-[var(--color-secondary)]" : "text-[var(--color-text)]",
                   )}
                 >
                   <c.icon className="h-4 w-4 shrink-0 text-[var(--color-muted)]" aria-hidden />

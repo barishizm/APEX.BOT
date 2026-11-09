@@ -144,7 +144,7 @@ export function AddPanel({
       </div>
 
       {done && (
-        <p role="status" className="flex items-center gap-2 rounded-lg bg-green-600/10 p-3 text-sm text-green-800 dark:text-green-300">
+        <p role="status" className="flex items-center gap-2 rounded-lg bg-[var(--color-success)]/10 p-3 text-sm text-[var(--color-success)]">
           <CircleCheck className="h-4 w-4 shrink-0" aria-hidden />
           {done}
         </p>

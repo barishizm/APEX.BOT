@@ -14,9 +14,9 @@ const tag = "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semi
 export const SOURCE_STATUS_TONE = {
   pending: "bg-[var(--color-raised)] text-[var(--color-muted)]",
   syncing: "bg-[var(--color-bubble)] text-[var(--color-text)]",
-  stuck: "bg-amber-500/15 text-amber-800 dark:text-amber-200",
-  ready: "bg-green-500/15 text-green-800 dark:text-green-300",
-  failed: "bg-red-500/15 text-red-700 dark:text-red-300",
+  stuck: "bg-[var(--color-warning)]/15 text-[var(--color-warning)]",
+  ready: "bg-[var(--color-success)]/15 text-[var(--color-success)]",
+  failed: "bg-[var(--color-danger)]/15 text-[var(--color-danger)]",
 } as const
 
 export function KnowledgeTable({ initialQuery }: { initialQuery: TableQuery }) {
@@ -58,7 +58,7 @@ export function KnowledgeTable({ initialQuery }: { initialQuery: TableQuery }) {
         <span className="flex min-w-0 flex-col items-start gap-1">
           <span className={cn(tag, SOURCE_STATUS_TONE[s.stuck ? "stuck" : s.status])}>{s.stuck ? t.statuses.stuck : t.statuses[s.status]}</span>
           {s.error && (
-            <span className="max-w-full truncate text-xs text-red-700 dark:text-red-300" title={s.error}>
+            <span className="max-w-full truncate text-xs text-[var(--color-danger)]" title={s.error}>
               {s.error}
             </span>
           )}
@@ -76,7 +76,7 @@ export function KnowledgeTable({ initialQuery }: { initialQuery: TableQuery }) {
           <span className="flex flex-col items-end gap-0.5">
             {formatNumber(s.pages, locale)}
             {s.at_ceiling && (
-              <span className={`${tag} bg-amber-500/15 text-amber-800 dark:text-amber-200`} title={t.ceilingHint.replace("{plan}", formatNumber(s.plan_pages, locale))}>
+              <span className={`${tag} bg-[var(--color-warning)]/15 text-[var(--color-warning)]`} title={t.ceilingHint.replace("{plan}", formatNumber(s.plan_pages, locale))}>
                 {t.ceilingTag}
               </span>
             )}

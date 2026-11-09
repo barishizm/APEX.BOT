@@ -18,6 +18,21 @@
   --color-secondary: #312c85;
   --color-bubble: #ecece7;
 
+  /* Status. Text-safe on surface, raised and bubble (AA); tint with an opacity modifier,
+     e.g. bg-[var(--color-danger)]/15. Solid fills carry white (danger, success) or ink (warning). */
+  --color-danger: #b02b27;
+  --color-success: #1f6f3d;
+  --color-warning: #8d5416;
+  --color-info: var(--color-secondary);
+  --color-danger-solid: #c22826;
+  --color-danger-solid-hover: #a91518;
+  --color-success-solid: #22864a;
+  --color-warning-solid: #eb9f2c;
+
+  /* Selection: where the viewer is (active nav item, chosen row). Re-declared wherever
+     --color-secondary changes, because a custom property resolves where it is declared. */
+  --color-select: color-mix(in srgb, var(--color-secondary) 12%, transparent);
+
   /* Data series (analytics charts): distinct in hue and lightness, AA against both grounds */
   --chart-1: #4338ca;
   --chart-2: #0f766e;
@@ -76,7 +91,11 @@
     --color-primary: #f4f4f1;
     --color-on-primary: #0c0c09;
     --color-secondary: #a9a4f2;
+    --color-select: color-mix(in srgb, #a9a4f2 16%, transparent);
     --color-bubble: #21211b;
+    --color-danger: #f69b95;
+    --color-success: #7ad59c;
+    --color-warning: #f2c26f;
     --chart-1: #a5b4fc;
     --chart-2: #5eead4;
     --chart-3: #fcd34d;
@@ -95,7 +114,11 @@
   --color-primary: #f4f4f1;
   --color-on-primary: #0c0c09;
   --color-secondary: #a9a4f2;
+  --color-select: color-mix(in srgb, #a9a4f2 16%, transparent);
   --color-bubble: #21211b;
+  --color-danger: #f69b95;
+  --color-success: #7ad59c;
+  --color-warning: #f2c26f;
   --chart-1: #a5b4fc;
   --chart-2: #5eead4;
   --chart-3: #fcd34d;
@@ -107,6 +130,8 @@
 /* Admin area: monochrome data series, separated by lightness only */
 .admin-mono {
   --color-secondary: var(--color-text);
+  --color-info: var(--color-text);
+  --color-select: var(--color-bubble);
   --chart-1: #0c0c09;
   --chart-2: #6b6b63;
   --chart-3: #a3a39b;
@@ -191,6 +216,16 @@ body {
 
 * {
   -webkit-tap-highlight-color: transparent;
+}
+
+/* Browser-drawn surfaces take the accent too */
+:root {
+  accent-color: var(--color-secondary);
+  caret-color: var(--color-secondary);
+}
+::selection {
+  background: color-mix(in srgb, var(--color-secondary) 24%, transparent);
+  color: inherit;
 }
 
 /* No outline after a mouse/touch click. Only links and buttons reached with the
@@ -934,6 +969,33 @@ button:not(:focus-visible) {
 .prose a {
   color: var(--color-text);
   text-underline-offset: 3px;
+}
+
+/* Install: the landing page's one indigo region. The accent is the ground, the surface color
+   is the ink, and quiet text is that ink mixed toward the ground rather than a gray. */
+.install-band__frame {
+  --band-ink: var(--color-surface);
+  --band-quiet: color-mix(in srgb, var(--color-surface) 74%, var(--color-secondary));
+  padding: clamp(32px, 6vw, 72px);
+  border-radius: var(--radius-xl);
+  background: var(--color-secondary);
+  color: var(--band-ink);
+}
+.install-band .eyebrow,
+.install-band .section-head__text,
+.install-band .install-note {
+  color: var(--band-quiet);
+}
+.install-band .install-note a {
+  color: var(--band-ink);
+}
+.install-band .install-note a:focus-visible {
+  outline-color: var(--band-ink);
+}
+.install-band .snippet {
+  border-color: transparent;
+  background: var(--color-surface);
+  color: var(--color-text);
 }
 
 .faq {

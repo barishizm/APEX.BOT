@@ -113,7 +113,7 @@ export function ProfileMenu({
         {platformRole && (
           <span
             aria-hidden
-            className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full border-2 border-[var(--color-surface)] bg-amber-500 text-white"
+            className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full border-2 border-[var(--color-surface)] bg-[var(--color-warning-solid)] text-white"
           >
             <ShieldCheck className="h-2.5 w-2.5" strokeWidth={3} />
           </span>
@@ -140,7 +140,7 @@ export function ProfileMenu({
                 <p className="truncate font-semibold">{name}</p>
                 <p className="truncate text-sm text-[var(--color-muted)]">{email}</p>
                 {platformRole && (
-                  <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:text-amber-200">
+                  <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-[var(--color-warning)]/15 px-2 py-0.5 text-xs font-semibold text-[var(--color-warning)]">
                     <ShieldCheck className="h-3.5 w-3.5" />
                     {t[platformRole]}
                   </span>
@@ -217,7 +217,7 @@ export function ProfileMenu({
                 <Link
                   href={inAdmin ? "/dashboard" : "/admin"}
                   onClick={() => setOpen(false)}
-                  className={`${rowButton} rounded-xl bg-amber-500/15 text-amber-800 no-underline hover:bg-amber-500/25 dark:text-amber-200`}
+                  className={`${rowButton} rounded-xl bg-[var(--color-warning)]/15 text-[var(--color-warning)] no-underline hover:bg-[var(--color-warning)]/25`}
                 >
                   {inAdmin ? admin.backToDashboard : admin.entry}
                   {inAdmin ? <ArrowLeft className="h-4 w-4" aria-hidden /> : <ShieldCheck className="h-4 w-4" aria-hidden />}

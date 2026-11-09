@@ -96,7 +96,7 @@ export function TicketThread({ data }: { data: UserTicketJson }) {
         </ol>
 
         {notice && (
-          <p role="status" className="m-0 flex items-center gap-2 text-sm text-green-800 dark:text-green-300">
+          <p role="status" className="m-0 flex items-center gap-2 text-sm text-[var(--color-success)]">
             <CheckCircle2 className="h-4 w-4" aria-hidden /> {notice}
           </p>
         )}
@@ -119,7 +119,7 @@ export function TicketThread({ data }: { data: UserTicketJson }) {
               className="resize-y rounded-lg border border-[var(--color-line)] bg-[var(--color-raised)] px-3 py-2 text-sm text-[var(--color-text)] outline-none focus:border-[var(--color-muted)]"
             />
             {error && (
-              <p role="alert" className="m-0 text-sm text-red-700 dark:text-red-300">
+              <p role="alert" className="m-0 text-sm text-[var(--color-danger)]">
                 {error}
               </p>
             )}

@@ -31,7 +31,7 @@ const num = "whitespace-nowrap tabular-nums"
 
 function Kpi({ label, value, help, tone }: { label: string; value: string; help: string; tone?: "warn" }) {
   return (
-    <div className={cn(box, tone === "warn" && "border-amber-500/50")}>
+    <div className={cn(box, tone === "warn" && "border-[var(--color-warning)]/50")}>
       <span className="text-xs font-medium text-[var(--color-muted)]">{label}</span>
       <span className="text-2xl font-semibold tracking-tight tabular-nums">{value}</span>
       <span className="mt-auto pt-1 text-xs leading-snug text-[var(--color-muted)]">{help}</span>
@@ -41,8 +41,8 @@ function Kpi({ label, value, help, tone }: { label: string; value: string; help:
 
 function Alert({ tone, children }: { tone: "bad" | "warn"; children: React.ReactNode }) {
   return (
-    <div role="alert" className={cn("flex gap-3 rounded-xl border px-4 py-3 text-sm", tone === "bad" ? "border-red-500/50 bg-red-500/10" : "border-amber-500/50 bg-amber-500/10")}>
-      <AlertTriangle className={cn("mt-0.5 h-4 w-4 shrink-0", tone === "bad" ? "text-red-700 dark:text-red-300" : "text-amber-800 dark:text-amber-200")} aria-hidden />
+    <div role="alert" className={cn("flex gap-3 rounded-xl border px-4 py-3 text-sm", tone === "bad" ? "border-[var(--color-danger)]/50 bg-[var(--color-danger)]/10" : "border-[var(--color-warning)]/50 bg-[var(--color-warning)]/10")}>
+      <AlertTriangle className={cn("mt-0.5 h-4 w-4 shrink-0", tone === "bad" ? "text-[var(--color-danger)]" : "text-[var(--color-warning)]")} aria-hidden />
       <div className="min-w-0">{children}</div>
     </div>
   )
@@ -90,7 +90,7 @@ export default async function AdminBillingPage() {
               key={s}
               className={cn(
                 "inline-flex items-baseline rounded-full border border-[var(--color-line)] px-3 py-1 text-sm",
-                s === "past_due" && overview.subscriptions[s] && "border-amber-500/50 bg-amber-500/10 text-amber-800 dark:text-amber-200",
+                s === "past_due" && overview.subscriptions[s] && "border-[var(--color-warning)]/50 bg-[var(--color-warning)]/10 text-[var(--color-warning)]",
               )}
             >
               {t.statuses[s]}
@@ -137,7 +137,7 @@ export default async function AdminBillingPage() {
                 <td className={cn(td, "whitespace-nowrap")}>{day(s.since)}</td>
                 <td className={cn(td, "whitespace-nowrap")}>
                   {day(s.graceUntil)}
-                  {s.graceExpiredAt && <span className="block text-xs text-red-700 dark:text-red-300">{t.pastDue.expired}</span>}
+                  {s.graceExpiredAt && <span className="block text-xs text-[var(--color-danger)]">{t.pastDue.expired}</span>}
                 </td>
               </tr>
             ))}

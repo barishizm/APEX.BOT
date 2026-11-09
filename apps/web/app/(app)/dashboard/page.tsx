@@ -79,10 +79,10 @@ function QuotaAlert({ usage, t, locale }: { usage: ReplyUsage; t: ReturnType<typ
     <section
       role={stopped ? "alert" : "status"}
       className={`flex flex-col gap-3 rounded-2xl border p-5 sm:flex-row sm:items-center ${
-        stopped ? "border-red-500/40 bg-red-500/10" : "border-amber-500/40 bg-amber-500/10"
+        stopped ? "border-[var(--color-danger)]/40 bg-[var(--color-danger)]/10" : "border-[var(--color-warning)]/40 bg-[var(--color-warning)]/10"
       }`}
     >
-      <AlertTriangle className={`h-5 w-5 shrink-0 ${stopped ? "text-red-700 dark:text-red-300" : "text-amber-800 dark:text-amber-200"}`} aria-hidden />
+      <AlertTriangle className={`h-5 w-5 shrink-0 ${stopped ? "text-[var(--color-danger)]" : "text-[var(--color-warning)]"}`} aria-hidden />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <h2 className="text-base font-semibold">{title}</h2>
         <p className="text-sm">{text}</p>
@@ -196,7 +196,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               </div>
               {bot.widgetSeenAt ? (
                 <p className="flex items-start gap-2 text-sm">
-                  <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-green-500" aria-hidden />
+                  <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[var(--color-success-solid)]" aria-hidden />
                   <span>
                     {t.liveOn} <strong>{bot.widgetSeenOrigin?.replace(/^https?:\/\//, "")}</strong>
                     <span className="text-[var(--color-muted)]"> · {format(t.lastSeen, { when: timeAgo(bot.widgetSeenAt, locale) })}</span>
@@ -278,7 +278,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               <p className="text-sm text-[var(--color-muted)]">{t.embedHelp}</p>
               <CopySnippet code={embedSnippet(bot.siteKey)} />
               {!next && (
-                <p className="flex items-center gap-1.5 text-sm text-green-800 dark:text-green-300">
+                <p className="flex items-center gap-1.5 text-sm text-[var(--color-success)]">
                   <CircleCheck className="h-4 w-4" aria-hidden />
                   {t.setupComplete}
                 </p>

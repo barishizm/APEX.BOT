@@ -18,7 +18,7 @@ export const field =
   "rounded-lg border border-[var(--color-line)] bg-[var(--color-raised)] px-3 text-sm font-normal text-[var(--color-text)] outline-none focus:border-[var(--color-text)]"
 export const button =
   "inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-[var(--color-line)] bg-[var(--color-raised)] px-3 text-sm font-medium text-[var(--color-text)] transition-colors hover:border-[var(--color-muted)]/60 disabled:cursor-not-allowed disabled:opacity-50"
-export const dangerButton = "border-red-500/40 text-red-700 hover:border-red-500 hover:bg-red-500/5 dark:text-red-300"
+export const dangerButton = "border-[var(--color-danger)]/40 text-[var(--color-danger)] hover:border-[var(--color-danger)] hover:bg-[var(--color-danger)]/5"
 export const primaryButton = "border-[var(--color-primary)] bg-[var(--color-primary)] text-[var(--color-on-primary)] hover:opacity-85"
 export const tag = "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold"
 export const th = "whitespace-nowrap px-3 py-2 font-semibold"
@@ -198,7 +198,7 @@ export function ConfirmDialog({
         )}
 
         {error && (
-          <p role="alert" className="m-0 text-sm text-red-700 dark:text-red-300">
+          <p role="alert" className="m-0 text-sm text-[var(--color-danger)]">
             {error}
           </p>
         )}
@@ -207,7 +207,7 @@ export function ConfirmDialog({
           <button type="button" onClick={onClose} disabled={busy} className={button}>
             {t.cancel}
           </button>
-          <button type="submit" disabled={!canSubmit || busy} className={cn(button, danger ? "border-red-600 bg-red-600 text-white hover:bg-red-500" : primaryButton)}>
+          <button type="submit" disabled={!canSubmit || busy} className={cn(button, danger ? "border-[var(--color-danger-solid)] bg-[var(--color-danger-solid)] text-white hover:bg-[var(--color-danger-solid-hover)]" : primaryButton)}>
             {(busy || needCode === null) && <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />}
             {busy ? t.working : t.confirm}
           </button>

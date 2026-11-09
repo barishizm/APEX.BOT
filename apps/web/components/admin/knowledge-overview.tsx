@@ -32,10 +32,10 @@ type RunState = "ok" | "failed" | "running" | "dead"
 const runState = (r: Jsonify<JobRun>): RunState =>
   r.finishedAt ? (r.ok ? "ok" : "failed") : Date.now() - new Date(r.startedAt).getTime() > RUN_DEAD_MINUTES * 60_000 ? "dead" : "running"
 const RUN_TONE: Record<RunState, string> = {
-  ok: "bg-green-500/15 text-green-800 dark:text-green-300",
-  failed: "bg-red-500/15 text-red-700 dark:text-red-300",
+  ok: "bg-[var(--color-success)]/15 text-[var(--color-success)]",
+  failed: "bg-[var(--color-danger)]/15 text-[var(--color-danger)]",
   running: "bg-[var(--color-bubble)] text-[var(--color-text)]",
-  dead: "bg-red-500/15 text-red-700 dark:text-red-300",
+  dead: "bg-[var(--color-danger)]/15 text-[var(--color-danger)]",
 }
 
 function Tile({ label, value, help, href, warn }: { label: string; value: string; help: string; href?: string; warn?: boolean }) {
@@ -46,7 +46,7 @@ function Tile({ label, value, help, href, warn }: { label: string; value: string
         {href && <ChevronRight className="h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5 group-hover:text-[var(--color-text)]" aria-hidden />}
       </span>
       <span className="flex items-center gap-1.5 text-2xl font-semibold tracking-tight tabular-nums">
-        {warn && <AlertTriangle className="h-4 w-4 text-amber-800 dark:text-amber-200" aria-hidden />}
+        {warn && <AlertTriangle className="h-4 w-4 text-[var(--color-warning)]" aria-hidden />}
         {value}
       </span>
       <span className="mt-auto pt-1 text-xs leading-snug text-[var(--color-muted)]">{help}</span>
@@ -85,13 +85,13 @@ export function KnowledgeOverview({ data }: { data: KnowledgeOverviewJson }) {
       </div>
 
       {s.atCeiling > 0 && (
-        <p className="m-0 rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-sm">{fill(t.ceilingNote, { n: num(s.atCeiling) })}</p>
+        <p className="m-0 rounded-lg border border-[var(--color-warning)]/40 bg-[var(--color-warning)]/5 px-3 py-2 text-sm">{fill(t.ceilingNote, { n: num(s.atCeiling) })}</p>
       )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Section title={t.refresh.title}>
           {late && (
-            <p className="m-0 flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/5 px-3 py-2 text-sm text-red-700 dark:text-red-300">
+            <p className="m-0 flex items-start gap-2 rounded-lg border border-[var(--color-danger)]/30 bg-[var(--color-danger)]/5 px-3 py-2 text-sm text-[var(--color-danger)]">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
               {last ? fill(t.refresh.late, { hours: RUN_LATE_HOURS }) : t.refresh.none}
             </p>
@@ -106,7 +106,7 @@ export function KnowledgeOverview({ data }: { data: KnowledgeOverviewJson }) {
               <dd className="m-0 flex flex-col items-start gap-1">
                 <span className={cn(tag, RUN_TONE[runState(last)])}>{t.refresh.states[runState(last)]}</span>
                 {result(last) && <span>{result(last)}</span>}
-                {last.error && <span className="break-words text-xs text-red-700 dark:text-red-300">{last.error}</span>}
+                {last.error && <span className="break-words text-xs text-[var(--color-danger)]">{last.error}</span>}
               </dd>
             </dl>
           )}
@@ -152,7 +152,7 @@ export function KnowledgeOverview({ data }: { data: KnowledgeOverviewJson }) {
                           </td>
                           <td className={cn(td, "text-right tabular-nums")}>{num(c.chunks)}</td>
                           <td className={cn(td, "whitespace-nowrap text-right tabular-nums")}>
-                            <span className={cn("font-medium", share < COVERAGE_LOW && "text-amber-800 dark:text-amber-200")}>{formatPercent(share, locale)}</span>
+                            <span className={cn("font-medium", share < COVERAGE_LOW && "text-[var(--color-warning)]")}>{formatPercent(share, locale)}</span>
                             <span className="block text-xs text-[var(--color-muted)]">
                               {num(c.embedded)}
                               {c.otherModels > 0 && ` · ${fill(t.coverage.otherModels, { n: num(c.otherModels) })}`}

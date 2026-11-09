@@ -82,11 +82,14 @@ export const Component = ({ billing = false }: { billing?: boolean }) => {
               pages: formatNumber(limits.websitePages, locale),
               retentionDays: formatNumber(limits.maxRetentionDays, locale),
             };
+            // The featured plan is the page's one indigo region; everything on it takes the
+            // surface color as ink, and its quiet text is that ink at reduced strength.
+            const muted = featured ? "text-[color-mix(in_srgb,var(--color-surface)_74%,transparent)]" : "text-[var(--color-muted)]";
             const checkout = billing && id !== "free" ? billingPath({ plan: id, interval: annual ? "year" : "month" }) : null;
             const ctaClass = cn(
               "mb-8 flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-lg text-sm font-semibold no-underline transition-[opacity,border-color] active:scale-[0.98]",
               featured
-                ? "border-0 bg-[var(--color-primary)] text-[var(--color-on-primary)] hover:opacity-85"
+                ? "border-0 bg-[var(--color-surface)] text-[var(--color-secondary)] hover:opacity-90"
                 : "border border-[var(--color-line)] bg-transparent text-[var(--color-text)] hover:border-[var(--color-muted)]",
             );
             return (
@@ -95,17 +98,17 @@ export const Component = ({ billing = false }: { billing?: boolean }) => {
                 className={cn(
                   "relative flex flex-col rounded-xl border p-7",
                   featured
-                    ? "border-[color-mix(in_srgb,var(--color-text)_30%,transparent)] bg-[var(--color-raised)] shadow-[var(--shadow-pop)]"
+                    ? "border-transparent bg-[var(--color-secondary)] text-[var(--color-surface)] shadow-[var(--shadow-pop)]"
                     : "border-[var(--color-line)] bg-[var(--color-raised)]",
                 )}
               >
                 <div className="mb-6 flex items-start justify-between gap-3">
                   <div>
                     <h2 className="text-lg font-semibold">{copy.name}</h2>
-                    <p className="mt-2 text-sm text-[var(--color-muted)]">{copy.blurb}</p>
+                    <p className={cn("mt-2 text-sm", muted)}>{copy.blurb}</p>
                   </div>
                   {featured && (
-                    <span className="shrink-0 rounded-full bg-[var(--color-text)] px-2 py-0.5 text-[0.6875rem] font-bold uppercase tracking-widest text-[var(--color-surface)]">
+                    <span className="shrink-0 rounded-full bg-[var(--color-surface)] px-2 py-0.5 text-[0.6875rem] font-bold uppercase tracking-widest text-[var(--color-secondary)]">
                       {t.popular}
                     </span>
                   )}
@@ -113,9 +116,9 @@ export const Component = ({ billing = false }: { billing?: boolean }) => {
 
                 <div className="mb-8 flex items-baseline gap-1.5">
                   <span className="text-4xl font-semibold tracking-tight">{price}</span>
-                  {copy.unit && <span className="text-sm font-medium text-[var(--color-muted)]">{copy.unit}</span>}
+                  {copy.unit && <span className={cn("text-sm font-medium", muted)}>{copy.unit}</span>}
                   {paid && annual && (
-                    <span className="text-xs text-[var(--color-muted)]">{t.billedYearly}</span>
+                    <span className={cn("text-xs", muted)}>{t.billedYearly}</span>
                   )}
                 </div>
 
@@ -139,13 +142,13 @@ export const Component = ({ billing = false }: { billing?: boolean }) => {
                   </button>
                 )}
 
-                <div className="mb-6 h-px w-full bg-[var(--color-line)]" />
+                <div className={cn("mb-6 h-px w-full", featured ? "bg-[color-mix(in_srgb,var(--color-surface)_22%,transparent)]" : "bg-[var(--color-line)]")} />
 
                 <ul className="flex flex-col gap-3.5 text-sm">
                   {copy.features.map((template) => format(template, numbers)).map((feature) => (
                     <li key={feature} className="flex items-start gap-3">
                       <Check
-                        className={cn("mt-0.5 h-4 w-4 shrink-0", featured ? "text-[var(--color-secondary)]" : "text-[var(--color-muted)]")}
+                        className={cn("mt-0.5 h-4 w-4 shrink-0", featured ? "text-[var(--color-surface)]" : "text-[var(--color-muted)]")}
                         aria-hidden
                       />
                       <span>{feature}</span>

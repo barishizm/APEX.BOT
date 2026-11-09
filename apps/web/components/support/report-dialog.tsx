@@ -164,7 +164,7 @@ export function ReportDialog({ site, onClose }: { site: { id: string; name: stri
             <Turnstile onToken={setHuman} resetKey={humanReset} />
 
             {error && (
-              <p role="alert" className="m-0 text-sm text-red-700 dark:text-red-300">
+              <p role="alert" className="m-0 text-sm text-[var(--color-danger)]">
                 {error}
               </p>
             )}

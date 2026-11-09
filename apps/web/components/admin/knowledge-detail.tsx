@@ -83,23 +83,23 @@ export function KnowledgeDetail({ detail }: { detail: KnowledgeDetailJson }) {
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="m-0 break-words text-2xl font-semibold tracking-tight">{s.title}</h1>
           <span className={cn(tag, SOURCE_STATUS_TONE[s.stuck ? "stuck" : s.status])}>{s.stuck ? k.statuses.stuck : k.statuses[s.status]}</span>
-          {s.atCeiling && <span className={`${tag} bg-amber-500/15 text-amber-800 dark:text-amber-200`}>{k.ceilingTag}</span>}
+          {s.atCeiling && <span className={`${tag} bg-[var(--color-warning)]/15 text-[var(--color-warning)]`}>{k.ceilingTag}</span>}
         </div>
       </header>
 
-      {s.stuck && <p className="m-0 rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-sm">{fill(t.stuckBanner, { when: when(s.updatedAt) })}</p>}
+      {s.stuck && <p className="m-0 rounded-lg border border-[var(--color-warning)]/40 bg-[var(--color-warning)]/5 px-3 py-2 text-sm">{fill(t.stuckBanner, { when: when(s.updatedAt) })}</p>}
       {s.error && (
-        <p className="m-0 rounded-lg border border-red-500/30 bg-red-500/5 px-3 py-2 text-sm text-red-700 dark:text-red-300">
+        <p className="m-0 rounded-lg border border-[var(--color-danger)]/30 bg-[var(--color-danger)]/5 px-3 py-2 text-sm text-[var(--color-danger)]">
           <span className="font-medium">{t.errorPrefix}</span> {s.error}
         </p>
       )}
       {s.atCeiling && (
-        <p className="m-0 rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-sm">
+        <p className="m-0 rounded-lg border border-[var(--color-warning)]/40 bg-[var(--color-warning)]/5 px-3 py-2 text-sm">
           {fill(t.ceilingBanner, { pages: formatNumber(s.pages, locale), plan: formatNumber(s.planPages, locale) })}
         </p>
       )}
       {notice && (
-        <p role="status" className="m-0 rounded-lg bg-green-500/10 px-3 py-2 text-sm text-green-800 dark:text-green-300">
+        <p role="status" className="m-0 rounded-lg bg-[var(--color-success)]/10 px-3 py-2 text-sm text-[var(--color-success)]">
           {notice}
         </p>
       )}

@@ -79,7 +79,7 @@ export function SettingsPanel({ settings, defaultMode, canEdit }: { settings: Se
               <span className="flex flex-col gap-0.5">
                 <span className="flex items-center gap-2 text-sm font-semibold">
                   {t.signups.modes[m].label}
-                  {effective === m && <span className={cn(tag, "bg-green-500/15 text-green-800 dark:text-green-300")}>{t.signups.current}</span>}
+                  {effective === m && <span className={cn(tag, "bg-[var(--color-success)]/15 text-[var(--color-success)]")}>{t.signups.current}</span>}
                 </span>
                 <span className="text-sm text-[var(--color-muted)]">{t.signups.modes[m].text}</span>
               </span>
@@ -233,7 +233,7 @@ export function SettingsPanel({ settings, defaultMode, canEdit }: { settings: Se
 
 function OnOff({ on, labels }: { on: boolean; labels: { on: string; off: string } }) {
   return (
-    <span className={cn(tag, on ? "bg-green-500/15 text-green-800 dark:text-green-300" : "bg-[var(--color-bubble)] text-[var(--color-muted)]")}>
+    <span className={cn(tag, on ? "bg-[var(--color-success)]/15 text-[var(--color-success)]" : "bg-[var(--color-bubble)] text-[var(--color-muted)]")}>
       {on ? labels.on : labels.off}
     </span>
   )

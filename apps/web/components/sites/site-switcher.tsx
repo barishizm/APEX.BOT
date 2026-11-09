@@ -106,7 +106,7 @@ export function SiteSwitcher({ sites }: { sites: SitesJson }) {
               {sites.sites.map((s) => (
                 <li key={s.id}>
                   <button type="button" disabled={busy} onClick={() => choose(s.id)} className={row} aria-current={s.id === sites.currentId ? "true" : undefined}>
-                    <span className={`h-2 w-2 shrink-0 rounded-full ${s.live ? "bg-[#16a34a]" : "bg-[var(--color-line)]"}`} aria-hidden />
+                    <span className={`h-2 w-2 shrink-0 rounded-full ${s.live ? "bg-[var(--color-success-solid)]" : "bg-[var(--color-line)]"}`} aria-hidden />
                     <span className="flex min-w-0 flex-1 flex-col">
                       <span className="truncate font-medium">{s.name}</span>
                       <span className="truncate text-xs text-[var(--color-muted)]">{s.origins[0]?.replace(/^https?:\/\//, "") ?? t.item.noOrigins}</span>
@@ -163,7 +163,7 @@ export function SiteSwitcher({ sites }: { sites: SitesJson }) {
               </Link>
             </div>
             {message && (
-              <p role="alert" className="m-0 px-3 pb-2 text-sm text-red-700 dark:text-red-300">
+              <p role="alert" className="m-0 px-3 pb-2 text-sm text-[var(--color-danger)]">
                 {message}
               </p>
             )}

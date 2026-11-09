@@ -120,9 +120,9 @@ export function UserDetail({ detail, viewer }: { detail: UserDetailJson; viewer:
           <span
             className={cn(
               tag,
-              status === "active" && "bg-green-500/15 text-green-800 dark:text-green-300",
+              status === "active" && "bg-[var(--color-success)]/15 text-[var(--color-success)]",
               status === "unverified" && "bg-[var(--color-bubble)] text-[var(--color-muted)]",
-              status === "suspended" && "bg-red-500/15 text-red-700 dark:text-red-300",
+              status === "suspended" && "bg-[var(--color-danger)]/15 text-[var(--color-danger)]",
             )}
           >
             {users.statuses[status]}
@@ -133,7 +133,7 @@ export function UserDetail({ detail, viewer }: { detail: UserDetailJson; viewer:
       </header>
 
       {notice && (
-        <p role="status" className="m-0 rounded-lg bg-green-500/10 px-3 py-2 text-sm text-green-800 dark:text-green-300">
+        <p role="status" className="m-0 rounded-lg bg-[var(--color-success)]/10 px-3 py-2 text-sm text-[var(--color-success)]">
           {notice}
         </p>
       )}
@@ -177,7 +177,7 @@ export function UserDetail({ detail, viewer }: { detail: UserDetailJson; viewer:
                       <Link href={`/admin/workspaces/${m.organizationId}`} className="font-medium">
                         {m.name}
                       </Link>
-                      {m.suspendedAt && <span className={`${tag} ml-2 bg-red-500/15 text-red-700 dark:text-red-300`}>{t.workspaceSuspended}</span>}
+                      {m.suspendedAt && <span className={`${tag} ml-2 bg-[var(--color-danger)]/15 text-[var(--color-danger)]`}>{t.workspaceSuspended}</span>}
                     </td>
                     <td className={`${td} capitalize`}>{m.plan}</td>
                     <td className={td}>
@@ -262,7 +262,7 @@ export function UserDetail({ detail, viewer }: { detail: UserDetailJson; viewer:
               <Table head={[t.eventColumns.event, t.eventColumns.ip, t.eventColumns.when]}>
                 {detail.events.map((e) => (
                   <tr key={e.id} className="border-t border-[var(--color-line)]">
-                    <td className={cn(td, (e.event.endsWith("_failed") || e.event === "login_failed") && "text-red-700 dark:text-red-300")}>
+                    <td className={cn(td, (e.event.endsWith("_failed") || e.event === "login_failed") && "text-[var(--color-danger)]")}>
                       {(t.events as Record<string, string>)[e.event] ?? e.event}
                       {e.userAgent && (
                         <span className="block max-w-xs truncate text-xs text-[var(--color-muted)]" title={e.userAgent}>
@@ -383,7 +383,7 @@ function Notes({ detail, onAdded }: { detail: UserDetailJson; onAdded: () => voi
           className={`${field} min-h-20 resize-y py-2`}
         />
         {error && (
-          <p role="alert" className="m-0 text-sm text-red-700 dark:text-red-300">
+          <p role="alert" className="m-0 text-sm text-[var(--color-danger)]">
             {error}
           </p>
         )}
@@ -532,7 +532,7 @@ function ActionDialog({
         </div>
 
         {action === "delete" && (
-          <div className="flex flex-col gap-2 rounded-lg border border-red-500/30 bg-red-500/5 p-3 text-sm">
+          <div className="flex flex-col gap-2 rounded-lg border border-[var(--color-danger)]/30 bg-[var(--color-danger)]/5 p-3 text-sm">
             {detail.deletion.deleted.length > 0 && (
               <div>
                 <p className="m-0 font-medium">{t.dialog.deleteWorkspaces}</p>
@@ -676,7 +676,7 @@ function ActionDialog({
         )}
 
         {error && (
-          <p role="alert" className="m-0 text-sm text-red-700 dark:text-red-300">
+          <p role="alert" className="m-0 text-sm text-[var(--color-danger)]">
             {error}
           </p>
         )}
@@ -685,7 +685,7 @@ function ActionDialog({
           <button type="button" onClick={onClose} disabled={busy} className={button}>
             {t.dialog.cancel}
           </button>
-          <button type="submit" disabled={!ready || busy} className={cn(button, spec.danger ? "border-red-600 bg-red-600 text-white hover:bg-red-500" : primaryButton)}>
+          <button type="submit" disabled={!ready || busy} className={cn(button, spec.danger ? "border-[var(--color-danger-solid)] bg-[var(--color-danger-solid)] text-white hover:bg-[var(--color-danger-solid-hover)]" : primaryButton)}>
             {(busy || needCode === null) && <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />}
             {busy ? t.dialog.working : t.dialog.confirm}
           </button>

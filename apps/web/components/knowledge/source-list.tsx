@@ -91,7 +91,7 @@ function SourceRow({
               type="button"
               onClick={remove}
               disabled={busy}
-              className="h-8 cursor-pointer rounded-md border-0 bg-red-600 px-3 text-xs font-semibold text-white disabled:opacity-50"
+              className="h-8 cursor-pointer rounded-md border-0 bg-[var(--color-danger-solid)] px-3 text-xs font-semibold text-white disabled:opacity-50"
             >
               {busy ? t.removing : t.remove}
             </button>
@@ -117,7 +117,7 @@ function SourceRow({
                 onClick={() => setConfirming(true)}
                 aria-label={format(t.removeLabel, { title: source.title })}
                 title={t.remove}
-                className="grid h-8 w-8 cursor-pointer place-items-center rounded-md border border-[var(--color-line)] bg-transparent text-[var(--color-muted)] hover:border-red-500/60 hover:text-red-600"
+                className="grid h-8 w-8 cursor-pointer place-items-center rounded-md border border-[var(--color-line)] bg-transparent text-[var(--color-muted)] hover:border-[var(--color-danger)]/60 hover:text-[var(--color-danger)]"
               >
                 <Trash2 className="h-3.5 w-3.5" aria-hidden />
               </button>
@@ -230,7 +230,7 @@ export function SourceList({
               {kinds.map(([key, label]) => (
                 <button key={key} type="button" aria-pressed={kind === key} onClick={() => onKind(key)} className={segment(kind === key)}>
                   {label}
-                  <span className={cn("text-xs tabular-nums", key === "attention" ? "text-amber-800 dark:text-amber-200" : "text-[var(--color-muted)]")}>
+                  <span className={cn("text-xs tabular-nums", key === "attention" ? "text-[var(--color-warning)]" : "text-[var(--color-muted)]")}>
                     {counts[key]}
                   </span>
                 </button>

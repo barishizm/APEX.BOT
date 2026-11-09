@@ -40,9 +40,9 @@ function readDismissed(): string[] {
 }
 
 const TONE = {
-  info: { icon: Info, bar: "bg-sky-600 text-white", card: "border-sky-500/40 bg-sky-50 text-sky-950 dark:bg-sky-950 dark:text-sky-50" },
-  warn: { icon: AlertTriangle, bar: "bg-amber-400 text-black", card: "border-amber-500/50 bg-amber-50 text-amber-950 dark:bg-amber-950 dark:text-amber-50" },
-  critical: { icon: OctagonAlert, bar: "bg-red-600 text-white", card: "border-red-500/50 bg-red-50 text-red-950 dark:bg-red-950 dark:text-red-50" },
+  info: { icon: Info, bar: "bg-[var(--color-secondary)] text-[var(--color-surface)]", card: "border-[var(--color-info)]/40 bg-[color-mix(in_srgb,var(--color-info)_8%,var(--color-raised))] text-[var(--color-text)]", mark: "text-[var(--color-info)]" },
+  warn: { icon: AlertTriangle, bar: "bg-[var(--color-warning-solid)] text-[#0c0c09]", card: "border-[var(--color-warning)]/50 bg-[color-mix(in_srgb,var(--color-warning)_10%,var(--color-raised))] text-[var(--color-text)]", mark: "text-[var(--color-warning)]" },
+  critical: { icon: OctagonAlert, bar: "bg-[var(--color-danger-solid)] text-white", card: "border-[var(--color-danger)]/50 bg-[color-mix(in_srgb,var(--color-danger)_10%,var(--color-raised))] text-[var(--color-text)]", mark: "text-[var(--color-danger)]" },
 } as const
 
 export function AnnouncementBanners({ items, variant = "bar" }: { items: AnnouncementJson[]; variant?: "bar" | "floating" }) {
@@ -80,7 +80,7 @@ export function AnnouncementBanners({ items, variant = "bar" }: { items: Announc
               variant === "floating" ? cn("w-full max-w-3xl rounded-xl border px-4 py-3 shadow-[var(--shadow-pop)]", tone.card) : cn("px-4 py-2 max-sm:px-3", tone.bar),
             )}
           >
-            <Icon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+            <Icon className={cn("mt-0.5 h-4 w-4 shrink-0", variant === "floating" && tone.mark)} aria-hidden />
             <p className="m-0 min-w-0 flex-1 font-medium leading-snug">
               {a.text}
               {a.action && (

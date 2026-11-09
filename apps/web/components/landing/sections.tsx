@@ -123,16 +123,18 @@ export function LandingSections({ locale }: { locale: Locale }) {
         </ul>
       </section>
 
-      <section id="install" className="section-block">
-        <SectionHead eyebrow={t.install.eyebrow} title={t.install.title} text={t.install.text} />
-        <CopySnippet code={embedSnippet("YOUR_SITE_KEY")} />
-        <p className="install-note">
-          <ScanSearch size={16} aria-hidden="true" />
-          <span>
-            {t.install.notePre} <a href={localizePath("/docs#platforms", locale)}>{t.install.noteLink}</a>
-            {t.install.notePost}
-          </span>
-        </p>
+      <section id="install" className="section-block install-band">
+        <div className="install-band__frame">
+          <SectionHead eyebrow={t.install.eyebrow} title={t.install.title} text={t.install.text} />
+          <CopySnippet code={embedSnippet("YOUR_SITE_KEY")} />
+          <p className="install-note">
+            <ScanSearch size={16} aria-hidden="true" />
+            <span>
+              {t.install.notePre} <a href={localizePath("/docs#platforms", locale)}>{t.install.noteLink}</a>
+              {t.install.notePost}
+            </span>
+          </p>
+        </div>
       </section>
 
       <section id="faq" className="section-block">

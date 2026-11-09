@@ -40,7 +40,7 @@ export default async function AdminWaitlistPage({ searchParams }: PageProps<"/ad
       <p
         className={cn(
           "m-0 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg px-3 py-2 text-sm",
-          mode === "closed" ? "bg-amber-500/10 text-amber-800 dark:text-amber-200" : "bg-[var(--color-surface)] text-[var(--color-muted)]",
+          mode === "closed" ? "bg-[var(--color-warning)]/10 text-[var(--color-warning)]" : "bg-[var(--color-surface)] text-[var(--color-muted)]",
         )}
       >
         <span>{t.mode[mode]}</span>

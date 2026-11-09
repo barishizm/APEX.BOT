@@ -61,7 +61,7 @@ export function WorkspacesTable({ initialQuery }: { initialQuery: TableQuery }) 
       key: "status",
       header: t.columns.status,
       cell: (w) => (
-        <span className={cn(tag, w.suspended_at ? "bg-red-500/15 text-red-700 dark:text-red-300" : "bg-green-500/15 text-green-800 dark:text-green-300")}>
+        <span className={cn(tag, w.suspended_at ? "bg-[var(--color-danger)]/15 text-[var(--color-danger)]" : "bg-[var(--color-success)]/15 text-[var(--color-success)]")}>
           {t.statuses[w.suspended_at ? "suspended" : "active"]}
         </span>
       ),

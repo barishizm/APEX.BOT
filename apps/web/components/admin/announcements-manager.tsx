@@ -25,12 +25,12 @@ const MAX_MESSAGE = 500
 
 const LEVEL_TONE: Record<AnnouncementLevel, string> = {
   info: "bg-[var(--color-bubble)] text-[var(--color-text)]",
-  warn: "bg-amber-500/15 text-amber-800 dark:text-amber-200",
-  critical: "bg-red-500/15 text-red-700 dark:text-red-300",
+  warn: "bg-[var(--color-warning)]/15 text-[var(--color-warning)]",
+  critical: "bg-[var(--color-danger)]/15 text-[var(--color-danger)]",
 }
 const STATUS_TONE = {
   scheduled: "border border-[var(--color-line)] text-[var(--color-muted)]",
-  active: "bg-green-500/15 text-green-800 dark:text-green-300",
+  active: "bg-[var(--color-success)]/15 text-[var(--color-success)]",
   ended: "bg-[var(--color-bubble)] text-[var(--color-muted)]",
 } as const
 

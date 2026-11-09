@@ -189,7 +189,7 @@ export function ImageEditor({
         </div>
 
         {problem ? (
-          <p className="text-sm text-red-700 dark:text-red-300">{translateMessage(problem, locale)}</p>
+          <p className="text-sm text-[var(--color-danger)]">{translateMessage(problem, locale)}</p>
         ) : (
           <div className="flex flex-wrap items-center justify-center gap-6">
             <div

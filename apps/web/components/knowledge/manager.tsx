@@ -23,7 +23,7 @@ function Meter({ label, value, max }: { label: string; value: number; max?: numb
     <div className="flex min-w-0 flex-col gap-1.5 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-3">
       <dt className="flex items-center justify-between gap-2 text-xs text-[var(--color-muted)]">
         {label}
-        {near && <span className="font-semibold text-amber-800 dark:text-amber-200">{t.nearFull}</span>}
+        {near && <span className="font-semibold text-[var(--color-warning)]">{t.nearFull}</span>}
       </dt>
       <dd className="m-0 flex items-baseline gap-1.5">
         <span className="text-xl font-semibold tabular-nums">{formatNumber(value, locale)}</span>
@@ -38,7 +38,7 @@ function Meter({ label, value, max }: { label: string; value: number; max?: numb
           aria-valuemax={max}
           aria-valuenow={value}
         >
-          <div className={cn("h-full rounded-full", near ? "bg-amber-500" : "bg-[var(--color-secondary)]")} style={{ width: `${Math.max(ratio * 100, value ? 2 : 0)}%` }} />
+          <div className={cn("h-full rounded-full", near ? "bg-[var(--color-warning-solid)]" : "bg-[var(--color-secondary)]")} style={{ width: `${Math.max(ratio * 100, value ? 2 : 0)}%` }} />
         </div>
       )}
     </div>
@@ -137,7 +137,7 @@ export function KnowledgeManager({
         </dl>
 
         {notice && (
-          <p role="alert" className="flex items-center justify-between gap-3 rounded-lg bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
+          <p role="alert" className="flex items-center justify-between gap-3 rounded-lg bg-[var(--color-danger)]/10 p-3 text-sm text-[var(--color-danger)]">
             {notice}
             <button type="button" onClick={() => setNotice(null)} className="shrink-0 cursor-pointer border-0 bg-transparent text-xs font-semibold text-inherit underline">
               {t.dismiss}
@@ -145,7 +145,7 @@ export function KnowledgeManager({
           </p>
         )}
         {attention > 0 && kind !== "attention" && (
-          <p className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-200">
+          <p className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg bg-[var(--color-warning)]/10 p-3 text-sm text-[var(--color-warning)]">
             <CircleAlert className="h-4 w-4 shrink-0" aria-hidden />
             <span className="flex-1">{plural(attention, t.attention, locale)}</span>
             <button type="button" onClick={() => setKind("attention")} className="cursor-pointer border-0 bg-transparent p-0 text-xs font-semibold text-inherit underline">

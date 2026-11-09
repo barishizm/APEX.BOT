@@ -76,7 +76,7 @@ export default function ForgotPassword() {
         <motion.div key={step} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} className="py-10">
           {step === "done" ? (
             <div role="status" className="flex flex-col items-start gap-4">
-              <CircleCheck className="h-12 w-12 text-green-800 dark:text-green-300" aria-hidden="true" />
+              <CircleCheck className="h-12 w-12 text-[var(--color-success)]" aria-hidden="true" />
               <h1 className="text-3xl font-semibold tracking-tight">{t.doneTitle}</h1>
               <p className="text-lg text-[var(--color-muted)]">{t.doneText}</p>
             </div>
@@ -99,10 +99,10 @@ export default function ForgotPassword() {
                 }}
                 placeholder={t.emailPlaceholder}
                 aria-invalid={!!error}
-                className={cn(input, error ? "border-red-500" : "border-[var(--color-line)] focus:border-[var(--color-secondary)]")}
+                className={cn(input, error ? "border-[var(--color-danger)]" : "border-[var(--color-line)] focus:border-[var(--color-secondary)]")}
               />
               {error && (
-                <p role="alert" className="mt-2 flex items-center gap-2 text-sm text-red-700 dark:text-red-300">
+                <p role="alert" className="mt-2 flex items-center gap-2 text-sm text-[var(--color-danger)]">
                   <CircleAlert className="h-4 w-4 shrink-0" aria-hidden="true" />
                   {error}
                 </p>
@@ -162,7 +162,7 @@ export default function ForgotPassword() {
                 className={cn(input, "border-[var(--color-line)] focus:border-[var(--color-secondary)]")}
               />
               {error && (
-                <p role="alert" className="mt-3 flex items-center gap-2 text-sm text-red-700 dark:text-red-300">
+                <p role="alert" className="mt-3 flex items-center gap-2 text-sm text-[var(--color-danger)]">
                   <CircleAlert className="h-4 w-4 shrink-0" aria-hidden="true" />
                   {error}
                 </p>

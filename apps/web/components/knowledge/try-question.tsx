@@ -58,13 +58,13 @@ export function TryQuestion({ disabled }: { disabled: boolean }) {
         </button>
       </form>
       {disabled && <p className="text-xs text-[var(--color-muted)]">{t.needSource}</p>}
-      {error && <p className="text-sm text-red-700 dark:text-red-300">{error}</p>}
+      {error && <p className="text-sm text-[var(--color-danger)]">{error}</p>}
       {result && (
         <div className="flex flex-col gap-3" aria-live="polite">
           <p
             className={cn(
               "rounded-lg p-3 text-sm",
-              result.answered ? "bg-green-600/10 text-green-800 dark:text-green-300" : "bg-amber-500/10 text-amber-800 dark:text-amber-200",
+              result.answered ? "bg-[var(--color-success)]/10 text-[var(--color-success)]" : "bg-[var(--color-warning)]/10 text-[var(--color-warning)]",
             )}
           >
             {result.answered ? (

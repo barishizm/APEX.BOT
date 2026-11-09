@@ -76,7 +76,7 @@ export default function InviteView({
     const sameAccount = viewer?.email === invitation.email
     body = joined ? (
       <div role="status">
-        <CircleCheck className="h-12 w-12 text-green-800 dark:text-green-300" aria-hidden="true" />
+        <CircleCheck className="h-12 w-12 text-[var(--color-success)]" aria-hidden="true" />
         <h1 className="mt-4 text-3xl font-semibold tracking-tight">{format(t.title, vars)}</h1>
         <p className="mt-3 text-lg text-[var(--color-muted)]">{format(t.joined, vars)}</p>
       </div>
@@ -88,7 +88,7 @@ export default function InviteView({
         <p className="mt-2 text-sm text-[var(--color-muted)]">{format(t.forEmail, { email: invitation.email })}</p>
 
         {error && (
-          <p role="alert" className="mt-6 flex items-center gap-2 text-sm text-red-700 dark:text-red-300">
+          <p role="alert" className="mt-6 flex items-center gap-2 text-sm text-[var(--color-danger)]">
             <CircleAlert className="h-4 w-4 shrink-0" aria-hidden="true" />
             {error}
           </p>

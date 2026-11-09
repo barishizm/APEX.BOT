@@ -51,9 +51,9 @@ export function UsersTable({ initialQuery }: { initialQuery: TableQuery }) {
           <span
             className={cn(
               tag,
-              status === "active" && "bg-green-500/15 text-green-800 dark:text-green-300",
+              status === "active" && "bg-[var(--color-success)]/15 text-[var(--color-success)]",
               status === "unverified" && "bg-[var(--color-bubble)] text-[var(--color-muted)]",
-              status === "suspended" && "bg-red-500/15 text-red-700 dark:text-red-300",
+              status === "suspended" && "bg-[var(--color-danger)]/15 text-[var(--color-danger)]",
             )}
           >
             {t.statuses[status]}

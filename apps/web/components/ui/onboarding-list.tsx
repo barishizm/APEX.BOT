@@ -76,7 +76,7 @@ export function OnboardingList({ stages }: { stages: { label: string; steps: Ste
                     stage === i ? "bg-[var(--color-bubble)] text-[var(--color-text)]" : "bg-transparent text-[var(--color-muted)] hover:text-[var(--color-text)]"
                   }`}
                 >
-                  {finished && <Check className="h-3.5 w-3.5 text-green-800 dark:text-green-300" strokeWidth={3} aria-label={t.done} />}
+                  {finished && <Check className="h-3.5 w-3.5 text-[var(--color-success)]" strokeWidth={3} aria-label={t.done} />}
                   {s.label}
                 </button>
               );
@@ -94,11 +94,11 @@ export function OnboardingList({ stages }: { stages: { label: string; steps: Ste
               const last = i === steps.length - 1;
               return (
                 <li key={step.key} className="relative flex gap-5 sm:gap-6">
-                  {!last && <span aria-hidden className={`absolute bottom-0 left-[11px] top-8 w-0.5 ${step.done ? "bg-green-500" : "bg-[var(--color-line)]"}`} />}
+                  {!last && <span aria-hidden className={`absolute bottom-0 left-[11px] top-8 w-0.5 ${step.done ? "bg-[var(--color-success-solid)]" : "bg-[var(--color-line)]"}`} />}
                   <span
                     aria-hidden
                     className={`relative mt-3 flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
-                      step.done ? "bg-green-600 text-white" : "border-2 border-[var(--color-line)] bg-[var(--color-surface)]"
+                      step.done ? "bg-[var(--color-success-solid)] text-white" : "border-2 border-[var(--color-line)] bg-[var(--color-surface)]"
                     }`}
                   >
                     {step.done && <Check className="h-3.5 w-3.5" strokeWidth={3} />}

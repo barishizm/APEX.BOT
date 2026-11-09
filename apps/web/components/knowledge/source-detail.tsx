@@ -26,7 +26,7 @@ function Highlight({ text, query }: { text: string; query: string }) {
     <>
       {parts.map((p, i) =>
         i % 2 ? (
-          <mark key={i} className="rounded-sm bg-amber-300/60 px-px text-inherit dark:bg-amber-400/40">
+          <mark key={i} className="rounded-sm bg-[var(--color-warning-solid)]/40 px-px text-inherit">
             {p}
           </mark>
         ) : (
@@ -304,7 +304,7 @@ export function SourceDetail({
         <div id="detail-panel" role="tabpanel" aria-labelledby={`detail-tab-${tab}`} className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">
           {loadError ? (
             <div className="flex flex-col items-center gap-3 py-10 text-center text-sm">
-              <p className="text-red-700 dark:text-red-300">{loadError}</p>
+              <p className="text-[var(--color-danger)]">{loadError}</p>
               <button type="button" onClick={load} className={outlineButton}>
                 <RefreshCw className="h-3.5 w-3.5" aria-hidden />
                 {t.retry}
@@ -408,11 +408,11 @@ export function SourceDetail({
           <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-[var(--color-line)] bg-[var(--color-raised)] px-4 py-3 sm:px-6" aria-live="polite">
             {confirmClose ? (
               <>
-                <span className="mr-auto text-sm text-amber-800 dark:text-amber-200">{t.unsaved}</span>
+                <span className="mr-auto text-sm text-[var(--color-warning)]">{t.unsaved}</span>
                 <button type="button" onClick={() => setConfirmClose(false)} className={outlineButton}>
                   {t.keepEditing}
                 </button>
-                <button type="button" onClick={onClose} className="h-8 cursor-pointer rounded-md border-0 bg-red-600 px-3 text-xs font-semibold text-white">
+                <button type="button" onClick={onClose} className="h-8 cursor-pointer rounded-md border-0 bg-[var(--color-danger-solid)] px-3 text-xs font-semibold text-white">
                   {t.discard}
                 </button>
               </>
@@ -427,7 +427,7 @@ export function SourceDetail({
                 </button>
               </>
             ) : (
-              <span className="mr-auto text-sm text-green-800 dark:text-green-300">{t.saved}</span>
+              <span className="mr-auto text-sm text-[var(--color-success)]">{t.saved}</span>
             )}
           </footer>
         )}

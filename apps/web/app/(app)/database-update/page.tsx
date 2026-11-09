@@ -17,7 +17,7 @@ export default async function DatabaseUpdatePage() {
   return (
     <main id="main" className="flex min-h-screen items-center justify-center bg-[var(--color-surface)] p-4 text-[var(--color-text)]">
       <section className="flex w-full max-w-xl flex-col gap-4 rounded-2xl border border-[var(--color-line)] bg-[var(--color-raised)] p-8">
-        <span className="grid h-11 w-11 place-items-center rounded-xl bg-amber-500/15 text-amber-800 dark:text-amber-200" aria-hidden>
+        <span className="grid h-11 w-11 place-items-center rounded-xl bg-[var(--color-warning)]/15 text-[var(--color-warning)]" aria-hidden>
           <DatabaseZap className="h-5 w-5" />
         </span>
         <h1 className="text-2xl font-semibold tracking-tight">{t.heading}</h1>

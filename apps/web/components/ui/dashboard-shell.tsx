@@ -37,7 +37,7 @@ function RailLink({ label, active, href, children }: { label: string; active?: b
       aria-current={active ? "page" : undefined}
       className={`group relative flex h-10 w-10 items-center justify-center rounded-lg no-underline transition-colors ${
         active
-          ? "bg-[var(--color-bubble)] text-[var(--color-text)]"
+          ? "bg-[var(--color-select)] text-[var(--color-secondary)]"
           : "text-[var(--color-muted)] hover:bg-[var(--color-bubble)] hover:text-[var(--color-text)]"
       }`}
     >
@@ -59,7 +59,7 @@ function ProgressRing({ done, total }: { done: number; total: number }) {
   return (
     <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden className="-rotate-90">
       <circle cx="9" cy="9" r={r} fill="none" stroke="var(--color-line)" strokeWidth="2.5" />
-      <circle cx="9" cy="9" r={r} fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeDasharray={`${(done / total) * c} ${c}`} />
+      <circle cx="9" cy="9" r={r} fill="none" stroke="var(--color-secondary)" strokeWidth="2.5" strokeLinecap="round" strokeDasharray={`${(done / total) * c} ${c}`} />
     </svg>
   )
 }

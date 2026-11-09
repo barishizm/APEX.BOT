@@ -12,9 +12,9 @@ type BotJson = Omit<AdminBotRow, "widget_seen_at" | "created_at"> & { widget_see
 
 const tag = "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold"
 const STATUS_TONE = {
-  serving: "bg-green-500/15 text-green-800 dark:text-green-300",
-  disabled: "bg-red-500/15 text-red-700 dark:text-red-300",
-  suspended: "bg-red-500/15 text-red-700 dark:text-red-300",
+  serving: "bg-[var(--color-success)]/15 text-[var(--color-success)]",
+  disabled: "bg-[var(--color-danger)]/15 text-[var(--color-danger)]",
+  suspended: "bg-[var(--color-danger)]/15 text-[var(--color-danger)]",
 } as const
 
 export function BotsTable({ initialQuery }: { initialQuery: TableQuery }) {

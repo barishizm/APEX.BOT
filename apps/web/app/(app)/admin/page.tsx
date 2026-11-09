@@ -27,7 +27,7 @@ function Kpi({ label, value, help, href, tone }: { label: string; value: string;
         {href && <ChevronRight className="h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5 group-hover:text-[var(--color-text)]" aria-hidden />}
       </span>
       <span className="flex items-center gap-1.5 text-2xl font-semibold tracking-tight tabular-nums">
-        {tone === "warn" && <AlertTriangle className="h-4 w-4 text-amber-800 dark:text-amber-200" aria-hidden />}
+        {tone === "warn" && <AlertTriangle className="h-4 w-4 text-[var(--color-warning)]" aria-hidden />}
         {value}
       </span>
       <span className="mt-auto pt-1 text-xs leading-snug text-[var(--color-muted)]">{help}</span>
@@ -64,7 +64,7 @@ function AttentionList({ icon: Icon, title, total, rows, more }: { icon: React.C
   return (
     <section className="flex flex-col gap-2 rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface)] p-4">
       <h3 className="flex items-center gap-2 text-sm font-semibold">
-        <Icon className="h-4 w-4 text-amber-800 dark:text-amber-200" aria-hidden />
+        <Icon className="h-4 w-4 text-[var(--color-warning)]" aria-hidden />
         {title}
         <span className="rounded-full bg-[var(--color-bubble)] px-2 py-px text-xs font-semibold tabular-nums">{total}</span>
       </h3>
@@ -181,7 +181,7 @@ export default async function AdminOverviewPage({ searchParams }: PageProps<"/ad
           </div>
         ) : (
           <p className="m-0 flex items-center gap-2 rounded-2xl border border-[var(--color-line)] px-4 py-3 text-sm text-[var(--color-muted)]">
-            <CircleCheck className="h-4 w-4 text-green-800 dark:text-green-300" aria-hidden />
+            <CircleCheck className="h-4 w-4 text-[var(--color-success)]" aria-hidden />
             {o.attention.allClear}
           </p>
         )}

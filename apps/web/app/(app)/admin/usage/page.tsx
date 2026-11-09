@@ -66,10 +66,10 @@ function Notice({ tone, title, children }: { tone: "warn" | "info"; title?: stri
       role={tone === "warn" ? "alert" : undefined}
       className={cn(
         "flex gap-3 rounded-2xl border px-4 py-3 text-sm",
-        tone === "warn" ? "border-amber-500/50 bg-amber-500/10" : "border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-muted)]",
+        tone === "warn" ? "border-[var(--color-warning)]/50 bg-[var(--color-warning)]/10" : "border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-muted)]",
       )}
     >
-      <Icon className={cn("mt-0.5 h-4 w-4 shrink-0", tone === "warn" ? "text-amber-800 dark:text-amber-200" : "")} aria-hidden />
+      <Icon className={cn("mt-0.5 h-4 w-4 shrink-0", tone === "warn" ? "text-[var(--color-warning)]" : "")} aria-hidden />
       <div className="flex min-w-0 flex-col gap-1">
         {title && <strong className="font-semibold text-[var(--color-text)]">{title}</strong>}
         <p className="m-0">{children}</p>
@@ -115,7 +115,7 @@ const KeyState = ({ on, labels }: { on: boolean | null; labels: { set: string; m
   on === null ? (
     <span className={cn(tag, "bg-[var(--color-bubble)] text-[var(--color-muted)]")}>{labels.unknown}</span>
   ) : on ? (
-    <span className={cn(tag, "bg-green-500/15 text-green-800 dark:text-green-300")}>{labels.set}</span>
+    <span className={cn(tag, "bg-[var(--color-success)]/15 text-[var(--color-success)]")}>{labels.set}</span>
   ) : (
     <span className={cn(tag, "bg-[var(--color-bubble)] text-[var(--color-muted)]")}>{labels.missing}</span>
   )
@@ -235,7 +235,7 @@ export default async function AdminUsagePage({ searchParams }: PageProps<"/admin
                       {b.override && <span className={cn(tag, "bg-[var(--color-bubble)] text-[var(--color-text)]")}>{t.near.override}</span>}
                     </span>
                   </td>
-                  <td className={cn(td, num, "font-semibold", b.tokens >= b.limit && "text-red-700 dark:text-red-300")}>{pct(b.tokens, b.limit)}</td>
+                  <td className={cn(td, num, "font-semibold", b.tokens >= b.limit && "text-[var(--color-danger)]")}>{pct(b.tokens, b.limit)}</td>
                 </tr>
               ))}
             </Table>

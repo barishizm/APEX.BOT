@@ -45,13 +45,13 @@ const ghost =
 function StatusText({ status }: { status: Status }) {
   if (status.kind === "ok")
     return (
-      <p role="status" className="flex items-center gap-1.5 text-sm text-green-800 dark:text-green-300">
+      <p role="status" className="flex items-center gap-1.5 text-sm text-[var(--color-success)]">
         <Check className="h-4 w-4" aria-hidden /> {status.message}
       </p>
     )
   if (status.kind === "error")
     return (
-      <p role="alert" className="text-sm text-red-700 dark:text-red-300">
+      <p role="alert" className="text-sm text-[var(--color-danger)]">
         {status.message}
       </p>
     )
@@ -189,7 +189,7 @@ function RecoveryCodes({ t, codes, onDone }: { t: T; codes: string[]; onDone: ()
     URL.revokeObjectURL(url)
   }
   return (
-    <div className="flex flex-col gap-4 rounded-xl border border-amber-500/40 bg-amber-500/5 p-4">
+    <div className="flex flex-col gap-4 rounded-xl border border-[var(--color-warning)]/40 bg-[var(--color-warning)]/5 p-4">
       <div className="flex flex-col gap-1">
         <h3 className="text-sm font-semibold">{t.recoveryTitle}</h3>
         <p className="text-sm text-[var(--color-muted)]">{t.recoveryText}</p>
@@ -286,13 +286,13 @@ function TwoFactorSection({
         <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
           <dt className="text-[var(--color-muted)]">{t.status}</dt>
           <dd className="m-0 flex items-center gap-1.5">
-            {enabled && <ShieldCheck className="h-4 w-4 text-green-800 dark:text-green-300" aria-hidden />}
+            {enabled && <ShieldCheck className="h-4 w-4 text-[var(--color-success)]" aria-hidden />}
             {enabled ? t.on : t.off}
           </dd>
           {enabled && (
             <>
               <dt className="text-[var(--color-muted)]">{t.recoveryLeft}</dt>
-              <dd className={`m-0 ${recoveryLeft <= 2 ? "font-semibold text-amber-800 dark:text-amber-200" : ""}`}>{recoveryLeft}</dd>
+              <dd className={`m-0 ${recoveryLeft <= 2 ? "font-semibold text-[var(--color-warning)]" : ""}`}>{recoveryLeft}</dd>
             </>
           )}
         </dl>
@@ -377,7 +377,7 @@ function TwoFactorSection({
           <div className="flex flex-wrap items-center gap-3">
             <button
               type="submit"
-              className={mode === "off" ? `${ghost} border-red-500/40 text-red-700 hover:border-red-500 hover:bg-red-500/5 dark:text-red-300` : primary}
+              className={mode === "off" ? `${ghost} border-[var(--color-danger)]/40 text-[var(--color-danger)] hover:border-[var(--color-danger)] hover:bg-[var(--color-danger)]/5` : primary}
               disabled={busy || code.trim().length < 6}
             >
               {busy && <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />}
@@ -488,8 +488,8 @@ export function AccountSettings({ initial, adminTwoFactor = false }: { initial: 
 
       <div className="flex w-full max-w-2xl flex-col gap-6 p-4 sm:p-6">
         {adminTwoFactor && !account.twoFactor && (
-          <p role="alert" className="flex items-start gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm">
-            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-amber-800 dark:text-amber-200" aria-hidden />
+          <p role="alert" className="flex items-start gap-2 rounded-xl border border-[var(--color-warning)]/40 bg-[var(--color-warning)]/10 p-4 text-sm">
+            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-warning)]" aria-hidden />
             {t.adminTwoFactor}
           </p>
         )}
@@ -630,13 +630,13 @@ export function AccountSettings({ initial, adminTwoFactor = false }: { initial: 
           <StatusText status={training} />
         </Group>
 
-        <section className="flex flex-col gap-4 rounded-2xl border border-red-500/40 p-5 sm:p-6">
+        <section className="flex flex-col gap-4 rounded-2xl border border-[var(--color-danger)]/40 p-5 sm:p-6">
           <div className="flex flex-col gap-1">
             <h2 className="text-base font-semibold">{t.deleteTitle}</h2>
             <p className="text-sm text-[var(--color-muted)]">{t.deleteText}</p>
           </div>
           {!deleting ? (
-            <button type="button" onClick={() => setDeleting(true)} className={`${ghost} border-red-500/40 text-red-700 hover:border-red-500 hover:bg-red-500/5 dark:text-red-300`}>
+            <button type="button" onClick={() => setDeleting(true)} className={`${ghost} border-[var(--color-danger)]/40 text-[var(--color-danger)] hover:border-[var(--color-danger)] hover:bg-[var(--color-danger)]/5`}>
               {t.deleteStart}
             </button>
           ) : (
@@ -647,7 +647,7 @@ export function AccountSettings({ initial, adminTwoFactor = false }: { initial: 
                   value={confirmEmail}
                   onChange={(e) => setConfirmEmail(e.target.value)}
                   autoComplete="off"
-                  className="h-10 rounded-lg border border-[var(--color-line)] bg-[var(--color-raised)] px-3 font-mono text-sm font-normal outline-none focus:border-red-500"
+                  className="h-10 rounded-lg border border-[var(--color-line)] bg-[var(--color-raised)] px-3 font-mono text-sm font-normal outline-none focus:border-[var(--color-danger)]"
                 />
               </label>
               <div className="flex flex-wrap items-center gap-3">
@@ -655,7 +655,7 @@ export function AccountSettings({ initial, adminTwoFactor = false }: { initial: 
                   type="button"
                   onClick={deleteNow}
                   disabled={confirmEmail.trim().toLowerCase() !== account.email || danger.kind === "busy"}
-                  className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg border-0 bg-red-600 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg border-0 bg-[var(--color-danger-solid)] px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {danger.kind === "busy" && <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />}
                   {t.deleteNow}

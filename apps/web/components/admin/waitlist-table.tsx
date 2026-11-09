@@ -50,7 +50,7 @@ export function WaitlistTable({ initialQuery, canInvite }: { initialQuery: Table
       header: t.columns.status,
       cell: (r) =>
         r.signed_up ? (
-          <span className={cn(tag, "bg-green-500/15 text-green-800 dark:text-green-300")}>{t.signedUp}</span>
+          <span className={cn(tag, "bg-[var(--color-success)]/15 text-[var(--color-success)]")}>{t.signedUp}</span>
         ) : (
           <span className={cn(tag, "bg-[var(--color-bubble)] text-[var(--color-muted)]")}>{t.waiting}</span>
         ),
@@ -89,7 +89,7 @@ export function WaitlistTable({ initialQuery, canInvite }: { initialQuery: Table
   return (
     <div className="flex flex-col gap-3">
       {notice && (
-        <p role="status" className="m-0 rounded-lg bg-green-500/10 px-3 py-2 text-sm text-green-800 dark:text-green-300">
+        <p role="status" className="m-0 rounded-lg bg-[var(--color-success)]/10 px-3 py-2 text-sm text-[var(--color-success)]">
           {notice}
         </p>
       )}

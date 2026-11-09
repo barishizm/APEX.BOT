@@ -14,8 +14,8 @@ import type { TableQuery } from "./table-query"
 type BotJson = Omit<AdminConversationBotRow, "last_at"> & { last_at: string | null }
 
 const STATUS_TONE = {
-  disabled: "bg-red-500/15 text-red-700 dark:text-red-300",
-  suspended: "bg-amber-500/15 text-amber-800 dark:text-amber-200",
+  disabled: "bg-[var(--color-danger)]/15 text-[var(--color-danger)]",
+  suspended: "bg-[var(--color-warning)]/15 text-[var(--color-warning)]",
 } as const
 
 export function ConversationBotsTable({ days, initialQuery }: { days: number; initialQuery: TableQuery }) {
@@ -58,12 +58,12 @@ export function ConversationBotsTable({ days, initialQuery }: { days: number; in
           muted(t.noReplies)
         ) : (
           <span className="flex flex-col items-end gap-0.5">
-            <span className={cn("font-medium", b.needs_knowledge && "text-amber-800 dark:text-amber-200")}>{formatPercent(b.unanswered / b.answers, locale)}</span>
+            <span className={cn("font-medium", b.needs_knowledge && "text-[var(--color-warning)]")}>{formatPercent(b.unanswered / b.answers, locale)}</span>
             <span className="text-xs text-[var(--color-muted)]">
               {fill(t.unansweredDetail, { n: num(b.unanswered), answers: num(b.answers) })}
               {b.open_questions > 0 && ` · ${fill(t.openDetail, { n: num(b.open_questions) })}`}
             </span>
-            {b.needs_knowledge && <span className={cn(tag, "bg-amber-500/15 text-amber-800 dark:text-amber-200")}>{t.needsKnowledge}</span>}
+            {b.needs_knowledge && <span className={cn(tag, "bg-[var(--color-warning)]/15 text-[var(--color-warning)]")}>{t.needsKnowledge}</span>}
           </span>
         ),
     },

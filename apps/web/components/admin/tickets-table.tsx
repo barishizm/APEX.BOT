@@ -22,8 +22,8 @@ const tag = "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semi
 export const PRIORITY_TONE: Record<TicketPriority, string> = {
   low: "bg-[var(--color-bubble)] text-[var(--color-muted)]",
   normal: "bg-[var(--color-bubble)] text-[var(--color-text)]",
-  high: "bg-amber-500/15 text-amber-800 dark:text-amber-200",
-  urgent: "bg-red-500/15 text-red-700 dark:text-red-300",
+  high: "bg-[var(--color-warning)]/15 text-[var(--color-warning)]",
+  urgent: "bg-[var(--color-danger)]/15 text-[var(--color-danger)]",
 }
 
 export function TicketsTable({ initialQuery, adminId, staff }: { initialQuery: TableQuery; adminId: string; staff: { id: string; name: string }[] }) {
@@ -79,7 +79,7 @@ export function TicketsTable({ initialQuery, adminId, staff }: { initialQuery: T
           <time
             dateTime={r.sla_due_at}
             title={formatDate(r.sla_due_at, locale, { dateStyle: "medium", timeStyle: "short" })}
-            className={cn(new Date(r.sla_due_at).getTime() < now && "font-semibold text-red-700 dark:text-red-300")}
+            className={cn(new Date(r.sla_due_at).getTime() < now && "font-semibold text-[var(--color-danger)]")}
           >
             {timeAgo(r.sla_due_at, locale, now)}
           </time>

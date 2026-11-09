@@ -6,9 +6,9 @@ import { cn } from "@/lib/utils"
 
 // The state's word is set in this color too: the 700 shades are the lightest that keep 4.5:1 on white
 const STATE: Record<ServiceState, { icon: typeof CircleCheck; color: string }> = {
-  operational: { icon: CircleCheck, color: "text-green-800 dark:text-green-300" },
-  degraded: { icon: CircleAlert, color: "text-amber-800 dark:text-amber-200" },
-  down: { icon: CircleX, color: "text-red-700 dark:text-red-300" },
+  operational: { icon: CircleCheck, color: "text-[var(--color-success)]" },
+  degraded: { icon: CircleAlert, color: "text-[var(--color-warning)]" },
+  down: { icon: CircleX, color: "text-[var(--color-danger)]" },
 }
 
 export function SystemStatus({ locale, checks, checkedAt }: { locale: Locale; checks: ServiceCheck[]; checkedAt: Date }) {
@@ -27,9 +27,9 @@ export function SystemStatus({ locale, checks, checkedAt }: { locale: Locale; ch
         role="status"
         className={cn(
           "flex items-center gap-3 rounded-xl border p-5",
-          overall === "operational" && "border-green-600/30 bg-green-600/5",
-          overall === "degraded" && "border-amber-500/40 bg-amber-500/5",
-          overall === "down" && "border-red-600/40 bg-red-600/5",
+          overall === "operational" && "border-[var(--color-success)]/30 bg-[var(--color-success)]/5",
+          overall === "degraded" && "border-[var(--color-warning)]/40 bg-[var(--color-warning)]/5",
+          overall === "down" && "border-[var(--color-danger)]/40 bg-[var(--color-danger)]/5",
         )}
       >
         <Overall className={cn("h-6 w-6 shrink-0", STATE[overall].color)} aria-hidden />

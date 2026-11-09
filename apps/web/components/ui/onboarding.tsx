@@ -32,9 +32,9 @@ function Progress({ state, children }: { state: "done" | "active" | "todo" | "fa
       <Icon
         className={cn(
           "h-4 w-4 shrink-0",
-          state === "done" && "text-green-800 dark:text-green-300",
+          state === "done" && "text-[var(--color-success)]",
           state === "active" && "animate-spin",
-          state === "failed" && "text-red-700 dark:text-red-300",
+          state === "failed" && "text-[var(--color-danger)]",
           state === "todo" && "opacity-50",
         )}
         aria-hidden="true"
@@ -177,11 +177,11 @@ export default function Onboarding() {
                   aria-describedby={error ? "website-url-error" : undefined}
                   className={cn(
                     "mt-2 h-14 w-full rounded-lg border bg-transparent px-4 text-base text-[var(--color-text)] outline-none transition-colors placeholder:text-[var(--color-muted)]/70",
-                    error ? "border-red-500" : "border-[var(--color-line)] focus:border-[var(--color-secondary)]",
+                    error ? "border-[var(--color-danger)]" : "border-[var(--color-line)] focus:border-[var(--color-secondary)]",
                   )}
                 />
                 {(error || (phase === "failed" && source?.error)) && (
-                  <p id="website-url-error" role="alert" style={{ marginTop: 8 }} className="flex items-center gap-2 text-sm text-red-700 dark:text-red-300">
+                  <p id="website-url-error" role="alert" style={{ marginTop: 8 }} className="flex items-center gap-2 text-sm text-[var(--color-danger)]">
                     <CircleAlert className="h-4 w-4 shrink-0" aria-hidden="true" />
                     {error ?? source?.error}
                   </p>
@@ -261,7 +261,7 @@ export function WidgetPreview() {
         <div className="mx-auto flex items-center gap-2.5 rounded-full border border-[var(--color-line)] bg-[var(--color-raised)] py-1.5 pl-1.5 pr-4">
           <span className="relative flex h-8 w-8 items-center justify-center rounded-full bg-[var(--color-secondary)] text-[var(--color-on-primary)]">
             <Sparkles className="h-4 w-4" aria-hidden="true" />
-            <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-[var(--color-raised)] bg-green-500" />
+            <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-[var(--color-raised)] bg-[var(--color-success-solid)]" />
           </span>
           <span className="text-sm font-semibold">{t.assistant}</span>
         </div>

@@ -42,11 +42,11 @@ export default async function AdminSupportPage({ searchParams }: PageProps<"/adm
               href={`/admin/support?${tableQueryString({ q: "", sort: null, dir: null, cursor: null, filters: s.filters })}`}
               className={cn(
                 "flex flex-col gap-1 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-3 text-[var(--color-text)] no-underline transition-colors hover:border-[var(--color-muted)]/60",
-                s.alert && "border-red-500/40 bg-red-500/5",
+                s.alert && "border-[var(--color-danger)]/40 bg-[var(--color-danger)]/5",
               )}
             >
               <span className="text-sm text-[var(--color-muted)]">{t.counts[s.key]}</span>
-              <span className={cn("text-2xl font-semibold tabular-nums", s.alert && "text-red-700 dark:text-red-300")}>{formatNumber(s.n, locale)}</span>
+              <span className={cn("text-2xl font-semibold tabular-nums", s.alert && "text-[var(--color-danger)]")}>{formatNumber(s.n, locale)}</span>
             </Link>
           </li>
         ))}

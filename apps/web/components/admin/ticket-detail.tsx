@@ -74,7 +74,7 @@ export function TicketDetail({ detail, adminId }: { detail: AdminTicketJson; adm
           role={notice.ok ? "status" : "alert"}
           className={cn(
             "m-0 rounded-lg px-3 py-2 text-sm",
-            notice.ok ? "bg-green-500/10 text-green-800 dark:text-green-300" : "bg-red-500/10 text-red-700 dark:text-red-300",
+            notice.ok ? "bg-[var(--color-success)]/10 text-[var(--color-success)]" : "bg-[var(--color-danger)]/10 text-[var(--color-danger)]",
           )}
         >
           {notice.text}
@@ -189,7 +189,7 @@ export function TicketDetail({ detail, adminId }: { detail: AdminTicketJson; adm
                 <dt className="text-[var(--color-muted)]">{t.sla}</dt>
                 <dd className="m-0">
                   {ticket.slaDueAt ? (
-                    <span className={cn(overdue && "font-semibold text-red-700 dark:text-red-300")}>
+                    <span className={cn(overdue && "font-semibold text-[var(--color-danger)]")}>
                       {when(ticket.slaDueAt)}
                       {overdue && ` · ${t.overdue}`}
                     </span>
@@ -211,7 +211,7 @@ export function TicketDetail({ detail, adminId }: { detail: AdminTicketJson; adm
                 {ticket.customer ? (
                   <>
                     {ticket.customer.email}
-                    {ticket.customer.suspended && <span className="ml-1 text-xs text-red-700 dark:text-red-300">●</span>}
+                    {ticket.customer.suspended && <span className="ml-1 text-xs text-[var(--color-danger)]">●</span>}
                   </>
                 ) : (
                   t.deleted
@@ -308,8 +308,8 @@ function ContextList({ context }: { context: AdminTicketJson["ticket"]["context"
         ))}
       </dl>
       {error && (
-        <div className="flex flex-col gap-1 rounded-lg border border-red-500/30 bg-red-500/5 p-3 text-sm">
-          <span className="text-xs font-medium text-red-700 dark:text-red-300">
+        <div className="flex flex-col gap-1 rounded-lg border border-[var(--color-danger)]/30 bg-[var(--color-danger)]/5 p-3 text-sm">
+          <span className="text-xs font-medium text-[var(--color-danger)]">
             {t.lastError}
             {error.at && ` · ${formatDate(error.at, locale, { dateStyle: "medium", timeStyle: "short" })}`}
           </span>
@@ -424,7 +424,7 @@ function Composer({
       <p className="m-0 text-xs text-[var(--color-muted)]">{note ? t.noteHint : fill(t.replyHint, { language: LOCALE_META[customerLocale].name })}</p>
 
       {error && (
-        <p role="alert" className="m-0 text-sm text-red-700 dark:text-red-300">
+        <p role="alert" className="m-0 text-sm text-[var(--color-danger)]">
           {error}
         </p>
       )}

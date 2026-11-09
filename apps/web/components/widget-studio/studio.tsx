@@ -233,7 +233,7 @@ export function WidgetStudio({
         {t.saving}
       </span>
     ) : save.kind === "error" ? (
-      <span className="text-red-700 dark:text-red-300">{save.message}</span>
+      <span className="text-[var(--color-danger)]">{save.message}</span>
     ) : dirty ? (
       t.unsaved
     ) : save.kind === "saved" ? (
@@ -310,14 +310,14 @@ export function WidgetStudio({
                     className={cn(
                       "flex h-10 w-full cursor-pointer items-center gap-2.5 whitespace-nowrap rounded-lg border-0 px-3 text-left text-sm transition-colors",
                       section === id
-                        ? "bg-[var(--color-bubble)] font-semibold text-[var(--color-text)]"
+                        ? "bg-[var(--color-select)] font-semibold text-[var(--color-secondary)]"
                         : "bg-transparent text-[var(--color-muted)] hover:bg-[var(--color-bubble)]/60 hover:text-[var(--color-text)]",
                     )}
                   >
                     <Icon className="h-4 w-4 shrink-0" aria-hidden />
                     <span className="flex-1">{t.sections[id].label}</span>
                     {n > 0 && (
-                      <span className="grid h-5 min-w-5 place-items-center rounded-full bg-red-500 px-1 text-[0.6875rem] font-semibold text-white" aria-label={format(t.toFix, { n })}>
+                      <span className="grid h-5 min-w-5 place-items-center rounded-full bg-[var(--color-danger-solid)] px-1 text-[0.6875rem] font-semibold text-white" aria-label={format(t.toFix, { n })}>
                         {n}
                       </span>
                     )}

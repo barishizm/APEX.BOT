@@ -87,16 +87,16 @@ export default function TwoFactor({ next }: { next: string | null }) {
               setError(null)
             }}
             aria-invalid={!!error}
-            className={cn(input, error ? "border-red-500" : "border-[var(--color-line)] focus:border-[var(--color-secondary)]")}
+            className={cn(input, error ? "border-[var(--color-danger)]" : "border-[var(--color-line)] focus:border-[var(--color-secondary)]")}
           />
           {error && (
-            <p role="alert" className="mt-2 flex items-center gap-2 text-sm text-red-700 dark:text-red-300">
+            <p role="alert" className="mt-2 flex items-center gap-2 text-sm text-[var(--color-danger)]">
               <CircleAlert className="h-4 w-4 shrink-0" aria-hidden="true" />
               {error}
             </p>
           )}
           {notice && (
-            <p role="status" className="mt-2 text-sm text-green-800 dark:text-green-300">
+            <p role="status" className="mt-2 text-sm text-[var(--color-success)]">
               {notice}
             </p>
           )}

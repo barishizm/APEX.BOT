@@ -37,8 +37,8 @@ function Kpi({ label, value, help, trend, vs, href }: { label: string; value: st
         <span
           className={cn(
             "inline-flex w-fit items-center gap-0.5 rounded-full px-1.5 py-px text-xs font-semibold tabular-nums",
-            trend.tone === "good" && "bg-green-600/12 text-green-800 dark:text-green-300",
-            trend.tone === "bad" && "bg-red-500/12 text-red-700 dark:text-red-300",
+            trend.tone === "good" && "bg-[var(--color-success)]/12 text-[var(--color-success)]",
+            trend.tone === "bad" && "bg-[var(--color-danger)]/12 text-[var(--color-danger)]",
             trend.tone === "neutral" && "bg-[var(--color-bubble)] text-[var(--color-muted)]",
           )}
           title={vs}
@@ -151,7 +151,7 @@ function TopicsCard({ data }: { data: AnalyticsJson }) {
                           <span className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-[var(--color-muted)]">
                             <span>{format(t.share, { p: pct(topic.share) })}</span>
                             {sourced !== null && <span>{format(t.sourced, { p: pct(sourced) })}</span>}
-                            {topic.unanswered > 0 && <span className="font-semibold text-amber-800 dark:text-amber-200">{plural(topic.unanswered, t.unanswered, locale)}</span>}
+                            {topic.unanswered > 0 && <span className="font-semibold text-[var(--color-warning)]">{plural(topic.unanswered, t.unanswered, locale)}</span>}
                           </span>
                         </span>
                         <span className="flex justify-end text-[var(--color-muted)]">
@@ -463,7 +463,7 @@ export function AnalyticsDashboard({ initial, canEdit, limits }: { initial: Anal
         </div>
 
         {error && (
-          <p role="alert" className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-300">
+          <p role="alert" className="rounded-lg bg-[var(--color-danger)]/10 px-3 py-2 text-sm text-[var(--color-danger)]">
             {error}
           </p>
         )}

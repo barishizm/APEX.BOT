@@ -23,9 +23,9 @@ const th = "whitespace-nowrap px-3 py-2 font-semibold"
 const td = "px-3 py-2.5 align-top"
 
 const KIND_TONE: Record<DiffLine["kind"], string> = {
-  added: "bg-green-500/15 text-green-800 dark:text-green-300",
-  removed: "bg-red-500/15 text-red-700 dark:text-red-300",
-  changed: "bg-amber-500/15 text-amber-800 dark:text-amber-200",
+  added: "bg-[var(--color-success)]/15 text-[var(--color-success)]",
+  removed: "bg-[var(--color-danger)]/15 text-[var(--color-danger)]",
+  changed: "bg-[var(--color-warning)]/15 text-[var(--color-warning)]",
   same: "bg-[var(--color-raised)] text-[var(--color-muted)]",
 }
 
@@ -41,10 +41,10 @@ function DiffRows({ lines, empty }: { lines: DiffLine[]; empty: string }) {
       <td className={cn(td, "whitespace-nowrap")}>
         <code className="text-xs">{d.path || "value"}</code>
       </td>
-      <td className={cn(td, d.kind === "removed" || d.kind === "changed" ? "bg-red-500/5" : "")}>
+      <td className={cn(td, d.kind === "removed" || d.kind === "changed" ? "bg-[var(--color-danger)]/5" : "")}>
         <Value value={d.before} empty={empty} />
       </td>
-      <td className={cn(td, d.kind === "added" || d.kind === "changed" ? "bg-green-500/5" : "")}>
+      <td className={cn(td, d.kind === "added" || d.kind === "changed" ? "bg-[var(--color-success)]/5" : "")}>
         <Value value={d.after} empty={empty} />
       </td>
     </tr>

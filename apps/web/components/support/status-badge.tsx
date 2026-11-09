@@ -5,10 +5,10 @@ import { useAppI18n } from "@/components/i18n/app-provider"
 import { cn } from "@/lib/utils"
 
 export const STATUS_TONE: Record<TicketStatus, string> = {
-  open: "bg-sky-500/15 text-sky-800 dark:text-sky-200",
-  pending_user: "bg-amber-500/15 text-amber-800 dark:text-amber-200",
-  in_progress: "bg-violet-500/15 text-violet-800 dark:text-violet-200",
-  resolved: "bg-green-500/15 text-green-800 dark:text-green-300",
+  open: "bg-[var(--color-info)]/15 text-[var(--color-info)]",
+  pending_user: "bg-[var(--color-warning)]/15 text-[var(--color-warning)]",
+  in_progress: "bg-[var(--color-text)]/10 text-[var(--color-text)]",
+  resolved: "bg-[var(--color-success)]/15 text-[var(--color-success)]",
   closed: "bg-[var(--color-bubble)] text-[var(--color-muted)]",
 }
 

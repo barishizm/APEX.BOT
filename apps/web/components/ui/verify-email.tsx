@@ -230,7 +230,7 @@ export default function VerifyEmail({ initialEmail, next }: { initialEmail: stri
                     aria-invalid={!!emailError}
                     className={cn(
                       "h-11 min-w-0 flex-1 rounded-lg border bg-transparent px-3 text-base text-[var(--color-text)] outline-none transition-colors",
-                      emailError ? "border-red-500" : "border-[var(--color-line)] focus:border-[var(--color-secondary)]"
+                      emailError ? "border-[var(--color-danger)]" : "border-[var(--color-line)] focus:border-[var(--color-secondary)]"
                     )}
                   />
                   <button
@@ -250,7 +250,7 @@ export default function VerifyEmail({ initialEmail, next }: { initialEmail: stri
                   </button>
                 </div>
                 {emailError && (
-                  <p role="alert" className="mt-2 flex items-center gap-2 text-sm text-red-700 dark:text-red-300">
+                  <p role="alert" className="mt-2 flex items-center gap-2 text-sm text-[var(--color-danger)]">
                     <CircleAlert className="h-4 w-4 shrink-0" aria-hidden="true" />
                     {emailError}
                   </p>
@@ -297,19 +297,19 @@ export default function VerifyEmail({ initialEmail, next }: { initialEmail: stri
                   aria-invalid={!!error}
                   className={cn(
                     "h-14 w-full min-w-0 rounded-lg border bg-transparent text-center text-2xl font-semibold text-[var(--color-text)] outline-none transition-colors",
-                    error ? "border-red-500 bg-red-500/10 shadow-[0_0_0_3px_rgb(239_68_68/0.25)]" : "border-[var(--color-line)] focus:border-[var(--color-secondary)]"
+                    error ? "border-[var(--color-danger)] bg-[var(--color-danger)]/10 shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-danger)_25%,transparent)]" : "border-[var(--color-line)] focus:border-[var(--color-secondary)]"
                   )}
                 />
               ))}
             </motion.div>
             {notice && !error && (
               <p role="status" style={{ marginTop: 20 }} className="flex items-center gap-2 text-sm text-[var(--color-muted)]">
-                <Check className="h-4 w-4 shrink-0 text-green-800 dark:text-green-300" aria-hidden="true" />
+                <Check className="h-4 w-4 shrink-0 text-[var(--color-success)]" aria-hidden="true" />
                 {notice}
               </p>
             )}
             {error && (
-              <p role="alert" style={{ marginTop: 20 }} className="flex items-center gap-2 text-sm text-red-700 dark:text-red-300">
+              <p role="alert" style={{ marginTop: 20 }} className="flex items-center gap-2 text-sm text-[var(--color-danger)]">
                 <CircleAlert className="h-4 w-4 shrink-0" aria-hidden="true" />
                 {error}
               </p>

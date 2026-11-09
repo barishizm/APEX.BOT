@@ -95,17 +95,17 @@ export function WorkspaceDetail({ detail, billing }: { detail: WorkspaceDetailJs
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="m-0 break-words text-2xl font-semibold tracking-tight">{w.name}</h1>
           <span className={`${tag} bg-[var(--color-text)] text-[var(--color-surface)]`}>{ws.plans[w.plan]}</span>
-          <span className={cn(tag, w.suspendedAt ? "bg-red-500/15 text-red-700 dark:text-red-300" : "bg-green-500/15 text-green-800 dark:text-green-300")}>
+          <span className={cn(tag, w.suspendedAt ? "bg-[var(--color-danger)]/15 text-[var(--color-danger)]" : "bg-[var(--color-success)]/15 text-[var(--color-success)]")}>
             {ws.statuses[w.suspendedAt ? "suspended" : "active"]}
           </span>
         </div>
       </header>
 
       {w.suspendedAt && (
-        <p className="m-0 rounded-lg border border-red-500/30 bg-red-500/5 px-3 py-2 text-sm text-red-700 dark:text-red-300">{t.suspendedBanner}</p>
+        <p className="m-0 rounded-lg border border-[var(--color-danger)]/30 bg-[var(--color-danger)]/5 px-3 py-2 text-sm text-[var(--color-danger)]">{t.suspendedBanner}</p>
       )}
       {notice && (
-        <p role="status" className="m-0 rounded-lg bg-green-500/10 px-3 py-2 text-sm text-green-800 dark:text-green-300">
+        <p role="status" className="m-0 rounded-lg bg-[var(--color-success)]/10 px-3 py-2 text-sm text-[var(--color-success)]">
           {notice}
         </p>
       )}
@@ -202,7 +202,7 @@ export function WorkspaceDetail({ detail, billing }: { detail: WorkspaceDetailJs
                             </button>
                           )}
                           {!lastOwner && (
-                            <button type="button" className={cn(linkButton, "text-red-700 dark:text-red-300")} onClick={() => open({ kind: "remove", member: m })}>
+                            <button type="button" className={cn(linkButton, "text-[var(--color-danger)]")} onClick={() => open({ kind: "remove", member: m })}>
                               {t.memberActions.remove}
                             </button>
                           )}
@@ -238,7 +238,7 @@ export function WorkspaceDetail({ detail, billing }: { detail: WorkspaceDetailJs
                           <button type="button" className={linkButton} onClick={() => open({ kind: "resend", invite: i })}>
                             {t.inviteActions.resend}
                           </button>
-                          <button type="button" className={cn(linkButton, "text-red-700 dark:text-red-300")} onClick={() => open({ kind: "revoke", invite: i })}>
+                          <button type="button" className={cn(linkButton, "text-[var(--color-danger)]")} onClick={() => open({ kind: "revoke", invite: i })}>
                             {t.inviteActions.revoke}
                           </button>
                         </span>
@@ -272,7 +272,7 @@ export function WorkspaceDetail({ detail, billing }: { detail: WorkspaceDetailJs
                         <span
                           className={cn(
                             tag,
-                            status === "serving" ? "bg-green-500/15 text-green-800 dark:text-green-300" : "bg-red-500/15 text-red-700 dark:text-red-300",
+                            status === "serving" ? "bg-[var(--color-success)]/15 text-[var(--color-success)]" : "bg-[var(--color-danger)]/15 text-[var(--color-danger)]",
                           )}
                         >
                           {t.siteStatuses[status]}
@@ -376,12 +376,12 @@ function Note({ workspaceId, initial, onSaved }: { workspaceId: string; initial:
           className={`${field} min-h-24 resize-y py-2`}
         />
         {error && (
-          <p role="alert" className="m-0 text-sm text-red-700 dark:text-red-300">
+          <p role="alert" className="m-0 text-sm text-[var(--color-danger)]">
             {error}
           </p>
         )}
         {saved && (
-          <p role="status" className="m-0 text-sm text-green-800 dark:text-green-300">
+          <p role="status" className="m-0 text-sm text-[var(--color-success)]">
             {t.noteSaved}
           </p>
         )}
@@ -490,7 +490,7 @@ function ActionDialog({ dialog, detail, onClose, onDone }: { dialog: Dialog; det
                       {limitValue(l.from)}
                       {capped(l.from, l.effectiveFrom) && <span className="block text-xs text-[var(--color-muted)]">{fill(t.dialog.ceiling, { n: limitValue(l.effectiveFrom) })}</span>}
                     </td>
-                    <td className={cn(td, "tabular-nums font-medium", l.change < 0 && "text-red-700 dark:text-red-300", l.change > 0 && "text-green-800 dark:text-green-300")}>
+                    <td className={cn(td, "tabular-nums font-medium", l.change < 0 && "text-[var(--color-danger)]", l.change > 0 && "text-[var(--color-success)]")}>
                       {limitValue(l.to)}
                       {capped(l.to, l.effectiveTo) && <span className="block text-xs font-normal text-[var(--color-muted)]">{fill(t.dialog.ceiling, { n: limitValue(l.effectiveTo) })}</span>}
                       {l.change === 0 && <span className="block text-xs font-normal text-[var(--color-muted)]">{t.dialog.unchanged}</span>}
@@ -500,7 +500,7 @@ function ActionDialog({ dialog, detail, onClose, onDone }: { dialog: Dialog; det
               </Table>
               {preview.overLimit.length ? (
                 <div>
-                  <p className="m-0 font-medium text-red-700 dark:text-red-300">{fill(t.dialog.overLimit, { n: formatNumber(preview.overLimit[0]!.limit, locale) })}</p>
+                  <p className="m-0 font-medium text-[var(--color-danger)]">{fill(t.dialog.overLimit, { n: formatNumber(preview.overLimit[0]!.limit, locale) })}</p>
                   <ul className="m-0 mt-1 pl-5">
                     {preview.overLimit.map((s) => (
                       <li key={s.sourceId} className="break-words">
@@ -545,7 +545,7 @@ function ActionDialog({ dialog, detail, onClose, onDone }: { dialog: Dialog; det
 
       {dialog.kind === "delete" && (
         <>
-          <div className="flex flex-col gap-2 rounded-lg border border-red-500/30 bg-red-500/5 p-3 text-sm">
+          <div className="flex flex-col gap-2 rounded-lg border border-[var(--color-danger)]/30 bg-[var(--color-danger)]/5 p-3 text-sm">
             <p className="m-0">
               {fill(t.dialog.deleteImpact, {
                 sites: formatNumber(detail.deletion.sites, locale),
@@ -580,11 +580,11 @@ function ActionDialog({ dialog, detail, onClose, onDone }: { dialog: Dialog; det
 }
 
 const STATUS_TONE: Record<string, string> = {
-  active: "bg-green-500/15 text-green-800 dark:text-green-300",
-  trialing: "bg-green-500/15 text-green-800 dark:text-green-300",
-  past_due: "bg-amber-500/15 text-amber-800 dark:text-amber-200",
+  active: "bg-[var(--color-success)]/15 text-[var(--color-success)]",
+  trialing: "bg-[var(--color-success)]/15 text-[var(--color-success)]",
+  past_due: "bg-[var(--color-warning)]/15 text-[var(--color-warning)]",
   paused: "bg-[var(--color-bubble)] text-[var(--color-muted)]",
-  canceled: "bg-red-500/15 text-red-700 dark:text-red-300",
+  canceled: "bg-[var(--color-danger)]/15 text-[var(--color-danger)]",
 }
 
 function PaddleLink({ href, children }: { href: string; children: React.ReactNode }) {
@@ -614,7 +614,7 @@ function BillingCard({ billing, onRevoke }: { billing: WorkspaceBillingJson; onR
         t.fields.period,
         <span key="p">
           {day(sub.currentPeriodStart)} – {day(sub.currentPeriodEnd)}
-          {sub.cancelAtPeriodEnd && <span className="block text-xs text-red-700 dark:text-red-300">{t.cancelAtPeriodEnd}</span>}
+          {sub.cancelAtPeriodEnd && <span className="block text-xs text-[var(--color-danger)]">{t.cancelAtPeriodEnd}</span>}
         </span>,
       ],
     )
@@ -654,11 +654,11 @@ function BillingCard({ billing, onRevoke }: { billing: WorkspaceBillingJson; onR
               <li key={c.id} className="flex flex-col gap-0.5 border-l-2 border-[var(--color-line)] pl-3">
                 <span className="flex flex-wrap items-center gap-2 font-medium">
                   {fill(t.comp, { plan: plans[c.plan], date: day(c.endsAt) })}
-                  <span className={cn(tag, state === "running" ? "bg-green-500/15 text-green-800 dark:text-green-300" : "bg-[var(--color-bubble)] text-[var(--color-muted)]")}>
+                  <span className={cn(tag, state === "running" ? "bg-[var(--color-success)]/15 text-[var(--color-success)]" : "bg-[var(--color-bubble)] text-[var(--color-muted)]")}>
                     {t.compStates[state]}
                   </span>
                   {c.running && (
-                    <button type="button" className={cn(linkButton, "text-red-700 dark:text-red-300")} onClick={() => onRevoke(c)}>
+                    <button type="button" className={cn(linkButton, "text-[var(--color-danger)]")} onClick={() => onRevoke(c)}>
                       {t.endNow}
                     </button>
                   )}
@@ -687,7 +687,7 @@ function BillingCard({ billing, onRevoke }: { billing: WorkspaceBillingJson; onR
                   <span className="flex flex-wrap items-center gap-2">
                     <span className="font-medium">{e.eventType}</span>
                     {state !== "processed" && (
-                      <span className={cn(tag, state === "failed" ? "bg-red-500/15 text-red-700 dark:text-red-300" : "bg-[var(--color-bubble)] text-[var(--color-muted)]")}>
+                      <span className={cn(tag, state === "failed" ? "bg-[var(--color-danger)]/15 text-[var(--color-danger)]" : "bg-[var(--color-bubble)] text-[var(--color-muted)]")}>
                         {t.eventStates[state]}
                       </span>
                     )}
@@ -696,7 +696,7 @@ function BillingCard({ billing, onRevoke }: { billing: WorkspaceBillingJson; onR
                     <When at={e.occurredAt} locale={locale} />
                     {e.attempts > 1 && <> · {fill(t.attempts, { n: formatNumber(e.attempts, locale) })}</>} · <code className="break-all">{e.eventId}</code>
                   </span>
-                  {e.error && <span className="break-words text-xs text-red-700 dark:text-red-300">{e.error}</span>}
+                  {e.error && <span className="break-words text-xs text-[var(--color-danger)]">{e.error}</span>}
                 </li>
               )
             })}

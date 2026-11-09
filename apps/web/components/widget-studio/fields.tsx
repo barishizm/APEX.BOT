@@ -14,7 +14,7 @@ import { bake, ImageEditor, type Adjust } from "./image-editor"
 export const inputClass =
   "w-full rounded-lg border bg-[var(--color-raised)] px-3 text-sm text-[var(--color-text)] outline-none transition-colors placeholder:text-[var(--color-muted)]/70 disabled:cursor-not-allowed disabled:opacity-50"
 const borderFor = (error?: string) =>
-  error ? "border-red-500" : "border-[var(--color-line)] hover:border-[var(--color-muted)]/60 focus:border-[var(--color-secondary)]"
+  error ? "border-[var(--color-danger)]" : "border-[var(--color-line)] hover:border-[var(--color-muted)]/60 focus:border-[var(--color-secondary)]"
 
 export function Group({ title, description, children, aside }: { title: string; description?: string; children: ReactNode; aside?: ReactNode }) {
   return (
@@ -53,7 +53,7 @@ export function Field({
           {label}
         </label>
         {counter && (
-          <span className={cn("text-xs tabular-nums", counter.value > counter.max ? "text-red-700 dark:text-red-300" : "text-[var(--color-muted)]")}>
+          <span className={cn("text-xs tabular-nums", counter.value > counter.max ? "text-[var(--color-danger)]" : "text-[var(--color-muted)]")}>
             {counter.value}/{counter.max}
           </span>
         )}
@@ -66,7 +66,7 @@ export function Field({
 
 export function ErrorText({ children }: { children: ReactNode }) {
   return (
-    <p role="alert" className="flex items-center gap-1.5 text-xs text-red-700 dark:text-red-300">
+    <p role="alert" className="flex items-center gap-1.5 text-xs text-[var(--color-danger)]">
       <CircleAlert className="h-3.5 w-3.5 shrink-0" aria-hidden />
       {children}
     </p>
@@ -505,7 +505,7 @@ export function ListEditor({
               <span
                 className={cn(
                   "flex max-w-full items-center gap-1 rounded-full border bg-[var(--color-raised)] py-1 pl-3 pr-1 text-sm",
-                  errors?.[String(i)] ? "border-red-500" : "border-[var(--color-line)]",
+                  errors?.[String(i)] ? "border-[var(--color-danger)]" : "border-[var(--color-line)]",
                   mono && "font-mono text-[0.8125rem]",
                 )}
                 title={errors?.[String(i)]}

@@ -5,7 +5,7 @@
 import * as React from "react"
 import { cn } from "@/lib/utils"
 
-const TONES = { default: "bg-[var(--color-text)]", warning: "bg-amber-500", danger: "bg-red-600 dark:bg-red-500" } as const
+const TONES = { default: "bg-[var(--color-text)]", warning: "bg-[var(--color-warning-solid)]", danger: "bg-[var(--color-danger-solid)] " } as const
 
 function Progress({
   className,

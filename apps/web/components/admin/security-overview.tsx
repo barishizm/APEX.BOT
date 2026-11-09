@@ -34,11 +34,11 @@ const num = "whitespace-nowrap text-right tabular-nums"
 const box = "flex min-w-0 flex-col gap-1 rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface)] p-4"
 const link = "font-medium text-[var(--color-text)] no-underline hover:underline"
 const TONE = {
-  locked: "bg-amber-500/15 text-amber-800 dark:text-amber-200",
-  blocked: "bg-red-500/15 text-red-700 dark:text-red-300",
+  locked: "bg-[var(--color-warning)]/15 text-[var(--color-warning)]",
+  blocked: "bg-[var(--color-danger)]/15 text-[var(--color-danger)]",
   staff: "bg-[var(--color-bubble)] text-[var(--color-text)]",
   muted: "bg-[var(--color-raised)] text-[var(--color-muted)]",
-  ok: "bg-green-500/15 text-green-800 dark:text-green-300",
+  ok: "bg-[var(--color-success)]/15 text-[var(--color-success)]",
 } as const
 
 const feedHref = (key: "ip" | "email", value: string) => `/admin/security?${new URLSearchParams({ [key]: value })}#events`
@@ -123,7 +123,7 @@ export function SecurityOverviewPanels({
   return (
     <div className="flex flex-col gap-6">
       {notice && (
-        <p role="status" className="m-0 rounded-lg bg-green-500/10 px-3 py-2 text-sm text-green-800 dark:text-green-300">
+        <p role="status" className="m-0 rounded-lg bg-[var(--color-success)]/10 px-3 py-2 text-sm text-[var(--color-success)]">
           {notice}
         </p>
       )}

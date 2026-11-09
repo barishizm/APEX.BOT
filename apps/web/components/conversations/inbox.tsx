@@ -103,10 +103,10 @@ function Badge({ tone, children }: { tone: "amber" | "blue" | "red" | "green"; c
     <span
       className={cn(
         "inline-flex items-center gap-1 rounded-full px-2 py-px text-[0.6875rem] font-semibold",
-        tone === "amber" && "bg-amber-500/15 text-amber-800 dark:text-amber-200",
+        tone === "amber" && "bg-[var(--color-warning)]/15 text-[var(--color-warning)]",
         tone === "blue" && "bg-[color-mix(in_srgb,var(--color-secondary)_16%,transparent)] text-[var(--color-secondary)]",
-        tone === "red" && "bg-red-500/12 text-red-700 dark:text-red-300",
-        tone === "green" && "bg-green-600/12 text-green-800 dark:text-green-300",
+        tone === "red" && "bg-[var(--color-danger)]/12 text-[var(--color-danger)]",
+        tone === "green" && "bg-[var(--color-success)]/12 text-[var(--color-success)]",
       )}
     >
       {children}
@@ -244,13 +244,13 @@ function Transcript({
             onClick={reveal}
             disabled={revealing}
             title={support.revealHint}
-            className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md border border-amber-500/50 bg-transparent px-2.5 text-xs font-semibold text-[var(--color-text)] hover:border-amber-500 disabled:opacity-50"
+            className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md border border-[var(--color-warning)]/50 bg-transparent px-2.5 text-xs font-semibold text-[var(--color-text)] hover:border-[var(--color-warning)] disabled:opacity-50"
           >
             {revealing ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <Eye className="h-3.5 w-3.5" aria-hidden />} {support.reveal}
           </button>
         )}
         {revealable && data && !data.masked && support && (
-          <span className="inline-flex h-8 items-center gap-1.5 rounded-md bg-amber-500/12 px-2.5 text-xs font-semibold text-amber-800 dark:text-amber-200">
+          <span className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[var(--color-warning)]/12 px-2.5 text-xs font-semibold text-[var(--color-warning)]">
             <EyeOff className="h-3.5 w-3.5" aria-hidden /> {support.revealed}
           </span>
         )}
@@ -267,7 +267,7 @@ function Transcript({
           data &&
           (confirming ? (
             <span className="flex items-center gap-2">
-              <button type="button" onClick={remove} disabled={deleting} className="h-8 cursor-pointer rounded-md border-0 bg-red-600 px-3 text-xs font-semibold text-white disabled:opacity-50">
+              <button type="button" onClick={remove} disabled={deleting} className="h-8 cursor-pointer rounded-md border-0 bg-[var(--color-danger-solid)] px-3 text-xs font-semibold text-white disabled:opacity-50">
                 {deleting ? t.deleting : t.delete}
               </button>
               <button
@@ -284,7 +284,7 @@ function Transcript({
               onClick={() => setConfirming(true)}
               aria-label={t.deleteConversation}
               title={t.deleteConversation}
-              className="grid h-8 w-8 cursor-pointer place-items-center rounded-md border border-[var(--color-line)] bg-transparent text-[var(--color-muted)] hover:border-red-500/60 hover:text-red-600"
+              className="grid h-8 w-8 cursor-pointer place-items-center rounded-md border border-[var(--color-line)] bg-transparent text-[var(--color-muted)] hover:border-[var(--color-danger)]/60 hover:text-[var(--color-danger)]"
             >
               <Trash2 className="h-3.5 w-3.5" aria-hidden />
             </button>
@@ -292,7 +292,7 @@ function Transcript({
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-6">
-        {error && <p className="text-sm text-red-700 dark:text-red-300">{error}</p>}
+        {error && <p className="text-sm text-[var(--color-danger)]">{error}</p>}
         {!data && !error && (
           <p className="flex items-center gap-2 text-sm text-[var(--color-muted)]">
             <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden /> {t.loading}
@@ -334,8 +334,8 @@ function Transcript({
                         {s.title}
                       </a>
                     ))}
-                    {m.feedback === "up" && <ThumbsUp className="h-3.5 w-3.5 text-green-800 dark:text-green-300" aria-label={t.helpful} />}
-                    {m.feedback === "down" && <ThumbsDown className="h-3.5 w-3.5 text-red-700 dark:text-red-300" aria-label={t.unhelpful} />}
+                    {m.feedback === "up" && <ThumbsUp className="h-3.5 w-3.5 text-[var(--color-success)]" aria-label={t.helpful} />}
+                    {m.feedback === "down" && <ThumbsDown className="h-3.5 w-3.5 text-[var(--color-danger)]" aria-label={t.unhelpful} />}
                   </div>
                 </div>
               ),
@@ -543,7 +543,7 @@ export function ConversationInbox({
                     aria-current={selected === c.id ? "true" : undefined}
                     className={cn(
                       "flex w-full cursor-pointer flex-col gap-1.5 border-0 px-4 py-3 text-left text-[var(--color-text)] transition-colors",
-                      selected === c.id ? "bg-[var(--color-bubble)]" : "bg-transparent hover:bg-[var(--color-surface)]",
+                      selected === c.id ? "bg-[var(--color-select)]" : "bg-transparent hover:bg-[var(--color-surface)]",
                     )}
                   >
                     <span className="flex items-baseline justify-between gap-3">

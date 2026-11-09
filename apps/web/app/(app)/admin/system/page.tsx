@@ -78,13 +78,13 @@ const WEB_ENV_KEYS = [
 ] as const
 
 const STATE_TONE: Record<ServiceState, string> = {
-  operational: "bg-green-500/15 text-green-800 dark:text-green-300",
-  degraded: "bg-amber-500/15 text-amber-800 dark:text-amber-200",
-  down: "bg-red-500/15 text-red-700 dark:text-red-300",
+  operational: "bg-[var(--color-success)]/15 text-[var(--color-success)]",
+  degraded: "bg-[var(--color-warning)]/15 text-[var(--color-warning)]",
+  down: "bg-[var(--color-danger)]/15 text-[var(--color-danger)]",
 }
-const OK = "bg-green-500/15 text-green-800 dark:text-green-300"
-const WARN = "bg-amber-500/15 text-amber-800 dark:text-amber-200"
-const BAD = "bg-red-500/15 text-red-700 dark:text-red-300"
+const OK = "bg-[var(--color-success)]/15 text-[var(--color-success)]"
+const WARN = "bg-[var(--color-warning)]/15 text-[var(--color-warning)]"
+const BAD = "bg-[var(--color-danger)]/15 text-[var(--color-danger)]"
 const MUTED = "bg-[var(--color-raised)] text-[var(--color-muted)]"
 
 type RunState = "ok" | "failed" | "running"
@@ -106,13 +106,13 @@ function Alert({ tone, title, children }: { tone: "bad" | "warn" | "info"; title
       role={tone === "info" ? undefined : "alert"}
       className={cn(
         "flex gap-3 rounded-xl border px-4 py-3 text-sm",
-        tone === "bad" && "border-red-500/50 bg-red-500/10",
-        tone === "warn" && "border-amber-500/50 bg-amber-500/10",
+        tone === "bad" && "border-[var(--color-danger)]/50 bg-[var(--color-danger)]/10",
+        tone === "warn" && "border-[var(--color-warning)]/50 bg-[var(--color-warning)]/10",
         tone === "info" && "border-[var(--color-line)] bg-[var(--color-raised)] text-[var(--color-muted)]",
       )}
     >
       <Icon
-        className={cn("mt-0.5 h-4 w-4 shrink-0", tone === "bad" && "text-red-700 dark:text-red-300", tone === "warn" && "text-amber-800 dark:text-amber-200")}
+        className={cn("mt-0.5 h-4 w-4 shrink-0", tone === "bad" && "text-[var(--color-danger)]", tone === "warn" && "text-[var(--color-warning)]")}
         aria-hidden
       />
       <div className="flex min-w-0 flex-col gap-1.5">
@@ -139,7 +139,7 @@ function Facts({ rows }: { rows: [string, React.ReactNode][] }) {
 
 const Badge = ({ tone, children }: { tone: string; children: React.ReactNode }) => <span className={cn(tag, tone)}>{children}</span>
 const Mono = ({ children }: { children: React.ReactNode }) => <code className="break-all text-xs">{children}</code>
-const ErrorText = ({ children }: { children: React.ReactNode }) => <span className="block break-words text-xs text-red-700 dark:text-red-300">{children}</span>
+const ErrorText = ({ children }: { children: React.ReactNode }) => <span className="block break-words text-xs text-[var(--color-danger)]">{children}</span>
 
 function EnvKeys({ keys, set, unset }: { keys: [string, boolean][]; set: string; unset: string }) {
   return (
@@ -289,7 +289,7 @@ export default async function AdminSystemPage() {
                 </td>
                 <td className={cn(td, "whitespace-nowrap text-right tabular-nums")}>
                   {c.latencyMs === null ? "—" : `${num(c.latencyMs)} ms`}
-                  {c.latencyMs !== null && c.latencyMs > 1500 && <span className="block text-xs text-amber-800 dark:text-amber-200">{t.services.slow}</span>}
+                  {c.latencyMs !== null && c.latencyMs > 1500 && <span className="block text-xs text-[var(--color-warning)]">{t.services.slow}</span>}
                 </td>
               </tr>
             ))}
@@ -337,7 +337,7 @@ export default async function AdminSystemPage() {
         {billing.enabled ? (
           <>
             <p className="m-0 flex items-center gap-2 text-sm">
-              <CircleCheck className="h-4 w-4 text-green-800 dark:text-green-300" aria-hidden />
+              <CircleCheck className="h-4 w-4 text-[var(--color-success)]" aria-hidden />
               {format(t.billing.on, { environment: billing.environment })}
             </p>
             {!billing.overage && <Alert tone="info">{t.billing.noOverage}</Alert>}
@@ -462,7 +462,7 @@ export default async function AdminSystemPage() {
           <>
             {pending.length === 0 && (
               <p className="m-0 flex items-center gap-2 text-sm">
-                <CircleCheck className="h-4 w-4 text-green-800 dark:text-green-300" aria-hidden />
+                <CircleCheck className="h-4 w-4 text-[var(--color-success)]" aria-hidden />
                 {format(t.migrations.upToDate, { n: num(migrations.value.applied.length) })}
               </p>
             )}
@@ -621,7 +621,7 @@ export default async function AdminSystemPage() {
               ).map(([label, n]) => (
                 <div key={label} className="flex min-w-36 flex-col gap-0.5 rounded-xl border border-[var(--color-line)] px-4 py-3">
                   <span className="text-xs font-medium text-[var(--color-muted)]">{label}</span>
-                  <span className={cn("text-xl font-semibold tabular-nums", n > 0 && "text-red-700 dark:text-red-300")}>{num(n)}</span>
+                  <span className={cn("text-xl font-semibold tabular-nums", n > 0 && "text-[var(--color-danger)]")}>{num(n)}</span>
                 </div>
               ))}
             </div>
@@ -648,7 +648,7 @@ export default async function AdminSystemPage() {
               </Table>
             ) : (
               <p className="m-0 flex items-center gap-2 text-sm text-[var(--color-muted)]">
-                <CircleCheck className="h-4 w-4 text-green-800 dark:text-green-300" aria-hidden />
+                <CircleCheck className="h-4 w-4 text-[var(--color-success)]" aria-hidden />
                 {t.email.none}
               </p>
             )}

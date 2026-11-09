@@ -39,9 +39,9 @@ const SPEC: Record<Kind, { path: string; danger?: boolean }> = {
 const MAX_TOKENS = 20_000_000
 const HOURS = ["1", "24", "72", "168", "720"]
 const STATUS_TONE = {
-  serving: "bg-green-500/15 text-green-800 dark:text-green-300",
-  disabled: "bg-red-500/15 text-red-700 dark:text-red-300",
-  suspended: "bg-red-500/15 text-red-700 dark:text-red-300",
+  serving: "bg-[var(--color-success)]/15 text-[var(--color-success)]",
+  disabled: "bg-[var(--color-danger)]/15 text-[var(--color-danger)]",
+  suspended: "bg-[var(--color-danger)]/15 text-[var(--color-danger)]",
 } as const
 
 export function BotDetail({
@@ -155,12 +155,12 @@ export function BotDetail({
       </header>
 
       {b.status !== "serving" && (
-        <p className="m-0 rounded-lg border border-red-500/30 bg-red-500/5 px-3 py-2 text-sm text-red-700 dark:text-red-300">
+        <p className="m-0 rounded-lg border border-[var(--color-danger)]/30 bg-[var(--color-danger)]/5 px-3 py-2 text-sm text-[var(--color-danger)]">
           {b.status === "disabled" ? t.disabledBanner : t.suspendedBanner}
         </p>
       )}
       {notice && (
-        <p role="status" className="m-0 rounded-lg bg-green-500/10 px-3 py-2 text-sm text-green-800 dark:text-green-300">
+        <p role="status" className="m-0 rounded-lg bg-[var(--color-success)]/10 px-3 py-2 text-sm text-[var(--color-success)]">
           {notice}
         </p>
       )}
@@ -180,7 +180,7 @@ export function BotDetail({
 
           <Section title={t.sections.settings}>
             {detail.issues.length ? (
-              <div className="flex flex-col gap-2 rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 text-sm">
+              <div className="flex flex-col gap-2 rounded-lg border border-[var(--color-warning)]/40 bg-[var(--color-warning)]/5 p-3 text-sm">
                 <p className="m-0 font-medium">{fill(t.issuesTitle, { n: detail.issues.length })}</p>
                 <ul className="m-0 flex flex-col gap-1 pl-5">
                   {detail.issues.map((i) => (
@@ -192,7 +192,7 @@ export function BotDetail({
                 <p className="m-0 text-xs text-[var(--color-muted)]">{t.issuesHint}</p>
               </div>
             ) : (
-              <p className="m-0 text-sm text-green-800 dark:text-green-300">{t.issuesNone}</p>
+              <p className="m-0 text-sm text-[var(--color-success)]">{t.issuesNone}</p>
             )}
             <p className="m-0 text-xs text-[var(--color-muted)]">{t.settingsHint}</p>
             <pre className="m-0 max-h-[32rem] overflow-auto rounded-lg border border-[var(--color-line)] bg-[var(--color-raised)] p-3 text-xs leading-relaxed">
@@ -206,7 +206,7 @@ export function BotDetail({
             {support ? (
               <>
                 <p className="m-0 flex flex-col gap-0.5 text-sm">
-                  <span className="font-medium text-amber-800 dark:text-amber-200">{fill(t.support.openUntil, { time: formatDate(support.expiresAt, locale, { timeStyle: "short" }) })}</span>
+                  <span className="font-medium text-[var(--color-warning)]">{fill(t.support.openUntil, { time: formatDate(support.expiresAt, locale, { timeStyle: "short" }) })}</span>
                   {support.ticketRef && <span className="text-xs text-[var(--color-muted)]">{fill(t.support.ticket, { ref: support.ticketRef })}</span>}
                 </p>
                 <div className="flex flex-wrap gap-2">
@@ -260,7 +260,7 @@ export function BotDetail({
                 {tokens.override ? fill(t.tokens.overrideValue, { tokens: formatNumber(tokens.override.tokens, locale), until: when(tokens.override.until) }) : t.tokens.none}
               </dd>
               <dt className="text-[var(--color-muted)]">{t.tokens.applies}</dt>
-              <dd className={cn("m-0 tabular-nums font-medium", tokens.today >= applies && "text-red-700 dark:text-red-300")}>{formatNumber(applies, locale)}</dd>
+              <dd className={cn("m-0 tabular-nums font-medium", tokens.today >= applies && "text-[var(--color-danger)]")}>{formatNumber(applies, locale)}</dd>
             </dl>
           </Section>
 

@@ -651,7 +651,7 @@ export default function Hero({
                         animate={{ opacity: 1, scale: 1 }}
                         className="flex flex-col items-center justify-center text-center h-[400px] space-y-6"
                       >
-                        <div className={`w-20 h-20 rounded-full flex items-center justify-center ${needsVerify ? "bg-[var(--color-primary)] text-[var(--color-on-primary)]" : "bg-green-600 text-white"}`}>
+                        <div className={`w-20 h-20 rounded-full flex items-center justify-center ${needsVerify ? "bg-[var(--color-primary)] text-[var(--color-on-primary)]" : "bg-[var(--color-success-solid)] text-white"}`}>
                           {needsVerify ? <ArrowRight className="w-10 h-10" aria-hidden="true" /> : <Check className="w-10 h-10" aria-hidden="true" />}
                         </div>
                         <div>
@@ -710,7 +710,7 @@ export default function Hero({
                         <Turnstile onToken={setTurnstileToken} resetKey={turnstileReset} />
 
                         {authError && (
-                          <p role="alert" className="text-sm text-red-700 dark:text-red-300">{authError}</p>
+                          <p role="alert" className="text-sm text-[var(--color-danger)]">{authError}</p>
                         )}
 
                         <button
@@ -742,7 +742,7 @@ export default function Hero({
                     ) : showWaitlist ? (
                       waitlistDone ? (
                         <div className="flex flex-col items-center space-y-5 py-6 text-center text-[var(--color-text)]">
-                          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-600">
+                          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[var(--color-success-solid)]">
                             <Check className="h-8 w-8 text-white" aria-hidden="true" />
                           </div>
                           <div>
@@ -783,7 +783,7 @@ export default function Hero({
                           <Turnstile onToken={setTurnstileToken} resetKey={turnstileReset} />
 
                           {authError && (
-                            <p role="alert" className="text-sm text-red-700 dark:text-red-300">{authError}</p>
+                            <p role="alert" className="text-sm text-[var(--color-danger)]">{authError}</p>
                           )}
 
                           <button
@@ -965,7 +965,7 @@ export default function Hero({
                         <Turnstile onToken={setTurnstileToken} resetKey={turnstileReset} />
 
                         {authError && (
-                          <p role="alert" className="text-sm text-red-700 dark:text-red-300">{authError}</p>
+                          <p role="alert" className="text-sm text-[var(--color-danger)]">{authError}</p>
                         )}
 
                         <button
