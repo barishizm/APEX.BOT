@@ -13,7 +13,7 @@ services:
     healthCheckPath: /health
     envVars:
       - key: NODE_VERSION
-        value: 24
+        value: 26
       # keeps the demo tenant (data/tenants.json) from loading
       - key: NODE_ENV
         value: production
